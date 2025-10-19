@@ -1,0 +1,4 @@
+rootProject.name = 'dbuff'
+
+include ':clients:dotapi'
+include 'server'
