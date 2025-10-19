@@ -1,0 +1,176 @@
+buildscript {
+    dependencies {
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:3.5.3"
+        classpath 'com.diffplug.spotless:spotless-plugin-gradle:7.2.1'
+    }
+}
+
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.3'
+    id 'io.spring.dependency-management' version '1.1.6'
+    id("org.openapi.generator") version "7.14.0"
+}
+
+group = 'com.ako'
+version = '0.0.1-SNAPSHOT'
+description = 'dbuff'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+allprojects {
+    apply plugin: 'idea'
+}
+
+subprojects {
+    apply plugin: "idea"
+    apply plugin: "java"
+    
+    // Skip Spotless for generated client to avoid conflicts
+    if (project.name != 'dotapi') {
+        apply plugin: "com.diffplug.spotless"
+    }
+
+    tasks.withType(JavaCompile) {
+        options.encoding = 'UTF-8'
+        options.compilerArgs << "-Xlint:unchecked"
+    }
+    test {
+        useJUnitPlatform()
+    }
+    tasks.withType(Test) { task ->
+        maxHeapSize '1024m'
+        jvmArgs '-XX:+HeapDumpOnOutOfMemoryError'
+        testLogging {
+            events 'started', 'failed', 'passed', 'skipped'
+            showStackTraces true
+            showCauses true
+            exceptionFormat 'full'
+        }
+    }
+    dependencies {
+        implementation "org.projectlombok:lombok:$lombokVersion"
+        annotationProcessor "org.projectlombok:lombok:$lombokVersion"
+        testAnnotationProcessor "org.projectlombok:lombok:$lombokVersion"
+    }
+
+    // Apply Spotless configuration only to non-generated projects
+    if (project.name != 'dotapi') {
+        spotless {
+            // don't run spotlessCheck during gradle check task
+            enforceCheck = true
+            java {
+                target 'src/main/java/**/*.java', 'src/test/java/**/*.java', 'src/testFixtures/java/**/*.java'
+                googleJavaFormat()
+                removeUnusedImports()
+                importOrder '', 'static '
+                trimTrailingWhitespace()
+                indentWithSpaces 2
+                endWithNewline()
+                toggleOffOn()
+            }
+        }
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+project('server') {
+    apply plugin: 'org.springframework.boot'
+    apply plugin: 'io.spring.dependency-management'
+    
+    dependencies {
+
+        implementation project(":clients:dotapi")
+
+        implementation 'org.springframework.boot:spring-boot-starter'
+        implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+        implementation 'org.springframework.boot:spring-boot-starter-web'
+        implementation 'org.springframework.retry:spring-retry:2.0.12'
+        implementation("com.microsoft.playwright:playwright:1.54.0")
+        implementation("org.jsoup:jsoup:1.21.2")
+        implementation 'com.github.ben-manes.caffeine:caffeine:3.2.2'
+        implementation 'com.google.guava:guava:33.4.8-jre'
+        implementation("org.postgresql:postgresql:42.7.7")
+        implementation("io.hypersistence:hypersistence-utils-hibernate-60:3.9.4")
+        implementation 'org.apache.commons:commons-collections4:4.5.0'
+        
+        // JBoss Logging - required by Hibernate
+        implementation 'org.jboss.logging:jboss-logging:3.6.1.Final'
+        
+        // JAX-RS dependencies - using Jersey 3.x with Jakarta EE
+        implementation 'jakarta.ws.rs:jakarta.ws.rs-api:3.1.0'
+        implementation 'org.glassfish.jersey.core:jersey-client:3.1.10'
+        implementation 'org.glassfish.jersey.inject:jersey-hk2:3.1.10'
+        implementation 'org.glassfish.jersey.media:jersey-media-json-jackson:3.1.10'
+        
+        // .env file support
+        implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+
+        implementation("javax.annotation:javax.annotation-api:1.3.2")
+        compileOnly 'org.projectlombok:lombok:1.18.38'
+        annotationProcessor 'org.projectlombok:lombok:1.18.38'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.12.2'
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+        testImplementation("org.junit.jupiter:junit-jupiter-api:5.13.4")
+    }
+
+    bootJar {
+        mainClass = "com.ako.dbuff.DbuffApplication"
+        enabled = true
+    }
+    
+    jar {
+        enabled = false
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+task cleanupodtaClient(type: Delete) {
+    delete "$rootDir/clients/dotapi"
+}
+
+task generateDotapiClient(type: org.openapitools.generator.gradle.plugin.tasks.GenerateTask) {
+    mustRunAfter cleanupodtaClient
+    generatorName = "java"
+    inputSpec = "$rootDir/clients/dota_api.json"
+    outputDir = "$rootDir/clients/dotapi"
+    apiPackage = "com.ako.dbuff.dotapi.api"
+    invokerPackage = "com.ako.dbuff.dotapi.invoker"
+    modelPackage = "com.ako.dbuff.dotapi.model"
+    groupId = "ccom.ako.dbuff.dotapi"
+    id = "dotapi"
+    version = "$project.version"
+    httpUserAgent = "dbuff"
+    generateApiDocumentation = false
+    generateModelDocumentation = false
+    typeMappings = ['integer':'Long']
+    configOptions = [
+            dateLibrary: "java8",
+            library: "jersey3",
+            useJakartaEe: "true",
+
+            hideGenerationTimestamp: "true",
+            // OpenAPI generator for jersey3 is not configuring the object mapper to ignore unknown fields. See
+            // https://github.com/OpenAPITools/openapi-generator/issues/12550
+            // We need this additional propety to annotate our model classes to ignore new fields.
+            additionalModelTypeAnnotations: "@com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)"
+    ]
+//    setTemplateDir("$rootDir/client_specs/openapi/templates")
+}
+

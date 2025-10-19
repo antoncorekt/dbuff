@@ -1,0 +1,6774 @@
+openapi: 3.0.3
+info:
+  description: "# Introduction\nThe OpenDota API provides Dota 2 related data including\
+    \ advanced match data extracted from match replays.\n\nYou can find data that\
+    \ can be used to convert hero and ability IDs and other information provided by\
+    \ the API from the [dotaconstants](https://github.com/odota/dotaconstants) repository.\n\
+    \nWithout a key, you can make 2,000 free calls per day at a rate limit of 60 requests/minute.\
+    \ We also offer a Premium Tier with unlimited API calls and higher rate limits.\
+    \ Check out the [API page](https://www.opendota.com/api-keys) to learn more.\n\
+    \    "
+  title: OpenDota API
+  version: 26.0.0
+servers:
+- url: https://api.opendota.com/api
+paths:
+  /matches/{match_id}:
+    get:
+      description: Match data
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_matches_by_match_id
+      parameters:
+      - explode: false
+        in: path
+        name: match_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/MatchResponse"
+          description: Success
+      summary: "GET /matches/{match_id}"
+      tags:
+      - matches
+  /players/{account_id}:
+    get:
+      description: Player data
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_players_by_account_id
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/PlayersResponse"
+          description: Success
+      summary: "GET /players/{account_id}"
+      tags:
+      - players
+  /players/{account_id}/wl:
+    get:
+      description: Win/Loss count
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_players_by_account_id_select_wl
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      - description: Number of matches to limit to
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Number of matches to offset start by
+        explode: true
+        in: query
+        name: offset
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player won
+        explode: true
+        in: query
+        name: win
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Patch ID, from dotaconstants"
+        explode: true
+        in: query
+        name: patch
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Game Mode ID
+        explode: true
+        in: query
+        name: game_mode
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lobby type ID
+        explode: true
+        in: query
+        name: lobby_type
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Region ID
+        explode: true
+        in: query
+        name: region
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Days previous
+        explode: true
+        in: query
+        name: date
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lane Role ID
+        explode: true
+        in: query
+        name: lane_role
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero ID
+        explode: true
+        in: query
+        name: hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player was radiant
+        explode: true
+        in: query
+        name: is_radiant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs in the match (array)
+        explode: true
+        in: query
+        name: included_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs not in the match (array)
+        explode: true
+        in: query
+        name: excluded_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs on the player's team (array)
+        explode: true
+        in: query
+        name: with_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs against the player's team (array)
+        explode: true
+        in: query
+        name: against_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Whether the match was significant for aggregation purposes.\
+          \ Defaults to 1 (true), set this to 0 to return data for non-standard modes/matches."
+        explode: true
+        in: query
+        name: significant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "The minimum number of games played, for filtering hero stats"
+        explode: true
+        in: query
+        name: having
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: The field to return matches sorted by in descending order
+        explode: true
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/PlayerWinLossResponse"
+          description: Success
+      summary: "GET /players/{account_id}/wl"
+      tags:
+      - players
+  /players/{account_id}/recentMatches:
+    get:
+      description: Recent matches played (limited number of results)
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_players_by_account_id_select_recent_matches
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  items:
+                    $ref: "#/components/schemas/PlayerRecentMatchesResponse"
+                  type: array
+                type: array
+          description: Success
+      summary: "GET /players/{account_id}/recentMatches"
+      tags:
+      - players
+  /players/{account_id}/matches:
+    get:
+      description: "Matches played (full history, and supports column selection)"
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_players_by_account_id_select_matches
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      - description: Number of matches to limit to
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Number of matches to offset start by
+        explode: true
+        in: query
+        name: offset
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player won
+        explode: true
+        in: query
+        name: win
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Patch ID, from dotaconstants"
+        explode: true
+        in: query
+        name: patch
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Game Mode ID
+        explode: true
+        in: query
+        name: game_mode
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lobby type ID
+        explode: true
+        in: query
+        name: lobby_type
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Region ID
+        explode: true
+        in: query
+        name: region
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Days previous
+        explode: true
+        in: query
+        name: date
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lane Role ID
+        explode: true
+        in: query
+        name: lane_role
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero ID
+        explode: true
+        in: query
+        name: hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player was radiant
+        explode: true
+        in: query
+        name: is_radiant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs in the match (array)
+        explode: true
+        in: query
+        name: included_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs not in the match (array)
+        explode: true
+        in: query
+        name: excluded_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs on the player's team (array)
+        explode: true
+        in: query
+        name: with_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs against the player's team (array)
+        explode: true
+        in: query
+        name: against_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Whether the match was significant for aggregation purposes.\
+          \ Defaults to 1 (true), set this to 0 to return data for non-standard modes/matches."
+        explode: true
+        in: query
+        name: significant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "The minimum number of games played, for filtering hero stats"
+        explode: true
+        in: query
+        name: having
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: The field to return matches sorted by in descending order
+        explode: true
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Fields to project (array)
+        explode: true
+        in: query
+        name: project
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/PlayerMatchesResponse"
+                type: array
+          description: Success
+      summary: "GET /players/{account_id}/matches"
+      tags:
+      - players
+  /players/{account_id}/heroes:
+    get:
+      description: Heroes played
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_players_by_account_id_select_heroes
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      - description: Number of matches to limit to
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Number of matches to offset start by
+        explode: true
+        in: query
+        name: offset
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player won
+        explode: true
+        in: query
+        name: win
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Patch ID, from dotaconstants"
+        explode: true
+        in: query
+        name: patch
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Game Mode ID
+        explode: true
+        in: query
+        name: game_mode
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lobby type ID
+        explode: true
+        in: query
+        name: lobby_type
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Region ID
+        explode: true
+        in: query
+        name: region
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Days previous
+        explode: true
+        in: query
+        name: date
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lane Role ID
+        explode: true
+        in: query
+        name: lane_role
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero ID
+        explode: true
+        in: query
+        name: hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player was radiant
+        explode: true
+        in: query
+        name: is_radiant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs in the match (array)
+        explode: true
+        in: query
+        name: included_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs not in the match (array)
+        explode: true
+        in: query
+        name: excluded_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs on the player's team (array)
+        explode: true
+        in: query
+        name: with_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs against the player's team (array)
+        explode: true
+        in: query
+        name: against_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Whether the match was significant for aggregation purposes.\
+          \ Defaults to 1 (true), set this to 0 to return data for non-standard modes/matches."
+        explode: true
+        in: query
+        name: significant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "The minimum number of games played, for filtering hero stats"
+        explode: true
+        in: query
+        name: having
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: The field to return matches sorted by in descending order
+        explode: true
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/PlayerHeroesResponse"
+                type: array
+          description: Success
+      summary: "GET /players/{account_id}/heroes"
+      tags:
+      - players
+  /players/{account_id}/peers:
+    get:
+      description: Players played with
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_players_by_account_id_select_peers
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      - description: Number of matches to limit to
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Number of matches to offset start by
+        explode: true
+        in: query
+        name: offset
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player won
+        explode: true
+        in: query
+        name: win
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Patch ID, from dotaconstants"
+        explode: true
+        in: query
+        name: patch
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Game Mode ID
+        explode: true
+        in: query
+        name: game_mode
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lobby type ID
+        explode: true
+        in: query
+        name: lobby_type
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Region ID
+        explode: true
+        in: query
+        name: region
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Days previous
+        explode: true
+        in: query
+        name: date
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lane Role ID
+        explode: true
+        in: query
+        name: lane_role
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero ID
+        explode: true
+        in: query
+        name: hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player was radiant
+        explode: true
+        in: query
+        name: is_radiant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs in the match (array)
+        explode: true
+        in: query
+        name: included_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs not in the match (array)
+        explode: true
+        in: query
+        name: excluded_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs on the player's team (array)
+        explode: true
+        in: query
+        name: with_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs against the player's team (array)
+        explode: true
+        in: query
+        name: against_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Whether the match was significant for aggregation purposes.\
+          \ Defaults to 1 (true), set this to 0 to return data for non-standard modes/matches."
+        explode: true
+        in: query
+        name: significant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "The minimum number of games played, for filtering hero stats"
+        explode: true
+        in: query
+        name: having
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: The field to return matches sorted by in descending order
+        explode: true
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/PlayerPeersResponse"
+                type: array
+          description: Success
+      summary: "GET /players/{account_id}/peers"
+      tags:
+      - players
+  /players/{account_id}/pros:
+    get:
+      description: Pro players played with
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_players_by_account_id_select_pros
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      - description: Number of matches to limit to
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Number of matches to offset start by
+        explode: true
+        in: query
+        name: offset
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player won
+        explode: true
+        in: query
+        name: win
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Patch ID, from dotaconstants"
+        explode: true
+        in: query
+        name: patch
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Game Mode ID
+        explode: true
+        in: query
+        name: game_mode
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lobby type ID
+        explode: true
+        in: query
+        name: lobby_type
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Region ID
+        explode: true
+        in: query
+        name: region
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Days previous
+        explode: true
+        in: query
+        name: date
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lane Role ID
+        explode: true
+        in: query
+        name: lane_role
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero ID
+        explode: true
+        in: query
+        name: hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player was radiant
+        explode: true
+        in: query
+        name: is_radiant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs in the match (array)
+        explode: true
+        in: query
+        name: included_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs not in the match (array)
+        explode: true
+        in: query
+        name: excluded_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs on the player's team (array)
+        explode: true
+        in: query
+        name: with_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs against the player's team (array)
+        explode: true
+        in: query
+        name: against_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Whether the match was significant for aggregation purposes.\
+          \ Defaults to 1 (true), set this to 0 to return data for non-standard modes/matches."
+        explode: true
+        in: query
+        name: significant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "The minimum number of games played, for filtering hero stats"
+        explode: true
+        in: query
+        name: having
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: The field to return matches sorted by in descending order
+        explode: true
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/PlayerProsResponse"
+                type: array
+          description: Success
+      summary: "GET /players/{account_id}/pros"
+      tags:
+      - players
+  /players/{account_id}/totals:
+    get:
+      description: Totals in stats
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_players_by_account_id_select_totals
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      - description: Number of matches to limit to
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Number of matches to offset start by
+        explode: true
+        in: query
+        name: offset
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player won
+        explode: true
+        in: query
+        name: win
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Patch ID, from dotaconstants"
+        explode: true
+        in: query
+        name: patch
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Game Mode ID
+        explode: true
+        in: query
+        name: game_mode
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lobby type ID
+        explode: true
+        in: query
+        name: lobby_type
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Region ID
+        explode: true
+        in: query
+        name: region
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Days previous
+        explode: true
+        in: query
+        name: date
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lane Role ID
+        explode: true
+        in: query
+        name: lane_role
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero ID
+        explode: true
+        in: query
+        name: hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player was radiant
+        explode: true
+        in: query
+        name: is_radiant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs in the match (array)
+        explode: true
+        in: query
+        name: included_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs not in the match (array)
+        explode: true
+        in: query
+        name: excluded_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs on the player's team (array)
+        explode: true
+        in: query
+        name: with_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs against the player's team (array)
+        explode: true
+        in: query
+        name: against_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Whether the match was significant for aggregation purposes.\
+          \ Defaults to 1 (true), set this to 0 to return data for non-standard modes/matches."
+        explode: true
+        in: query
+        name: significant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "The minimum number of games played, for filtering hero stats"
+        explode: true
+        in: query
+        name: having
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: The field to return matches sorted by in descending order
+        explode: true
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/PlayerTotalsResponse"
+                type: array
+          description: Success
+      summary: "GET /players/{account_id}/totals"
+      tags:
+      - players
+  /players/{account_id}/counts:
+    get:
+      description: Counts in categories
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_players_by_account_id_select_counts
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      - description: Number of matches to limit to
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Number of matches to offset start by
+        explode: true
+        in: query
+        name: offset
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player won
+        explode: true
+        in: query
+        name: win
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Patch ID, from dotaconstants"
+        explode: true
+        in: query
+        name: patch
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Game Mode ID
+        explode: true
+        in: query
+        name: game_mode
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lobby type ID
+        explode: true
+        in: query
+        name: lobby_type
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Region ID
+        explode: true
+        in: query
+        name: region
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Days previous
+        explode: true
+        in: query
+        name: date
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lane Role ID
+        explode: true
+        in: query
+        name: lane_role
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero ID
+        explode: true
+        in: query
+        name: hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player was radiant
+        explode: true
+        in: query
+        name: is_radiant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs in the match (array)
+        explode: true
+        in: query
+        name: included_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs not in the match (array)
+        explode: true
+        in: query
+        name: excluded_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs on the player's team (array)
+        explode: true
+        in: query
+        name: with_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs against the player's team (array)
+        explode: true
+        in: query
+        name: against_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Whether the match was significant for aggregation purposes.\
+          \ Defaults to 1 (true), set this to 0 to return data for non-standard modes/matches."
+        explode: true
+        in: query
+        name: significant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "The minimum number of games played, for filtering hero stats"
+        explode: true
+        in: query
+        name: having
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: The field to return matches sorted by in descending order
+        explode: true
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/PlayerCountsResponse"
+          description: Success
+      summary: "GET /players/{account_id}/counts"
+      tags:
+      - players
+  /players/{account_id}/histograms/{field}:
+    get:
+      description: Distribution of matches in a single stat
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_players_by_account_id_histograms_by_field
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      - description: Number of matches to limit to
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Number of matches to offset start by
+        explode: true
+        in: query
+        name: offset
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player won
+        explode: true
+        in: query
+        name: win
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Patch ID, from dotaconstants"
+        explode: true
+        in: query
+        name: patch
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Game Mode ID
+        explode: true
+        in: query
+        name: game_mode
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lobby type ID
+        explode: true
+        in: query
+        name: lobby_type
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Region ID
+        explode: true
+        in: query
+        name: region
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Days previous
+        explode: true
+        in: query
+        name: date
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lane Role ID
+        explode: true
+        in: query
+        name: lane_role
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero ID
+        explode: true
+        in: query
+        name: hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player was radiant
+        explode: true
+        in: query
+        name: is_radiant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs in the match (array)
+        explode: true
+        in: query
+        name: included_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs not in the match (array)
+        explode: true
+        in: query
+        name: excluded_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs on the player's team (array)
+        explode: true
+        in: query
+        name: with_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs against the player's team (array)
+        explode: true
+        in: query
+        name: against_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Whether the match was significant for aggregation purposes.\
+          \ Defaults to 1 (true), set this to 0 to return data for non-standard modes/matches."
+        explode: true
+        in: query
+        name: significant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "The minimum number of games played, for filtering hero stats"
+        explode: true
+        in: query
+        name: having
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: The field to return matches sorted by in descending order
+        explode: true
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Field to aggregate on
+        explode: false
+        in: path
+        name: field
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  title: PlayerHistogramsResponse
+                  type: object
+                type: array
+          description: Success
+      summary: "GET /players/{account_id}/histograms"
+      tags:
+      - players
+  /players/{account_id}/wardmap:
+    get:
+      description: Wards placed in matches played
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_players_by_account_id_select_wardmap
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      - description: Number of matches to limit to
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Number of matches to offset start by
+        explode: true
+        in: query
+        name: offset
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player won
+        explode: true
+        in: query
+        name: win
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Patch ID, from dotaconstants"
+        explode: true
+        in: query
+        name: patch
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Game Mode ID
+        explode: true
+        in: query
+        name: game_mode
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lobby type ID
+        explode: true
+        in: query
+        name: lobby_type
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Region ID
+        explode: true
+        in: query
+        name: region
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Days previous
+        explode: true
+        in: query
+        name: date
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lane Role ID
+        explode: true
+        in: query
+        name: lane_role
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero ID
+        explode: true
+        in: query
+        name: hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player was radiant
+        explode: true
+        in: query
+        name: is_radiant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs in the match (array)
+        explode: true
+        in: query
+        name: included_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs not in the match (array)
+        explode: true
+        in: query
+        name: excluded_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs on the player's team (array)
+        explode: true
+        in: query
+        name: with_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs against the player's team (array)
+        explode: true
+        in: query
+        name: against_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Whether the match was significant for aggregation purposes.\
+          \ Defaults to 1 (true), set this to 0 to return data for non-standard modes/matches."
+        explode: true
+        in: query
+        name: significant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "The minimum number of games played, for filtering hero stats"
+        explode: true
+        in: query
+        name: having
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: The field to return matches sorted by in descending order
+        explode: true
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/PlayerWardMapResponse"
+          description: Success
+      summary: "GET /players/{account_id}/wardmap"
+      tags:
+      - players
+  /players/{account_id}/wordcloud:
+    get:
+      description: Words said/read in matches played
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_players_by_account_id_select_wordcloud
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      - description: Number of matches to limit to
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Number of matches to offset start by
+        explode: true
+        in: query
+        name: offset
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player won
+        explode: true
+        in: query
+        name: win
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Patch ID, from dotaconstants"
+        explode: true
+        in: query
+        name: patch
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Game Mode ID
+        explode: true
+        in: query
+        name: game_mode
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lobby type ID
+        explode: true
+        in: query
+        name: lobby_type
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Region ID
+        explode: true
+        in: query
+        name: region
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Days previous
+        explode: true
+        in: query
+        name: date
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Lane Role ID
+        explode: true
+        in: query
+        name: lane_role
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero ID
+        explode: true
+        in: query
+        name: hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Whether the player was radiant
+        explode: true
+        in: query
+        name: is_radiant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs in the match (array)
+        explode: true
+        in: query
+        name: included_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Account IDs not in the match (array)
+        explode: true
+        in: query
+        name: excluded_account_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs on the player's team (array)
+        explode: true
+        in: query
+        name: with_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Hero IDs against the player's team (array)
+        explode: true
+        in: query
+        name: against_hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Whether the match was significant for aggregation purposes.\
+          \ Defaults to 1 (true), set this to 0 to return data for non-standard modes/matches."
+        explode: true
+        in: query
+        name: significant
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "The minimum number of games played, for filtering hero stats"
+        explode: true
+        in: query
+        name: having
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: The field to return matches sorted by in descending order
+        explode: true
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/PlayerWordCloudResponse"
+          description: Success
+      summary: "GET /players/{account_id}/wordcloud"
+      tags:
+      - players
+  /players/{account_id}/ratings:
+    get:
+      description: Player rating history
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_players_by_account_id_select_ratings
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/PlayerRatingsResponse"
+                type: array
+          description: Success
+      summary: "GET /players/{account_id}/ratings"
+      tags:
+      - players
+  /players/{account_id}/rankings:
+    get:
+      description: Player hero rankings
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_players_by_account_id_select_rankings
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/PlayerRankingsResponse"
+                type: array
+          description: Success
+      summary: "GET /players/{account_id}/rankings"
+      tags:
+      - players
+  /players/{account_id}/refresh:
+    post:
+      description: Refresh player match history (up to 500) and medal
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: post_refresh
+      parameters:
+      - description: Steam32 account ID
+        explode: false
+        in: path
+        name: account_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                title: PlayerRefreshResponse
+                type: object
+          description: Success
+      summary: "POST /players/{account_id}/refresh"
+      tags:
+      - players
+  /proPlayers:
+    get:
+      description: Get list of pro players
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_pro_players
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/PlayerObjectResponse"
+                type: array
+          description: Success
+      summary: GET /proPlayers
+      tags:
+      - pro players
+  /proMatches:
+    get:
+      description: Get list of pro matches
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_pro_matches
+      parameters:
+      - description: Get matches with a match ID lower than this value
+        explode: true
+        in: query
+        name: less_than_match_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/MatchObjectResponse"
+                type: array
+          description: Success
+      summary: GET /proMatches
+      tags:
+      - pro matches
+  /publicMatches:
+    get:
+      description: Get list of randomly sampled public matches
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_public_matches
+      parameters:
+      - description: Get matches with a match ID lower than this value
+        explode: true
+        in: query
+        name: less_than_match_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Minimum rank for the matches. Ranks are represented by integers\
+          \ (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55:\
+          \ Legend, 60-65: Ancient, 70-75: Divine, 80-85: Immortal). Each increment\
+          \ represents an additional star."
+        explode: true
+        in: query
+        name: min_rank
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: "Maximum rank for the matches. Ranks are represented by integers\
+          \ (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55:\
+          \ Legend, 60-65: Ancient, 70-75: Divine, 80-85: Immortal). Each increment\
+          \ represents an additional star."
+        explode: true
+        in: query
+        name: max_rank
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Order by average rank ascending
+        explode: true
+        in: query
+        name: mmr_ascending
+        required: false
+        schema:
+          type: integer
+        style: form
+      - description: Order by average rank descending
+        explode: true
+        in: query
+        name: mmr_descending
+        required: false
+        schema:
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/PublicMatchesResponse"
+                type: array
+          description: Success
+      summary: GET /publicMatches
+      tags:
+      - public matches
+  /parsedMatches:
+    get:
+      description: Get list of parsed match IDs
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_parsed_matches
+      parameters:
+      - description: Get matches with a match ID lower than this value
+        explode: true
+        in: query
+        name: less_than_match_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/ParsedMatchesResponse"
+                type: array
+          description: Success
+      summary: GET /parsedMatches
+      tags:
+      - parsed matches
+  /explorer:
+    get:
+      description: Submit arbitrary SQL queries to the database
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_explorer
+      parameters:
+      - description: The PostgreSQL query as percent-encoded string.
+        explode: true
+        in: query
+        name: sql
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                title: ExplorerResponse
+                type: object
+          description: Success
+      summary: GET /explorer
+      tags:
+      - explorer
+  /metadata:
+    get:
+      description: Site metadata
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_metadata
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/MetadataResponse"
+          description: Success
+      summary: GET /metadata
+      tags:
+      - metadata
+  /distributions:
+    get:
+      description: Distributions of MMR data by bracket and country
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_distributions
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/DistributionsResponse"
+          description: Success
+      summary: GET /distributions
+      tags:
+      - distributions
+  /search:
+    get:
+      description: Search players by personaname.
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_search
+      parameters:
+      - description: Search string
+        explode: true
+        in: query
+        name: q
+        required: true
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/SearchResponse"
+                type: array
+          description: Success
+      summary: GET /search
+      tags:
+      - search
+  /rankings:
+    get:
+      description: Top players by hero
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_rankings
+      parameters:
+      - description: Hero ID
+        explode: true
+        in: query
+        name: hero_id
+        required: true
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/RankingsResponse"
+          description: Success
+      summary: GET /rankings
+      tags:
+      - rankings
+  /benchmarks:
+    get:
+      description: Benchmarks of average stat values for a hero
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_benchmarks
+      parameters:
+      - description: Hero ID
+        explode: true
+        in: query
+        name: hero_id
+        required: true
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/BenchmarksResponse"
+          description: Success
+      summary: GET /benchmarks
+      tags:
+      - benchmarks
+  /health:
+    get:
+      description: Get service health data
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_health
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                title: HealthResponse
+                type: object
+          description: Success
+      summary: GET /health
+      tags:
+      - health
+  /request/{jobId}:
+    get:
+      description: Get parse request state
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_request_by_job_id
+      parameters:
+      - description: The job ID to query.
+        explode: false
+        in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                title: RequestJobResponse
+                type: object
+          description: Success
+      summary: "GET /request/{jobId}"
+      tags:
+      - request
+  /request/{match_id}:
+    post:
+      description: Submit a new parse request. This call counts as 10 calls for rate
+        limit (but not billing) purposes.
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: post_request_by_job_id
+      parameters:
+      - explode: false
+        in: path
+        name: match_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                title: RequestMatchResponse
+                type: object
+          description: Success
+      summary: "POST /request/{match_id}"
+      tags:
+      - request
+  /findMatches:
+    get:
+      description: Finds recent matches by heroes played
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_find_matches
+      parameters:
+      - description: Hero IDs on first team (array)
+        explode: false
+        in: query
+        name: teamA
+        required: false
+        schema:
+          items:
+            type: integer
+          type: array
+        style: form
+      - description: Hero IDs on second team (array)
+        explode: false
+        in: query
+        name: teamB
+        required: false
+        schema:
+          items:
+            type: integer
+          type: array
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  type: object
+                title: FindMatchesResponse
+                type: array
+          description: Success
+      summary: GET /
+      tags:
+      - findMatches
+  /heroes:
+    get:
+      description: Get hero data
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_heroes
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/HeroObjectResponse"
+                type: array
+          description: Success
+      summary: GET /heroes
+      tags:
+      - heroes
+  /heroStats:
+    get:
+      description: Get stats about hero performance in recent matches
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_hero_stats
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/HeroStatsResponse"
+                type: array
+          description: Success
+      summary: GET /heroStats
+      tags:
+      - hero stats
+  /heroes/{hero_id}/matches:
+    get:
+      description: Get recent matches with a hero
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_heroes_by_hero_id_select_matches
+      parameters:
+      - description: Hero ID
+        explode: false
+        in: path
+        name: hero_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/MatchObjectResponse"
+                type: array
+          description: Success
+      summary: "GET /heroes/{hero_id}/matches"
+      tags:
+      - heroes
+  /heroes/{hero_id}/matchups:
+    get:
+      description: Get results against other heroes for a hero
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_heroes_by_hero_id_select_matchups
+      parameters:
+      - description: Hero ID
+        explode: false
+        in: path
+        name: hero_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/HeroMatchupsResponse"
+                type: array
+          description: Success
+      summary: "GET /heroes/{hero_id}/matchups"
+      tags:
+      - heroes
+  /heroes/{hero_id}/durations:
+    get:
+      description: Get hero performance over a range of match durations
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_heroes_by_hero_id_select_durations
+      parameters:
+      - description: Hero ID
+        explode: false
+        in: path
+        name: hero_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/HeroDurationsResponse"
+                type: array
+          description: Success
+      summary: "GET /heroes/{hero_id}/durations"
+      tags:
+      - heroes
+  /heroes/{hero_id}/players:
+    get:
+      description: Get players who have played this hero
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_heroes_by_hero_id_select_players
+      parameters:
+      - description: Hero ID
+        explode: false
+        in: path
+        name: hero_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  items:
+                    $ref: "#/components/schemas/PlayerObjectResponse"
+                  type: array
+                type: array
+          description: Success
+      summary: "GET /heroes/{hero_id}/players"
+      tags:
+      - heroes
+  /heroes/{hero_id}/itemPopularity:
+    get:
+      description: "Get item popularity of hero categoried by start, early, mid and\
+        \ late game, analyzed from professional games"
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_heroes_by_hero_id_select_item_popularity
+      parameters:
+      - description: Hero ID
+        explode: false
+        in: path
+        name: hero_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/HeroItemPopularityResponse"
+          description: Success
+      summary: "GET /heroes/{hero_id}/itemPopularity"
+      tags:
+      - heroes
+  /leagues:
+    get:
+      description: Get league data
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_leagues
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/LeagueObjectResponse"
+                type: array
+          description: Success
+      summary: GET /leagues
+      tags:
+      - leagues
+  /leagues/{league_id}:
+    get:
+      description: Get data for a league
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_leagues_by_league_id
+      parameters:
+      - description: League ID
+        explode: false
+        in: path
+        name: league_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/LeagueObjectResponse"
+                type: array
+          description: Success
+      summary: "GET /leagues/{league_id}"
+      tags:
+      - leagues
+  /leagues/{league_id}/matches:
+    get:
+      description: Get matches for a league
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_leagues_by_league_id_select_matches
+      parameters:
+      - description: League ID
+        explode: false
+        in: path
+        name: league_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/MatchObjectResponse"
+          description: Success
+      summary: "GET /leagues/{league_id}/matches"
+      tags:
+      - leagues
+  /leagues/{league_id}/teams:
+    get:
+      description: Get teams for a league
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_leagues_by_league_id_select_teams
+      parameters:
+      - description: League ID
+        explode: false
+        in: path
+        name: league_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/TeamObjectResponse"
+          description: Success
+      summary: "GET /leagues/{league_id}/teams"
+      tags:
+      - leagues
+  /teams:
+    get:
+      description: Get team data
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_teams
+      parameters:
+      - description: "Page number, zero indexed. Each page returns up to 1000 entries."
+        explode: true
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/TeamObjectResponse"
+                type: array
+          description: Success
+      summary: GET /teams
+      tags:
+      - teams
+  /teams/{team_id}:
+    get:
+      description: Get data for a team
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_teams_by_team_id
+      parameters:
+      - description: Team ID
+        explode: false
+        in: path
+        name: team_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/TeamObjectResponse"
+          description: Success
+      summary: "GET /teams/{team_id}"
+      tags:
+      - teams
+  /teams/{team_id}/matches:
+    get:
+      description: Get matches for a team
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_teams_by_team_id_select_matches
+      parameters:
+      - description: Team ID
+        explode: false
+        in: path
+        name: team_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/TeamMatchObjectResponse"
+          description: Success
+      summary: "GET /teams/{team_id}/matches"
+      tags:
+      - teams
+  /teams/{team_id}/players:
+    get:
+      description: Get players who have played for a team
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_teams_by_team_id_select_players
+      parameters:
+      - description: Team ID
+        explode: false
+        in: path
+        name: team_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/TeamPlayersResponse"
+          description: Success
+      summary: "GET /teams/{team_id}/players"
+      tags:
+      - teams
+  /teams/{team_id}/heroes:
+    get:
+      description: Get heroes for a team
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_teams_by_team_id_select_heroes
+      parameters:
+      - description: Team ID
+        explode: false
+        in: path
+        name: team_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/TeamHeroesResponse"
+          description: Success
+      summary: "GET /teams/{team_id}/heroes"
+      tags:
+      - teams
+  /records/{field}:
+    get:
+      description: Get top performances in a stat
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_records_by_field
+      parameters:
+      - description: Field name to query
+        explode: false
+        in: path
+        name: field
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/RecordsResponse"
+                type: array
+          description: Success
+      summary: "GET /records/{field}"
+      tags:
+      - records
+  /live:
+    get:
+      description: Get top currently ongoing live games
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_live
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  properties: {}
+                  title: LiveResponse
+                  type: object
+                type: array
+          description: Success
+      summary: GET /live
+      tags:
+      - live
+  /scenarios/itemTimings:
+    get:
+      description: Win rates for certain item timings on a hero for items that cost
+        at least 1400 gold
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_scenarios_item_timings
+      parameters:
+      - description: Filter by item name e.g. "spirit_vessel"
+        explode: true
+        in: query
+        name: item
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Hero ID
+        explode: true
+        in: query
+        name: hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/ScenarioItemTimingsResponse"
+                type: array
+          description: Success
+      summary: GET /scenarios/itemTimings
+      tags:
+      - scenarios
+  /scenarios/laneRoles:
+    get:
+      description: Win rates for heroes in certain lane roles
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_scenarios_lane_roles
+      parameters:
+      - description: "Filter by lane role 1-4 (Safe, Mid, Off, Jungle)"
+        explode: true
+        in: query
+        name: lane_role
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Hero ID
+        explode: true
+        in: query
+        name: hero_id
+        required: false
+        schema:
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/ScenarioLaneRolesResponse"
+                type: array
+          description: Success
+      summary: GET /scenarios/laneRoles
+      tags:
+      - scenarios
+  /scenarios/misc:
+    get:
+      description: Miscellaneous team scenarios
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_scenarios_misc
+      parameters:
+      - description: Name of the scenario (see teamScenariosQueryParams)
+        explode: true
+        in: query
+        name: scenario
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/ScenarioMiscResponse"
+                type: array
+          description: Success
+      summary: GET /scenarios/misc
+      tags:
+      - scenarios
+  /schema:
+    get:
+      description: Get database schema
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_schema
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/SchemaResponse"
+                type: array
+          description: Success
+      summary: GET /schema
+      tags:
+      - schema
+  /constants/{resource}:
+    get:
+      description: Get static game data mirrored from the dotaconstants repository.
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_constants_by_resource
+      parameters:
+      - description: "Resource name e.g. `heroes`. [List of resources](https://github.com/odota/dotaconstants/tree/master/build)"
+        explode: false
+        in: path
+        name: resource
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/get_constants_by_resource_200_response"
+          description: Success
+      summary: GET /constants
+      tags:
+      - constants
+components:
+  parameters:
+    heroIdPathParam:
+      description: Hero ID
+      explode: false
+      in: path
+      name: hero_id
+      required: true
+      schema:
+        type: integer
+      style: simple
+    leagueIdPathParam:
+      description: League ID
+      explode: false
+      in: path
+      name: league_id
+      required: true
+      schema:
+        type: integer
+      style: simple
+    matchIdParam:
+      explode: false
+      in: path
+      name: match_id
+      required: true
+      schema:
+        type: integer
+      style: simple
+    lessThanMatchIdParam:
+      description: Get matches with a match ID lower than this value
+      explode: true
+      in: query
+      name: less_than_match_id
+      required: false
+      schema:
+        type: integer
+      style: form
+    minRankParam:
+      description: "Minimum rank for the matches. Ranks are represented by integers\
+        \ (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55:\
+        \ Legend, 60-65: Ancient, 70-75: Divine, 80-85: Immortal). Each increment\
+        \ represents an additional star."
+      explode: true
+      in: query
+      name: min_rank
+      required: false
+      schema:
+        type: integer
+      style: form
+    maxRankParam:
+      description: "Maximum rank for the matches. Ranks are represented by integers\
+        \ (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55:\
+        \ Legend, 60-65: Ancient, 70-75: Divine, 80-85: Immortal). Each increment\
+        \ represents an additional star."
+      explode: true
+      in: query
+      name: max_rank
+      required: false
+      schema:
+        type: integer
+      style: form
+    mmrAscendingParam:
+      description: Order by average rank ascending
+      explode: true
+      in: query
+      name: mmr_ascending
+      required: false
+      schema:
+        type: integer
+      style: form
+    mmrDescendingParam:
+      description: Order by average rank descending
+      explode: true
+      in: query
+      name: mmr_descending
+      required: false
+      schema:
+        type: integer
+      style: form
+    accountIdParam:
+      description: Steam32 account ID
+      explode: false
+      in: path
+      name: account_id
+      required: true
+      schema:
+        type: integer
+      style: simple
+    fieldParam:
+      description: Field to aggregate on
+      explode: false
+      in: path
+      name: field
+      required: true
+      schema:
+        type: string
+      style: simple
+    projectParam:
+      description: Fields to project (array)
+      explode: true
+      in: query
+      name: project
+      required: false
+      schema:
+        type: string
+      style: form
+    limitParam:
+      description: Number of matches to limit to
+      explode: true
+      in: query
+      name: limit
+      required: false
+      schema:
+        type: integer
+      style: form
+    offsetParam:
+      description: Number of matches to offset start by
+      explode: true
+      in: query
+      name: offset
+      required: false
+      schema:
+        type: integer
+      style: form
+    winParam:
+      description: Whether the player won
+      explode: true
+      in: query
+      name: win
+      required: false
+      schema:
+        type: integer
+      style: form
+    patchParam:
+      description: "Patch ID, from dotaconstants"
+      explode: true
+      in: query
+      name: patch
+      required: false
+      schema:
+        type: integer
+      style: form
+    gameModeParam:
+      description: Game Mode ID
+      explode: true
+      in: query
+      name: game_mode
+      required: false
+      schema:
+        type: integer
+      style: form
+    lobbyTypeParam:
+      description: Lobby type ID
+      explode: true
+      in: query
+      name: lobby_type
+      required: false
+      schema:
+        type: integer
+      style: form
+    regionParam:
+      description: Region ID
+      explode: true
+      in: query
+      name: region
+      required: false
+      schema:
+        type: integer
+      style: form
+    dateParam:
+      description: Days previous
+      explode: true
+      in: query
+      name: date
+      required: false
+      schema:
+        type: integer
+      style: form
+    laneRoleParam:
+      description: Lane Role ID
+      explode: true
+      in: query
+      name: lane_role
+      required: false
+      schema:
+        type: integer
+      style: form
+    heroIdParam:
+      description: Hero ID
+      explode: true
+      in: query
+      name: hero_id
+      required: false
+      schema:
+        type: integer
+      style: form
+    isRadiantParam:
+      description: Whether the player was radiant
+      explode: true
+      in: query
+      name: is_radiant
+      required: false
+      schema:
+        type: integer
+      style: form
+    includedAccountIdParam:
+      description: Account IDs in the match (array)
+      explode: true
+      in: query
+      name: included_account_id
+      required: false
+      schema:
+        type: integer
+      style: form
+    excludedAccountIdParam:
+      description: Account IDs not in the match (array)
+      explode: true
+      in: query
+      name: excluded_account_id
+      required: false
+      schema:
+        type: integer
+      style: form
+    withHeroIdParam:
+      description: Hero IDs on the player's team (array)
+      explode: true
+      in: query
+      name: with_hero_id
+      required: false
+      schema:
+        type: integer
+      style: form
+    againstHeroIdParam:
+      description: Hero IDs against the player's team (array)
+      explode: true
+      in: query
+      name: against_hero_id
+      required: false
+      schema:
+        type: integer
+      style: form
+    significantParam:
+      description: "Whether the match was significant for aggregation purposes. Defaults\
+        \ to 1 (true), set this to 0 to return data for non-standard modes/matches."
+      explode: true
+      in: query
+      name: significant
+      required: false
+      schema:
+        type: integer
+      style: form
+    havingParam:
+      description: "The minimum number of games played, for filtering hero stats"
+      explode: true
+      in: query
+      name: having
+      required: false
+      schema:
+        type: integer
+      style: form
+    sortParam:
+      description: The field to return matches sorted by in descending order
+      explode: true
+      in: query
+      name: sort
+      required: false
+      schema:
+        type: string
+      style: form
+    scenarioParam:
+      description: Name of the scenario (see teamScenariosQueryParams)
+      explode: true
+      in: query
+      name: scenario
+      required: false
+      schema:
+        type: string
+      style: form
+    teamIdPathParam:
+      description: Team ID
+      explode: false
+      in: path
+      name: team_id
+      required: true
+      schema:
+        type: integer
+      style: simple
+  schemas:
+    BenchmarksResponse:
+      example:
+        result:
+          gold_per_min:
+          - percentile: 6.027456183070403
+            value: 1.4658129805029452
+          - percentile: 6.027456183070403
+            value: 1.4658129805029452
+          tower_damage:
+          - percentile: 5.962133916683182
+            value: 5
+          - percentile: 5.962133916683182
+            value: 5
+          last_hits_per_min:
+          - percentile: 6.027456183070403
+            value: 1.4658129805029452
+          - percentile: 6.027456183070403
+            value: 1.4658129805029452
+          hero_damage_per_min:
+          - percentile: 6.027456183070403
+            value: 1.4658129805029452
+          - percentile: 6.027456183070403
+            value: 1.4658129805029452
+          xp_per_min:
+          - percentile: 6.027456183070403
+            value: 1.4658129805029452
+          - percentile: 6.027456183070403
+            value: 1.4658129805029452
+          hero_healing_per_min:
+          - percentile: 6.027456183070403
+            value: 1.4658129805029452
+          - percentile: 6.027456183070403
+            value: 1.4658129805029452
+          kills_per_min:
+          - percentile: 6.027456183070403
+            value: 1.4658129805029452
+          - percentile: 6.027456183070403
+            value: 1.4658129805029452
+        hero_id: 0
+      properties:
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        result:
+          $ref: "#/components/schemas/BenchmarksResponse_result"
+      title: BenchmarksResponse
+      type: object
+    DistributionsResponse:
+      example:
+        ranks:
+          sum:
+            count: 5
+          rows:
+          - bin: 0
+            bin_name: 6
+            cumulative_sum: 5
+            count: 1
+          - bin: 0
+            bin_name: 6
+            cumulative_sum: 5
+            count: 1
+      properties:
+        ranks:
+          $ref: "#/components/schemas/DistributionsResponse_ranks"
+      title: DistributionsResponse
+      type: object
+    HeroDurationsResponse:
+      example:
+        wins: 6
+        duration_bin: duration_bin
+        games_played: 0
+      properties:
+        duration_bin:
+          description: Lower bound of number of seconds the match lasted
+          type: string
+        games_played:
+          description: Number of games played
+          type: integer
+        wins:
+          description: Number of wins
+          type: integer
+      title: HeroDurationsResponse
+      type: object
+    HeroItemPopularityResponse:
+      example:
+        mid_game_items:
+          item: 1
+        late_game_items:
+          item: 5
+        early_game_items:
+          item: 6
+        start_game_items:
+          item: 0
+      properties:
+        start_game_items:
+          $ref: "#/components/schemas/HeroItemPopularityResponse_start_game_items"
+        early_game_items:
+          $ref: "#/components/schemas/HeroItemPopularityResponse_early_game_items"
+        mid_game_items:
+          $ref: "#/components/schemas/HeroItemPopularityResponse_mid_game_items"
+        late_game_items:
+          $ref: "#/components/schemas/HeroItemPopularityResponse_late_game_items"
+      title: HeroItemPopularityResponse
+      type: object
+    HeroMatchupsResponse:
+      example:
+        wins: 1
+        games_played: 6
+        hero_id: 0
+      properties:
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        games_played:
+          description: Number of games played
+          type: integer
+        wins:
+          description: Number of games won
+          type: integer
+      title: HeroMatchupsResponse
+      type: object
+    HeroObjectResponse:
+      example:
+        primary_attr: primary_attr
+        attack_type: attack_type
+        roles:
+        - roles
+        - roles
+        name: npc_dota_hero_antimage
+        id: 0
+        localized_name: Anti-Mage
+      properties:
+        id:
+          description: The ID value of the hero played
+          type: integer
+        name:
+          description: Dota hero command name
+          example: npc_dota_hero_antimage
+          type: string
+        localized_name:
+          description: Hero name
+          example: Anti-Mage
+          type: string
+        primary_attr:
+          description: "Hero primary shorthand attribute name, e.g. 'agi'"
+          type: string
+        attack_type:
+          description: "Hero attack type, either 'Melee' or 'Ranged'"
+          type: string
+        roles:
+          items:
+            description: A hero's role in the game
+            type: string
+          type: array
+      required:
+      - id
+      title: HeroObjectResponse
+      type: object
+    HeroStatsResponse:
+      example:
+        primary_attr: primary_attr
+        attack_range: 6
+        attack_type: attack_type
+        "5_pick": 6
+        pro_pick: 6
+        "1_win": 5
+        base_health: 6
+        legs: 6
+        "8_win": 7
+        id: 0
+        "6_pick": 4
+        str_gain: 1.2315135367772556
+        night_vision: 9
+        "2_win": 3
+        attack_rate: 1.1730742509559433
+        base_str: 2
+        "3_win": 7
+        agi_gain: 1.0246457001441578
+        attack_point: 5.025004791520295
+        "8_pick": 3
+        name: npc_dota_hero_antimage
+        turbo_picks: 3
+        projectile_speed: 7
+        day_vision: 8
+        pro_win: 2
+        img: img
+        cm_enabled: true
+        "5_win": 0
+        roles:
+        - roles
+        - roles
+        icon: icon
+        turbo_wins: 6
+        base_mana: 5
+        localized_name: Anti-Mage
+        "2_pick": 6
+        "4_win": 7
+        hero_id: 6
+        "3_pick": 3
+        "7_pick": 7
+        "7_win": 3
+        base_armor: 2
+        "1_pick": 6
+        "4_pick": 0
+        base_mana_regen: 5
+        base_attack_max: 3
+        base_int: 7
+        int_gain: 1.4894159098541704
+        move_speed: 9
+        turn_rate: 9.369310271410669
+        pro_ban: 1
+        "6_win": 8
+        base_attack_min: 9
+        base_attack_time: 4
+        base_agi: 4
+        base_health_regen: 1.4658129805029452
+        base_mr: 7
+      properties:
+        id:
+          description: The ID value of the hero played
+          type: integer
+        name:
+          description: Dota hero command name
+          example: npc_dota_hero_antimage
+          type: string
+        localized_name:
+          description: Hero name
+          example: Anti-Mage
+          type: string
+        primary_attr:
+          description: primary_attr
+          type: string
+        attack_type:
+          description: attack_type
+          type: string
+        roles:
+          description: roles
+          items:
+            type: string
+          type: array
+        img:
+          description: img
+          type: string
+        icon:
+          description: icon
+          type: string
+        base_health:
+          description: base_health
+          type: integer
+        base_health_regen:
+          description: base_health_regen
+          type: number
+        base_mana:
+          description: base_mana
+          type: integer
+        base_mana_regen:
+          description: base_mana_regen
+          type: integer
+        base_armor:
+          description: base_armor
+          type: integer
+        base_mr:
+          description: base_mr
+          type: integer
+        base_attack_min:
+          description: base_attack_min
+          type: integer
+        base_attack_max:
+          description: base_attack_max
+          type: integer
+        base_str:
+          description: base_str
+          type: integer
+        base_agi:
+          description: base_agi
+          type: integer
+        base_int:
+          description: base_int
+          type: integer
+        str_gain:
+          description: str_gain
+          type: number
+        agi_gain:
+          description: agi_gain
+          type: number
+        int_gain:
+          description: int_gain
+          type: number
+        attack_range:
+          description: attack_range
+          type: integer
+        projectile_speed:
+          description: projectile_speed
+          type: integer
+        attack_rate:
+          description: attack_rate
+          type: number
+        base_attack_time:
+          description: base_attack_time
+          type: integer
+        attack_point:
+          description: attack_point
+          type: number
+        move_speed:
+          description: move_speed
+          type: integer
+        turn_rate:
+          description: turn_rate
+          type: number
+        cm_enabled:
+          description: cm_enabled
+          type: boolean
+        legs:
+          description: legs
+          type: integer
+        day_vision:
+          description: day_vision
+          type: integer
+        night_vision:
+          description: night_vision
+          type: integer
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        turbo_picks:
+          description: Picks in Turbo mode this month
+          type: integer
+        turbo_wins:
+          description: Wins in Turbo mode this month
+          type: integer
+        pro_ban:
+          description: pro_ban
+          type: integer
+        pro_win:
+          description: pro_win
+          type: integer
+        pro_pick:
+          description: pro_pick
+          type: integer
+        "1_pick":
+          description: Herald picks
+          type: integer
+        "1_win":
+          description: Herald wins
+          type: integer
+        "2_pick":
+          description: Guardian picks
+          type: integer
+        "2_win":
+          description: Guardian wins
+          type: integer
+        "3_pick":
+          description: Crusader picks
+          type: integer
+        "3_win":
+          description: Crusader wins
+          type: integer
+        "4_pick":
+          description: Archon picks
+          type: integer
+        "4_win":
+          description: Archon wins
+          type: integer
+        "5_pick":
+          description: Legend picks
+          type: integer
+        "5_win":
+          description: Legend wins
+          type: integer
+        "6_pick":
+          description: Ancient picks
+          type: integer
+        "6_win":
+          description: Ancient wins
+          type: integer
+        "7_pick":
+          description: Divine picks
+          type: integer
+        "7_win":
+          description: Divine wins
+          type: integer
+        "8_pick":
+          description: Immortal picks
+          type: integer
+        "8_win":
+          description: Immortal wins
+          type: integer
+      title: HeroStatsResponse
+      type: object
+    LeagueObjectResponse:
+      example:
+        ticket: ticket
+        tier: tier
+        leagueid: 0
+        name: ASUS ROG DreamLeague Season 4
+        banner: banner
+      properties:
+        leagueid:
+          description: leagueid
+          type: integer
+        ticket:
+          description: ticket
+          type: string
+        banner:
+          description: banner
+          type: string
+        tier:
+          description: tier
+          type: string
+        name:
+          description: League name
+          example: ASUS ROG DreamLeague Season 4
+          type: string
+      title: LeagueObjectResponse
+      type: object
+    MatchObjectResponse:
+      example:
+        match_id: 3703866531
+        league_name: league_name
+        series_type: 7
+        radiant: true
+        series_id: 2
+        duration: 0
+        start_time: 6
+        radiant_name: radiant_name
+        radiant_win: true
+        dire_name: dire_name
+        leagueid: 5
+        dire_score: 3
+        radiant_team_id: 1
+        radiant_score: 9
+        dire_team_id: 5
+      properties:
+        match_id:
+          description: The ID number of the match assigned by Valve
+          example: 3703866531
+          type: integer
+        duration:
+          description: Duration of the game in seconds
+          type: integer
+        start_time:
+          description: The Unix timestamp at which the game started
+          type: integer
+        radiant_team_id:
+          description: The Radiant's team_id
+          type: integer
+        radiant_name:
+          description: The Radiant's team name
+          type: string
+        dire_team_id:
+          description: The Dire's team_id
+          type: integer
+        dire_name:
+          description: The Dire's team name
+          type: string
+        leagueid:
+          description: Identifier for the league the match took place in
+          type: integer
+        league_name:
+          description: Name of league the match took place in
+          type: string
+        series_id:
+          description: Identifier for the series of the match
+          type: integer
+        series_type:
+          description: Type of series the match was
+          type: integer
+        radiant_score:
+          description: Number of kills the Radiant team had when the match ended
+          type: integer
+        dire_score:
+          description: Number of kills the Dire team had when the match ended
+          type: integer
+        radiant_win:
+          description: Boolean indicating whether Radiant won the match
+          nullable: true
+          type: boolean
+        radiant:
+          description: Whether the team/player/hero was on Radiant
+          type: boolean
+      title: MatchObjectResponse
+      type: object
+    MatchResponse:
+      example:
+        first_blood_time: 7
+        cluster: 2
+        match_seq_num: 9
+        replay_salt: 3
+        human_players: 4
+        all_word_counts: "{}"
+        series_type: 7
+        barracks_status_radiant: 6
+        radiant_team: "{}"
+        comeback: 6
+        cosmetics:
+          key: 7
+        duration: 1
+        patch: 4
+        loss: 0
+        radiant_win: true
+        radiant_xp_adv:
+        - 2.8841621266687802
+        - 2.8841621266687802
+        my_word_counts: "{}"
+        engine: 6
+        skill: 0
+        negative_votes: 6
+        picks_bans:
+        - hero_id: 8
+          team: 9
+          is_pick: true
+          order: 6
+        - hero_id: 8
+          team: 9
+          is_pick: true
+          order: 6
+        win: 2
+        dire_team: "{}"
+        replay_url: replay_url
+        tower_status_radiant: 5
+        teamfights:
+        - "{}"
+        - "{}"
+        players:
+        - obs: "{}"
+          cluster: 0
+          gold_spent: 0
+          obs_left_log:
+          - "{}"
+          - "{}"
+          runes:
+            key: 3
+          observer_kills: 5
+          purchase_tpscroll: 3
+          obs_log:
+          - "{}"
+          - "{}"
+          lane_role: 4
+          observer_uses: 7
+          patch: 2
+          neutral_kills: 1
+          roshan_kills: 3
+          item_uses: "{}"
+          pings: 5
+          deaths: 4
+          purchase_log:
+          - charges: 7
+            time: 8
+            key: key
+          - charges: 7
+            time: 8
+            key: key
+          gold_per_min: 9
+          last_login: 2000-01-23T04:56:07.000+00:00
+          lose: 2
+          party_size: 0
+          kda: 9.806951670467935
+          lane_pos: "{}"
+          kills_per_min: 6.966044574347761
+          xp_reasons: "{}"
+          hero_variant: 5
+          buyback_count: 9
+          necronomicon_kills: 1
+          multi_kills: "{}"
+          kills_log:
+          - time: 1
+            key: key
+          - time: 1
+            key: key
+          rune_pickups: 3
+          actions: "{}"
+          damage: "{}"
+          lh_t:
+          - 8
+          - 8
+          gold_t:
+          - 9
+          - 9
+          first_purchase_time: "{}"
+          additional_units:
+          - "{}"
+          - "{}"
+          gold: 7
+          radiant_win: true
+          camps_stacked: 3
+          runes_log:
+          - time: 9
+            key: 5
+          - time: 9
+            key: 5
+          purchase_time: "{}"
+          sen: "{}"
+          ancient_kills: 3
+          actions_per_min: 8
+          match_id: 3703866531
+          life_state_dead: 2
+          lane_kills: 1
+          hero_kills: 4
+          stuns: 0.4768402382624515
+          account_id: 0
+          leaver_status: 6
+          hero_healing: 7
+          max_hero_hit: "{}"
+          killed_by: "{}"
+          game_mode: 4
+          obs_placed: 9
+          total_xp: 4
+          item_win: "{}"
+          gold_reasons: "{}"
+          personaname: 420 booty wizard
+          damage_inflictor_received: "{}"
+          damage_inflictor: "{}"
+          total_gold: 6
+          buyback_log:
+          - player_slot: 5
+            time: 3
+            slot: 7
+          - player_slot: 5
+            time: 3
+            slot: 7
+          sentry_kills: 5
+          kill_streaks: "{}"
+          hero_hits: "{}"
+          xp_per_min: 3
+          benchmarks: "{}"
+          level: 4
+          abandons: 1
+          player_slot: 7
+          damage_taken: "{}"
+          moonshard: 8
+          start_time: 4
+          last_hits: 8
+          sentry_uses: 7
+          ability_uses: "{}"
+          item_5: 0
+          item_4: 3
+          item_usage: "{}"
+          neutral_tokens_log:
+          - time: 8
+            key: key
+          - time: 8
+            key: key
+          item_3: 4
+          name: name
+          item_2: 8
+          item_1: 6
+          lane_efficiency: 7.92839742024475
+          creeps_stacked: 6
+          item_0: 4
+          region: 9
+          aghanims_shard: 9
+          kills: 2
+          hero_damage: 0
+          tower_kills: 3
+          backpack_1: 7
+          damage_targets: "{}"
+          backpack_2: 3
+          denies: 1
+          backpack_0: 8
+          life_state: "{}"
+          courier_kills: 5
+          cosmetics:
+          - prefab: prefab
+            image_inventory: image_inventory
+            item_type_name: item_type_name
+            item_id: 4
+            image_path: image_path
+            name: name
+            item_name: item_name
+            creation_date: 2000-01-23T04:56:07.000+00:00
+            item_description: item_description
+            used_by_heroes: used_by_heroes
+            item_rarity: item_rarity
+          - prefab: prefab
+            image_inventory: image_inventory
+            item_type_name: item_type_name
+            item_id: 4
+            image_path: image_path
+            name: name
+            item_name: item_name
+            creation_date: 2000-01-23T04:56:07.000+00:00
+            item_description: item_description
+            used_by_heroes: used_by_heroes
+            item_rarity: item_rarity
+          dn_t:
+          - 4
+          - 4
+          duration: 0
+          permanent_buffs:
+          - "{}"
+          - "{}"
+          times:
+          - 3
+          - 3
+          lane_efficiency_pct: 9.402167524121316
+          assists: 4
+          tower_damage: 2
+          xp_t:
+          - 8
+          - 8
+          rank_tier: 9
+          connection_log:
+          - player_slot: 0
+            time: 4
+            event: event
+          - player_slot: 0
+            time: 4
+            event: event
+          isRadiant: true
+          hero_id: 5
+          win: 0
+          lane: 1
+          sen_log:
+          - "{}"
+          - "{}"
+          sen_left_log:
+          - "{}"
+          - "{}"
+          is_roaming: true
+          aghanims_scepter: 3
+          purchase: "{}"
+          lobby_type: 7
+          ability_targets: "{}"
+          killed: "{}"
+          sen_placed: 7
+          ability_upgrades_arr:
+          - 6
+          - 6
+          party_id: 1
+          neutral_item_history:
+          - item_neutral: item_neutral
+            time: 6
+            item_neutral_enhancement: item_neutral_enhancement
+          - item_neutral: item_neutral
+            time: 6
+            item_neutral_enhancement: item_neutral_enhancement
+        - obs: "{}"
+          cluster: 0
+          gold_spent: 0
+          obs_left_log:
+          - "{}"
+          - "{}"
+          runes:
+            key: 3
+          observer_kills: 5
+          purchase_tpscroll: 3
+          obs_log:
+          - "{}"
+          - "{}"
+          lane_role: 4
+          observer_uses: 7
+          patch: 2
+          neutral_kills: 1
+          roshan_kills: 3
+          item_uses: "{}"
+          pings: 5
+          deaths: 4
+          purchase_log:
+          - charges: 7
+            time: 8
+            key: key
+          - charges: 7
+            time: 8
+            key: key
+          gold_per_min: 9
+          last_login: 2000-01-23T04:56:07.000+00:00
+          lose: 2
+          party_size: 0
+          kda: 9.806951670467935
+          lane_pos: "{}"
+          kills_per_min: 6.966044574347761
+          xp_reasons: "{}"
+          hero_variant: 5
+          buyback_count: 9
+          necronomicon_kills: 1
+          multi_kills: "{}"
+          kills_log:
+          - time: 1
+            key: key
+          - time: 1
+            key: key
+          rune_pickups: 3
+          actions: "{}"
+          damage: "{}"
+          lh_t:
+          - 8
+          - 8
+          gold_t:
+          - 9
+          - 9
+          first_purchase_time: "{}"
+          additional_units:
+          - "{}"
+          - "{}"
+          gold: 7
+          radiant_win: true
+          camps_stacked: 3
+          runes_log:
+          - time: 9
+            key: 5
+          - time: 9
+            key: 5
+          purchase_time: "{}"
+          sen: "{}"
+          ancient_kills: 3
+          actions_per_min: 8
+          match_id: 3703866531
+          life_state_dead: 2
+          lane_kills: 1
+          hero_kills: 4
+          stuns: 0.4768402382624515
+          account_id: 0
+          leaver_status: 6
+          hero_healing: 7
+          max_hero_hit: "{}"
+          killed_by: "{}"
+          game_mode: 4
+          obs_placed: 9
+          total_xp: 4
+          item_win: "{}"
+          gold_reasons: "{}"
+          personaname: 420 booty wizard
+          damage_inflictor_received: "{}"
+          damage_inflictor: "{}"
+          total_gold: 6
+          buyback_log:
+          - player_slot: 5
+            time: 3
+            slot: 7
+          - player_slot: 5
+            time: 3
+            slot: 7
+          sentry_kills: 5
+          kill_streaks: "{}"
+          hero_hits: "{}"
+          xp_per_min: 3
+          benchmarks: "{}"
+          level: 4
+          abandons: 1
+          player_slot: 7
+          damage_taken: "{}"
+          moonshard: 8
+          start_time: 4
+          last_hits: 8
+          sentry_uses: 7
+          ability_uses: "{}"
+          item_5: 0
+          item_4: 3
+          item_usage: "{}"
+          neutral_tokens_log:
+          - time: 8
+            key: key
+          - time: 8
+            key: key
+          item_3: 4
+          name: name
+          item_2: 8
+          item_1: 6
+          lane_efficiency: 7.92839742024475
+          creeps_stacked: 6
+          item_0: 4
+          region: 9
+          aghanims_shard: 9
+          kills: 2
+          hero_damage: 0
+          tower_kills: 3
+          backpack_1: 7
+          damage_targets: "{}"
+          backpack_2: 3
+          denies: 1
+          backpack_0: 8
+          life_state: "{}"
+          courier_kills: 5
+          cosmetics:
+          - prefab: prefab
+            image_inventory: image_inventory
+            item_type_name: item_type_name
+            item_id: 4
+            image_path: image_path
+            name: name
+            item_name: item_name
+            creation_date: 2000-01-23T04:56:07.000+00:00
+            item_description: item_description
+            used_by_heroes: used_by_heroes
+            item_rarity: item_rarity
+          - prefab: prefab
+            image_inventory: image_inventory
+            item_type_name: item_type_name
+            item_id: 4
+            image_path: image_path
+            name: name
+            item_name: item_name
+            creation_date: 2000-01-23T04:56:07.000+00:00
+            item_description: item_description
+            used_by_heroes: used_by_heroes
+            item_rarity: item_rarity
+          dn_t:
+          - 4
+          - 4
+          duration: 0
+          permanent_buffs:
+          - "{}"
+          - "{}"
+          times:
+          - 3
+          - 3
+          lane_efficiency_pct: 9.402167524121316
+          assists: 4
+          tower_damage: 2
+          xp_t:
+          - 8
+          - 8
+          rank_tier: 9
+          connection_log:
+          - player_slot: 0
+            time: 4
+            event: event
+          - player_slot: 0
+            time: 4
+            event: event
+          isRadiant: true
+          hero_id: 5
+          win: 0
+          lane: 1
+          sen_log:
+          - "{}"
+          - "{}"
+          sen_left_log:
+          - "{}"
+          - "{}"
+          is_roaming: true
+          aghanims_scepter: 3
+          purchase: "{}"
+          lobby_type: 7
+          ability_targets: "{}"
+          killed: "{}"
+          sen_placed: 7
+          ability_upgrades_arr:
+          - 6
+          - 6
+          party_id: 1
+          neutral_item_history:
+          - item_neutral: item_neutral
+            time: 6
+            item_neutral_enhancement: item_neutral_enhancement
+          - item_neutral: item_neutral
+            time: 6
+            item_neutral_enhancement: item_neutral_enhancement
+        match_id: 3703866531
+        league: "{}"
+        lobby_type: 9
+        version: 6
+        series_id: 3
+        start_time: 6
+        draft_timings:
+        - active_team: 2
+          pick: true
+          player_slot: 7
+          hero_id: 4
+          total_time_taken: 1
+          order: 3
+          extra_time: 1
+        - active_team: 2
+          pick: true
+          player_slot: 7
+          hero_id: 4
+          total_time_taken: 1
+          order: 3
+          extra_time: 1
+        throw: 2
+        chat:
+        - unit: unit
+          player_slot: 5
+          time: 1
+          slot: 5
+          key: key
+        - unit: unit
+          player_slot: 5
+          time: 1
+          slot: 5
+          key: key
+        leagueid: 5
+        dire_score: 9
+        game_mode: 1
+        positive_votes: 3
+        radiant_score: 1
+        tower_status_dire: 6
+        objectives:
+        - "{}"
+        - "{}"
+        barracks_status_dire: 0
+        region: 8
+        radiant_gold_adv:
+        - 6.965117697638846
+        - 6.965117697638846
+      properties:
+        match_id:
+          description: The ID number of the match assigned by Valve
+          example: 3703866531
+          type: integer
+        barracks_status_dire:
+          description: Bitmask. An integer that represents a binary of which barracks
+            are still standing. 63 would mean all barracks still stand at the end
+            of the game.
+          type: integer
+        barracks_status_radiant:
+          description: Bitmask. An integer that represents a binary of which barracks
+            are still standing. 63 would mean all barracks still stand at the end
+            of the game.
+          type: integer
+        chat:
+          description: Array containing information on the chat of the game
+          items:
+            $ref: "#/components/schemas/MatchResponse_chat_inner"
+          type: array
+        cluster:
+          description: cluster
+          type: integer
+        cosmetics:
+          additionalProperties:
+            type: integer
+          description: cosmetics
+          type: object
+        dire_score:
+          description: Number of kills the Dire team had when the match ended
+          type: integer
+        draft_timings:
+          description: draft_timings
+          items:
+            $ref: "#/components/schemas/MatchResponse_draft_timings_inner"
+          type: array
+        duration:
+          description: Duration of the game in seconds
+          type: integer
+        engine:
+          description: engine
+          type: integer
+        first_blood_time:
+          description: Time in seconds at which first blood occurred
+          type: integer
+        game_mode:
+          description: "Integer corresponding to game mode played. List of constants\
+            \ can be found here: https://github.com/odota/dotaconstants/blob/master/json/game_mode.json"
+          type: integer
+        human_players:
+          description: Number of human players in the game
+          type: integer
+        leagueid:
+          description: leagueid
+          type: integer
+        lobby_type:
+          description: "Integer corresponding to lobby type of match. List of constants\
+            \ can be found here: https://github.com/odota/dotaconstants/blob/master/json/lobby_type.json"
+          type: integer
+        match_seq_num:
+          description: match_seq_num
+          type: integer
+        negative_votes:
+          description: Number of negative votes the replay received in the in-game
+            client
+          type: integer
+        objectives:
+          description: objectives
+          items:
+            type: object
+          type: array
+        picks_bans:
+          description: "Array containing information on the draft. Each item contains\
+            \ a boolean relating to whether the choice is a pick or a ban, the hero\
+            \ ID, the team the picked or banned it, and the order."
+          items:
+            $ref: "#/components/schemas/MatchResponse_picks_bans_inner"
+          type: array
+        positive_votes:
+          description: Number of positive votes the replay received in the in-game
+            client
+          type: integer
+        radiant_gold_adv:
+          description: "Array of the Radiant gold advantage at each minute in the\
+            \ game. A negative number means that Radiant is behind, and thus it is\
+            \ their gold disadvantage. "
+          items:
+            type: number
+          type: array
+        radiant_score:
+          description: Number of kills the Radiant team had when the match ended
+          type: integer
+        radiant_win:
+          description: Boolean indicating whether Radiant won the match
+          nullable: true
+          type: boolean
+        radiant_xp_adv:
+          description: "Array of the Radiant experience advantage at each minute in\
+            \ the game. A negative number means that Radiant is behind, and thus it\
+            \ is their experience disadvantage. "
+          items:
+            type: number
+          type: array
+        start_time:
+          description: The Unix timestamp at which the game started
+          type: integer
+        teamfights:
+          description: teamfights
+          items:
+            type: object
+          nullable: true
+          type: array
+        tower_status_dire:
+          description: Bitmask. An integer that represents a binary of which Dire
+            towers are still standing.
+          type: integer
+        tower_status_radiant:
+          description: Bitmask. An integer that represents a binary of which Radiant
+            towers are still standing.
+          type: integer
+        version:
+          description: "Parse version, used internally by OpenDota"
+          type: integer
+        replay_salt:
+          description: replay_salt
+          type: integer
+        series_id:
+          description: series_id
+          type: integer
+        series_type:
+          description: series_type
+          type: integer
+        radiant_team:
+          description: radiant_team
+          type: object
+        dire_team:
+          description: dire_team
+          type: object
+        league:
+          description: league
+          type: object
+        skill:
+          description: "Skill bracket assigned by Valve (Normal, High, Very High)"
+          nullable: true
+          type: integer
+        players:
+          description: Array of information on individual players
+          items:
+            $ref: "#/components/schemas/MatchResponse_players_inner"
+          type: array
+        patch:
+          description: "Patch ID, from dotaconstants"
+          type: integer
+        region:
+          description: Integer corresponding to the region the game was played on
+          type: integer
+        all_word_counts:
+          description: Word counts of the all chat messages in the player's games
+          type: object
+        my_word_counts:
+          description: Word counts of the player's all chat messages
+          type: object
+        throw:
+          description: Maximum gold advantage of the player's team if they lost the
+            match
+          type: integer
+        comeback:
+          description: Maximum gold disadvantage of the player's team if they won
+            the match
+          type: integer
+        loss:
+          description: Maximum gold disadvantage of the player's team if they lost
+            the match
+          type: integer
+        win:
+          description: Maximum gold advantage of the player's team if they won the
+            match
+          type: integer
+        replay_url:
+          description: replay_url
+          type: string
+      title: MatchResponse
+      type: object
+    MetadataResponse:
+      example:
+        banner: "{}"
+      properties:
+        banner:
+          description: banner
+          nullable: true
+          type: object
+      title: MetadataResponse
+      type: object
+    ParsedMatchesResponse:
+      example:
+        match_id: 3703866531
+      properties:
+        match_id:
+          description: The ID number of the match assigned by Valve
+          example: 3703866531
+          type: integer
+      title: ParsedMatchesResponse
+      type: object
+    PlayerCountsResponse:
+      example:
+        patch: "{}"
+        leaver_status: "{}"
+        game_mode: "{}"
+        lobby_type: "{}"
+        region: "{}"
+        lane_role: "{}"
+      properties:
+        leaver_status:
+          description: "Integer describing whether or not the player left the game.\
+            \ 0: didn't leave. 1: left safely. 2+: Abandoned"
+          type: object
+        game_mode:
+          description: "Integer corresponding to game mode played. List of constants\
+            \ can be found here: https://github.com/odota/dotaconstants/blob/master/json/game_mode.json"
+          type: object
+        lobby_type:
+          description: "Integer corresponding to lobby type of match. List of constants\
+            \ can be found here: https://github.com/odota/dotaconstants/blob/master/json/lobby_type.json"
+          type: object
+        lane_role:
+          description: lane_role
+          type: object
+        region:
+          description: Integer corresponding to the region the game was played on
+          type: object
+        patch:
+          description: "Patch ID, from dotaconstants"
+          type: object
+      title: PlayerCountsResponse
+      type: object
+    PlayerHeroesResponse:
+      description: hero
+      example:
+        with_win: 2
+        with_games: 5
+        against_win: 9
+        last_played: 6
+        games: 1
+        hero_id: 0
+        win: 5
+        against_games: 7
+      properties:
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        last_played:
+          description: last_played
+          type: integer
+        games:
+          description: games
+          type: integer
+        win:
+          description: win
+          type: integer
+        with_games:
+          description: with_games
+          type: integer
+        with_win:
+          description: with_win
+          type: integer
+        against_games:
+          description: against_games
+          type: integer
+        against_win:
+          description: against_win
+          type: integer
+      title: PlayerHeroesResponse
+      type: object
+    PlayerMatchesResponse:
+      description: Object containing information on the match
+      example:
+        kills: 9
+        average_rank: 7
+        match_id: 3703866531
+        player_slot: 0
+        party_size: 1
+        lobby_type: 5
+        version: 7
+        duration: 6
+        start_time: 2
+        hero_variant: 1
+        radiant_win: true
+        leaver_status: 1
+        assists: 2
+        skill: 4
+        game_mode: 1
+        hero_id: 5
+        deaths: 3
+      properties:
+        match_id:
+          description: The ID number of the match assigned by Valve
+          example: 3703866531
+          type: integer
+        player_slot:
+          description: "Which slot the player is in. 0-127 are Radiant, 128-255 are\
+            \ Dire"
+          nullable: true
+          type: integer
+        radiant_win:
+          description: Boolean indicating whether Radiant won the match
+          nullable: true
+          type: boolean
+        duration:
+          description: Duration of the game in seconds
+          type: integer
+        game_mode:
+          description: "Integer corresponding to game mode played. List of constants\
+            \ can be found here: https://github.com/odota/dotaconstants/blob/master/json/game_mode.json"
+          type: integer
+        lobby_type:
+          description: "Integer corresponding to lobby type of match. List of constants\
+            \ can be found here: https://github.com/odota/dotaconstants/blob/master/json/lobby_type.json"
+          type: integer
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        start_time:
+          description: The Unix timestamp at which the game started
+          type: integer
+        version:
+          description: version
+          nullable: true
+          type: integer
+        kills:
+          description: Total kills the player had at the end of the game
+          type: integer
+        deaths:
+          description: Total deaths the player had at the end of the game
+          type: integer
+        assists:
+          description: Total assists the player had at the end of the game
+          type: integer
+        skill:
+          description: "Skill bracket assigned by Valve (Normal, High, Very High)"
+          nullable: true
+          type: integer
+        average_rank:
+          description: Average rank of players with public match data
+          nullable: true
+          type: integer
+        leaver_status:
+          description: "Integer describing whether or not the player left the game.\
+            \ 0: didn't leave. 1: left safely. 2+: Abandoned"
+          type: integer
+        party_size:
+          description: Size of the player's party
+          nullable: true
+          type: integer
+        hero_variant:
+          description: "1-indexed facet, see https://github.com/odota/dotaconstants/blob/master/build/hero_abilities.json"
+          type: integer
+      title: PlayerMatchesResponse
+      type: object
+    PlayerObjectResponse:
+      example:
+        profileurl: profileurl
+        is_locked: true
+        last_login: 2000-01-23T04:56:07.000+00:00
+        fantasy_role: 1
+        avatarfull: avatarfull
+        fh_unavailable: true
+        team_tag: team_tag
+        avatarmedium: avatarmedium
+        locked_until: 5
+        avatar: avatar
+        team_id: 5
+        personaname: 420 booty wizard
+        team_name: Newbee
+        full_history_time: 2000-01-23T04:56:07.000+00:00
+        cheese: 6
+        steamid: steamid
+        country_code: country_code
+        account_id: 0
+        is_pro: true
+        name: name
+        loccountrycode: loccountrycode
+      properties:
+        account_id:
+          description: The player account ID
+          type: integer
+        steamid:
+          description: Player's steam identifier
+          type: string
+        avatar:
+          description: Steam picture URL (small picture)
+          type: string
+        avatarmedium:
+          description: Steam picture URL (medium picture)
+          type: string
+        avatarfull:
+          description: Steam picture URL (full picture)
+          type: string
+        profileurl:
+          description: Steam profile URL
+          type: string
+        personaname:
+          description: Player's Steam name
+          example: 420 booty wizard
+          nullable: true
+          type: string
+        last_login:
+          description: Date and time of last login to OpenDota
+          format: date-time
+          type: string
+        full_history_time:
+          description: Date and time of last request to refresh player's match history
+          format: date-time
+          type: string
+        cheese:
+          description: Amount of dollars the player has donated to OpenDota
+          type: integer
+        fh_unavailable:
+          description: Whether the refresh of player' match history failed
+          type: boolean
+        loccountrycode:
+          description: "Player's country identifier, e.g. US"
+          type: string
+        name:
+          description: "Verified player name, e.g. 'Miracle-'"
+          type: string
+        country_code:
+          description: Player's country code
+          type: string
+        fantasy_role:
+          description: "Player's ingame role (core: 1 or support: 2)"
+          type: integer
+        team_id:
+          description: Player's team identifier
+          type: integer
+        team_name:
+          description: Team name
+          example: Newbee
+          nullable: true
+          type: string
+        team_tag:
+          description: "Player's team shorthand tag, e.g. 'EG'"
+          type: string
+        is_locked:
+          description: Whether the roster lock is active
+          type: boolean
+        is_pro:
+          description: Whether the player is professional or not
+          type: boolean
+        locked_until:
+          description: When the roster lock will end
+          type: integer
+      title: PlayerObjectResponse
+      type: object
+    PlayerPeersResponse:
+      example:
+        with_gpm_sum: 3
+        against_win: 7
+        last_login: last_login
+        is_subscriber: true
+        avatarfull: avatarfull
+        avatar: avatar
+        personaname: 420 booty wizard
+        is_contributor: true
+        with_win: 5
+        account_id: 0
+        with_games: 2
+        with_xpm_sum: 2
+        last_played: 6
+        games: 5
+        name: name
+        win: 1
+        against_games: 9
+      properties:
+        account_id:
+          description: The player account ID
+          type: integer
+        last_played:
+          description: last_played
+          type: integer
+        win:
+          description: win
+          type: integer
+        games:
+          description: games
+          type: integer
+        with_win:
+          description: with_win
+          type: integer
+        with_games:
+          description: with_games
+          type: integer
+        against_win:
+          description: against_win
+          type: integer
+        against_games:
+          description: against_games
+          type: integer
+        with_gpm_sum:
+          description: with_gpm_sum
+          type: integer
+        with_xpm_sum:
+          description: with_xpm_sum
+          type: integer
+        personaname:
+          description: Player's Steam name
+          example: 420 booty wizard
+          nullable: true
+          type: string
+        name:
+          description: name
+          nullable: true
+          type: string
+        is_contributor:
+          description: is_contributor
+          type: boolean
+        is_subscriber:
+          description: is_subscriber
+          type: boolean
+        last_login:
+          description: last_login
+          nullable: true
+          type: string
+        avatar:
+          description: avatar
+          nullable: true
+          type: string
+        avatarfull:
+          description: avatarfull
+          nullable: true
+          type: string
+      title: PlayerPeersResponse
+      type: object
+    PlayerProsResponse:
+      example:
+        is_locked: true
+        with_gpm_sum: 1
+        fantasy_role: 6
+        fh_unavailable: true
+        locked_until: 5
+        team_id: 1
+        cheese: 5
+        with_win: 3
+        last_played: 2
+        games: 9
+        loccountrycode: loccountrycode
+        win: 7
+        profileurl: profileurl
+        last_login: 2000-01-23T04:56:07.000+00:00
+        against_win: 4
+        team_tag: team_tag
+        avatarfull: avatarfull
+        avatarmedium: avatarmedium
+        avatar: avatar
+        team_name: Newbee
+        full_history_time: 2000-01-23T04:56:07.000+00:00
+        steamid: steamid
+        country_code: country_code
+        account_id: 0
+        with_games: 2
+        with_xpm_sum: 1
+        is_pro: true
+        name: name
+        against_games: 7
+      properties:
+        account_id:
+          description: The player account ID
+          type: integer
+        name:
+          description: name
+          nullable: true
+          type: string
+        country_code:
+          description: country_code
+          type: string
+        fantasy_role:
+          description: fantasy_role
+          type: integer
+        team_id:
+          description: team_id
+          type: integer
+        team_name:
+          description: Team name
+          example: Newbee
+          nullable: true
+          type: string
+        team_tag:
+          description: team_tag
+          nullable: true
+          type: string
+        is_locked:
+          description: is_locked
+          type: boolean
+        is_pro:
+          description: is_pro
+          type: boolean
+        locked_until:
+          description: locked_until
+          nullable: true
+          type: integer
+        steamid:
+          description: steamid
+          nullable: true
+          type: string
+        avatar:
+          description: avatar
+          nullable: true
+          type: string
+        avatarmedium:
+          description: avatarmedium
+          nullable: true
+          type: string
+        avatarfull:
+          description: avatarfull
+          nullable: true
+          type: string
+        profileurl:
+          description: profileurl
+          nullable: true
+          type: string
+        last_login:
+          description: last_login
+          format: date-time
+          nullable: true
+          type: string
+        full_history_time:
+          description: full_history_time
+          format: date-time
+          nullable: true
+          type: string
+        cheese:
+          description: cheese
+          nullable: true
+          type: integer
+        fh_unavailable:
+          description: fh_unavailable
+          nullable: true
+          type: boolean
+        loccountrycode:
+          description: loccountrycode
+          nullable: true
+          type: string
+        last_played:
+          description: last_played
+          nullable: true
+          type: integer
+        win:
+          description: win
+          type: integer
+        games:
+          description: games
+          type: integer
+        with_win:
+          description: with_win
+          type: integer
+        with_games:
+          description: with_games
+          type: integer
+        against_win:
+          description: against_win
+          type: integer
+        against_games:
+          description: against_games
+          type: integer
+        with_gpm_sum:
+          description: with_gpm_sum
+          nullable: true
+          type: integer
+        with_xpm_sum:
+          description: with_xpm_sum
+          nullable: true
+          type: integer
+      title: PlayerProsResponse
+      type: object
+    PlayerRankingsResponse:
+      example:
+        score: 6.027456183070403
+        percent_rank: 1.4658129805029452
+        hero_id: 0
+        card: 5
+      properties:
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        score:
+          description: Hero score
+          type: number
+        percent_rank:
+          description: percent_rank
+          type: number
+        card:
+          description: numeric_rank
+          type: integer
+      title: PlayerRankingsResponse
+      type: object
+    PlayerRatingsResponse:
+      example:
+        account_id: 0
+        solo_competitive_rank: 6
+        competitive_rank: 1
+        match_id: 3703866531
+        time: 5
+      properties:
+        account_id:
+          description: The player account ID
+          type: integer
+        match_id:
+          description: The ID number of the match assigned by Valve
+          example: 3703866531
+          type: integer
+        solo_competitive_rank:
+          description: solo_competitive_rank
+          nullable: true
+          type: integer
+        competitive_rank:
+          description: competitive_rank
+          type: integer
+        time:
+          description: time
+          type: integer
+      title: PlayerRatingsResponse
+      type: object
+    PlayerRecentMatchesResponse:
+      description: match
+      example:
+        kills: 9
+        cluster: 5
+        hero_damage: 1
+        lane_role: 4
+        duration: 6
+        radiant_win: true
+        assists: 2
+        skill: 4
+        xp_per_min: 1
+        hero_id: 5
+        deaths: 3
+        lane: 1
+        gold_per_min: 1
+        is_roaming: true
+        average_rank: 7
+        match_id: 3703866531
+        player_slot: 0
+        party_size: 9
+        lobby_type: 5
+        version: 7
+        start_time: 2
+        last_hits: 7
+        hero_variant: 6
+        leaver_status: 9
+        hero_healing: 6
+        game_mode: 1
+      properties:
+        match_id:
+          description: The ID number of the match assigned by Valve
+          example: 3703866531
+          type: integer
+        player_slot:
+          description: "Which slot the player is in. 0-127 are Radiant, 128-255 are\
+            \ Dire"
+          nullable: true
+          type: integer
+        radiant_win:
+          description: Boolean indicating whether Radiant won the match
+          nullable: true
+          type: boolean
+        duration:
+          description: Duration of the game in seconds
+          type: integer
+        game_mode:
+          description: "Integer corresponding to game mode played. List of constants\
+            \ can be found here: https://github.com/odota/dotaconstants/blob/master/json/game_mode.json"
+          type: integer
+        lobby_type:
+          description: "Integer corresponding to lobby type of match. List of constants\
+            \ can be found here: https://github.com/odota/dotaconstants/blob/master/json/lobby_type.json"
+          type: integer
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        start_time:
+          description: The Unix timestamp at which the game started
+          type: integer
+        version:
+          description: version
+          nullable: true
+          type: integer
+        kills:
+          description: Total kills the player had at the end of the match
+          type: integer
+        deaths:
+          description: Total deaths the player had at the end of the match
+          type: integer
+        assists:
+          description: Total assists the player had at the end of the match
+          type: integer
+        skill:
+          description: "Skill bracket assigned by Valve (Normal, High, Very High).\
+            \ If the skill is unknown, will return null."
+          nullable: true
+          type: integer
+        average_rank:
+          description: Average rank of players with public match data
+          nullable: true
+          type: integer
+        xp_per_min:
+          description: Experience Per Minute obtained by the player
+          type: integer
+        gold_per_min:
+          description: Average gold per minute of the player
+          type: integer
+        hero_damage:
+          description: Total hero damage to enemy heroes
+          type: integer
+        hero_healing:
+          description: Total healing of ally heroes
+          type: integer
+        last_hits:
+          description: Total last hits the player had at the end of the match
+          type: integer
+        lane:
+          description: Integer corresponding to which lane the player laned in for
+            the match
+          nullable: true
+          type: integer
+        lane_role:
+          description: lane_role
+          nullable: true
+          type: integer
+        is_roaming:
+          description: Boolean describing whether or not the player roamed
+          nullable: true
+          type: boolean
+        cluster:
+          description: cluster
+          type: integer
+        leaver_status:
+          description: "Integer describing whether or not the player left the game.\
+            \ 0: didn't leave. 1: left safely. 2+: Abandoned"
+          type: integer
+        party_size:
+          description: "Size of the players party. If not in a party, will return\
+            \ 1."
+          nullable: true
+          type: integer
+        hero_variant:
+          description: "1-indexed facet, see https://github.com/odota/dotaconstants/blob/master/build/hero_abilities.json"
+          type: integer
+      title: PlayerRecentMatchesResponse
+      type: object
+    PlayersResponse:
+      example:
+        solo_competitive_rank: 0
+        rank_tier: 1.4658129805029452
+        competitive_rank: 6
+        profile:
+          profileurl: profileurl
+          last_login: last_login
+          avatarfull: avatarfull
+          is_subscriber: false
+          avatarmedium: avatarmedium
+          avatar: avatar
+          personaname: 420 booty wizard
+          plus: true
+          is_contributor: false
+          cheese: 2
+          steamid: steamid
+          account_id: 5
+          name: name
+          loccountrycode: loccountrycode
+        leaderboard_rank: 5.962133916683182
+      properties:
+        solo_competitive_rank:
+          description: solo_competitive_rank
+          nullable: true
+          type: integer
+        competitive_rank:
+          description: competitive_rank
+          nullable: true
+          type: integer
+        rank_tier:
+          description: rank_tier
+          nullable: true
+          type: number
+        leaderboard_rank:
+          description: leaderboard_rank
+          nullable: true
+          type: number
+        profile:
+          $ref: "#/components/schemas/PlayersResponse_profile"
+      title: PlayerResponse
+      type: object
+    PlayerTotalsResponse:
+      example:
+        field: field
+        sum: 6.027456183070403
+        "n": 0
+      properties:
+        field:
+          description: field
+          type: string
+        "n":
+          description: number
+          type: integer
+        sum:
+          description: sum
+          type: number
+      title: PlayerTotalsResponse
+      type: object
+    PlayerWardMapResponse:
+      example:
+        obs: "{}"
+        sen: "{}"
+      properties:
+        obs:
+          description: obs
+          type: object
+        sen:
+          description: sen
+          type: object
+      title: PlayerWardMapResponse
+      type: object
+    PlayerWinLossResponse:
+      example:
+        lose: 6
+        win: 0
+      properties:
+        win:
+          description: Number of wins
+          type: integer
+        lose:
+          description: Number of loses
+          type: integer
+      title: PlayerWinLossResponse
+      type: object
+    PlayerWordCloudResponse:
+      example:
+        my_word_counts: "{}"
+        all_word_counts: "{}"
+      properties:
+        my_word_counts:
+          description: my_word_counts
+          type: object
+        all_word_counts:
+          description: all_word_counts
+          type: object
+      title: PlayerWordCloudResponse
+      type: object
+    PublicMatchesResponse:
+      example:
+        duration: 1
+        start_time: 6
+        cluster: 9
+        num_rank_tier: 7
+        radiant_win: true
+        dire_team:
+        - 2
+        - 2
+        match_seq_num: 0
+        avg_rank_tier: 2
+        match_id: 3703866531
+        game_mode: 5
+        lobby_type: 5
+        radiant_team:
+        - 3
+        - 3
+      properties:
+        match_id:
+          description: The ID number of the match assigned by Valve
+          example: 3703866531
+          type: integer
+        match_seq_num:
+          description: match_seq_num
+          type: integer
+        radiant_win:
+          description: Boolean indicating whether Radiant won the match
+          nullable: true
+          type: boolean
+        start_time:
+          description: The Unix timestamp at which the game started
+          type: integer
+        duration:
+          description: Duration of the game in seconds
+          type: integer
+        lobby_type:
+          type: integer
+        game_mode:
+          type: integer
+        avg_rank_tier:
+          type: integer
+        num_rank_tier:
+          type: integer
+        cluster:
+          type: integer
+        radiant_team:
+          description: radiant_team
+          items:
+            type: integer
+          type: array
+        dire_team:
+          description: dire_team
+          items:
+            type: integer
+          type: array
+      title: PublicMatchesResponse
+      type: object
+    RankingsResponse:
+      example:
+        rankings:
+        - profileurl: profileurl
+          last_login: 2000-01-23T04:56:07.000+00:00
+          avatarfull: avatarfull
+          fh_unavailable: true
+          avatarmedium: avatarmedium
+          avatar: avatar
+          personaname: 420 booty wizard
+          full_history_time: 2000-01-23T04:56:07.000+00:00
+          cheese: 5
+          steamid: steamid
+          score: 1.4658129805029452
+          account_id: 6
+          rank_tier: 5
+          loccountrycode: loccountrycode
+        - profileurl: profileurl
+          last_login: 2000-01-23T04:56:07.000+00:00
+          avatarfull: avatarfull
+          fh_unavailable: true
+          avatarmedium: avatarmedium
+          avatar: avatar
+          personaname: 420 booty wizard
+          full_history_time: 2000-01-23T04:56:07.000+00:00
+          cheese: 5
+          steamid: steamid
+          score: 1.4658129805029452
+          account_id: 6
+          rank_tier: 5
+          loccountrycode: loccountrycode
+        hero_id: 0
+      properties:
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        rankings:
+          description: rankings
+          items:
+            $ref: "#/components/schemas/RankingsResponse_rankings_inner"
+          type: array
+      title: RankingsResponse
+      type: object
+    RecordsResponse:
+      example:
+        start_time: 0
+        score: 1
+        match_id: 3703866531
+        hero_id: 6
+      properties:
+        match_id:
+          description: The ID number of the match assigned by Valve
+          example: 3703866531
+          type: integer
+        start_time:
+          description: The Unix timestamp at which the game started
+          type: integer
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        score:
+          description: Record score
+          type: integer
+      title: RecordsResponse
+      type: object
+    ScenarioItemTimingsResponse:
+      example:
+        wins: wins
+        item: item
+        games: games
+        hero_id: 0
+        time: 6
+      properties:
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        item:
+          description: Purchased item
+          type: string
+        time:
+          description: Ingame time in seconds before the item was purchased
+          type: integer
+        games:
+          description: The number of games where the hero bought this item before
+            this time
+          type: string
+        wins:
+          description: The number of games won where the hero bought this item before
+            this time
+          type: string
+      title: ScenarioItemTimingsResponse
+      type: object
+    ScenarioLaneRolesResponse:
+      example:
+        wins: wins
+        games: games
+        hero_id: 0
+        time: 1
+        lane_role: 6
+      properties:
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        lane_role:
+          description: The hero's lane role
+          type: integer
+        time:
+          description: Maximum game length in seconds
+          type: integer
+        games:
+          description: The number of games where the hero played in this lane role
+          type: string
+        wins:
+          description: The number of games won where the hero played in this lane
+            role
+          type: string
+      title: ScenarioLaneRolesResponse
+      type: object
+    ScenarioMiscResponse:
+      example:
+        wins: wins
+        scenario: scenario
+        is_radiant: true
+        games: games
+        region: 0
+      properties:
+        scenario:
+          description: The scenario's name or description
+          type: string
+        is_radiant:
+          description: Boolean indicating whether Radiant executed this scenario
+          type: boolean
+        region:
+          description: Region the game was played in
+          type: integer
+        games:
+          description: The number of games where this scenario occurred
+          type: string
+        wins:
+          description: The number of games won where this scenario occured
+          type: string
+      title: ScenarioMiscResponse
+      type: object
+    SchemaResponse:
+      example:
+        column_name: column_name
+        data_type: data_type
+        table_name: table_name
+      properties:
+        table_name:
+          description: table_name
+          type: string
+        column_name:
+          description: column_name
+          type: string
+        data_type:
+          description: data_type
+          type: string
+      title: SchemaResponse
+      type: object
+    SearchResponse:
+      example:
+        last_match_time: last_match_time
+        account_id: 0
+        similarity: 6.027456183070403
+        avatarfull: avatarfull
+        personaname: 420 booty wizard
+      properties:
+        account_id:
+          description: The player account ID
+          type: integer
+        avatarfull:
+          description: avatarfull
+          nullable: true
+          type: string
+        personaname:
+          description: Player's Steam name
+          example: 420 booty wizard
+          nullable: true
+          type: string
+        last_match_time:
+          description: last_match_time. May not be present or null.
+          type: string
+        similarity:
+          description: similarity
+          type: number
+      title: SearchResponse
+      type: object
+    TeamHeroesResponse:
+      example:
+        wins: 1
+        name: Anti-Mage
+        games_played: 6
+        hero_id: 0
+      properties:
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        name:
+          description: Hero name
+          example: Anti-Mage
+          type: string
+        games_played:
+          description: Number of games played
+          type: integer
+        wins:
+          description: Number of wins
+          type: integer
+      title: TeamHeroesResponse
+      type: object
+    TeamMatchObjectResponse:
+      example:
+        opposing_team_id: 7
+        cluster: 2
+        match_id: 3703866531
+        league_name: league_name
+        radiant: true
+        duration: 1
+        start_time: 5
+        radiant_win: true
+        leagueid: 5
+        dire_score: 6
+        radiant_score: 0
+        opposing_team_name: opposing_team_name
+        opposing_team_logo: opposing_team_logo
+      properties:
+        match_id:
+          description: The ID number of the match assigned by Valve
+          example: 3703866531
+          type: integer
+        radiant:
+          description: Whether the team/player/hero was on Radiant
+          type: boolean
+        radiant_win:
+          description: Boolean indicating whether Radiant won the match
+          nullable: true
+          type: boolean
+        radiant_score:
+          description: Number of kills the Radiant team had when the match ended
+          type: integer
+        dire_score:
+          description: Number of kills the Dire team had when the match ended
+          type: integer
+        duration:
+          description: Duration of the game in seconds
+          type: integer
+        start_time:
+          description: The Unix timestamp at which the game started
+          type: integer
+        leagueid:
+          description: Identifier for the league the match took place in
+          type: integer
+        league_name:
+          description: Name of league the match took place in
+          type: string
+        cluster:
+          description: cluster
+          type: integer
+        opposing_team_id:
+          description: Opposing team identifier
+          type: integer
+        opposing_team_name:
+          description: "Opposing team name, e.g. 'Evil Geniuses'"
+          nullable: true
+          type: string
+        opposing_team_logo:
+          description: Opposing team logo url
+          type: string
+      title: TeamMatchObjectResponse
+      type: object
+    TeamObjectResponse:
+      example:
+        wins: 1
+        last_match_time: 5
+        rating: 6.027456183070403
+        name: Newbee
+        team_id: 0
+        tag: tag
+        losses: 5
+      properties:
+        team_id:
+          description: Team's identifier
+          type: integer
+        rating:
+          description: The Elo rating of the team
+          type: number
+        wins:
+          description: The number of games won by this team
+          type: integer
+        losses:
+          description: The number of losses by this team
+          type: integer
+        last_match_time:
+          description: The Unix timestamp of the last match played by this team
+          type: integer
+        name:
+          description: Team name
+          example: Newbee
+          nullable: true
+          type: string
+        tag:
+          description: The team tag/abbreviation
+          type: string
+      title: TeamObjectResponse
+      type: object
+    TeamPlayersResponse:
+      example:
+        wins: 1
+        account_id: 0
+        name: name
+        games_played: 6
+        is_current_team_member: true
+      properties:
+        account_id:
+          description: The player account ID
+          type: integer
+        name:
+          description: name
+          nullable: true
+          type: string
+        games_played:
+          description: Number of games played
+          type: integer
+        wins:
+          description: Number of wins
+          type: integer
+        is_current_team_member:
+          description: If this player is on the current roster
+          type: boolean
+      title: TeamPlayersResponse
+      type: object
+    get_constants_by_resource_200_response_oneOf_inner:
+      oneOf:
+      - additionalProperties:
+          title: ConstantResourceResponse
+        type: object
+      - type: integer
+    get_constants_by_resource_200_response:
+      nullable: true
+      oneOf:
+      - additionalProperties:
+          title: ConstantResourceResponse
+        type: object
+      - items:
+          $ref: "#/components/schemas/get_constants_by_resource_200_response_oneOf_inner"
+        type: array
+    BenchmarksResponse_result_gold_per_min_inner:
+      example:
+        percentile: 6.027456183070403
+        value: 1.4658129805029452
+      properties:
+        percentile:
+          description: percentile
+          type: number
+        value:
+          description: value
+          type: number
+      type: object
+    BenchmarksResponse_result_tower_damage_inner:
+      example:
+        percentile: 5.962133916683182
+        value: 5
+      properties:
+        percentile:
+          description: percentile
+          type: number
+        value:
+          description: value
+          type: integer
+      type: object
+    BenchmarksResponse_result:
+      description: result
+      example:
+        gold_per_min:
+        - percentile: 6.027456183070403
+          value: 1.4658129805029452
+        - percentile: 6.027456183070403
+          value: 1.4658129805029452
+        tower_damage:
+        - percentile: 5.962133916683182
+          value: 5
+        - percentile: 5.962133916683182
+          value: 5
+        last_hits_per_min:
+        - percentile: 6.027456183070403
+          value: 1.4658129805029452
+        - percentile: 6.027456183070403
+          value: 1.4658129805029452
+        hero_damage_per_min:
+        - percentile: 6.027456183070403
+          value: 1.4658129805029452
+        - percentile: 6.027456183070403
+          value: 1.4658129805029452
+        xp_per_min:
+        - percentile: 6.027456183070403
+          value: 1.4658129805029452
+        - percentile: 6.027456183070403
+          value: 1.4658129805029452
+        hero_healing_per_min:
+        - percentile: 6.027456183070403
+          value: 1.4658129805029452
+        - percentile: 6.027456183070403
+          value: 1.4658129805029452
+        kills_per_min:
+        - percentile: 6.027456183070403
+          value: 1.4658129805029452
+        - percentile: 6.027456183070403
+          value: 1.4658129805029452
+      properties:
+        gold_per_min:
+          items:
+            $ref: "#/components/schemas/BenchmarksResponse_result_gold_per_min_inner"
+          type: array
+        xp_per_min:
+          items:
+            $ref: "#/components/schemas/BenchmarksResponse_result_gold_per_min_inner"
+          type: array
+        kills_per_min:
+          items:
+            $ref: "#/components/schemas/BenchmarksResponse_result_gold_per_min_inner"
+          type: array
+        last_hits_per_min:
+          items:
+            $ref: "#/components/schemas/BenchmarksResponse_result_gold_per_min_inner"
+          type: array
+        hero_damage_per_min:
+          items:
+            $ref: "#/components/schemas/BenchmarksResponse_result_gold_per_min_inner"
+          type: array
+        hero_healing_per_min:
+          items:
+            $ref: "#/components/schemas/BenchmarksResponse_result_gold_per_min_inner"
+          type: array
+        tower_damage:
+          items:
+            $ref: "#/components/schemas/BenchmarksResponse_result_tower_damage_inner"
+          type: array
+      type: object
+    DistributionsResponse_ranks_rows_inner:
+      example:
+        bin: 0
+        bin_name: 6
+        cumulative_sum: 5
+        count: 1
+      properties:
+        bin:
+          description: bin
+          type: integer
+        bin_name:
+          description: bin_name
+          type: integer
+        count:
+          description: count
+          type: integer
+        cumulative_sum:
+          description: cumulative_sum
+          type: integer
+      type: object
+    DistributionsResponse_ranks_sum:
+      description: sum
+      example:
+        count: 5
+      properties:
+        count:
+          description: count
+          type: integer
+      type: object
+    DistributionsResponse_ranks:
+      description: ranks
+      example:
+        sum:
+          count: 5
+        rows:
+        - bin: 0
+          bin_name: 6
+          cumulative_sum: 5
+          count: 1
+        - bin: 0
+          bin_name: 6
+          cumulative_sum: 5
+          count: 1
+      properties:
+        rows:
+          description: rows
+          items:
+            $ref: "#/components/schemas/DistributionsResponse_ranks_rows_inner"
+          type: array
+        sum:
+          $ref: "#/components/schemas/DistributionsResponse_ranks_sum"
+      type: object
+    HeroItemPopularityResponse_start_game_items:
+      description: Items bought before game started
+      example:
+        item: 0
+      properties:
+        item:
+          description: Number of item bought
+          type: integer
+      type: object
+    HeroItemPopularityResponse_early_game_items:
+      description: "Items bought in the first 10 min of the game, with cost at least\
+        \ 700"
+      example:
+        item: 6
+      properties:
+        item:
+          description: Number of item bought
+          type: integer
+      type: object
+    HeroItemPopularityResponse_mid_game_items:
+      description: "Items bought between 10 and 25 min of the game, with cost at least\
+        \ 2000"
+      example:
+        item: 1
+      properties:
+        item:
+          description: Number of item bought
+          type: integer
+      type: object
+    HeroItemPopularityResponse_late_game_items:
+      description: "Items bought at least 25 min after game started, with cost at\
+        \ least 4000"
+      example:
+        item: 5
+      properties:
+        item:
+          description: Number of item bought
+          type: integer
+      type: object
+    MatchResponse_chat_inner:
+      example:
+        unit: unit
+        player_slot: 5
+        time: 1
+        slot: 5
+        key: key
+      properties:
+        time:
+          description: Time in seconds at which the message was said
+          type: integer
+        unit:
+          description: Name of the player who sent the message
+          type: string
+        key:
+          description: The message the player sent
+          type: string
+        slot:
+          description: slot
+          type: integer
+        player_slot:
+          description: "Which slot the player is in. 0-127 are Radiant, 128-255 are\
+            \ Dire"
+          nullable: true
+          type: integer
+      type: object
+    MatchResponse_draft_timings_inner:
+      description: draft_stage
+      example:
+        active_team: 2
+        pick: true
+        player_slot: 7
+        hero_id: 4
+        total_time_taken: 1
+        order: 3
+        extra_time: 1
+      properties:
+        order:
+          description: order
+          type: integer
+        pick:
+          description: pick
+          type: boolean
+        active_team:
+          description: active_team
+          type: integer
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        player_slot:
+          description: "Which slot the player is in. 0-127 are Radiant, 128-255 are\
+            \ Dire"
+          nullable: true
+          type: integer
+        extra_time:
+          description: extra_time
+          type: integer
+        total_time_taken:
+          description: total_time_taken
+          type: integer
+      type: object
+    MatchResponse_picks_bans_inner:
+      example:
+        hero_id: 8
+        team: 9
+        is_pick: true
+        order: 6
+      properties:
+        is_pick:
+          description: Boolean indicating whether the choice is a pick or a ban
+          type: boolean
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        team:
+          description: The team that picked or banned the hero
+          type: integer
+        order:
+          description: The order of the pick or ban
+          type: integer
+      type: object
+    MatchResponse_players_inner_buyback_log_inner:
+      example:
+        player_slot: 5
+        time: 3
+        slot: 7
+      properties:
+        time:
+          description: Time in seconds the buyback occurred
+          type: integer
+        slot:
+          description: slot
+          type: integer
+        player_slot:
+          description: "Which slot the player is in. 0-127 are Radiant, 128-255 are\
+            \ Dire"
+          nullable: true
+          type: integer
+      type: object
+    MatchResponse_players_inner_connection_log_inner:
+      example:
+        player_slot: 0
+        time: 4
+        event: event
+      properties:
+        time:
+          description: Game time in seconds the event ocurred
+          type: integer
+        event:
+          description: Event that occurred
+          type: string
+        player_slot:
+          description: "Which slot the player is in. 0-127 are Radiant, 128-255 are\
+            \ Dire"
+          nullable: true
+          type: integer
+      type: object
+    MatchResponse_players_inner_kills_log_inner:
+      example:
+        time: 1
+        key: key
+      properties:
+        time:
+          description: Time in seconds the player killed the hero
+          type: integer
+        key:
+          description: Hero killed
+          type: string
+      type: object
+    MatchResponse_players_inner_purchase_log_inner:
+      example:
+        charges: 7
+        time: 8
+        key: key
+      properties:
+        time:
+          description: Time in seconds the item was bought
+          type: integer
+        key:
+          description: String item ID
+          type: string
+        charges:
+          description: Integer amount of charges
+          type: integer
+      type: object
+    MatchResponse_players_inner_runes_log_inner:
+      example:
+        time: 9
+        key: 5
+      properties:
+        time:
+          description: Time in seconds rune picked up
+          type: integer
+        key:
+          description: key
+          type: integer
+      type: object
+    MatchResponse_players_inner_cosmetics_inner:
+      example:
+        prefab: prefab
+        image_inventory: image_inventory
+        item_type_name: item_type_name
+        item_id: 4
+        image_path: image_path
+        name: name
+        item_name: item_name
+        creation_date: 2000-01-23T04:56:07.000+00:00
+        item_description: item_description
+        used_by_heroes: used_by_heroes
+        item_rarity: item_rarity
+      properties:
+        item_id:
+          type: integer
+        name:
+          description: name
+          nullable: true
+          type: string
+        prefab:
+          type: string
+        creation_date:
+          format: date-time
+          nullable: true
+          type: string
+        image_inventory:
+          nullable: true
+          type: string
+        image_path:
+          nullable: true
+          type: string
+        item_description:
+          nullable: true
+          type: string
+        item_name:
+          type: string
+        item_rarity:
+          nullable: true
+          type: string
+        item_type_name:
+          nullable: true
+          type: string
+        used_by_heroes:
+          nullable: true
+          type: string
+      type: object
+    MatchResponse_players_inner_neutral_tokens_log_inner:
+      example:
+        time: 8
+        key: key
+      properties:
+        time:
+          description: Time in seconds at which the token was dropped
+          type: integer
+        key:
+          description: Type of token dropped
+          type: string
+      type: object
+    MatchResponse_players_inner_neutral_item_history_inner:
+      example:
+        item_neutral: item_neutral
+        time: 6
+        item_neutral_enhancement: item_neutral_enhancement
+      properties:
+        time:
+          description: Time in seconds at which the item was crafted
+          type: integer
+        item_neutral:
+          description: Neutral item name
+          type: string
+        item_neutral_enhancement:
+          description: Neutral enhancement name
+          type: string
+      type: object
+    MatchResponse_players_inner:
+      description: player
+      example:
+        obs: "{}"
+        cluster: 0
+        gold_spent: 0
+        obs_left_log:
+        - "{}"
+        - "{}"
+        runes:
+          key: 3
+        observer_kills: 5
+        purchase_tpscroll: 3
+        obs_log:
+        - "{}"
+        - "{}"
+        lane_role: 4
+        observer_uses: 7
+        patch: 2
+        neutral_kills: 1
+        roshan_kills: 3
+        item_uses: "{}"
+        pings: 5
+        deaths: 4
+        purchase_log:
+        - charges: 7
+          time: 8
+          key: key
+        - charges: 7
+          time: 8
+          key: key
+        gold_per_min: 9
+        last_login: 2000-01-23T04:56:07.000+00:00
+        lose: 2
+        party_size: 0
+        kda: 9.806951670467935
+        lane_pos: "{}"
+        kills_per_min: 6.966044574347761
+        xp_reasons: "{}"
+        hero_variant: 5
+        buyback_count: 9
+        necronomicon_kills: 1
+        multi_kills: "{}"
+        kills_log:
+        - time: 1
+          key: key
+        - time: 1
+          key: key
+        rune_pickups: 3
+        actions: "{}"
+        damage: "{}"
+        lh_t:
+        - 8
+        - 8
+        gold_t:
+        - 9
+        - 9
+        first_purchase_time: "{}"
+        additional_units:
+        - "{}"
+        - "{}"
+        gold: 7
+        radiant_win: true
+        camps_stacked: 3
+        runes_log:
+        - time: 9
+          key: 5
+        - time: 9
+          key: 5
+        purchase_time: "{}"
+        sen: "{}"
+        ancient_kills: 3
+        actions_per_min: 8
+        match_id: 3703866531
+        life_state_dead: 2
+        lane_kills: 1
+        hero_kills: 4
+        stuns: 0.4768402382624515
+        account_id: 0
+        leaver_status: 6
+        hero_healing: 7
+        max_hero_hit: "{}"
+        killed_by: "{}"
+        game_mode: 4
+        obs_placed: 9
+        total_xp: 4
+        item_win: "{}"
+        gold_reasons: "{}"
+        personaname: 420 booty wizard
+        damage_inflictor_received: "{}"
+        damage_inflictor: "{}"
+        total_gold: 6
+        buyback_log:
+        - player_slot: 5
+          time: 3
+          slot: 7
+        - player_slot: 5
+          time: 3
+          slot: 7
+        sentry_kills: 5
+        kill_streaks: "{}"
+        hero_hits: "{}"
+        xp_per_min: 3
+        benchmarks: "{}"
+        level: 4
+        abandons: 1
+        player_slot: 7
+        damage_taken: "{}"
+        moonshard: 8
+        start_time: 4
+        last_hits: 8
+        sentry_uses: 7
+        ability_uses: "{}"
+        item_5: 0
+        item_4: 3
+        item_usage: "{}"
+        neutral_tokens_log:
+        - time: 8
+          key: key
+        - time: 8
+          key: key
+        item_3: 4
+        name: name
+        item_2: 8
+        item_1: 6
+        lane_efficiency: 7.92839742024475
+        creeps_stacked: 6
+        item_0: 4
+        region: 9
+        aghanims_shard: 9
+        kills: 2
+        hero_damage: 0
+        tower_kills: 3
+        backpack_1: 7
+        damage_targets: "{}"
+        backpack_2: 3
+        denies: 1
+        backpack_0: 8
+        life_state: "{}"
+        courier_kills: 5
+        cosmetics:
+        - prefab: prefab
+          image_inventory: image_inventory
+          item_type_name: item_type_name
+          item_id: 4
+          image_path: image_path
+          name: name
+          item_name: item_name
+          creation_date: 2000-01-23T04:56:07.000+00:00
+          item_description: item_description
+          used_by_heroes: used_by_heroes
+          item_rarity: item_rarity
+        - prefab: prefab
+          image_inventory: image_inventory
+          item_type_name: item_type_name
+          item_id: 4
+          image_path: image_path
+          name: name
+          item_name: item_name
+          creation_date: 2000-01-23T04:56:07.000+00:00
+          item_description: item_description
+          used_by_heroes: used_by_heroes
+          item_rarity: item_rarity
+        dn_t:
+        - 4
+        - 4
+        duration: 0
+        permanent_buffs:
+        - "{}"
+        - "{}"
+        times:
+        - 3
+        - 3
+        lane_efficiency_pct: 9.402167524121316
+        assists: 4
+        tower_damage: 2
+        xp_t:
+        - 8
+        - 8
+        rank_tier: 9
+        connection_log:
+        - player_slot: 0
+          time: 4
+          event: event
+        - player_slot: 0
+          time: 4
+          event: event
+        isRadiant: true
+        hero_id: 5
+        win: 0
+        lane: 1
+        sen_log:
+        - "{}"
+        - "{}"
+        sen_left_log:
+        - "{}"
+        - "{}"
+        is_roaming: true
+        aghanims_scepter: 3
+        purchase: "{}"
+        lobby_type: 7
+        ability_targets: "{}"
+        killed: "{}"
+        sen_placed: 7
+        ability_upgrades_arr:
+        - 6
+        - 6
+        party_id: 1
+        neutral_item_history:
+        - item_neutral: item_neutral
+          time: 6
+          item_neutral_enhancement: item_neutral_enhancement
+        - item_neutral: item_neutral
+          time: 6
+          item_neutral_enhancement: item_neutral_enhancement
+      properties:
+        match_id:
+          description: The ID number of the match assigned by Valve
+          example: 3703866531
+          type: integer
+        player_slot:
+          description: "Which slot the player is in. 0-127 are Radiant, 128-255 are\
+            \ Dire"
+          nullable: true
+          type: integer
+        ability_upgrades_arr:
+          description: An array describing how abilities were upgraded
+          items:
+            type: integer
+          type: array
+        ability_uses:
+          description: Object containing information on how many times the played
+            used their abilities
+          type: object
+        ability_targets:
+          description: Object containing information on who the player used their
+            abilities on
+          type: object
+        damage_targets:
+          description: Object containing information on how and how much damage the
+            player dealt to other heroes
+          type: object
+        account_id:
+          description: The player account ID
+          type: integer
+        actions:
+          description: Object containing information on how many and what type of
+            actions the player issued to their hero
+          type: object
+        additional_units:
+          description: Object containing information on additional units the player
+            had under their control
+          items:
+            type: object
+          nullable: true
+          type: array
+        assists:
+          description: Number of assists the player had
+          type: integer
+        backpack_0:
+          description: Item in backpack slot 0
+          type: integer
+        backpack_1:
+          description: Item in backpack slot 1
+          type: integer
+        backpack_2:
+          description: Item in backpack slot 2
+          type: integer
+        buyback_log:
+          description: Array containing information about buybacks
+          items:
+            $ref: "#/components/schemas/MatchResponse_players_inner_buyback_log_inner"
+          type: array
+        camps_stacked:
+          description: Number of camps stacked
+          type: integer
+        connection_log:
+          description: Array containing information about the player's disconnections
+            and reconnections
+          items:
+            $ref: "#/components/schemas/MatchResponse_players_inner_connection_log_inner"
+          type: array
+        creeps_stacked:
+          description: Number of creeps stacked
+          type: integer
+        damage:
+          description: Object containing information about damage dealt by the player
+            to different units
+          type: object
+        damage_inflictor:
+          description: Object containing information about about the sources of this
+            player's damage to heroes
+          type: object
+        damage_inflictor_received:
+          description: Object containing information about the sources of damage received
+            by this player from heroes
+          type: object
+        damage_taken:
+          description: Object containing information about from whom the player took
+            damage
+          type: object
+        deaths:
+          description: Number of deaths
+          type: integer
+        denies:
+          description: Number of denies
+          type: integer
+        dn_t:
+          description: Array containing number of denies at different times of the
+            match
+          items:
+            type: integer
+          type: array
+        gold:
+          description: Gold at the end of the game
+          type: integer
+        gold_per_min:
+          description: Gold Per Minute obtained by this player
+          type: integer
+        gold_reasons:
+          description: Object containing information on how the player gainined gold
+            over the course of the match
+          type: object
+        gold_spent:
+          description: How much gold the player spent
+          type: integer
+        gold_t:
+          description: Array containing total gold at different times of the match
+          items:
+            type: integer
+          type: array
+        hero_damage:
+          description: Hero Damage Dealt
+          type: integer
+        hero_healing:
+          description: Hero Healing Done
+          type: integer
+        hero_hits:
+          description: Object containing information on how many ticks of damages
+            the hero inflicted with different spells and damage inflictors
+          type: object
+        hero_id:
+          description: The ID value of the hero played
+          type: integer
+        item_0:
+          description: Item in the player's first slot
+          type: integer
+        item_1:
+          description: Item in the player's second slot
+          type: integer
+        item_2:
+          description: Item in the player's third slot
+          type: integer
+        item_3:
+          description: Item in the player's fourth slot
+          type: integer
+        item_4:
+          description: Item in the player's fifth slot
+          type: integer
+        item_5:
+          description: Item in the player's sixth slot
+          type: integer
+        item_uses:
+          description: Object containing information about how many times a player
+            used items
+          type: object
+        kill_streaks:
+          description: Object containing information about the player's killstreaks
+          type: object
+        killed:
+          description: Object containing information about what units the player killed
+          type: object
+        killed_by:
+          description: Object containing information about who killed the player
+          type: object
+        kills:
+          description: Number of kills
+          type: integer
+        kills_log:
+          description: Array containing information on which hero the player killed
+            at what time
+          items:
+            $ref: "#/components/schemas/MatchResponse_players_inner_kills_log_inner"
+          type: array
+        lane_pos:
+          description: Object containing information on lane position
+          type: object
+        last_hits:
+          description: Number of last hits
+          type: integer
+        leaver_status:
+          description: "Integer describing whether or not the player left the game.\
+            \ 0: didn't leave. 1: left safely. 2+: Abandoned"
+          type: integer
+        level:
+          description: Level at the end of the game
+          type: integer
+        lh_t:
+          description: Array describing last hits at each minute in the game
+          items:
+            type: integer
+          type: array
+        life_state:
+          description: life_state
+          type: object
+        max_hero_hit:
+          description: Object with information on the highest damage instance the
+            player inflicted
+          type: object
+        multi_kills:
+          description: Object with information on the number of the number of multikills
+            the player had
+          type: object
+        obs:
+          description: "Object with information on where the player placed observer\
+            \ wards. The location takes the form (outer number, inner number) and\
+            \ are from ~64-192."
+          type: object
+        obs_left_log:
+          description: obs_left_log
+          items:
+            type: object
+          type: array
+        obs_log:
+          description: Object containing information on when and where the player
+            placed observer wards
+          items:
+            type: object
+          type: array
+        obs_placed:
+          description: Total number of observer wards placed
+          type: integer
+        party_id:
+          description: party_id
+          type: integer
+        aghanims_scepter:
+          description: aghanims_scepter
+          type: integer
+        aghanims_shard:
+          description: aghanims_shard
+          type: integer
+        moonshard:
+          description: moonshard
+          type: integer
+        party_size:
+          description: party_size
+          type: integer
+        permanent_buffs:
+          description: "Array describing permanent buffs the player had at the end\
+            \ of the game. List of constants can be found here: https://github.com/odota/dotaconstants/blob/master/json/permanent_buffs.json"
+          items:
+            type: object
+          type: array
+        hero_variant:
+          description: "1-indexed facet, see https://github.com/odota/dotaconstants/blob/master/build/hero_abilities.json"
+          type: integer
+        pings:
+          description: Total number of pings
+          type: integer
+        purchase:
+          description: Object containing information on the items the player purchased
+          type: object
+        purchase_log:
+          description: Object containing information on when items were purchased
+          items:
+            $ref: "#/components/schemas/MatchResponse_players_inner_purchase_log_inner"
+          type: array
+        rune_pickups:
+          description: Number of runes picked up
+          type: integer
+        runes:
+          additionalProperties:
+            type: integer
+          description: Object with information about which runes the player picked
+            up
+          type: object
+        runes_log:
+          description: Array with information on when runes were picked up
+          items:
+            $ref: "#/components/schemas/MatchResponse_players_inner_runes_log_inner"
+          type: array
+        sen:
+          description: "Object with information on where sentries were placed. The\
+            \ location takes the form (outer number, inner number) and are from ~64-192."
+          type: object
+        sen_left_log:
+          description: Array containing information on when and where the player placed
+            sentries
+          items:
+            type: object
+          type: array
+        sen_log:
+          description: Array with information on when and where sentries were placed
+            by the player
+          items:
+            type: object
+          type: array
+        sen_placed:
+          description: How many sentries were placed by the player
+          type: integer
+        stuns:
+          description: Total stun duration of all stuns by the player
+          type: number
+        times:
+          description: Time in seconds corresponding to the time of entries of other
+            arrays in the match.
+          items:
+            type: integer
+          type: array
+        tower_damage:
+          description: Total tower damage done by the player
+          type: integer
+        xp_per_min:
+          description: Experience Per Minute obtained by the player
+          type: integer
+        xp_reasons:
+          description: Object containing information on the sources of this player's
+            experience
+          type: object
+        xp_t:
+          description: Experience at each minute of the game
+          items:
+            type: integer
+          type: array
+        personaname:
+          description: Player's Steam name
+          example: 420 booty wizard
+          nullable: true
+          type: string
+        name:
+          description: name
+          nullable: true
+          type: string
+        last_login:
+          description: Time of player's last login
+          format: date-time
+          nullable: true
+          type: string
+        radiant_win:
+          description: Boolean indicating whether Radiant won the match
+          nullable: true
+          type: boolean
+        start_time:
+          description: The Unix timestamp at which the game started
+          type: integer
+        duration:
+          description: Duration of the game in seconds
+          type: integer
+        cluster:
+          description: cluster
+          type: integer
+        lobby_type:
+          description: "Integer corresponding to lobby type of match. List of constants\
+            \ can be found here: https://github.com/odota/dotaconstants/blob/master/json/lobby_type.json"
+          type: integer
+        game_mode:
+          description: "Integer corresponding to game mode played. List of constants\
+            \ can be found here: https://github.com/odota/dotaconstants/blob/master/json/game_mode.json"
+          type: integer
+        patch:
+          description: "Patch ID, from dotaconstants"
+          type: integer
+        region:
+          description: Integer corresponding to the region the game was played on
+          type: integer
+        isRadiant:
+          description: Boolean for whether or not the player is on Radiant
+          type: boolean
+        win:
+          description: Binary integer representing whether or not the player won
+          type: integer
+        lose:
+          description: Binary integer representing whether or not the player lost
+          type: integer
+        total_gold:
+          description: Total gold at the end of the game
+          type: integer
+        total_xp:
+          description: Total experience at the end of the game
+          type: integer
+        kills_per_min:
+          description: Number of kills per minute
+          type: number
+        kda:
+          description: kda
+          type: number
+        abandons:
+          description: abandons
+          type: integer
+        neutral_kills:
+          description: Total number of neutral creeps killed
+          type: integer
+        tower_kills:
+          description: Total number of tower kills the player had
+          type: integer
+        courier_kills:
+          description: Total number of courier kills the player had
+          type: integer
+        lane_kills:
+          description: Total number of lane creeps killed by the player
+          type: integer
+        hero_kills:
+          description: Total number of heroes killed by the player
+          type: integer
+        observer_kills:
+          description: Total number of observer wards killed by the player
+          type: integer
+        sentry_kills:
+          description: Total number of sentry wards killed by the player
+          type: integer
+        roshan_kills:
+          description: Total number of roshan kills (last hit on roshan) the player
+            had
+          type: integer
+        necronomicon_kills:
+          description: Total number of Necronomicon creeps killed by the player
+          type: integer
+        ancient_kills:
+          description: Total number of Ancient creeps killed by the player
+          type: integer
+        buyback_count:
+          description: Total number of buyback the player used
+          type: integer
+        observer_uses:
+          description: Number of observer wards used
+          type: integer
+        sentry_uses:
+          description: Number of sentry wards used
+          type: integer
+        lane_efficiency:
+          description: lane_efficiency
+          type: number
+        lane_efficiency_pct:
+          description: lane_efficiency_pct
+          type: number
+        lane:
+          description: Integer referring to which lane the hero laned in
+          nullable: true
+          type: integer
+        lane_role:
+          description: lane_role
+          nullable: true
+          type: integer
+        is_roaming:
+          description: Boolean referring to whether or not the player roamed
+          nullable: true
+          type: boolean
+        purchase_time:
+          description: Object with information on when the player last purchased an
+            item
+          type: object
+        first_purchase_time:
+          description: Object with information on when the player first puchased an
+            item
+          type: object
+        item_win:
+          description: Object with information on whether or not the item won
+          type: object
+        item_usage:
+          description: "Object containing binary integers the tell whether the item\
+            \ was purchased by the player (note: this is always 1)"
+          type: object
+        purchase_tpscroll:
+          description: Total number of TP scrolls purchased by the player
+          type: integer
+        actions_per_min:
+          description: Actions per minute
+          type: integer
+        life_state_dead:
+          description: life_state_dead
+          type: integer
+        rank_tier:
+          description: "The rank tier of the player. Tens place indicates rank, ones\
+            \ place indicates stars."
+          type: integer
+        cosmetics:
+          description: cosmetics
+          items:
+            $ref: "#/components/schemas/MatchResponse_players_inner_cosmetics_inner"
+          type: array
+        benchmarks:
+          description: "Object containing information on certain benchmarks like GPM,\
+            \ XPM, KDA, tower damage, etc"
+          type: object
+        neutral_tokens_log:
+          description: Object containing information on neutral tokens drops
+          items:
+            $ref: "#/components/schemas/MatchResponse_players_inner_neutral_tokens_log_inner"
+          type: array
+        neutral_item_history:
+          description: Object containing information on neutral item history
+          items:
+            $ref: "#/components/schemas/MatchResponse_players_inner_neutral_item_history_inner"
+          type: array
+      type: object
+    PlayersResponse_profile:
+      description: profile
+      example:
+        profileurl: profileurl
+        last_login: last_login
+        avatarfull: avatarfull
+        is_subscriber: false
+        avatarmedium: avatarmedium
+        avatar: avatar
+        personaname: 420 booty wizard
+        plus: true
+        is_contributor: false
+        cheese: 2
+        steamid: steamid
+        account_id: 5
+        name: name
+        loccountrycode: loccountrycode
+      properties:
+        account_id:
+          description: The player account ID
+          type: integer
+        personaname:
+          description: Player's Steam name
+          example: 420 booty wizard
+          nullable: true
+          type: string
+        name:
+          description: name
+          nullable: true
+          type: string
+        plus:
+          description: Boolean indicating status of current Dota Plus subscription
+          type: boolean
+        cheese:
+          description: cheese
+          nullable: true
+          type: integer
+        steamid:
+          description: steamid
+          nullable: true
+          type: string
+        avatar:
+          description: avatar
+          nullable: true
+          type: string
+        avatarmedium:
+          description: avatarmedium
+          nullable: true
+          type: string
+        avatarfull:
+          description: avatarfull
+          nullable: true
+          type: string
+        profileurl:
+          description: profileurl
+          nullable: true
+          type: string
+        last_login:
+          description: last_login
+          nullable: true
+          type: string
+        loccountrycode:
+          description: loccountrycode
+          nullable: true
+          type: string
+        is_contributor:
+          default: false
+          description: Boolean indicating if the user contributed to the development
+            of OpenDota
+          type: boolean
+        is_subscriber:
+          default: false
+          description: Boolean indicating if the user subscribed to OpenDota
+          type: boolean
+      type: object
+    RankingsResponse_rankings_inner:
+      example:
+        profileurl: profileurl
+        last_login: 2000-01-23T04:56:07.000+00:00
+        avatarfull: avatarfull
+        fh_unavailable: true
+        avatarmedium: avatarmedium
+        avatar: avatar
+        personaname: 420 booty wizard
+        full_history_time: 2000-01-23T04:56:07.000+00:00
+        cheese: 5
+        steamid: steamid
+        score: 1.4658129805029452
+        account_id: 6
+        rank_tier: 5
+        loccountrycode: loccountrycode
+      properties:
+        account_id:
+          description: The player account ID
+          type: integer
+        score:
+          description: Score
+          type: number
+        steamid:
+          description: steamid
+          nullable: true
+          type: string
+        avatar:
+          description: avatar
+          nullable: true
+          type: string
+        avatarmedium:
+          description: avatarmedium
+          nullable: true
+          type: string
+        avatarfull:
+          description: avatarfull
+          nullable: true
+          type: string
+        profileurl:
+          description: profileurl
+          nullable: true
+          type: string
+        personaname:
+          description: Player's Steam name
+          example: 420 booty wizard
+          nullable: true
+          type: string
+        last_login:
+          description: last_login
+          format: date-time
+          nullable: true
+          type: string
+        full_history_time:
+          description: full_history_time
+          format: date-time
+          type: string
+        cheese:
+          description: cheese
+          nullable: true
+          type: integer
+        fh_unavailable:
+          description: fh_unavailable
+          nullable: true
+          type: boolean
+        loccountrycode:
+          description: loccountrycode
+          nullable: true
+          type: string
+        rank_tier:
+          description: rank_tier
+          nullable: true
+          type: integer
+      type: object
+  securitySchemes:
+    api_key:
+      description: "Use an API key to remove monthly call limits and to receive higher\
+        \ rate limits. [Learn more and get your API key](https://www.opendota.com/api-keys).\n\
+        \        Usage example: https://api.opendota.com/api/matches/271145478?api_key=YOUR-API-KEY\n\
+        \        \n        API key can also be sent using the authorization header\
+        \ \"Authorization: Bearer YOUR-API-KEY\"\n        "
+      in: query
+      name: api_key
+      type: apiKey
+
