@@ -29,6 +29,15 @@ public class DotabuffBuildDetailsParser {
   private final ConstantsManagers constantsManagers;
   private final PlayerGameStatisticRepo playerGameStatisticRepo;
 
+  private static final Map<String, String> knownItemMapper =
+      Map.of(
+          "heart_of_tarrasque", "heart",
+          "giants_maul", "giant_maul",
+          "aghanims_scepter", "ultimate_scepter",
+          "gleipnir", "gungir",
+          "crystalys", "lesser_crit",
+          "linkens_sphere", "sphere");
+
   public void parse(Document doc, MatchDomain matchDomain) {
     {
       Elements section = doc.select("section.performance-artifact");
@@ -43,6 +52,14 @@ public class DotabuffBuildDetailsParser {
       }
 
       Map<String, ItemConstant> itemConstantMap = constantsManagers.getItemConstantMap();
+      Map<String, ItemConstant> itemsByDname =
+          itemConstantMap.entrySet().stream()
+              .filter(e -> e.getValue().getDname() != null)
+              .collect(
+                  Collectors.toMap(
+                      e -> e.getValue().getDname().toLowerCase(),
+                      Map.Entry::getValue,
+                      (x, y) -> x));
       Map<String, String> abilitiesByDnName =
           constantsManagers.getAllAbilityConstants().entrySet().stream()
               .collect(
@@ -102,7 +119,14 @@ public class DotabuffBuildDetailsParser {
             String attrHref = aElement.attr("href");
             String itemName = attrHref.substring(attrHref.lastIndexOf('/') + 1).replace("-", "_");
 
+            itemName = knownItemMapper.getOrDefault(itemName, itemName);
+
             ItemConstant itemConstant = itemConstantMap.get(itemName);
+
+            // in case different of dotabuff and dota api names
+            if (itemConstant == null) {
+              itemConstant = itemsByDname.get(itemName.replace("_", " "));
+            }
 
             if (itemConstant == null) {
               log.error("itemConstant not found, itemName:{}", itemName);

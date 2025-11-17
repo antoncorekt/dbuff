@@ -6,8 +6,10 @@ import com.ako.dbuff.service.constant.data.AbilityIdsConstant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 public class AbilityIdsConstantService extends BaseApiConstantService<AbilityIdsConstant> {
 
@@ -26,15 +28,29 @@ public class AbilityIdsConstantService extends BaseApiConstantService<AbilityIds
 
     resp.forEach(
         (key, value) -> {
-          String[] id = key.split(",");
-          Arrays.stream(id)
-              .map(Long::parseLong)
-              .forEach(
-                  l ->
-                      res.put(
-                          l.toString(),
-                          new AbilityIdsConstant(
-                              l, (String) ((Map<String, Object>) value).get("name"))));
+          try {
+            String abilityName =
+                value instanceof String
+                    ? (String) value
+                    : objectMapper.convertValue(value, AbilityIdsConstant.class).getName();
+
+            // Handle comma-separated IDs like "3060,1617": "templar_assassin_hidden_gates"
+            String[] ids = key.split(",");
+            Arrays.stream(ids)
+                .map(String::trim)
+                .forEach(
+                    idStr -> {
+                      try {
+                        Long abilityId = Long.parseLong(idStr);
+                        res.put(
+                            abilityId.toString(), new AbilityIdsConstant(abilityId, abilityName));
+                      } catch (NumberFormatException e) {
+                        log.warn("Skipping invalid ability ID: {} in key: {}", idStr, key);
+                      }
+                    });
+          } catch (Exception e) {
+            log.error("Convert failed to key: {}", key, e);
+          }
         });
 
     return res;
