@@ -69,11 +69,12 @@ public class ScrapperConfig {
     // use render for return all HTML dom
     defaultUriVariables.put("render", "true");
 
-    // premium option is better but consume 10 credits instead of 1, use this when API key is available
+    // premium option is better but consume 10 credits instead of 1, use this when API key is
+    // available
     if (StringUtils.hasLength(scrapperConfigurationProperties.getApiKey())) {
       defaultUriVariables.put("premium", "true");
     }
-    
+
     log.debug("Default URI variables: {}", defaultUriVariables);
     return defaultUriVariables;
   }

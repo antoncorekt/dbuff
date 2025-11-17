@@ -18,6 +18,7 @@ public class CacheConfig {
   public static final String ALL_ABILITIES_CACHE = "all_abilities";
   public static final String MATCH_TYPE_CACHE = "match_type";
   public static final String PATCH_CACHE = "patch_cache";
+  public static final String DOTA_CONSTANTS_CACHE = "dotaConstants";
 
   @Bean
   public CacheManager cacheManager() {
@@ -30,7 +31,8 @@ public class CacheConfig {
             ALL_HERO_ABILITIES_CACHE,
             ALL_ABILITIES_CACHE,
             MATCH_TYPE_CACHE,
-            PATCH_CACHE);
+            PATCH_CACHE,
+            DOTA_CONSTANTS_CACHE);
     return cacheManager;
   }
 }

@@ -42,7 +42,7 @@ public class MatchParserHandler {
         return null;
       } else {
         log.info(
-            "macth {} found, but items or abilities for found, will try to parse this match again",
+            "match {} found, but items or abilities not found, will try to parse this match again",
             matchId);
       }
     }
@@ -58,7 +58,11 @@ public class MatchParserHandler {
       log.info("Successfully fetched match details for {}", matchId);
 
       basicMatchDetailsMapper.handle(matchResponse, matchDomain);
+      matchRepo.flush();
+
+      log.info("Successfully mapped match details for {}", matchId);
     } catch (Exception e) {
+      log.error("Failed to fetch match details for {}", matchId, e);
       matchDomain.setDotaApiFailed(true);
       if (e.getCause() instanceof ApiException apiException) {
         if (apiException.getMessage().contains("Not Found")) {

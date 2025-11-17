@@ -60,10 +60,10 @@ public class ScrapperApiService {
       RetryContext retryContext, UriBuilder uriBuilder, String targetUrl) {
     // Add the target URL parameter
     uriBuilder.queryParam("url", targetUrl);
-    
+
     // Add render parameter for full HTML DOM
     uriBuilder.queryParam("render", "true");
-    
+
     // Add API key if available
     if (StringUtils.hasLength(scrapperConfigurationProperties.getApiKey())) {
       uriBuilder.queryParam("api_key", scrapperConfigurationProperties.getApiKey());
@@ -71,13 +71,13 @@ public class ScrapperApiService {
     } else {
       log.debug("No API key available, using free tier");
     }
-    
+
     // Override premium on retry if needed
     if (retryContext.getRetryCount() > 1) {
       log.debug("Retry attempt {}, ensuring premium=true", retryContext.getRetryCount());
       uriBuilder.queryParam("premium", "true");
     }
-    
+
     return uriBuilder;
   }
 }

@@ -19,7 +19,7 @@ public class DotaApiMatchDetailsService {
   public MatchResponse fetchMatchDetails(long matchId) {
     MatchResponse matchResponse = null;
     try {
-      log.info("Try to fetch match {}", matchId);
+      log.debug("Try to fetch match {}", matchId);
       dotaApiRateLimiter.acquire();
       log.info("Fetching match {}", matchId);
       matchResponse = matchesApi.getMatchesByMatchId(matchId);

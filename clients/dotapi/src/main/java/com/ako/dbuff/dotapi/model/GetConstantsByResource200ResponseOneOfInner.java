@@ -83,7 +83,7 @@ public class GetConstantsByResource200ResponseOneOfInner extends AbstractOpenApi
         public GetConstantsByResource200ResponseOneOfInner deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException, JsonProcessingException {
             JsonNode tree = jp.readValueAsTree();
             Object deserialized = null;
-            boolean typeCoercion = ctxt.isEnabled(MapperFeature.ALLOW_COERCION_OF_SCALARS);
+            boolean typeCoercion = true;
             int match = 0;
             JsonToken token = tree.traverse(jp.getCodec()).nextToken();
             // deserialize Map<String, Object>
