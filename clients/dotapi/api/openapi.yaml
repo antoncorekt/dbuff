@@ -4,12 +4,11 @@ info:
     \ advanced match data extracted from match replays.\n\nYou can find data that\
     \ can be used to convert hero and ability IDs and other information provided by\
     \ the API from the [dotaconstants](https://github.com/odota/dotaconstants) repository.\n\
-    \nWithout a key, you can make 2,000 free calls per day at a rate limit of 60 requests/minute.\
-    \ We also offer a Premium Tier with unlimited API calls and higher rate limits.\
-    \ Check out the [API page](https://www.opendota.com/api-keys) to learn more.\n\
-    \    "
+    \nYou can use the API without a key, but registering for a key allows increased\
+    \ rate limits and usage. Check out the [API page](https://www.opendota.com/api-keys)\
+    \ to learn more.\n    "
   title: OpenDota API
-  version: 26.0.0
+  version: 31.1.0
 servers:
 - url: https://api.opendota.com/api
 paths:
@@ -1822,7 +1821,8 @@ paths:
       - players
   /players/{account_id}/ratings:
     get:
-      description: Player rating history
+      description: Returns a history of the player rank tier/medal changes (replaces
+        MMR)
       x-accepts:
       - application/json; charset=utf-8
       operationId: get_players_by_account_id_select_ratings
@@ -1876,7 +1876,8 @@ paths:
       - players
   /players/{account_id}/refresh:
     post:
-      description: Refresh player match history (up to 500) and medal
+      description: "Refresh player match history (up to 500), medal (rank), and profile\
+        \ name"
       x-accepts:
       - application/json; charset=utf-8
       operationId: post_refresh
@@ -1893,13 +1894,38 @@ paths:
         "200":
           content:
             application/json; charset=utf-8:
-              schema:
-                title: PlayerRefreshResponse
-                type: object
+              schema: {}
           description: Success
       summary: "POST /players/{account_id}/refresh"
       tags:
       - players
+  /topPlayers:
+    get:
+      description: Get list of highly ranked players
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_top_players
+      parameters:
+      - description: Get ratings based on turbo matches
+        explode: true
+        in: query
+        name: turbo
+        required: false
+        schema:
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/PlayerObjectResponse"
+                type: array
+          description: Success
+      summary: GET /topPlayers
+      tags:
+      - top players
   /proPlayers:
     get:
       description: Get list of pro players
@@ -1963,8 +1989,8 @@ paths:
         style: form
       - description: "Minimum rank for the matches. Ranks are represented by integers\
           \ (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55:\
-          \ Legend, 60-65: Ancient, 70-75: Divine, 80-85: Immortal). Each increment\
-          \ represents an additional star."
+          \ Legend, 60-65: Ancient, 70-75: Divine, 80: Immortal). Each increment represents\
+          \ an additional star."
         explode: true
         in: query
         name: min_rank
@@ -1974,27 +2000,11 @@ paths:
         style: form
       - description: "Maximum rank for the matches. Ranks are represented by integers\
           \ (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55:\
-          \ Legend, 60-65: Ancient, 70-75: Divine, 80-85: Immortal). Each increment\
-          \ represents an additional star."
+          \ Legend, 60-65: Ancient, 70-75: Divine, 80: Immortal). Each increment represents\
+          \ an additional star."
         explode: true
         in: query
         name: max_rank
-        required: false
-        schema:
-          type: integer
-        style: form
-      - description: Order by average rank ascending
-        explode: true
-        in: query
-        name: mmr_ascending
-        required: false
-        schema:
-          type: integer
-        style: form
-      - description: Order by average rank descending
-        explode: true
-        in: query
-        name: mmr_descending
         required: false
         schema:
           type: integer
@@ -2504,7 +2514,7 @@ paths:
       - leagues
   /leagues/{league_id}/matches:
     get:
-      description: Get matches for a league
+      description: Get matches for a league (excluding amateur leagues)
       x-accepts:
       - application/json; charset=utf-8
       operationId: get_leagues_by_league_id_select_matches
@@ -2525,6 +2535,33 @@ paths:
                 $ref: "#/components/schemas/MatchObjectResponse"
           description: Success
       summary: "GET /leagues/{league_id}/matches"
+      tags:
+      - leagues
+  /leagues/{league_id}/matchIds:
+    get:
+      description: Get match IDs for a league (including amateur leagues)
+      x-accepts:
+      - application/json; charset=utf-8
+      operationId: get_leagues_by_league_id_select_match_ids
+      parameters:
+      - description: League ID
+        explode: false
+        in: path
+        name: league_id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json; charset=utf-8:
+              schema:
+                items:
+                  type: string
+                type: array
+          description: Success
+      summary: "GET /leagues/{league_id}/matchIds"
       tags:
       - leagues
   /leagues/{league_id}/teams:
@@ -2909,8 +2946,8 @@ components:
     minRankParam:
       description: "Minimum rank for the matches. Ranks are represented by integers\
         \ (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55:\
-        \ Legend, 60-65: Ancient, 70-75: Divine, 80-85: Immortal). Each increment\
-        \ represents an additional star."
+        \ Legend, 60-65: Ancient, 70-75: Divine, 80: Immortal). Each increment represents\
+        \ an additional star."
       explode: true
       in: query
       name: min_rank
@@ -2921,29 +2958,11 @@ components:
     maxRankParam:
       description: "Maximum rank for the matches. Ranks are represented by integers\
         \ (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55:\
-        \ Legend, 60-65: Ancient, 70-75: Divine, 80-85: Immortal). Each increment\
-        \ represents an additional star."
+        \ Legend, 60-65: Ancient, 70-75: Divine, 80: Immortal). Each increment represents\
+        \ an additional star."
       explode: true
       in: query
       name: max_rank
-      required: false
-      schema:
-        type: integer
-      style: form
-    mmrAscendingParam:
-      description: Order by average rank ascending
-      explode: true
-      in: query
-      name: mmr_ascending
-      required: false
-      schema:
-        type: integer
-      style: form
-    mmrDescendingParam:
-      description: Order by average rank descending
-      explode: true
-      in: query
-      name: mmr_descending
       required: false
       schema:
         type: integer
@@ -3654,8 +3673,13 @@ components:
         cosmetics:
           key: 7
         duration: 1
-        patch: 4
-        loss: 0
+        patch: 9
+        loss: 4
+        pauses:
+        - duration: 6
+          time: 2
+        - duration: 6
+          time: 2
         radiant_win: true
         radiant_xp_adv:
         - 2.8841621266687802
@@ -3673,7 +3697,7 @@ components:
           team: 9
           is_pick: true
           order: 6
-        win: 2
+        win: 8
         dire_team: "{}"
         replay_url: replay_url
         tower_status_radiant: 5
@@ -3682,51 +3706,50 @@ components:
         - "{}"
         players:
         - obs: "{}"
-          cluster: 0
+          cluster: 3
           gold_spent: 0
           obs_left_log:
           - "{}"
           - "{}"
           runes:
-            key: 3
-          observer_kills: 5
-          purchase_tpscroll: 3
+            key: 5
+          observer_kills: 3
+          purchase_tpscroll: 7
           obs_log:
           - "{}"
           - "{}"
-          lane_role: 4
-          observer_uses: 7
-          patch: 2
-          neutral_kills: 1
-          roshan_kills: 3
+          lane_role: 7
+          observer_uses: 3
+          patch: 0
+          neutral_kills: 4
+          roshan_kills: 1
           item_uses: "{}"
-          pings: 5
+          pings: 9
           deaths: 4
           purchase_log:
-          - charges: 7
+          - charges: 0
             time: 8
             key: key
-          - charges: 7
+          - charges: 0
             time: 8
             key: key
           gold_per_min: 9
           last_login: 2000-01-23T04:56:07.000+00:00
-          lose: 2
-          party_size: 0
-          kda: 9.806951670467935
+          lose: 4
+          kda: 2.535258963197524
           lane_pos: "{}"
-          kills_per_min: 6.966044574347761
+          kills_per_min: 0.58919091925136
           xp_reasons: "{}"
-          hero_variant: 5
-          buyback_count: 9
-          necronomicon_kills: 1
+          hero_variant: 3
+          buyback_count: 5
+          necronomicon_kills: 4
           multi_kills: "{}"
           kills_log:
           - time: 1
             key: key
           - time: 1
             key: key
-          rune_pickups: 3
+          rune_pickups: 5
           actions: "{}"
           damage: "{}"
           lh_t:
@@ -3743,19 +3766,19 @@ components:
           radiant_win: true
           camps_stacked: 3
           runes_log:
-          - time: 9
-            key: 5
-          - time: 9
-            key: 5
+          - time: 8
+            key: 7
+          - time: 8
+            key: 7
           purchase_time: "{}"
           sen: "{}"
-          ancient_kills: 3
-          actions_per_min: 8
+          ancient_kills: 5
+          actions_per_min: 9
           match_id: 3703866531
-          life_state_dead: 2
+          life_state_dead: 1
           lane_kills: 1
-          hero_kills: 4
-          stuns: 0.4768402382624515
+          hero_kills: 1
+          stuns: 3.111202833403195
           account_id: 0
           leaver_status: 6
           hero_healing: 7
@@ -3763,13 +3786,13 @@ components:
           killed_by: "{}"
           game_mode: 4
           obs_placed: 9
-          total_xp: 4
+          total_xp: 9
           item_win: "{}"
           gold_reasons: "{}"
           personaname: 420 booty wizard
           damage_inflictor_received: "{}"
           damage_inflictor: "{}"
-          total_gold: 6
+          total_gold: 2
           buyback_log:
           - player_slot: 5
             time: 3
@@ -3780,16 +3803,15 @@ components:
           sentry_kills: 5
           kill_streaks: "{}"
           hero_hits: "{}"
-          xp_per_min: 3
+          xp_per_min: 7
           benchmarks: "{}"
           level: 4
-          abandons: 1
+          abandons: 6
           player_slot: 7
           damage_taken: "{}"
-          moonshard: 8
-          start_time: 4
+          start_time: 3
           last_hits: 8
-          sentry_uses: 7
+          sentry_uses: 1
           ability_uses: "{}"
           item_5: 0
           item_4: 3
@@ -3803,26 +3825,25 @@ components:
           name: name
           item_2: 8
           item_1: 6
-          lane_efficiency: 7.92839742024475
+          lane_efficiency: 3.2841216543560217
           creeps_stacked: 6
           item_0: 4
-          region: 9
-          aghanims_shard: 9
+          region: 0
           kills: 2
           hero_damage: 0
-          tower_kills: 3
+          tower_kills: 6
           backpack_1: 7
           damage_targets: "{}"
           backpack_2: 3
           denies: 1
           backpack_0: 8
           life_state: "{}"
-          courier_kills: 5
+          courier_kills: 9
           cosmetics:
           - prefab: prefab
             image_inventory: image_inventory
             item_type_name: item_type_name
-            item_id: 4
+            item_id: 3
             image_path: image_path
             name: name
             item_name: item_name
@@ -3833,7 +3854,7 @@ components:
           - prefab: prefab
             image_inventory: image_inventory
             item_type_name: item_type_name
-            item_id: 4
+            item_id: 3
             image_path: image_path
             name: name
             item_name: item_name
@@ -3844,20 +3865,20 @@ components:
           dn_t:
           - 4
           - 4
-          duration: 0
+          duration: 2
           permanent_buffs:
           - "{}"
           - "{}"
           times:
-          - 3
-          - 3
-          lane_efficiency_pct: 9.402167524121316
+          - 9
+          - 9
+          lane_efficiency_pct: 9.785002165136461
           assists: 4
-          tower_damage: 2
+          tower_damage: 5
           xp_t:
-          - 8
-          - 8
-          rank_tier: 9
+          - 0
+          - 0
+          rank_tier: 4
           connection_log:
           - player_slot: 0
             time: 4
@@ -3867,8 +3888,8 @@ components:
             event: event
           isRadiant: true
           hero_id: 5
-          win: 0
-          lane: 1
+          win: 7
+          lane: 7
           sen_log:
           - "{}"
           - "{}"
@@ -3876,69 +3897,67 @@ components:
           - "{}"
           - "{}"
           is_roaming: true
-          aghanims_scepter: 3
           purchase: "{}"
-          lobby_type: 7
+          lobby_type: 8
           ability_targets: "{}"
           killed: "{}"
-          sen_placed: 7
+          sen_placed: 3
           ability_upgrades_arr:
           - 6
           - 6
           party_id: 1
           neutral_item_history:
           - item_neutral: item_neutral
-            time: 6
+            time: 2
             item_neutral_enhancement: item_neutral_enhancement
           - item_neutral: item_neutral
-            time: 6
+            time: 2
             item_neutral_enhancement: item_neutral_enhancement
         - obs: "{}"
-          cluster: 0
+          cluster: 3
           gold_spent: 0
           obs_left_log:
           - "{}"
           - "{}"
           runes:
-            key: 3
-          observer_kills: 5
-          purchase_tpscroll: 3
+            key: 5
+          observer_kills: 3
+          purchase_tpscroll: 7
           obs_log:
           - "{}"
           - "{}"
-          lane_role: 4
-          observer_uses: 7
-          patch: 2
-          neutral_kills: 1
-          roshan_kills: 3
+          lane_role: 7
+          observer_uses: 3
+          patch: 0
+          neutral_kills: 4
+          roshan_kills: 1
           item_uses: "{}"
-          pings: 5
+          pings: 9
           deaths: 4
           purchase_log:
-          - charges: 7
+          - charges: 0
             time: 8
             key: key
-          - charges: 7
+          - charges: 0
             time: 8
             key: key
           gold_per_min: 9
           last_login: 2000-01-23T04:56:07.000+00:00
-          lose: 2
-          party_size: 0
-          kda: 9.806951670467935
+          lose: 4
+          kda: 2.535258963197524
           lane_pos: "{}"
-          kills_per_min: 6.966044574347761
+          kills_per_min: 0.58919091925136
           xp_reasons: "{}"
-          hero_variant: 5
-          buyback_count: 9
-          necronomicon_kills: 1
+          hero_variant: 3
+          buyback_count: 5
+          necronomicon_kills: 4
           multi_kills: "{}"
           kills_log:
           - time: 1
             key: key
           - time: 1
             key: key
-          rune_pickups: 3
+          rune_pickups: 5
           actions: "{}"
           damage: "{}"
           lh_t:
@@ -3955,19 +3974,19 @@ components:
           radiant_win: true
           camps_stacked: 3
           runes_log:
-          - time: 9
-            key: 5
-          - time: 9
-            key: 5
+          - time: 8
+            key: 7
+          - time: 8
+            key: 7
           purchase_time: "{}"
           sen: "{}"
-          ancient_kills: 3
-          actions_per_min: 8
+          ancient_kills: 5
+          actions_per_min: 9
           match_id: 3703866531
-          life_state_dead: 2
+          life_state_dead: 1
           lane_kills: 1
-          hero_kills: 4
-          stuns: 0.4768402382624515
+          hero_kills: 1
+          stuns: 3.111202833403195
           account_id: 0
           leaver_status: 6
           hero_healing: 7
@@ -3975,13 +3994,13 @@ components:
           killed_by: "{}"
           game_mode: 4
           obs_placed: 9
-          total_xp: 4
+          total_xp: 9
           item_win: "{}"
           gold_reasons: "{}"
           personaname: 420 booty wizard
           damage_inflictor_received: "{}"
           damage_inflictor: "{}"
-          total_gold: 6
+          total_gold: 2
           buyback_log:
           - player_slot: 5
             time: 3
@@ -3992,16 +4011,15 @@ components:
           sentry_kills: 5
           kill_streaks: "{}"
           hero_hits: "{}"
-          xp_per_min: 3
+          xp_per_min: 7
           benchmarks: "{}"
           level: 4
-          abandons: 1
+          abandons: 6
           player_slot: 7
           damage_taken: "{}"
-          moonshard: 8
-          start_time: 4
+          start_time: 3
           last_hits: 8
-          sentry_uses: 7
+          sentry_uses: 1
           ability_uses: "{}"
           item_5: 0
           item_4: 3
@@ -4015,26 +4033,25 @@ components:
           name: name
           item_2: 8
           item_1: 6
-          lane_efficiency: 7.92839742024475
+          lane_efficiency: 3.2841216543560217
           creeps_stacked: 6
           item_0: 4
-          region: 9
-          aghanims_shard: 9
+          region: 0
           kills: 2
           hero_damage: 0
-          tower_kills: 3
+          tower_kills: 6
           backpack_1: 7
           damage_targets: "{}"
           backpack_2: 3
           denies: 1
           backpack_0: 8
           life_state: "{}"
-          courier_kills: 5
+          courier_kills: 9
           cosmetics:
           - prefab: prefab
             image_inventory: image_inventory
             item_type_name: item_type_name
-            item_id: 4
+            item_id: 3
             image_path: image_path
             name: name
             item_name: item_name
@@ -4045,7 +4062,7 @@ components:
           - prefab: prefab
             image_inventory: image_inventory
             item_type_name: item_type_name
-            item_id: 4
+            item_id: 3
             image_path: image_path
             name: name
             item_name: item_name
@@ -4056,20 +4073,20 @@ components:
           dn_t:
           - 4
           - 4
-          duration: 0
+          duration: 2
           permanent_buffs:
           - "{}"
           - "{}"
           times:
-          - 3
-          - 3
-          lane_efficiency_pct: 9.402167524121316
+          - 9
+          - 9
+          lane_efficiency_pct: 9.785002165136461
           assists: 4
-          tower_damage: 2
+          tower_damage: 5
           xp_t:
-          - 8
-          - 8
-          rank_tier: 9
+          - 0
+          - 0
+          rank_tier: 4
           connection_log:
           - player_slot: 0
             time: 4
@@ -4079,8 +4096,8 @@ components:
             event: event
           isRadiant: true
           hero_id: 5
-          win: 0
-          lane: 1
+          win: 7
+          lane: 7
           sen_log:
           - "{}"
           - "{}"
@@ -4088,22 +4105,21 @@ components:
           - "{}"
           - "{}"
           is_roaming: true
-          aghanims_scepter: 3
           purchase: "{}"
-          lobby_type: 7
+          lobby_type: 8
           ability_targets: "{}"
           killed: "{}"
-          sen_placed: 7
+          sen_placed: 3
           ability_upgrades_arr:
           - 6
           - 6
           party_id: 1
           neutral_item_history:
           - item_neutral: item_neutral
-            time: 6
+            time: 2
             item_neutral_enhancement: item_neutral_enhancement
           - item_neutral: item_neutral
-            time: 6
+            time: 2
             item_neutral_enhancement: item_neutral_enhancement
         match_id: 3703866531
         league: "{}"
@@ -4126,7 +4142,7 @@ components:
           total_time_taken: 1
           order: 3
           extra_time: 1
-        throw: 2
+        throw: 8
         chat:
         - unit: unit
           player_slot: 5
@@ -4148,7 +4164,7 @@ components:
         - "{}"
         - "{}"
         barracks_status_dire: 0
-        region: 8
+        region: 4
         radiant_gold_adv:
         - 6.965117697638846
         - 6.965117697638846
@@ -4333,6 +4349,12 @@ components:
         replay_url:
           description: replay_url
           type: string
+        pauses:
+          description: Array containing information about pauses during the game.
+            Each item contains the time and duration of the pause.
+          items:
+            $ref: "#/components/schemas/MatchResponse_pauses_inner"
+          type: array
       title: MatchResponse
       type: object
     MetadataResponse:
@@ -4531,6 +4553,7 @@ components:
         country_code: country_code
         account_id: 0
         is_pro: true
+        computed_mmr: 2
         name: name
         loccountrycode: loccountrycode
       properties:
@@ -4602,6 +4625,10 @@ components:
           type: boolean
         locked_until:
           description: When the roster lock will end
+          type: integer
+        computed_mmr:
+          description: Rating estimate based on ranked matches
+          nullable: true
           type: integer
       title: PlayerObjectResponse
       type: object
@@ -5002,9 +5029,13 @@ components:
       type: object
     PlayersResponse:
       example:
-        solo_competitive_rank: 0
-        rank_tier: 1.4658129805029452
-        competitive_rank: 6
+        aliases:
+        - name_since: name_since
+          personaname: personaname
+        - name_since: name_since
+          personaname: personaname
+        rank_tier: 0.8008281904610115
+        computed_mmr: 1.4658129805029452
         profile:
           profileurl: profileurl
           last_login: last_login
@@ -5020,24 +5051,30 @@ components:
           account_id: 5
           name: name
           loccountrycode: loccountrycode
-        leaderboard_rank: 5.962133916683182
+        leaderboard_rank: 6.027456183070403
+        computed_mmr_turbo: 5
       properties:
-        solo_competitive_rank:
-          description: solo_competitive_rank
-          nullable: true
-          type: integer
-        competitive_rank:
-          description: competitive_rank
-          nullable: true
-          type: integer
         rank_tier:
-          description: rank_tier
+          description: The player's Dota medal/rank
           nullable: true
           type: number
         leaderboard_rank:
-          description: leaderboard_rank
+          description: The player's rank on the Dota leaderboard (if Immortal)
           nullable: true
           type: number
+        computed_mmr:
+          description: Rating estimate based on ranked matches
+          nullable: true
+          type: number
+        computed_mmr_turbo:
+          description: Rating estimate based on turbo matches
+          nullable: true
+          type: integer
+        aliases:
+          description: List of names the player has used on Steam
+          items:
+            $ref: "#/components/schemas/PlayersResponse_aliases_inner"
+          type: array
         profile:
           $ref: "#/components/schemas/PlayersResponse_profile"
       title: PlayerResponse
@@ -5816,7 +5853,7 @@ components:
       type: object
     MatchResponse_players_inner_purchase_log_inner:
       example:
-        charges: 7
+        charges: 0
         time: 8
         key: key
       properties:
@@ -5832,8 +5869,8 @@ components:
       type: object
     MatchResponse_players_inner_runes_log_inner:
       example:
-        time: 9
-        key: 5
+        time: 8
+        key: 7
       properties:
         time:
           description: Time in seconds rune picked up
@@ -5847,7 +5884,7 @@ components:
         prefab: prefab
         image_inventory: image_inventory
         item_type_name: item_type_name
-        item_id: 4
+        item_id: 3
         image_path: image_path
         name: name
         item_name: item_name
@@ -5904,7 +5941,7 @@ components:
     MatchResponse_players_inner_neutral_item_history_inner:
       example:
         item_neutral: item_neutral
-        time: 6
+        time: 2
         item_neutral_enhancement: item_neutral_enhancement
       properties:
         time:
@@ -5921,51 +5958,50 @@ components:
       description: player
       example:
         obs: "{}"
-        cluster: 0
+        cluster: 3
         gold_spent: 0
         obs_left_log:
         - "{}"
         - "{}"
         runes:
-          key: 3
-        observer_kills: 5
-        purchase_tpscroll: 3
+          key: 5
+        observer_kills: 3
+        purchase_tpscroll: 7
         obs_log:
         - "{}"
         - "{}"
-        lane_role: 4
-        observer_uses: 7
-        patch: 2
-        neutral_kills: 1
-        roshan_kills: 3
+        lane_role: 7
+        observer_uses: 3
+        patch: 0
+        neutral_kills: 4
+        roshan_kills: 1
         item_uses: "{}"
-        pings: 5
+        pings: 9
         deaths: 4
         purchase_log:
-        - charges: 7
+        - charges: 0
           time: 8
           key: key
-        - charges: 7
+        - charges: 0
           time: 8
           key: key
         gold_per_min: 9
         last_login: 2000-01-23T04:56:07.000+00:00
-        lose: 2
-        party_size: 0
-        kda: 9.806951670467935
+        lose: 4
+        kda: 2.535258963197524
         lane_pos: "{}"
-        kills_per_min: 6.966044574347761
+        kills_per_min: 0.58919091925136
         xp_reasons: "{}"
-        hero_variant: 5
-        buyback_count: 9
-        necronomicon_kills: 1
+        hero_variant: 3
+        buyback_count: 5
+        necronomicon_kills: 4
         multi_kills: "{}"
         kills_log:
         - time: 1
           key: key
         - time: 1
           key: key
-        rune_pickups: 3
+        rune_pickups: 5
         actions: "{}"
         damage: "{}"
         lh_t:
@@ -5982,19 +6018,19 @@ components:
         radiant_win: true
         camps_stacked: 3
         runes_log:
-        - time: 9
-          key: 5
-        - time: 9
-          key: 5
+        - time: 8
+          key: 7
+        - time: 8
+          key: 7
         purchase_time: "{}"
         sen: "{}"
-        ancient_kills: 3
-        actions_per_min: 8
+        ancient_kills: 5
+        actions_per_min: 9
         match_id: 3703866531
-        life_state_dead: 2
+        life_state_dead: 1
         lane_kills: 1
-        hero_kills: 4
-        stuns: 0.4768402382624515
+        hero_kills: 1
+        stuns: 3.111202833403195
         account_id: 0
         leaver_status: 6
         hero_healing: 7
@@ -6002,13 +6038,13 @@ components:
         killed_by: "{}"
         game_mode: 4
         obs_placed: 9
-        total_xp: 4
+        total_xp: 9
         item_win: "{}"
         gold_reasons: "{}"
         personaname: 420 booty wizard
         damage_inflictor_received: "{}"
         damage_inflictor: "{}"
-        total_gold: 6
+        total_gold: 2
         buyback_log:
         - player_slot: 5
           time: 3
@@ -6019,16 +6055,15 @@ components:
         sentry_kills: 5
         kill_streaks: "{}"
         hero_hits: "{}"
-        xp_per_min: 3
+        xp_per_min: 7
         benchmarks: "{}"
         level: 4
-        abandons: 1
+        abandons: 6
         player_slot: 7
         damage_taken: "{}"
-        moonshard: 8
-        start_time: 4
+        start_time: 3
         last_hits: 8
-        sentry_uses: 7
+        sentry_uses: 1
         ability_uses: "{}"
         item_5: 0
         item_4: 3
@@ -6042,26 +6077,25 @@ components:
         name: name
         item_2: 8
         item_1: 6
-        lane_efficiency: 7.92839742024475
+        lane_efficiency: 3.2841216543560217
         creeps_stacked: 6
         item_0: 4
-        region: 9
-        aghanims_shard: 9
+        region: 0
         kills: 2
         hero_damage: 0
-        tower_kills: 3
+        tower_kills: 6
         backpack_1: 7
         damage_targets: "{}"
         backpack_2: 3
         denies: 1
         backpack_0: 8
         life_state: "{}"
-        courier_kills: 5
+        courier_kills: 9
         cosmetics:
         - prefab: prefab
           image_inventory: image_inventory
           item_type_name: item_type_name
-          item_id: 4
+          item_id: 3
           image_path: image_path
           name: name
           item_name: item_name
@@ -6072,7 +6106,7 @@ components:
         - prefab: prefab
           image_inventory: image_inventory
           item_type_name: item_type_name
-          item_id: 4
+          item_id: 3
           image_path: image_path
           name: name
           item_name: item_name
@@ -6083,20 +6117,20 @@ components:
         dn_t:
         - 4
         - 4
-        duration: 0
+        duration: 2
         permanent_buffs:
         - "{}"
         - "{}"
         times:
-        - 3
-        - 3
-        lane_efficiency_pct: 9.402167524121316
+        - 9
+        - 9
+        lane_efficiency_pct: 9.785002165136461
         assists: 4
-        tower_damage: 2
+        tower_damage: 5
         xp_t:
-        - 8
-        - 8
-        rank_tier: 9
+        - 0
+        - 0
+        rank_tier: 4
         connection_log:
         - player_slot: 0
           time: 4
@@ -6106,8 +6140,8 @@ components:
           event: event
         isRadiant: true
         hero_id: 5
-        win: 0
-        lane: 1
+        win: 7
+        lane: 7
         sen_log:
         - "{}"
         - "{}"
@@ -6115,22 +6149,21 @@ components:
         - "{}"
         - "{}"
         is_roaming: true
-        aghanims_scepter: 3
         purchase: "{}"
-        lobby_type: 7
+        lobby_type: 8
         ability_targets: "{}"
         killed: "{}"
-        sen_placed: 7
+        sen_placed: 3
         ability_upgrades_arr:
         - 6
         - 6
         party_id: 1
         neutral_item_history:
         - item_neutral: item_neutral
-          time: 6
+          time: 2
           item_neutral_enhancement: item_neutral_enhancement
         - item_neutral: item_neutral
-          time: 6
+          time: 2
           item_neutral_enhancement: item_neutral_enhancement
       properties:
         match_id:
@@ -6351,18 +6384,6 @@ components:
           type: integer
         party_id:
           description: party_id
-          type: integer
-        aghanims_scepter:
-          description: aghanims_scepter
-          type: integer
-        aghanims_shard:
-          description: aghanims_shard
-          type: integer
-        moonshard:
-          description: moonshard
-          type: integer
-        party_size:
-          description: party_size
           type: integer
         permanent_buffs:
           description: "Array describing permanent buffs the player had at the end\
@@ -6611,6 +6632,30 @@ components:
           items:
             $ref: "#/components/schemas/MatchResponse_players_inner_neutral_item_history_inner"
           type: array
+      type: object
+    MatchResponse_pauses_inner:
+      example:
+        duration: 6
+        time: 2
+      properties:
+        time:
+          description: Time in seconds at which pause started
+          type: integer
+        duration:
+          description: The duration of the pause
+          type: integer
+      type: object
+    PlayersResponse_aliases_inner:
+      example:
+        name_since: name_since
+        personaname: personaname
+      properties:
+        personaname:
+          description: The name used by the player
+          type: string
+        name_since:
+          description: The date the name was used since
+          type: string
       type: object
     PlayersResponse_profile:
       description: profile

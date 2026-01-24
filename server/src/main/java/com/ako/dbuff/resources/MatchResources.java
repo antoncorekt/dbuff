@@ -21,7 +21,7 @@ public class MatchResources {
   private final LastMatchesProcessorService lastMatchesProcessorService;
 
   @PostMapping("/{id}/parse")
-  public MatchDomain parseMatch(@PathVariable(name = "id") String id) {
+  public MatchDomain parseMatch(@PathVariable String id) {
     return matchParserHandler.handle(Long.parseLong(id));
   }
 

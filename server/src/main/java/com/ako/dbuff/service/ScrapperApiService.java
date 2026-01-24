@@ -2,6 +2,9 @@ package com.ako.dbuff.service;
 
 import com.ako.dbuff.config.ScrapperConfig;
 import com.google.common.util.concurrent.RateLimiter;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
@@ -12,7 +15,6 @@ import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.util.UriBuilder;
 
 @Slf4j
 @Service
@@ -34,11 +36,15 @@ public class ScrapperApiService {
           log.info("Start scrap url {}", targetUrl);
 
           try {
+            // Build the full URI manually to avoid double-encoding issues
+            URI uri = buildScrapperUri(targetUrl, r);
+            log.debug("Final scrapper URI: {}", uri);
+
             // Perform GET request
             String html =
                 scrapperApiRestClient
                     .get()
-                    .uri(uriBuilder -> prepareUri(r, uriBuilder, targetUrl).build())
+                    .uri(uri)
                     .retrieve()
                     .body(String.class);
 
@@ -56,28 +62,39 @@ public class ScrapperApiService {
         });
   }
 
-  private org.springframework.web.util.UriBuilder prepareUri(
-      RetryContext retryContext, UriBuilder uriBuilder, String targetUrl) {
-    // Add the target URL parameter
-    uriBuilder.queryParam("url", targetUrl);
-
+  /**
+   * Builds the scrapper API URI manually to ensure proper URL encoding.
+   * The target URL must be URL-encoded as a single parameter value,
+   * while the other parameters (render, api_key, premium) are added normally.
+   */
+  private URI buildScrapperUri(String targetUrl, RetryContext retryContext) {
+    StringBuilder sb = new StringBuilder();
+    
+    // URL-encode the target URL so it becomes a single parameter value
+    String encodedTargetUrl = URLEncoder.encode(targetUrl, StandardCharsets.UTF_8);
+    
+    // Start with the url parameter
+    sb.append("?url=").append(encodedTargetUrl);
+    
     // Add render parameter for full HTML DOM
-    uriBuilder.queryParam("render", "true");
-
+    sb.append("&render=true");
+    
     // Add API key if available
     if (StringUtils.hasLength(scrapperConfigurationProperties.getApiKey())) {
-      uriBuilder.queryParam("api_key", scrapperConfigurationProperties.getApiKey());
-      log.debug("Added api_key and premium parameters to request");
+      sb.append("&api_key=").append(scrapperConfigurationProperties.getApiKey());
+      log.debug("Added api_key parameter to request");
     } else {
       log.debug("No API key available, using free tier");
     }
-
+    
     // Override premium on retry if needed
     if (retryContext.getRetryCount() > 1) {
       log.debug("Retry attempt {}, ensuring premium=true", retryContext.getRetryCount());
-      uriBuilder.queryParam("premium", "true");
+      sb.append("&premium=true");
     }
-
-    return uriBuilder;
+    
+    // Create URI from base URL + query string
+    String baseUrl = scrapperConfigurationProperties.getUrl();
+    return URI.create(baseUrl + sb.toString());
   }
 }

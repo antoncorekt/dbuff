@@ -38,6 +38,10 @@ subprojects {
     tasks.withType(JavaCompile) {
         options.encoding = 'UTF-8'
         options.compilerArgs << "-Xlint:unchecked"
+        // Enable preview features only for non-generated projects (not dotapi)
+        if (project.name != 'dotapi') {
+            options.compilerArgs << "--enable-preview"
+        }
     }
     test {
         useJUnitPlatform()
@@ -94,6 +98,9 @@ project('server') {
     dependencies {
 
         implementation project(":clients:dotapi")
+
+        // Jackson nullable module for OpenAPI client compatibility
+        implementation 'org.openapitools:jackson-databind-nullable:0.2.6'
 
         implementation 'org.springframework.boot:spring-boot-starter'
         implementation 'org.springframework.boot:spring-boot-starter-data-jpa'

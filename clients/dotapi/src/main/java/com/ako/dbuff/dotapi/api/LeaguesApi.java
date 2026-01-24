@@ -132,8 +132,55 @@ public class LeaguesApi {
                                null, localVarReturnType, false);
   }
   /**
+   * GET /leagues/{league_id}/matchIds
+   * Get match IDs for a league (including amateur leagues)
+   * @param leagueId League ID (required)
+   * @return List&lt;String&gt;
+   * @throws ApiException if fails to make API call
+   * @http.response.details
+     <table border="1">
+       <caption>Response Details</caption>
+       <tr><td> Status Code </td><td> Description </td><td> Response Headers </td></tr>
+       <tr><td> 200 </td><td> Success </td><td>  -  </td></tr>
+     </table>
+   */
+  public List<String> getLeaguesByLeagueIdSelectMatchIds(@jakarta.annotation.Nonnull Long leagueId) throws ApiException {
+    return getLeaguesByLeagueIdSelectMatchIdsWithHttpInfo(leagueId).getData();
+  }
+
+  /**
+   * GET /leagues/{league_id}/matchIds
+   * Get match IDs for a league (including amateur leagues)
+   * @param leagueId League ID (required)
+   * @return ApiResponse&lt;List&lt;String&gt;&gt;
+   * @throws ApiException if fails to make API call
+   * @http.response.details
+     <table border="1">
+       <caption>Response Details</caption>
+       <tr><td> Status Code </td><td> Description </td><td> Response Headers </td></tr>
+       <tr><td> 200 </td><td> Success </td><td>  -  </td></tr>
+     </table>
+   */
+  public ApiResponse<List<String>> getLeaguesByLeagueIdSelectMatchIdsWithHttpInfo(@jakarta.annotation.Nonnull Long leagueId) throws ApiException {
+    // Check required parameters
+    if (leagueId == null) {
+      throw new ApiException(400, "Missing the required parameter 'leagueId' when calling getLeaguesByLeagueIdSelectMatchIds");
+    }
+
+    // Path parameters
+    String localVarPath = "/leagues/{league_id}/matchIds"
+            .replaceAll("\\{league_id}", apiClient.escapeString(leagueId.toString()));
+
+    String localVarAccept = apiClient.selectHeaderAccept("application/json; charset=utf-8");
+    String localVarContentType = apiClient.selectHeaderContentType();
+    GenericType<List<String>> localVarReturnType = new GenericType<List<String>>() {};
+    return apiClient.invokeAPI("LeaguesApi.getLeaguesByLeagueIdSelectMatchIds", localVarPath, "GET", new ArrayList<>(), null,
+                               new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>(), localVarAccept, localVarContentType,
+                               null, localVarReturnType, false);
+  }
+  /**
    * GET /leagues/{league_id}/matches
-   * Get matches for a league
+   * Get matches for a league (excluding amateur leagues)
    * @param leagueId League ID (required)
    * @return MatchObjectResponse
    * @throws ApiException if fails to make API call
@@ -150,7 +197,7 @@ public class LeaguesApi {
 
   /**
    * GET /leagues/{league_id}/matches
-   * Get matches for a league
+   * Get matches for a league (excluding amateur leagues)
    * @param leagueId League ID (required)
    * @return ApiResponse&lt;MatchObjectResponse&gt;
    * @throws ApiException if fails to make API call

@@ -793,7 +793,7 @@ public class PlayersApi {
   }
   /**
    * GET /players/{account_id}/ratings
-   * Player rating history
+   * Returns a history of the player rank tier/medal changes (replaces MMR)
    * @param accountId Steam32 account ID (required)
    * @return List&lt;PlayerRatingsResponse&gt;
    * @throws ApiException if fails to make API call
@@ -810,7 +810,7 @@ public class PlayersApi {
 
   /**
    * GET /players/{account_id}/ratings
-   * Player rating history
+   * Returns a history of the player rank tier/medal changes (replaces MMR)
    * @param accountId Steam32 account ID (required)
    * @return ApiResponse&lt;List&lt;PlayerRatingsResponse&gt;&gt;
    * @throws ApiException if fails to make API call
@@ -842,7 +842,7 @@ public class PlayersApi {
    * GET /players/{account_id}/recentMatches
    * Recent matches played (limited number of results)
    * @param accountId Steam32 account ID (required)
-   * @return List&lt;PlayerRecentMatchesResponse&gt;
+   * @return List&lt;List&lt;PlayerRecentMatchesResponse&gt;&gt;
    * @throws ApiException if fails to make API call
    * @http.response.details
      <table border="1">
@@ -851,7 +851,7 @@ public class PlayersApi {
        <tr><td> 200 </td><td> Success </td><td>  -  </td></tr>
      </table>
    */
-  public List<PlayerRecentMatchesResponse> getPlayersByAccountIdSelectRecentMatches(@jakarta.annotation.Nonnull Long accountId) throws ApiException {
+  public List<List<PlayerRecentMatchesResponse>> getPlayersByAccountIdSelectRecentMatches(@jakarta.annotation.Nonnull Long accountId) throws ApiException {
     return getPlayersByAccountIdSelectRecentMatchesWithHttpInfo(accountId).getData();
   }
 
@@ -859,7 +859,7 @@ public class PlayersApi {
    * GET /players/{account_id}/recentMatches
    * Recent matches played (limited number of results)
    * @param accountId Steam32 account ID (required)
-   * @return ApiResponse&lt;List&lt;PlayerRecentMatchesResponse&gt;&gt;
+   * @return ApiResponse&lt;List&lt;List&lt;PlayerRecentMatchesResponse&gt;&gt;&gt;
    * @throws ApiException if fails to make API call
    * @http.response.details
      <table border="1">
@@ -868,7 +868,7 @@ public class PlayersApi {
        <tr><td> 200 </td><td> Success </td><td>  -  </td></tr>
      </table>
    */
-  public ApiResponse<List<PlayerRecentMatchesResponse>> getPlayersByAccountIdSelectRecentMatchesWithHttpInfo(@jakarta.annotation.Nonnull Long accountId) throws ApiException {
+  public ApiResponse<List<List<PlayerRecentMatchesResponse>>> getPlayersByAccountIdSelectRecentMatchesWithHttpInfo(@jakarta.annotation.Nonnull Long accountId) throws ApiException {
     // Check required parameters
     if (accountId == null) {
       throw new ApiException(400, "Missing the required parameter 'accountId' when calling getPlayersByAccountIdSelectRecentMatches");
@@ -880,7 +880,7 @@ public class PlayersApi {
 
     String localVarAccept = apiClient.selectHeaderAccept("application/json; charset=utf-8");
     String localVarContentType = apiClient.selectHeaderContentType();
-    GenericType<List<PlayerRecentMatchesResponse>> localVarReturnType = new GenericType<List<PlayerRecentMatchesResponse>>() {};
+    GenericType<List<List<PlayerRecentMatchesResponse>>> localVarReturnType = new GenericType<List<List<PlayerRecentMatchesResponse>>>() {};
     return apiClient.invokeAPI("PlayersApi.getPlayersByAccountIdSelectRecentMatches", localVarPath, "GET", new ArrayList<>(), null,
                                new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>(), localVarAccept, localVarContentType,
                                null, localVarReturnType, false);
@@ -1307,7 +1307,7 @@ public class PlayersApi {
   }
   /**
    * POST /players/{account_id}/refresh
-   * Refresh player match history (up to 500) and medal
+   * Refresh player match history (up to 500), medal (rank), and profile name
    * @param accountId Steam32 account ID (required)
    * @return Object
    * @throws ApiException if fails to make API call
@@ -1324,7 +1324,7 @@ public class PlayersApi {
 
   /**
    * POST /players/{account_id}/refresh
-   * Refresh player match history (up to 500) and medal
+   * Refresh player match history (up to 500), medal (rank), and profile name
    * @param accountId Steam32 account ID (required)
    * @return ApiResponse&lt;Object&gt;
    * @throws ApiException if fails to make API call

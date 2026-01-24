@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.match.mapper;
 
+import com.ako.dbuff.context.ProcessContext;
 import com.ako.dbuff.dao.model.AbilityDomain;
 import com.ako.dbuff.dao.model.ItemDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
@@ -40,112 +41,154 @@ public class PlayersMapper {
   private final AbilityRepo abilityRepo;
   private final ConstantsManagers constantManagers;
 
+  /**
+   * Handles mapping of player data from API response to domain objects.
+   * Uses ScopedValue to set player context for logging within this scope.
+   *
+   * @param matchDomain the match domain
+   * @param player the player data from API
+   */
   public void handle(MatchDomain matchDomain, MatchResponsePlayersInner player) {
-
     Long accountId = Optional.ofNullable(player.getAccountId()).orElse(-1L);
     String personaname = Optional.ofNullable(player.getPersonaname()).orElse("anonymous");
 
-    PlayerDomain playerDomain =
-        playerRepo
-            .findById(accountId)
-            .orElseGet(() -> playerRepo.save(new PlayerDomain(accountId, personaname)));
+    // Run player processing with playerId in scope for logging
+    ProcessContext.runWithPlayerId(accountId, () -> 
+        processPlayer(matchDomain, player, accountId, personaname)
+    );
+  }
 
-    PlayerMatchStatisticDomain playerStatisticDomain = new PlayerMatchStatisticDomain();
-    playerStatisticDomain.setPlayerId(accountId);
-    playerStatisticDomain.setMatchId(matchDomain.getId());
-    playerStatisticDomain.setPlayerSlot(player.getPlayerSlot());
-    playerStatisticDomain.setObsPlaced(player.getObsPlaced());
-    playerStatisticDomain.setSenPlaced(player.getSenPlaced());
-    playerStatisticDomain.setCreepsStacked(player.getCreepsStacked());
-    playerStatisticDomain.setLastHits(player.getLastHits());
-    playerStatisticDomain.setDenies(player.getDenies());
-    playerStatisticDomain.setCampsStacked(player.getCampsStacked());
-    playerStatisticDomain.setRunePickups(player.getRunePickups());
-    playerStatisticDomain.setTowerKills(player.getTowerKills());
-    playerStatisticDomain.setRoshanKills(player.getRoshanKills());
+  private void processPlayer(MatchDomain matchDomain, MatchResponsePlayersInner player, 
+                             Long accountId, String personaname) {
+    String ctx = ProcessContext.getContextString();
+    log.debug("{} Processing player {} for match {}", ctx, accountId, matchDomain.getId());
 
-    player.setPartySize(player.getPartySize());
+    PlayerDomain playerDomain = getOrCreatePlayer(accountId, personaname);
+    PlayerMatchStatisticDomain playerStatisticDomain = createPlayerStatistics(matchDomain, player, accountId);
 
     Long heroId = player.getHeroId();
+    HeroConstant hero = constantManagers.getHeroConstantMap().get(String.valueOf(heroId));
 
-    Map<String, HeroConstant> heroConstantMap = constantManagers.getHeroConstantMap();
+    setHeroInfo(playerStatisticDomain, heroId, hero);
+    setPlayerStats(playerStatisticDomain, player);
+    setBenchmarks(player, playerStatisticDomain);
 
-    HeroConstant hero = heroConstantMap.get(String.valueOf(heroId));
+    Set<Pair<AbilityIdsConstant, AbilityConstant>> playerAbilities = processAbilities(player, matchDomain, playerDomain);
+    playerStatisticDomain.setHasAbilities(!playerAbilities.isEmpty());
 
-    playerStatisticDomain.setHeroId(heroId);
-    playerStatisticDomain.setHeroName(hero.getName());
-    playerStatisticDomain.setHeroPrettyName(hero.getLocalized_name());
+    processItems(player, matchDomain, playerDomain, playerStatisticDomain);
 
-    playerStatisticDomain.setAganim(player.getAghanimsScepter());
-    playerStatisticDomain.setAganimShard(player.getAghanimsShard());
-    playerStatisticDomain.setMoonshard(player.getMoonshard());
+    playerGameStatisticRepo.save(playerStatisticDomain);
+    log.debug("{} Saved player statistics for player {} in match {}", ctx, accountId, matchDomain.getId());
+  }
 
-    playerStatisticDomain.setWin(player.getWin());
-    playerStatisticDomain.setTotalGold(player.getTotalGold());
-    playerStatisticDomain.setTotalXp(player.getTotalXp());
-    playerStatisticDomain.setKda(player.getKda());
+  private PlayerDomain getOrCreatePlayer(Long accountId, String personaname) {
+    return playerRepo
+        .findById(accountId)
+        .orElseGet(() -> playerRepo.save(new PlayerDomain(accountId, personaname)));
+  }
 
-    playerStatisticDomain.setAbandons(player.getAbandons());
+  private PlayerMatchStatisticDomain createPlayerStatistics(MatchDomain matchDomain, 
+                                                            MatchResponsePlayersInner player, 
+                                                            Long accountId) {
+    PlayerMatchStatisticDomain stats = new PlayerMatchStatisticDomain();
+    stats.setPlayerId(accountId);
+    stats.setMatchId(matchDomain.getId());
+    stats.setPlayerSlot(player.getPlayerSlot());
+    stats.setObsPlaced(player.getObsPlaced());
+    stats.setSenPlaced(player.getSenPlaced());
+    stats.setCreepsStacked(player.getCreepsStacked());
+    stats.setLastHits(player.getLastHits());
+    stats.setDenies(player.getDenies());
+    stats.setCampsStacked(player.getCampsStacked());
+    stats.setRunePickups(player.getRunePickups());
+    stats.setTowerKills(player.getTowerKills());
+    stats.setRoshanKills(player.getRoshanKills());
+    return stats;
+  }
 
-    playerStatisticDomain.setNeutralKills(player.getNeutralKills());
-    playerStatisticDomain.setCourierKills(player.getCourierKills());
+  private void setHeroInfo(PlayerMatchStatisticDomain stats, Long heroId, HeroConstant hero) {
+    stats.setHeroId(heroId);
+    stats.setHeroName(hero.getName());
+    stats.setHeroPrettyName(hero.getLocalized_name());
+  }
 
-    playerStatisticDomain.setLane(player.getLane());
-    playerStatisticDomain.setLaneEfficiency(player.getLaneEfficiency());
-    playerStatisticDomain.setLaneEfficiencyPct(player.getLaneEfficiencyPct());
+  private void setPlayerStats(PlayerMatchStatisticDomain stats, MatchResponsePlayersInner player) {
+//    stats.setAganim(player.getAghanimsScepter()); // todo add
+//    stats.setAganimShard(player.getAghanimsShard());
+//    stats.setMoonshard(player.getMoonshard());
+    stats.setWin(player.getWin());
+    stats.setTotalGold(player.getTotalGold());
+    stats.setTotalXp(player.getTotalXp());
+    stats.setKda(player.getKda());
+    stats.setAbandons(player.getAbandons());
+    stats.setNeutralKills(player.getNeutralKills());
+    stats.setCourierKills(player.getCourierKills());
+    stats.setLane(player.getLane());
+    stats.setLaneEfficiency(player.getLaneEfficiency());
+    stats.setLaneEfficiencyPct(player.getLaneEfficiencyPct());
+  }
 
-    Map<String, Map<String, Integer>> benchmarks =
+  private void setBenchmarks(MatchResponsePlayersInner player, PlayerMatchStatisticDomain stats) {
+    @SuppressWarnings("unchecked")
+    Map<String, Map<String, Integer>> benchmarks = 
         (Map<String, Map<String, Integer>>) player.getBenchmarks();
-    setUpBenchmarks(benchmarks, playerStatisticDomain);
+    if (benchmarks != null) {
+      setUpBenchmarks(benchmarks, stats);
+    }
+  }
 
+  private Set<Pair<AbilityIdsConstant, AbilityConstant>> processAbilities(
+      MatchResponsePlayersInner player, MatchDomain matchDomain, PlayerDomain playerDomain) {
+    
     Set<String> allHeroAbilities = constantManagers.getAllHeroAbilities();
-
     Map<String, AbilityConstant> allAbilities = constantManagers.getAllAbilityConstants();
+    Map<String, AbilityIdsConstant> abilityIdsConstantMap = constantManagers.getAbilityConstantMap();
+    Long playerSlot = Long.valueOf(player.getPlayerSlot());
 
-    Map<String, AbilityIdsConstant> abilityIdsConstantMap =
-        constantManagers.getAbilityConstantMap();
     Set<Pair<AbilityIdsConstant, AbilityConstant>> playerAbilities =
         new HashSet<>(CollectionUtils.emptyIfNull(player.getAbilityUpgradesArr()))
             .stream()
-                .map(abilityId -> abilityIdsConstantMap.get(String.valueOf(abilityId)))
-                .filter(ablIdConst -> allHeroAbilities.contains(ablIdConst.getName()))
-                .map(ablIdConst -> Pair.of(ablIdConst, allAbilities.get(ablIdConst.getName())))
-                .collect(Collectors.toSet());
+            .map(abilityId -> abilityIdsConstantMap.get(String.valueOf(abilityId)))
+            .filter(ablIdConst -> ablIdConst != null && allHeroAbilities.contains(ablIdConst.getName()))
+            .map(ablIdConst -> Pair.of(ablIdConst, allAbilities.get(ablIdConst.getName())))
+            .collect(Collectors.toSet());
 
-    playerAbilities.forEach(
-        ability -> {
-          addAbility(ability, matchDomain, playerDomain);
-        });
+    playerAbilities.forEach(ability -> addAbility(ability, matchDomain, playerDomain, playerSlot));
+    return playerAbilities;
+  }
 
-    playerStatisticDomain.setHasAbilities(!playerAbilities.isEmpty());
-
+  private void processItems(MatchResponsePlayersInner player, MatchDomain matchDomain,
+                           PlayerDomain playerDomain, PlayerMatchStatisticDomain stats) {
     Map<String, ItemConstant> itemsConstant = constantManagers.getItemConstantMap();
+    Long playerSlot = Long.valueOf(player.getPlayerSlot());
 
     Collection<MatchResponsePlayersInnerPurchaseLogInner> purchaseLogs =
         CollectionUtils.emptyIfNull(player.getPurchaseLog());
-    playerStatisticDomain.setDotaApiItems(!purchaseLogs.isEmpty());
+    stats.setDotaApiItems(!purchaseLogs.isEmpty());
 
-    purchaseLogs.forEach(item -> addItemPurchase(item, itemsConstant, matchDomain, playerDomain));
-
-    playerStatisticDomain.setHasItems(!purchaseLogs.isEmpty());
+    purchaseLogs.forEach(item -> addItemPurchase(item, itemsConstant, matchDomain, playerDomain, playerSlot));
+    stats.setHasItems(!purchaseLogs.isEmpty());
 
     Collection<MatchResponsePlayersInnerNeutralItemHistoryInner> neutralItemHistory =
         CollectionUtils.emptyIfNull(player.getNeutralItemHistory());
-    CollectionUtils.emptyIfNull(player.getNeutralItemHistory())
-        .forEach(item -> addNeutralItem(item, itemsConstant, matchDomain, playerDomain));
-
-    playerStatisticDomain.setHasNeutralItems(!neutralItemHistory.isEmpty());
-
-    playerGameStatisticRepo.save(playerStatisticDomain);
+    neutralItemHistory.forEach(item -> addNeutralItem(item, itemsConstant, matchDomain, playerDomain, playerSlot));
+    stats.setHasNeutralItems(!neutralItemHistory.isEmpty());
   }
 
+  /**
+   * Adds an ability to the database.
+   * Uses playerSlot as part of the primary key since anonymous players have playerId = -1.
+   */
   private AbilityDomain addAbility(
       Pair<AbilityIdsConstant, AbilityConstant> abilityPair,
       MatchDomain matchDomain,
-      PlayerDomain playerDomain) {
+      PlayerDomain playerDomain,
+      Long playerSlot) {
 
     AbilityDomain abilityDomain = new AbilityDomain();
     abilityDomain.setPlayerId(playerDomain.getId());
+    abilityDomain.setPlayerSlot(playerSlot);
     abilityDomain.setMatchId(matchDomain.getId());
 
     AbilityIdsConstant id = abilityPair.getFirst();
@@ -171,39 +214,50 @@ public class PlayersMapper {
       MatchResponsePlayersInnerNeutralItemHistoryInner item,
       Map<String, ItemConstant> itemsConstant,
       MatchDomain matchDomain,
-      PlayerDomain playerDomain) {
+      PlayerDomain playerDomain,
+      Long playerSlot) {
     String itemName = item.getItemNeutral();
 
     if (itemName == null) {
-      log.debug("itemName is null");
+      log.debug("{} itemName is null", ProcessContext.getContextString());
       return null;
     }
 
     Long time = item.getTime();
     String itemEnhancement = item.getItemNeutralEnhancement();
-    return saveItemDomain(
-        itemsConstant, matchDomain, playerDomain, itemName, time, itemEnhancement);
+    return saveItemDomain(itemsConstant, matchDomain, playerDomain, playerSlot, itemName, time, itemEnhancement);
   }
 
   private ItemDomain addItemPurchase(
       MatchResponsePlayersInnerPurchaseLogInner item,
       Map<String, ItemConstant> itemsConstant,
       MatchDomain matchDomain,
-      PlayerDomain playerDomain) {
+      PlayerDomain playerDomain,
+      Long playerSlot) {
     String itemName = item.getKey();
     Long time = item.getTime();
 
-    return saveItemDomain(itemsConstant, matchDomain, playerDomain, itemName, time, null);
+    return saveItemDomain(itemsConstant, matchDomain, playerDomain, playerSlot, itemName, time, null);
   }
 
+  /**
+   * Saves an item to the database.
+   * Uses playerSlot as part of the primary key since anonymous players have playerId = -1.
+   */
   private ItemDomain saveItemDomain(
       Map<String, ItemConstant> itemsConstant,
       MatchDomain matchDomain,
       PlayerDomain playerDomain,
+      Long playerSlot,
       String itemName,
       Long time,
       String neutralEnhancement) {
     ItemConstant itemConstant = itemsConstant.get(itemName);
+
+    if (itemConstant == null) {
+      log.warn("{} Item constant not found for: {}", ProcessContext.getContextString(), itemName);
+      return null;
+    }
 
     String dname = itemConstant.getDname();
     Long id = itemConstant.getId();
@@ -212,6 +266,7 @@ public class PlayersMapper {
     itemDomain.setItemId(id);
     itemDomain.setMatchId(matchDomain.getId());
     itemDomain.setPlayerId(playerDomain.getId());
+    itemDomain.setPlayerSlot(playerSlot);
     itemDomain.setItemName(itemName);
     itemDomain.setItemPrettyName(dname);
     itemDomain.setItemPurchaseTime(time);

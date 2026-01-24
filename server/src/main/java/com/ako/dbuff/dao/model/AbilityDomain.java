@@ -10,6 +10,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
+/**
+ * Ability used by a player in a match.
+ * 
+ * Primary key uses playerSlot instead of playerId because:
+ * - Anonymous players have null accountId (stored as -1 in playerId)
+ * - Multiple anonymous players in the same match would have the same playerId
+ * - playerSlot (0-9) is always unique within a match
+ */
 @Entity
 @IdClass(AbilityId.class)
 @Builder
@@ -19,11 +27,24 @@ import lombok.ToString;
 @AllArgsConstructor
 public class AbilityDomain {
 
-  @Id private Long playerId;
+  @Id 
+  private Long matchId;
 
-  @Id private Long matchId;
+  /**
+   * Player slot in the match (0-9).
+   * Part of the composite primary key.
+   */
+  @Id 
+  private Long playerSlot;
 
-  @Id private Long abilityId;
+  @Id 
+  private Long abilityId;
+
+  /**
+   * Player account ID. Can be -1 for anonymous players.
+   * Not part of the primary key.
+   */
+  private Long playerId;
 
   private String name;
   private String prettyName;
