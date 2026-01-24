@@ -50,10 +50,16 @@ public class HistoryResources {
                     .startPage(startPage)
                     .endPage(endPage)
                     .build());
-            log.info("{} Finished loading player {} history", ProcessContext.getContextString(), playerId);
+            log.info(
+                "{} Finished loading player {} history",
+                ProcessContext.getContextString(),
+                playerId);
           } catch (Exception e) {
-            log.error("{} Error loading player {} history", 
-                ProcessContext.getContextString(), playerId, e);
+            log.error(
+                "{} Error loading player {} history",
+                ProcessContext.getContextString(),
+                playerId,
+                e);
           }
         });
   }

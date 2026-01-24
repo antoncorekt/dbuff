@@ -12,11 +12,10 @@ import lombok.ToString;
 
 /**
  * Item purchased by a player in a match.
- * 
- * Primary key uses playerSlot instead of playerId because:
- * - Anonymous players have null accountId (stored as -1 in playerId)
- * - Multiple anonymous players in the same match would have the same playerId
- * - playerSlot (0-9) is always unique within a match
+ *
+ * <p>Primary key uses playerSlot instead of playerId because: - Anonymous players have null
+ * accountId (stored as -1 in playerId) - Multiple anonymous players in the same match would have
+ * the same playerId - playerSlot (0-9) is always unique within a match
  */
 @Entity
 @IdClass(ItemId.class)
@@ -27,23 +26,14 @@ import lombok.ToString;
 @AllArgsConstructor
 public class ItemDomain {
 
-  @Id 
-  private Long itemId;
+  @Id private Long itemId;
 
-  @Id 
-  private Long matchId;
+  @Id private Long matchId;
 
-  /**
-   * Player slot in the match (0-9).
-   * Part of the composite primary key.
-   */
-  @Id 
-  private Long playerSlot;
+  /** Player slot in the match (0-9). Part of the composite primary key. */
+  @Id private Long playerSlot;
 
-  /**
-   * Player account ID. Can be -1 for anonymous players.
-   * Not part of the primary key.
-   */
+  /** Player account ID. Can be -1 for anonymous players. Not part of the primary key. */
   private Long playerId;
 
   private String itemName;

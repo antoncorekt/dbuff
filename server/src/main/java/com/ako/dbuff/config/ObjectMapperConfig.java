@@ -16,11 +16,11 @@ public class ObjectMapperConfig {
 
   /**
    * Creates the default ObjectMapper with common configurations.
-   * 
-   * - ALLOW_COERCION_OF_SCALARS - enables coercion of scalar values (e.g., String to Number)
-   *   which is required by the generated OpenAPI client (GetConstantsByResource200Response).
-   * - JavaTimeModule - enables support for Java 8 date/time types (LocalDateTime, etc.)
-   * - WRITE_DATES_AS_TIMESTAMPS disabled - writes dates as ISO-8601 strings instead of arrays
+   *
+   * <p>- ALLOW_COERCION_OF_SCALARS - enables coercion of scalar values (e.g., String to Number)
+   * which is required by the generated OpenAPI client (GetConstantsByResource200Response). -
+   * JavaTimeModule - enables support for Java 8 date/time types (LocalDateTime, etc.) -
+   * WRITE_DATES_AS_TIMESTAMPS disabled - writes dates as ISO-8601 strings instead of arrays
    */
   @Bean
   @Primary
@@ -36,6 +36,7 @@ public class ObjectMapperConfig {
 
   /**
    * Static factory method for creating ObjectMapper instances outside of Spring context.
+   *
    * @deprecated Use the Spring-managed bean instead when possible.
    */
   @Deprecated

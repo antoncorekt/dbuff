@@ -41,36 +41,38 @@ public class DotaApiConfig {
   }
 
   /**
-   * Configure the JSON ObjectMapper for the DotaAPI client.
-   * This enables ALLOW_COERCION_OF_SCALARS which is required for proper
-   * deserialization of the API responses (e.g., GetConstantsByResource200Response).
+   * Configure the JSON ObjectMapper for the DotaAPI client. This enables ALLOW_COERCION_OF_SCALARS
+   * which is required for proper deserialization of the API responses (e.g.,
+   * GetConstantsByResource200Response).
    */
   @PostConstruct
   public void configureJsonMapper() {
-    ObjectMapper mapper = JsonMapper.builder()
-        .serializationInclusion(JsonInclude.Include.NON_NULL)
-        .enable(MapperFeature.ALLOW_COERCION_OF_SCALARS)  // Enable coercion of scalars
-        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-        .disable(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE)
-        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-        .enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)
-        .enable(DeserializationFeature.READ_ENUMS_USING_TO_STRING)
-        .addModule(new JavaTimeModule())
-        .addModule(new JsonNullableModule())
-        .build();
+    ObjectMapper mapper =
+        JsonMapper.builder()
+            .serializationInclusion(JsonInclude.Include.NON_NULL)
+            .enable(MapperFeature.ALLOW_COERCION_OF_SCALARS) // Enable coercion of scalars
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .disable(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE)
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)
+            .enable(DeserializationFeature.READ_ENUMS_USING_TO_STRING)
+            .addModule(new JavaTimeModule())
+            .addModule(new JsonNullableModule())
+            .build();
 
     // Create a custom JSON instance with the configured mapper
-    JSON customJson = new JSON() {
-      @Override
-      public ObjectMapper getContext(Class<?> type) {
-        return mapper;
-      }
+    JSON customJson =
+        new JSON() {
+          @Override
+          public ObjectMapper getContext(Class<?> type) {
+            return mapper;
+          }
 
-      @Override
-      public ObjectMapper getMapper() {
-        return mapper;
-      }
-    };
+          @Override
+          public ObjectMapper getMapper() {
+            return mapper;
+          }
+        };
 
     // Set as the default JSON instance for the API client
     JSON.setDefault(customJson);

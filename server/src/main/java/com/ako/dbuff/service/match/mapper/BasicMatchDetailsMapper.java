@@ -37,8 +37,8 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
   private final Cache<Long, Document> scrappedDotabufPage = Caffeine.newBuilder().build();
 
   /**
-   * Handles mapping of match response to domain object.
-   * Uses ScopedValue context for logging - matchId should already be in scope.
+   * Handles mapping of match response to domain object. Uses ScopedValue context for logging -
+   * matchId should already be in scope.
    *
    * @param matchResponse the API response
    * @param matchDomain the domain object to populate
@@ -46,15 +46,16 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
   @Override
   public void handle(MatchResponse matchResponse, MatchDomain matchDomain) {
     String ctx = ProcessContext.getContextString();
-    
+
     mapGameMode(matchResponse, matchDomain);
     mapTimeInfo(matchResponse, matchDomain);
     mapPatchInfo(matchResponse, matchDomain);
     mapScoreInfo(matchResponse, matchDomain);
 
-    log.debug("{} Processing {} players for match {}", 
-        ctx, 
-        CollectionUtils.size(matchResponse.getPlayers()), 
+    log.debug(
+        "{} Processing {} players for match {}",
+        ctx,
+        CollectionUtils.size(matchResponse.getPlayers()),
         matchDomain.getId());
 
     CollectionUtils.emptyIfNull(matchResponse.getPlayers())
@@ -77,10 +78,9 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
     matchDomain.setStartTime(matchResponse.getStartTime());
     long startTimeMillis = matchResponse.getStartTime() * 1000;
     matchDomain.setStartTimeMillis(startTimeMillis);
-    
-    LocalDate localDate = Instant.ofEpochMilli(startTimeMillis)
-        .atZone(ZoneId.systemDefault())
-        .toLocalDate();
+
+    LocalDate localDate =
+        Instant.ofEpochMilli(startTimeMillis).atZone(ZoneId.systemDefault()).toLocalDate();
     matchDomain.setStartLocalDate(localDate);
     matchDomain.setStartMonth(localDate.getMonth().getValue());
     matchDomain.setStartYear(localDate.getYear());
@@ -106,21 +106,27 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
 
   private void checkAndScrapeAdditionalData(MatchDomain matchDomain) {
     String ctx = ProcessContext.getContextString();
-    
+
     playerGameStatisticRepo.findAllByMatchId(matchDomain.getId()).stream()
         .findAny()
-        .ifPresent(playerGameStatistic -> {
-          boolean needsItems = playerGameStatistic.getHasItems() == null || !playerGameStatistic.getHasItems();
-          boolean needsAbilities = playerGameStatistic.getHasAbilities() == null || !playerGameStatistic.getHasAbilities();
-          
-          if (needsItems || needsAbilities) {
-            log.info("{} For match {} items or abilities not found, trying to scrape from dotabuff",
-                ctx, matchDomain.getId());
-            Document scrappedPage = scrappedDotabufPage.get(
-                matchDomain.getId(), 
-                k -> dotaBuffMatchDetailsScrapper.scrap(matchDomain));
-            dotabuffBuildDetailsParser.parse(scrappedPage, matchDomain);
-          }
-        });
+        .ifPresent(
+            playerGameStatistic -> {
+              boolean needsItems =
+                  playerGameStatistic.getHasItems() == null || !playerGameStatistic.getHasItems();
+              boolean needsAbilities =
+                  playerGameStatistic.getHasAbilities() == null
+                      || !playerGameStatistic.getHasAbilities();
+
+              if (needsItems || needsAbilities) {
+                log.info(
+                    "{} For match {} items or abilities not found, trying to scrape from dotabuff",
+                    ctx,
+                    matchDomain.getId());
+                Document scrappedPage =
+                    scrappedDotabufPage.get(
+                        matchDomain.getId(), k -> dotaBuffMatchDetailsScrapper.scrap(matchDomain));
+                dotabuffBuildDetailsParser.parse(scrappedPage, matchDomain);
+              }
+            });
   }
 }

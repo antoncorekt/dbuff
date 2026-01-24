@@ -42,8 +42,8 @@ public class PlayersMapper {
   private final ConstantsManagers constantManagers;
 
   /**
-   * Handles mapping of player data from API response to domain objects.
-   * Uses ScopedValue to set player context for logging within this scope.
+   * Handles mapping of player data from API response to domain objects. Uses ScopedValue to set
+   * player context for logging within this scope.
    *
    * @param matchDomain the match domain
    * @param player the player data from API
@@ -53,18 +53,21 @@ public class PlayersMapper {
     String personaname = Optional.ofNullable(player.getPersonaname()).orElse("anonymous");
 
     // Run player processing with playerId in scope for logging
-    ProcessContext.runWithPlayerId(accountId, () -> 
-        processPlayer(matchDomain, player, accountId, personaname)
-    );
+    ProcessContext.runWithPlayerId(
+        accountId, () -> processPlayer(matchDomain, player, accountId, personaname));
   }
 
-  private void processPlayer(MatchDomain matchDomain, MatchResponsePlayersInner player, 
-                             Long accountId, String personaname) {
+  private void processPlayer(
+      MatchDomain matchDomain,
+      MatchResponsePlayersInner player,
+      Long accountId,
+      String personaname) {
     String ctx = ProcessContext.getContextString();
     log.debug("{} Processing player {} for match {}", ctx, accountId, matchDomain.getId());
 
     PlayerDomain playerDomain = getOrCreatePlayer(accountId, personaname);
-    PlayerMatchStatisticDomain playerStatisticDomain = createPlayerStatistics(matchDomain, player, accountId);
+    PlayerMatchStatisticDomain playerStatisticDomain =
+        createPlayerStatistics(matchDomain, player, accountId);
 
     Long heroId = player.getHeroId();
     HeroConstant hero = constantManagers.getHeroConstantMap().get(String.valueOf(heroId));
@@ -73,13 +76,18 @@ public class PlayersMapper {
     setPlayerStats(playerStatisticDomain, player);
     setBenchmarks(player, playerStatisticDomain);
 
-    Set<Pair<AbilityIdsConstant, AbilityConstant>> playerAbilities = processAbilities(player, matchDomain, playerDomain);
+    Set<Pair<AbilityIdsConstant, AbilityConstant>> playerAbilities =
+        processAbilities(player, matchDomain, playerDomain);
     playerStatisticDomain.setHasAbilities(!playerAbilities.isEmpty());
 
     processItems(player, matchDomain, playerDomain, playerStatisticDomain);
 
     playerGameStatisticRepo.save(playerStatisticDomain);
-    log.debug("{} Saved player statistics for player {} in match {}", ctx, accountId, matchDomain.getId());
+    log.debug(
+        "{} Saved player statistics for player {} in match {}",
+        ctx,
+        accountId,
+        matchDomain.getId());
   }
 
   private PlayerDomain getOrCreatePlayer(Long accountId, String personaname) {
@@ -88,9 +96,8 @@ public class PlayersMapper {
         .orElseGet(() -> playerRepo.save(new PlayerDomain(accountId, personaname)));
   }
 
-  private PlayerMatchStatisticDomain createPlayerStatistics(MatchDomain matchDomain, 
-                                                            MatchResponsePlayersInner player, 
-                                                            Long accountId) {
+  private PlayerMatchStatisticDomain createPlayerStatistics(
+      MatchDomain matchDomain, MatchResponsePlayersInner player, Long accountId) {
     PlayerMatchStatisticDomain stats = new PlayerMatchStatisticDomain();
     stats.setPlayerId(accountId);
     stats.setMatchId(matchDomain.getId());
@@ -114,9 +121,9 @@ public class PlayersMapper {
   }
 
   private void setPlayerStats(PlayerMatchStatisticDomain stats, MatchResponsePlayersInner player) {
-//    stats.setAganim(player.getAghanimsScepter()); // todo add
-//    stats.setAganimShard(player.getAghanimsShard());
-//    stats.setMoonshard(player.getMoonshard());
+    //    stats.setAganim(player.getAghanimsScepter()); // todo add
+    //    stats.setAganimShard(player.getAghanimsShard());
+    //    stats.setMoonshard(player.getMoonshard());
     stats.setWin(player.getWin());
     stats.setTotalGold(player.getTotalGold());
     stats.setTotalXp(player.getTotalXp());
@@ -131,7 +138,7 @@ public class PlayersMapper {
 
   private void setBenchmarks(MatchResponsePlayersInner player, PlayerMatchStatisticDomain stats) {
     @SuppressWarnings("unchecked")
-    Map<String, Map<String, Integer>> benchmarks = 
+    Map<String, Map<String, Integer>> benchmarks =
         (Map<String, Map<String, Integer>>) player.getBenchmarks();
     if (benchmarks != null) {
       setUpBenchmarks(benchmarks, stats);
@@ -140,26 +147,32 @@ public class PlayersMapper {
 
   private Set<Pair<AbilityIdsConstant, AbilityConstant>> processAbilities(
       MatchResponsePlayersInner player, MatchDomain matchDomain, PlayerDomain playerDomain) {
-    
+
     Set<String> allHeroAbilities = constantManagers.getAllHeroAbilities();
     Map<String, AbilityConstant> allAbilities = constantManagers.getAllAbilityConstants();
-    Map<String, AbilityIdsConstant> abilityIdsConstantMap = constantManagers.getAbilityConstantMap();
+    Map<String, AbilityIdsConstant> abilityIdsConstantMap =
+        constantManagers.getAbilityConstantMap();
     Long playerSlot = Long.valueOf(player.getPlayerSlot());
 
     Set<Pair<AbilityIdsConstant, AbilityConstant>> playerAbilities =
         new HashSet<>(CollectionUtils.emptyIfNull(player.getAbilityUpgradesArr()))
             .stream()
-            .map(abilityId -> abilityIdsConstantMap.get(String.valueOf(abilityId)))
-            .filter(ablIdConst -> ablIdConst != null && allHeroAbilities.contains(ablIdConst.getName()))
-            .map(ablIdConst -> Pair.of(ablIdConst, allAbilities.get(ablIdConst.getName())))
-            .collect(Collectors.toSet());
+                .map(abilityId -> abilityIdsConstantMap.get(String.valueOf(abilityId)))
+                .filter(
+                    ablIdConst ->
+                        ablIdConst != null && allHeroAbilities.contains(ablIdConst.getName()))
+                .map(ablIdConst -> Pair.of(ablIdConst, allAbilities.get(ablIdConst.getName())))
+                .collect(Collectors.toSet());
 
     playerAbilities.forEach(ability -> addAbility(ability, matchDomain, playerDomain, playerSlot));
     return playerAbilities;
   }
 
-  private void processItems(MatchResponsePlayersInner player, MatchDomain matchDomain,
-                           PlayerDomain playerDomain, PlayerMatchStatisticDomain stats) {
+  private void processItems(
+      MatchResponsePlayersInner player,
+      MatchDomain matchDomain,
+      PlayerDomain playerDomain,
+      PlayerMatchStatisticDomain stats) {
     Map<String, ItemConstant> itemsConstant = constantManagers.getItemConstantMap();
     Long playerSlot = Long.valueOf(player.getPlayerSlot());
 
@@ -167,18 +180,20 @@ public class PlayersMapper {
         CollectionUtils.emptyIfNull(player.getPurchaseLog());
     stats.setDotaApiItems(!purchaseLogs.isEmpty());
 
-    purchaseLogs.forEach(item -> addItemPurchase(item, itemsConstant, matchDomain, playerDomain, playerSlot));
+    purchaseLogs.forEach(
+        item -> addItemPurchase(item, itemsConstant, matchDomain, playerDomain, playerSlot));
     stats.setHasItems(!purchaseLogs.isEmpty());
 
     Collection<MatchResponsePlayersInnerNeutralItemHistoryInner> neutralItemHistory =
         CollectionUtils.emptyIfNull(player.getNeutralItemHistory());
-    neutralItemHistory.forEach(item -> addNeutralItem(item, itemsConstant, matchDomain, playerDomain, playerSlot));
+    neutralItemHistory.forEach(
+        item -> addNeutralItem(item, itemsConstant, matchDomain, playerDomain, playerSlot));
     stats.setHasNeutralItems(!neutralItemHistory.isEmpty());
   }
 
   /**
-   * Adds an ability to the database.
-   * Uses playerSlot as part of the primary key since anonymous players have playerId = -1.
+   * Adds an ability to the database. Uses playerSlot as part of the primary key since anonymous
+   * players have playerId = -1.
    */
   private AbilityDomain addAbility(
       Pair<AbilityIdsConstant, AbilityConstant> abilityPair,
@@ -225,7 +240,8 @@ public class PlayersMapper {
 
     Long time = item.getTime();
     String itemEnhancement = item.getItemNeutralEnhancement();
-    return saveItemDomain(itemsConstant, matchDomain, playerDomain, playerSlot, itemName, time, itemEnhancement);
+    return saveItemDomain(
+        itemsConstant, matchDomain, playerDomain, playerSlot, itemName, time, itemEnhancement);
   }
 
   private ItemDomain addItemPurchase(
@@ -237,12 +253,13 @@ public class PlayersMapper {
     String itemName = item.getKey();
     Long time = item.getTime();
 
-    return saveItemDomain(itemsConstant, matchDomain, playerDomain, playerSlot, itemName, time, null);
+    return saveItemDomain(
+        itemsConstant, matchDomain, playerDomain, playerSlot, itemName, time, null);
   }
 
   /**
-   * Saves an item to the database.
-   * Uses playerSlot as part of the primary key since anonymous players have playerId = -1.
+   * Saves an item to the database. Uses playerSlot as part of the primary key since anonymous
+   * players have playerId = -1.
    */
   private ItemDomain saveItemDomain(
       Map<String, ItemConstant> itemsConstant,

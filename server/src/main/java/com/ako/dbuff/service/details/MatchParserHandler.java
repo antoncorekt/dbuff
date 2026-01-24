@@ -30,9 +30,8 @@ public class MatchParserHandler {
   private final DotabuffMatchMapperService dotabuffMatchMapperService;
 
   /**
-   * Handles the processing of a match by its ID.
-   * Uses ScopedValue context for logging - matchId should already be in scope
-   * from the calling MatchProcessorService.
+   * Handles the processing of a match by its ID. Uses ScopedValue context for logging - matchId
+   * should already be in scope from the calling MatchProcessorService.
    *
    * @param matchId the match ID to process
    * @return the processed MatchDomain, or null if already processed
@@ -47,8 +46,10 @@ public class MatchParserHandler {
         log.info("{} Match {} is already scrapped and has Items and has Abilities", ctx, matchId);
         return null;
       } else {
-        log.info("{} Match {} found, but items or abilities not found, will try to parse again",
-            ctx, matchId);
+        log.info(
+            "{} Match {} found, but items or abilities not found, will try to parse again",
+            ctx,
+            matchId);
       }
     }
 
@@ -89,11 +90,11 @@ public class MatchParserHandler {
   private void handleDotaApiError(long matchId, MatchDomain matchDomain, Exception e, String ctx) {
     log.error("{} Failed to fetch match details for {}", ctx, matchId, e);
     matchDomain.setDotaApiFailed(true);
-    
+
     if (e.getCause() instanceof ApiException apiException) {
       if (apiException.getMessage().contains("Not Found")) {
-        log.info("{} Not found match in DotaAPI for {}, trying to scrape from dotabuff", 
-            ctx, matchId);
+        log.info(
+            "{} Not found match in DotaAPI for {}, trying to scrape from dotabuff", ctx, matchId);
         Document doc = dotabuffMatchScrapperService.scrap(matchId);
         matchDomain.setEndProcess(LocalDateTime.now());
         dotabuffMatchMapperService.parse(doc, matchDomain);

@@ -10,7 +10,6 @@ import com.ako.dbuff.dao.repo.ItemRepository;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.ItemConstant;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,8 +52,8 @@ public class DotabuffBuildDetailsParser {
   }
 
   /**
-   * Parses dotabuff page to extract items and abilities for players.
-   * Uses ScopedValue context for logging - matchId should already be in scope.
+   * Parses dotabuff page to extract items and abilities for players. Uses ScopedValue context for
+   * logging - matchId should already be in scope.
    *
    * @param doc the scraped document
    * @param matchDomain the match domain
@@ -64,7 +63,8 @@ public class DotabuffBuildDetailsParser {
     Elements section = doc.select("section.performance-artifact");
 
     if (section.isEmpty()) {
-      log.error("{} Not found section.performance-artifact for matchId {}", ctx, matchDomain.getId());
+      log.error(
+          "{} Not found section.performance-artifact for matchId {}", ctx, matchDomain.getId());
       throw new IllegalStateException(
           "Not found section.performance-artifact. Game: "
               + matchDomain.getId()
@@ -78,89 +78,117 @@ public class DotabuffBuildDetailsParser {
     Map<String, Long> abilityNameIdMap = buildAbilityNameIdMap();
 
     for (Element elementSection : section) {
-      processPlayerSection(elementSection, matchDomain, itemConstantMap, itemsByDname, 
-          abilitiesByDnName, abilityNameIdMap);
+      processPlayerSection(
+          elementSection,
+          matchDomain,
+          itemConstantMap,
+          itemsByDname,
+          abilitiesByDnName,
+          abilityNameIdMap);
     }
   }
 
-  private Map<String, ItemConstant> buildItemsByDnameMap(Map<String, ItemConstant> itemConstantMap) {
+  private Map<String, ItemConstant> buildItemsByDnameMap(
+      Map<String, ItemConstant> itemConstantMap) {
     return itemConstantMap.entrySet().stream()
         .filter(e -> e.getValue().getDname() != null)
-        .collect(Collectors.toMap(
-            e -> e.getValue().getDname().toLowerCase(),
-            Map.Entry::getValue,
-            (x, y) -> x));
+        .collect(
+            Collectors.toMap(
+                e -> e.getValue().getDname().toLowerCase(), Map.Entry::getValue, (x, y) -> x));
   }
 
   private Map<String, String> buildAbilitiesByDnNameMap() {
     return constantsManagers.getAllAbilityConstants().entrySet().stream()
-        .collect(Collectors.toMap(
-            x -> x.getValue().getDname(), 
-            Map.Entry::getKey, 
-            (x, y) -> y));
+        .collect(Collectors.toMap(x -> x.getValue().getDname(), Map.Entry::getKey, (x, y) -> y));
   }
 
   private Map<String, Long> buildAbilityNameIdMap() {
     return constantsManagers.getAbilityConstantMap().entrySet().stream()
-        .collect(Collectors.toMap(
-            x -> x.getValue().getName(), 
-            x -> x.getValue().getId(), 
-            (x, y) -> y));
+        .collect(
+            Collectors.toMap(x -> x.getValue().getName(), x -> x.getValue().getId(), (x, y) -> y));
   }
 
-  private void processPlayerSection(Element elementSection, MatchDomain matchDomain,
-      Map<String, ItemConstant> itemConstantMap, Map<String, ItemConstant> itemsByDname,
-      Map<String, String> abilitiesByDnName, Map<String, Long> abilityNameIdMap) {
-    
+  private void processPlayerSection(
+      Element elementSection,
+      MatchDomain matchDomain,
+      Map<String, ItemConstant> itemConstantMap,
+      Map<String, ItemConstant> itemsByDname,
+      Map<String, String> abilitiesByDnName,
+      Map<String, Long> abilityNameIdMap) {
+
     Elements header = elementSection.select("header.header.no-padding");
     Elements titleHeader = header.first().select("div.title");
     Optional<Element> linkToPlayer = Optional.ofNullable(titleHeader.first().select("a").first());
 
-    Optional<String> href = linkToPlayer.map(x-> x.attr("href"));
-    Long playerId = href.map(x->Long.valueOf(x.substring(x.lastIndexOf('/') + 1))).orElse(-1L);
+    Optional<String> href = linkToPlayer.map(x -> x.attr("href"));
+    Long playerId = href.map(x -> Long.valueOf(x.substring(x.lastIndexOf('/') + 1))).orElse(-1L);
 
     // Process player with playerId in scope for logging
-    ProcessContext.runWithPlayerId(playerId, () -> 
-        processPlayerData(elementSection, header, matchDomain, playerId, 
-            itemConstantMap, itemsByDname, abilitiesByDnName, abilityNameIdMap)
-    );
+    ProcessContext.runWithPlayerId(
+        playerId,
+        () ->
+            processPlayerData(
+                elementSection,
+                header,
+                matchDomain,
+                playerId,
+                itemConstantMap,
+                itemsByDname,
+                abilitiesByDnName,
+                abilityNameIdMap));
   }
 
-  private void processPlayerData(Element elementSection, Elements header, MatchDomain matchDomain,
-      Long playerId, Map<String, ItemConstant> itemConstantMap, Map<String, ItemConstant> itemsByDname,
-      Map<String, String> abilitiesByDnName, Map<String, Long> abilityNameIdMap) {
-    
+  private void processPlayerData(
+      Element elementSection,
+      Elements header,
+      MatchDomain matchDomain,
+      Long playerId,
+      Map<String, ItemConstant> itemConstantMap,
+      Map<String, ItemConstant> itemsByDname,
+      Map<String, String> abilitiesByDnName,
+      Map<String, Long> abilityNameIdMap) {
+
     String ctx = ProcessContext.getContextString();
-    
+
     PlayerMatchStatisticDomain playerStat = getPlayerStat(matchDomain.getId(), playerId, header);
 
     if (playerStat == null) {
-      log.warn("{} Player stat not found for match: {}, player: {}. " +
-          "Cannot save items/abilities without playerSlot from existing stat record.",
-          ctx, matchDomain.getId(), playerId);
+      log.warn(
+          "{} Player stat not found for match: {}, player: {}. "
+              + "Cannot save items/abilities without playerSlot from existing stat record.",
+          ctx,
+          matchDomain.getId(),
+          playerId);
       // Cannot save items and abilities without playerSlot (required for PK)
       // The player must be processed by DotaAPI first to get playerSlot
       return;
     }
 
     Long playerSlot = playerStat.getPlayerSlot();
-    
-    boolean parsedItems = processItems(header, matchDomain, playerId, playerSlot, playerStat,
-        itemConstantMap, itemsByDname);
-    
+
+    boolean parsedItems =
+        processItems(
+            header, matchDomain, playerId, playerSlot, playerStat, itemConstantMap, itemsByDname);
+
     if (parsedItems) {
       playerStat.setHasItems(true);
     }
     playerGameStatisticRepo.save(playerStat);
 
-    processAbilities(elementSection, matchDomain, playerId, playerSlot, playerStat,
-        abilitiesByDnName, abilityNameIdMap);
+    processAbilities(
+        elementSection,
+        matchDomain,
+        playerId,
+        playerSlot,
+        playerStat,
+        abilitiesByDnName,
+        abilityNameIdMap);
   }
 
   /**
-   * Gets or creates player statistics by matchId and playerId.
-   * Note: When creating new stats from Dotabuff scraping, we don't have playerSlot,
-   * so we cannot create new records. This method only returns existing records.
+   * Gets or creates player statistics by matchId and playerId. Note: When creating new stats from
+   * Dotabuff scraping, we don't have playerSlot, so we cannot create new records. This method only
+   * returns existing records.
    *
    * @param matchId the match ID
    * @param playerId the player account ID
@@ -170,39 +198,42 @@ public class DotabuffBuildDetailsParser {
 
     // not anon
     if (playerId != -1) {
-      return playerGameStatisticRepo
-          .findByMatchIdAndPlayerId(matchId, playerId)
-          .orElse(null);
+      return playerGameStatisticRepo.findByMatchIdAndPlayerId(matchId, playerId).orElse(null);
     }
 
     try {
-      List<PlayerMatchStatisticDomain> allByMatchId = playerGameStatisticRepo
-          .findAllByMatchId(matchId);
+      List<PlayerMatchStatisticDomain> allByMatchId =
+          playerGameStatisticRepo.findAllByMatchId(matchId);
 
       Elements avatarContainer = header.first().select("div.avatar");
       Element linkToAvatar = avatarContainer.first().select("a").first();
 
       String href = linkToAvatar.attr("href");
-      String hero = href.substring(href.lastIndexOf('/') + 1).replace("_"," ").replace("-"," ");
+      String hero = href.substring(href.lastIndexOf('/') + 1).replace("_", " ").replace("-", " ");
 
       log.info("Trying to parse hero {} for matchId: {}", hero, matchId);
 
-      return allByMatchId
-          .stream()
+      return allByMatchId.stream()
           .filter(x -> x.getHeroPrettyName().toLowerCase().equals(hero))
           .findAny()
-          .orElseThrow(() -> new IllegalStateException(STR."Hero \{hero} not found for matchId: \{matchId}"));
-    }
-    catch (Exception e) {
+          .orElseThrow(
+              () ->
+                  new IllegalStateException("Hero " + hero + " not found for matchId: " + matchId));
+    } catch (Exception e) {
       log.error("Failed to parse hero for match: {}", matchId, e);
       return null;
     }
   }
 
-  private boolean processItems(Elements header, MatchDomain matchDomain, Long playerId,
-      Long playerSlot, PlayerMatchStatisticDomain playerStat, Map<String, ItemConstant> itemConstantMap,
+  private boolean processItems(
+      Elements header,
+      MatchDomain matchDomain,
+      Long playerId,
+      Long playerSlot,
+      PlayerMatchStatisticDomain playerStat,
+      Map<String, ItemConstant> itemConstantMap,
       Map<String, ItemConstant> itemsByDname) {
-    
+
     String ctx = ProcessContext.getContextString();
     Element itemsGroupElement = header.select("div.items").first();
 
@@ -210,24 +241,30 @@ public class DotabuffBuildDetailsParser {
       return false;
     }
 
-    log.info("{} Found items 'div.items' for match: {}, player: {}",
-        ctx, matchDomain.getId(), playerId);
+    log.info(
+        "{} Found items 'div.items' for match: {}, player: {}", ctx, matchDomain.getId(), playerId);
 
     boolean parsedItems = false;
     for (Element itemFrame : itemsGroupElement.children()) {
       parsedItems = true;
-      processItemElement(itemFrame, matchDomain, playerId, playerSlot, itemConstantMap, itemsByDname);
+      processItemElement(
+          itemFrame, matchDomain, playerId, playerSlot, itemConstantMap, itemsByDname);
     }
     return parsedItems;
   }
 
   /**
-   * Processes an item element from the Dotabuff page.
-   * Uses playerSlot as part of the primary key since anonymous players have playerId = -1.
+   * Processes an item element from the Dotabuff page. Uses playerSlot as part of the primary key
+   * since anonymous players have playerId = -1.
    */
-  private void processItemElement(Element itemFrame, MatchDomain matchDomain, Long playerId,
-      Long playerSlot, Map<String, ItemConstant> itemConstantMap, Map<String, ItemConstant> itemsByDname) {
-    
+  private void processItemElement(
+      Element itemFrame,
+      MatchDomain matchDomain,
+      Long playerId,
+      Long playerSlot,
+      Map<String, ItemConstant> itemConstantMap,
+      Map<String, ItemConstant> itemsByDname) {
+
     String ctx = ProcessContext.getContextString();
     Elements aElement = itemFrame.select("a");
     String attrHref = aElement.attr("href");
@@ -244,20 +281,21 @@ public class DotabuffBuildDetailsParser {
       return;
     }
 
-    ItemDomain itemDomain = ItemDomain.builder()
-        .matchId(matchDomain.getId())
-        .itemId(itemConstant.getId())
-        .itemName(itemName)
-        .itemPrettyName(itemConstant.getDname())
-        .playerId(playerId)
-        .playerSlot(playerSlot)
-        .build();
+    ItemDomain itemDomain =
+        ItemDomain.builder()
+            .matchId(matchDomain.getId())
+            .itemId(itemConstant.getId())
+            .itemName(itemName)
+            .itemPrettyName(itemConstant.getDname())
+            .playerId(playerId)
+            .playerSlot(playerSlot)
+            .build();
 
     Element timeElement = itemFrame.select("div.time").first();
     if (timeElement != null) {
       parseItemTime(timeElement, itemDomain);
     }
-    
+
     itemRepo.save(itemDomain);
   }
 
@@ -274,21 +312,30 @@ public class DotabuffBuildDetailsParser {
     }
   }
 
-  private void processAbilities(Element elementSection, MatchDomain matchDomain, Long playerId,
-      Long playerSlot, PlayerMatchStatisticDomain playerStat, Map<String, String> abilitiesByDnName,
+  private void processAbilities(
+      Element elementSection,
+      MatchDomain matchDomain,
+      Long playerId,
+      Long playerSlot,
+      PlayerMatchStatisticDomain playerStat,
+      Map<String, String> abilitiesByDnName,
       Map<String, Long> abilityNameIdMap) {
-    
+
     String ctx = ProcessContext.getContextString();
     Element skills = elementSection.select("article.skill-choices").first();
 
     if (skills == null || playerStat.getHasAbilities() == null || playerStat.getHasAbilities()) {
-      log.info("{} SKILLS or ABILITIES NOT FOUND or skills already parsed, matchId: {}, playerId: {}",
-          ctx, matchDomain.getId(), playerId);
+      log.info(
+          "{} SKILLS or ABILITIES NOT FOUND or skills already parsed, matchId: {}, playerId: {}",
+          ctx,
+          matchDomain.getId(),
+          playerId);
       return;
     }
 
     for (Element skillEl : skills.children()) {
-      processSkillElement(skillEl, matchDomain, playerId, playerSlot, abilitiesByDnName, abilityNameIdMap);
+      processSkillElement(
+          skillEl, matchDomain, playerId, playerSlot, abilitiesByDnName, abilityNameIdMap);
     }
 
     playerStat.setHasAbilities(true);
@@ -296,12 +343,17 @@ public class DotabuffBuildDetailsParser {
   }
 
   /**
-   * Processes a skill element from the Dotabuff page.
-   * Uses playerSlot as part of the primary key since anonymous players have playerId = -1.
+   * Processes a skill element from the Dotabuff page. Uses playerSlot as part of the primary key
+   * since anonymous players have playerId = -1.
    */
-  private void processSkillElement(Element skillEl, MatchDomain matchDomain, Long playerId,
-      Long playerSlot, Map<String, String> abilitiesByDnName, Map<String, Long> abilityNameIdMap) {
-    
+  private void processSkillElement(
+      Element skillEl,
+      MatchDomain matchDomain,
+      Long playerId,
+      Long playerSlot,
+      Map<String, String> abilitiesByDnName,
+      Map<String, Long> abilityNameIdMap) {
+
     String ctx = ProcessContext.getContextString();
     String skillName = skillEl.select("div.icon").first().select("img").first().attr("alt");
 
@@ -317,18 +369,20 @@ public class DotabuffBuildDetailsParser {
 
     Long abilityId = abilityNameIdMap.get(abilityName);
     if (abilityId == null) {
-      log.error("{} abilityId not found, skillName: {}, abilityName: {}", ctx, skillName, abilityName);
+      log.error(
+          "{} abilityId not found, skillName: {}, abilityName: {}", ctx, skillName, abilityName);
       return;
     }
 
-    AbilityDomain abilityDomain = AbilityDomain.builder()
-        .matchId(matchDomain.getId())
-        .playerId(playerId)
-        .playerSlot(playerSlot)
-        .abilityId(abilityId)
-        .name(abilityName)
-        .prettyName(skillName)
-        .build();
+    AbilityDomain abilityDomain =
+        AbilityDomain.builder()
+            .matchId(matchDomain.getId())
+            .playerId(playerId)
+            .playerSlot(playerSlot)
+            .abilityId(abilityId)
+            .name(abilityName)
+            .prettyName(skillName)
+            .build();
 
     abilityRepo.save(abilityDomain);
   }

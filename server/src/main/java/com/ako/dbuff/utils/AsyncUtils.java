@@ -1,8 +1,3 @@
 package com.ako.dbuff.utils;
 
-public class AsyncUtils {
-
-
-
-
-}
+public class AsyncUtils {}

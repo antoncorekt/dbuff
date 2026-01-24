@@ -5,10 +5,8 @@ import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.executors.Executors;
 import com.ako.dbuff.service.details.MatchParserHandler;
-
 import java.util.List;
 import java.util.concurrent.Semaphore;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,12 +21,11 @@ public class MatchProcessorService {
   private final Semaphore matchProcessingSemaphore;
 
   /**
-   * Processes a list of matches asynchronously using virtual threads.
-   * Each match is processed in its own virtual thread with the matchId
-   * available via ScopedValue for logging and tracing.
-   * 
-   * Uses a semaphore to limit concurrent database operations and prevent
-   * exhausting the connection pool.
+   * Processes a list of matches asynchronously using virtual threads. Each match is processed in
+   * its own virtual thread with the matchId available via ScopedValue for logging and tracing.
+   *
+   * <p>Uses a semaphore to limit concurrent database operations and prevent exhausting the
+   * connection pool.
    *
    * @param matchDomains the list of matches to process
    */
@@ -38,7 +35,7 @@ public class MatchProcessorService {
 
   private void processMatch(MatchDomain matchDomain) {
     Long gameId = matchDomain.getId();
-    
+
     // Execute in virtual thread with matchId in scope for logging
     Executors.executeWithFullContext(
         Executors.ProcessTypes.MATCH_PROCESSING,
@@ -58,8 +55,10 @@ public class MatchProcessorService {
             }
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.error("{} Interrupted while waiting for semaphore for game {}", 
-                ProcessContext.getContextString(), gameId);
+            log.error(
+                "{} Interrupted while waiting for semaphore for game {}",
+                ProcessContext.getContextString(),
+                gameId);
           } catch (Exception e) {
             handleProcessingError(matchDomain, gameId, e);
           }
@@ -69,7 +68,11 @@ public class MatchProcessorService {
   private void handleProcessingError(MatchDomain matchDomain, Long gameId, Exception e) {
     matchDomain.setError(e.getMessage());
     matchRepo.save(matchDomain);
-    log.error("{} Failed to process game {} with exception: {}", 
-        ProcessContext.getContextString(), gameId, e.getMessage(), e);
+    log.error(
+        "{} Failed to process game {} with exception: {}",
+        ProcessContext.getContextString(),
+        gameId,
+        e.getMessage(),
+        e);
   }
 }

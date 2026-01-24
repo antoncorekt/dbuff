@@ -13,11 +13,10 @@ import lombok.ToString;
 
 /**
  * Player statistics for a specific match.
- * 
- * Primary key is (matchId, playerSlot) instead of (matchId, playerId) because:
- * - Anonymous players have null accountId (stored as -1 in playerId)
- * - Multiple anonymous players in the same match would have the same playerId
- * - playerSlot (0-9) is always unique within a match
+ *
+ * <p>Primary key is (matchId, playerSlot) instead of (matchId, playerId) because: - Anonymous
+ * players have null accountId (stored as -1 in playerId) - Multiple anonymous players in the same
+ * match would have the same playerId - playerSlot (0-9) is always unique within a match
  */
 @Entity
 @IdClass(PlayerGameStatisticDomainId.class)
@@ -28,20 +27,17 @@ import lombok.ToString;
 @ToString
 public class PlayerMatchStatisticDomain {
 
-  @Id 
-  private Long matchId;
+  @Id private Long matchId;
 
   /**
-   * Player slot in the match (0-9).
-   * Slots 0-4 are Radiant, slots 5-9 (or 128-132 in raw format) are Dire.
-   * This is part of the composite primary key.
+   * Player slot in the match (0-9). Slots 0-4 are Radiant, slots 5-9 (or 128-132 in raw format) are
+   * Dire. This is part of the composite primary key.
    */
-  @Id 
-  private Long playerSlot;
+  @Id private Long playerSlot;
 
   /**
-   * Player account ID. Can be -1 for anonymous players.
-   * Not part of the primary key to avoid conflicts with multiple anonymous players.
+   * Player account ID. Can be -1 for anonymous players. Not part of the primary key to avoid
+   * conflicts with multiple anonymous players.
    */
   private Long playerId;
 
