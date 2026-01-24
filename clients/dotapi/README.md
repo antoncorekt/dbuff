@@ -2,7 +2,7 @@
 
 OpenDota API
 
-- API version: 26.0.0
+- API version: 31.1.0
 
 - Generator version: 7.14.0
 
@@ -11,7 +11,7 @@ The OpenDota API provides Dota 2 related data including advanced match data extr
 
 You can find data that can be used to convert hero and ability IDs and other information provided by the API from the [dotaconstants](https://github.com/odota/dotaconstants) repository.
 
-Without a key, you can make 2,000 free calls per day at a rate limit of 60 requests/minute. We also offer a Premium Tier with unlimited API calls and higher rate limits. Check out the [API page](https://www.opendota.com/api-keys) to learn more.
+You can use the API without a key, but registering for a key allows increased rate limits and usage. Check out the [API page](https://www.opendota.com/api-keys) to learn more.
     
 
 
@@ -136,6 +136,7 @@ Class | Method | HTTP request | Description
 *HeroesApi* | [**getHeroesByHeroIdSelectPlayers**](docs/HeroesApi.md#getHeroesByHeroIdSelectPlayers) | **GET** /heroes/{hero_id}/players | GET /heroes/{hero_id}/players
 *LeaguesApi* | [**getLeagues**](docs/LeaguesApi.md#getLeagues) | **GET** /leagues | GET /leagues
 *LeaguesApi* | [**getLeaguesByLeagueId**](docs/LeaguesApi.md#getLeaguesByLeagueId) | **GET** /leagues/{league_id} | GET /leagues/{league_id}
+*LeaguesApi* | [**getLeaguesByLeagueIdSelectMatchIds**](docs/LeaguesApi.md#getLeaguesByLeagueIdSelectMatchIds) | **GET** /leagues/{league_id}/matchIds | GET /leagues/{league_id}/matchIds
 *LeaguesApi* | [**getLeaguesByLeagueIdSelectMatches**](docs/LeaguesApi.md#getLeaguesByLeagueIdSelectMatches) | **GET** /leagues/{league_id}/matches | GET /leagues/{league_id}/matches
 *LeaguesApi* | [**getLeaguesByLeagueIdSelectTeams**](docs/LeaguesApi.md#getLeaguesByLeagueIdSelectTeams) | **GET** /leagues/{league_id}/teams | GET /leagues/{league_id}/teams
 *LiveApi* | [**getLive**](docs/LiveApi.md#getLive) | **GET** /live | GET /live
@@ -174,6 +175,7 @@ Class | Method | HTTP request | Description
 *TeamsApi* | [**getTeamsByTeamIdSelectHeroes**](docs/TeamsApi.md#getTeamsByTeamIdSelectHeroes) | **GET** /teams/{team_id}/heroes | GET /teams/{team_id}/heroes
 *TeamsApi* | [**getTeamsByTeamIdSelectMatches**](docs/TeamsApi.md#getTeamsByTeamIdSelectMatches) | **GET** /teams/{team_id}/matches | GET /teams/{team_id}/matches
 *TeamsApi* | [**getTeamsByTeamIdSelectPlayers**](docs/TeamsApi.md#getTeamsByTeamIdSelectPlayers) | **GET** /teams/{team_id}/players | GET /teams/{team_id}/players
+*TopPlayersApi* | [**getTopPlayers**](docs/TopPlayersApi.md#getTopPlayers) | **GET** /topPlayers | GET /topPlayers
 
 
 ## Documentation for Models
@@ -202,6 +204,7 @@ Class | Method | HTTP request | Description
  - [MatchResponse](docs/MatchResponse.md)
  - [MatchResponseChatInner](docs/MatchResponseChatInner.md)
  - [MatchResponseDraftTimingsInner](docs/MatchResponseDraftTimingsInner.md)
+ - [MatchResponsePausesInner](docs/MatchResponsePausesInner.md)
  - [MatchResponsePicksBansInner](docs/MatchResponsePicksBansInner.md)
  - [MatchResponsePlayersInner](docs/MatchResponsePlayersInner.md)
  - [MatchResponsePlayersInnerBuybackLogInner](docs/MatchResponsePlayersInnerBuybackLogInner.md)
@@ -228,6 +231,7 @@ Class | Method | HTTP request | Description
  - [PlayerWinLossResponse](docs/PlayerWinLossResponse.md)
  - [PlayerWordCloudResponse](docs/PlayerWordCloudResponse.md)
  - [PlayersResponse](docs/PlayersResponse.md)
+ - [PlayersResponseAliasesInner](docs/PlayersResponseAliasesInner.md)
  - [PlayersResponseProfile](docs/PlayersResponseProfile.md)
  - [PublicMatchesResponse](docs/PublicMatchesResponse.md)
  - [RankingsResponse](docs/RankingsResponse.md)

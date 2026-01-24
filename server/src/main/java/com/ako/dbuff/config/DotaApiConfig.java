@@ -5,11 +5,21 @@ import com.ako.dbuff.dotapi.api.MatchesApi;
 import com.ako.dbuff.dotapi.api.PlayersApi;
 import com.ako.dbuff.dotapi.api.PublicMatchesApi;
 import com.ako.dbuff.dotapi.invoker.ApiClient;
+import com.ako.dbuff.dotapi.invoker.JSON;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.util.concurrent.RateLimiter;
+import jakarta.annotation.PostConstruct;
 import jakarta.ws.rs.client.ClientRequestFilter;
 import java.net.URI;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.openapitools.jackson.nullable.JsonNullableModule;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -28,6 +38,43 @@ public class DotaApiConfig {
     log.info(
         "Enabled api_key for dota_api: {}",
         StringUtils.hasLength(dotaApiConfigurationProperties.getApiKey()));
+  }
+
+  /**
+   * Configure the JSON ObjectMapper for the DotaAPI client.
+   * This enables ALLOW_COERCION_OF_SCALARS which is required for proper
+   * deserialization of the API responses (e.g., GetConstantsByResource200Response).
+   */
+  @PostConstruct
+  public void configureJsonMapper() {
+    ObjectMapper mapper = JsonMapper.builder()
+        .serializationInclusion(JsonInclude.Include.NON_NULL)
+        .enable(MapperFeature.ALLOW_COERCION_OF_SCALARS)  // Enable coercion of scalars
+        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+        .disable(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE)
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+        .enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)
+        .enable(DeserializationFeature.READ_ENUMS_USING_TO_STRING)
+        .addModule(new JavaTimeModule())
+        .addModule(new JsonNullableModule())
+        .build();
+
+    // Create a custom JSON instance with the configured mapper
+    JSON customJson = new JSON() {
+      @Override
+      public ObjectMapper getContext(Class<?> type) {
+        return mapper;
+      }
+
+      @Override
+      public ObjectMapper getMapper() {
+        return mapper;
+      }
+    };
+
+    // Set as the default JSON instance for the API client
+    JSON.setDefault(customJson);
+    log.info("Configured DotaAPI JSON mapper with ALLOW_COERCION_OF_SCALARS enabled");
   }
 
   @Bean

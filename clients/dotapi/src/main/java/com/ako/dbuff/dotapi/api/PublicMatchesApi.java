@@ -50,10 +50,8 @@ public class PublicMatchesApi {
    * GET /publicMatches
    * Get list of randomly sampled public matches
    * @param lessThanMatchId Get matches with a match ID lower than this value (optional)
-   * @param minRank Minimum rank for the matches. Ranks are represented by integers (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55: Legend, 60-65: Ancient, 70-75: Divine, 80-85: Immortal). Each increment represents an additional star. (optional)
-   * @param maxRank Maximum rank for the matches. Ranks are represented by integers (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55: Legend, 60-65: Ancient, 70-75: Divine, 80-85: Immortal). Each increment represents an additional star. (optional)
-   * @param mmrAscending Order by average rank ascending (optional)
-   * @param mmrDescending Order by average rank descending (optional)
+   * @param minRank Minimum rank for the matches. Ranks are represented by integers (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55: Legend, 60-65: Ancient, 70-75: Divine, 80: Immortal). Each increment represents an additional star. (optional)
+   * @param maxRank Maximum rank for the matches. Ranks are represented by integers (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55: Legend, 60-65: Ancient, 70-75: Divine, 80: Immortal). Each increment represents an additional star. (optional)
    * @return List&lt;PublicMatchesResponse&gt;
    * @throws ApiException if fails to make API call
    * @http.response.details
@@ -63,18 +61,16 @@ public class PublicMatchesApi {
        <tr><td> 200 </td><td> Success </td><td>  -  </td></tr>
      </table>
    */
-  public List<PublicMatchesResponse> getPublicMatches(@jakarta.annotation.Nullable Long lessThanMatchId, @jakarta.annotation.Nullable Long minRank, @jakarta.annotation.Nullable Long maxRank, @jakarta.annotation.Nullable Long mmrAscending, @jakarta.annotation.Nullable Long mmrDescending) throws ApiException {
-    return getPublicMatchesWithHttpInfo(lessThanMatchId, minRank, maxRank, mmrAscending, mmrDescending).getData();
+  public List<PublicMatchesResponse> getPublicMatches(@jakarta.annotation.Nullable Long lessThanMatchId, @jakarta.annotation.Nullable Long minRank, @jakarta.annotation.Nullable Long maxRank) throws ApiException {
+    return getPublicMatchesWithHttpInfo(lessThanMatchId, minRank, maxRank).getData();
   }
 
   /**
    * GET /publicMatches
    * Get list of randomly sampled public matches
    * @param lessThanMatchId Get matches with a match ID lower than this value (optional)
-   * @param minRank Minimum rank for the matches. Ranks are represented by integers (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55: Legend, 60-65: Ancient, 70-75: Divine, 80-85: Immortal). Each increment represents an additional star. (optional)
-   * @param maxRank Maximum rank for the matches. Ranks are represented by integers (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55: Legend, 60-65: Ancient, 70-75: Divine, 80-85: Immortal). Each increment represents an additional star. (optional)
-   * @param mmrAscending Order by average rank ascending (optional)
-   * @param mmrDescending Order by average rank descending (optional)
+   * @param minRank Minimum rank for the matches. Ranks are represented by integers (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55: Legend, 60-65: Ancient, 70-75: Divine, 80: Immortal). Each increment represents an additional star. (optional)
+   * @param maxRank Maximum rank for the matches. Ranks are represented by integers (10-15: Herald, 20-25: Guardian, 30-35: Crusader, 40-45: Archon, 50-55: Legend, 60-65: Ancient, 70-75: Divine, 80: Immortal). Each increment represents an additional star. (optional)
    * @return ApiResponse&lt;List&lt;PublicMatchesResponse&gt;&gt;
    * @throws ApiException if fails to make API call
    * @http.response.details
@@ -84,15 +80,13 @@ public class PublicMatchesApi {
        <tr><td> 200 </td><td> Success </td><td>  -  </td></tr>
      </table>
    */
-  public ApiResponse<List<PublicMatchesResponse>> getPublicMatchesWithHttpInfo(@jakarta.annotation.Nullable Long lessThanMatchId, @jakarta.annotation.Nullable Long minRank, @jakarta.annotation.Nullable Long maxRank, @jakarta.annotation.Nullable Long mmrAscending, @jakarta.annotation.Nullable Long mmrDescending) throws ApiException {
+  public ApiResponse<List<PublicMatchesResponse>> getPublicMatchesWithHttpInfo(@jakarta.annotation.Nullable Long lessThanMatchId, @jakarta.annotation.Nullable Long minRank, @jakarta.annotation.Nullable Long maxRank) throws ApiException {
     // Query parameters
     List<Pair> localVarQueryParams = new ArrayList<>(
             apiClient.parameterToPairs("", "less_than_match_id", lessThanMatchId)
     );
     localVarQueryParams.addAll(apiClient.parameterToPairs("", "min_rank", minRank));
     localVarQueryParams.addAll(apiClient.parameterToPairs("", "max_rank", maxRank));
-    localVarQueryParams.addAll(apiClient.parameterToPairs("", "mmr_ascending", mmrAscending));
-    localVarQueryParams.addAll(apiClient.parameterToPairs("", "mmr_descending", mmrDescending));
 
     String localVarAccept = apiClient.selectHeaderAccept("application/json; charset=utf-8");
     String localVarContentType = apiClient.selectHeaderContentType();
