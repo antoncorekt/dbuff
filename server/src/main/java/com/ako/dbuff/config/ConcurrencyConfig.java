@@ -9,18 +9,17 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Configuration for concurrency limits when using virtual threads.
- * 
- * Virtual threads can spawn thousands of concurrent tasks, but database
- * connections are limited. This configuration provides semaphores to
- * limit concurrent database operations.
+ *
+ * <p>Virtual threads can spawn thousands of concurrent tasks, but database connections are limited.
+ * This configuration provides semaphores to limit concurrent database operations.
  */
 @Slf4j
 @Configuration
 public class ConcurrencyConfig {
 
   /**
-   * Semaphore to limit concurrent match processing operations.
-   * This prevents overwhelming the database connection pool.
+   * Semaphore to limit concurrent match processing operations. This prevents overwhelming the
+   * database connection pool.
    */
   @Bean
   public Semaphore matchProcessingSemaphore(ConcurrencyProperties props) {
@@ -28,9 +27,7 @@ public class ConcurrencyConfig {
     return new Semaphore(props.getMaxParallelMatches());
   }
 
-  /**
-   * Semaphore to limit concurrent page scraping operations.
-   */
+  /** Semaphore to limit concurrent page scraping operations. */
   @Bean
   public Semaphore pageScrapingSemaphore(ConcurrencyProperties props) {
     log.info("Creating page scraping semaphore with {} permits", props.getMaxParallelPages());
@@ -42,14 +39,12 @@ public class ConcurrencyConfig {
   @ConfigurationProperties(prefix = "app.concurrency")
   public static class ConcurrencyProperties {
     /**
-     * Maximum number of matches to process in parallel.
-     * Each match processing requires database connections.
+     * Maximum number of matches to process in parallel. Each match processing requires database
+     * connections.
      */
     private int maxParallelMatches = 20;
 
-    /**
-     * Maximum number of pages to scrape in parallel.
-     */
+    /** Maximum number of pages to scrape in parallel. */
     private int maxParallelPages = 5;
   }
 }

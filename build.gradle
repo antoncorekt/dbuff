@@ -69,7 +69,8 @@ subprojects {
             enforceCheck = true
             java {
                 target 'src/main/java/**/*.java', 'src/test/java/**/*.java', 'src/testFixtures/java/**/*.java'
-                googleJavaFormat()
+                // Use google-java-format 1.19.2 for Java 21 support
+                googleJavaFormat('1.19.2')
                 removeUnusedImports()
                 importOrder '', 'static '
                 trimTrailingWhitespace()

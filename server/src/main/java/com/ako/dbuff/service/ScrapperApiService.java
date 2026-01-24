@@ -41,12 +41,7 @@ public class ScrapperApiService {
             log.debug("Final scrapper URI: {}", uri);
 
             // Perform GET request
-            String html =
-                scrapperApiRestClient
-                    .get()
-                    .uri(uri)
-                    .retrieve()
-                    .body(String.class);
+            String html = scrapperApiRestClient.get().uri(uri).retrieve().body(String.class);
 
             // You can now parse it with Jsoup:
             Document doc = Jsoup.parse(html);
@@ -63,22 +58,22 @@ public class ScrapperApiService {
   }
 
   /**
-   * Builds the scrapper API URI manually to ensure proper URL encoding.
-   * The target URL must be URL-encoded as a single parameter value,
-   * while the other parameters (render, api_key, premium) are added normally.
+   * Builds the scrapper API URI manually to ensure proper URL encoding. The target URL must be
+   * URL-encoded as a single parameter value, while the other parameters (render, api_key, premium)
+   * are added normally.
    */
   private URI buildScrapperUri(String targetUrl, RetryContext retryContext) {
     StringBuilder sb = new StringBuilder();
-    
+
     // URL-encode the target URL so it becomes a single parameter value
     String encodedTargetUrl = URLEncoder.encode(targetUrl, StandardCharsets.UTF_8);
-    
+
     // Start with the url parameter
     sb.append("?url=").append(encodedTargetUrl);
-    
+
     // Add render parameter for full HTML DOM
     sb.append("&render=true");
-    
+
     // Add API key if available
     if (StringUtils.hasLength(scrapperConfigurationProperties.getApiKey())) {
       sb.append("&api_key=").append(scrapperConfigurationProperties.getApiKey());
@@ -86,13 +81,13 @@ public class ScrapperApiService {
     } else {
       log.debug("No API key available, using free tier");
     }
-    
+
     // Override premium on retry if needed
     if (retryContext.getRetryCount() > 1) {
       log.debug("Retry attempt {}, ensuring premium=true", retryContext.getRetryCount());
       sb.append("&premium=true");
     }
-    
+
     // Create URI from base URL + query string
     String baseUrl = scrapperConfigurationProperties.getUrl();
     return URI.create(baseUrl + sb.toString());

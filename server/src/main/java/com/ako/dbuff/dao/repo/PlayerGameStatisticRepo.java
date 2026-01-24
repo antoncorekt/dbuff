@@ -14,9 +14,9 @@ public interface PlayerGameStatisticRepo
   List<PlayerMatchStatisticDomain> findAllByMatchId(long matchId);
 
   /**
-   * Find player statistics by matchId and playerId.
-   * Used when we don't have the playerSlot (e.g., when scraping from Dotabuff).
-   * 
+   * Find player statistics by matchId and playerId. Used when we don't have the playerSlot (e.g.,
+   * when scraping from Dotabuff).
+   *
    * @param matchId the match ID
    * @param playerId the player account ID
    * @return the player statistics if found

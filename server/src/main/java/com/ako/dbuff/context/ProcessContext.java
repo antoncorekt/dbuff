@@ -1,43 +1,32 @@
 package com.ako.dbuff.context;
 
-import java.lang.ScopedValue;
 import java.util.concurrent.Callable;
 
 /**
- * Process context using Java 21 ScopedValue for thread-safe context propagation.
- * ScopedValues are automatically inherited by virtual threads and provide
- * better performance than ThreadLocal for virtual thread workloads.
+ * Process context using Java 21 ScopedValue for thread-safe context propagation. ScopedValues are
+ * automatically inherited by virtual threads and provide better performance than ThreadLocal for
+ * virtual thread workloads.
  */
 public class ProcessContext {
 
-  /**
-   * The type of process being executed (e.g., "MATCH_PROCESSING", "HISTORY_FETCH")
-   */
+  /** The type of process being executed (e.g., "MATCH_PROCESSING", "HISTORY_FETCH") */
   public static final ScopedValue<String> PROCESS_TYPE = ScopedValue.newInstance();
 
-  /**
-   * The current match ID being processed - used for logging and tracing
-   */
+  /** The current match ID being processed - used for logging and tracing */
   public static final ScopedValue<Long> MATCH_ID = ScopedValue.newInstance();
 
-  /**
-   * The current player ID being processed - used for logging and tracing
-   */
+  /** The current player ID being processed - used for logging and tracing */
   public static final ScopedValue<Long> PLAYER_ID = ScopedValue.newInstance();
 
-  /**
-   * The current page number being processed - used for pagination logging
-   */
+  /** The current page number being processed - used for pagination logging */
   public static final ScopedValue<Integer> PAGE_NUM = ScopedValue.newInstance();
 
-  /**
-   * User ID for request tracing (kept for backward compatibility)
-   */
+  /** User ID for request tracing (kept for backward compatibility) */
   public static final ScopedValue<String> USER_ID = ScopedValue.newInstance();
 
   /**
-   * Runs a task with the specified match ID in scope.
-   * The match ID will be available via MATCH_ID.get() within the task.
+   * Runs a task with the specified match ID in scope. The match ID will be available via
+   * MATCH_ID.get() within the task.
    *
    * @param matchId the match ID to set in scope
    * @param task the task to run
@@ -47,8 +36,8 @@ public class ProcessContext {
   }
 
   /**
-   * Runs a task with the specified player ID in scope.
-   * The player ID will be available via PLAYER_ID.get() within the task.
+   * Runs a task with the specified player ID in scope. The player ID will be available via
+   * PLAYER_ID.get() within the task.
    *
    * @param playerId the player ID to set in scope
    * @param task the task to run
@@ -58,8 +47,8 @@ public class ProcessContext {
   }
 
   /**
-   * Runs a task with the specified page number in scope.
-   * The page number will be available via PAGE_NUM.get() within the task.
+   * Runs a task with the specified page number in scope. The page number will be available via
+   * PAGE_NUM.get() within the task.
    *
    * @param pageNum the page number to set in scope
    * @param task the task to run
@@ -89,9 +78,7 @@ public class ProcessContext {
    * @param task the task to run
    */
   public static void runWithContext(Long matchId, Long playerId, Runnable task) {
-    ScopedValue.where(MATCH_ID, matchId)
-        .where(PLAYER_ID, playerId)
-        .run(task);
+    ScopedValue.where(MATCH_ID, matchId).where(PLAYER_ID, playerId).run(task);
   }
 
   /**
@@ -102,7 +89,8 @@ public class ProcessContext {
    * @param playerId the player ID to set in scope
    * @param task the task to run
    */
-  public static void runWithFullContext(String processType, Long matchId, Long playerId, Runnable task) {
+  public static void runWithFullContext(
+      String processType, Long matchId, Long playerId, Runnable task) {
     ScopedValue.where(PROCESS_TYPE, processType)
         .where(MATCH_ID, matchId)
         .where(PLAYER_ID, playerId)
@@ -132,10 +120,9 @@ public class ProcessContext {
    * @return the result of the task
    * @throws Exception if the task throws an exception
    */
-  public static <T> T callWithContext(Long matchId, Long playerId, Callable<T> task) throws Exception {
-    return ScopedValue.where(MATCH_ID, matchId)
-        .where(PLAYER_ID, playerId)
-        .call(task);
+  public static <T> T callWithContext(Long matchId, Long playerId, Callable<T> task)
+      throws Exception {
+    return ScopedValue.where(MATCH_ID, matchId).where(PLAYER_ID, playerId).call(task);
   }
 
   /**

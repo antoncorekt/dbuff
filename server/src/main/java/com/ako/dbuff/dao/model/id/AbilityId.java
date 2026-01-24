@@ -8,11 +8,10 @@ import lombok.NoArgsConstructor;
 
 /**
  * Composite primary key for AbilityDomain.
- * 
- * Uses playerSlot instead of playerId because:
- * - Anonymous players have null accountId (stored as -1 in playerId)
- * - Multiple anonymous players in the same match would have the same playerId
- * - playerSlot (0-9) is always unique within a match
+ *
+ * <p>Uses playerSlot instead of playerId because: - Anonymous players have null accountId (stored
+ * as -1 in playerId) - Multiple anonymous players in the same match would have the same playerId -
+ * playerSlot (0-9) is always unique within a match
  */
 @Data
 @Builder
