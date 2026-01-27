@@ -42,7 +42,7 @@ public class ConcurrencyConfig {
      * Maximum number of matches to process in parallel. Each match processing requires database
      * connections.
      */
-    private int maxParallelMatches = 20;
+    private int maxParallelMatches = 50;
 
     /** Maximum number of pages to scrape in parallel. */
     private int maxParallelPages = 5;
