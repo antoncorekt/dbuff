@@ -4,7 +4,6 @@ import com.ako.dbuff.dotapi.api.PlayersApi;
 import com.ako.dbuff.dotapi.invoker.ApiException;
 import com.ako.dbuff.dotapi.model.PlayerRecentMatchesResponse;
 import com.google.common.util.concurrent.RateLimiter;
-import java.util.Collection;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,9 +23,7 @@ public class DotaApiLastMatchesService {
       dotaApiRateLimiter.acquire();
       log.info("Fetching recentMatches for account {}", accountId);
       List<PlayerRecentMatchesResponse> recentMatches =
-          playersApi.getPlayersByAccountIdSelectRecentMatches(accountId).stream()
-              .flatMap(Collection::stream)
-              .toList();
+          playersApi.getPlayersByAccountIdSelectRecentMatches(accountId);
       log.info("Fetched recentMatches for account {}", accountId);
 
       return recentMatches.stream().map(PlayerRecentMatchesResponse::getMatchId).toList();

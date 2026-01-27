@@ -842,7 +842,7 @@ public class PlayersApi {
    * GET /players/{account_id}/recentMatches
    * Recent matches played (limited number of results)
    * @param accountId Steam32 account ID (required)
-   * @return List&lt;List&lt;PlayerRecentMatchesResponse&gt;&gt;
+   * @return List&lt;PlayerRecentMatchesResponse&gt;
    * @throws ApiException if fails to make API call
    * @http.response.details
      <table border="1">
@@ -851,7 +851,7 @@ public class PlayersApi {
        <tr><td> 200 </td><td> Success </td><td>  -  </td></tr>
      </table>
    */
-  public List<List<PlayerRecentMatchesResponse>> getPlayersByAccountIdSelectRecentMatches(@jakarta.annotation.Nonnull Long accountId) throws ApiException {
+  public List<PlayerRecentMatchesResponse> getPlayersByAccountIdSelectRecentMatches(@jakarta.annotation.Nonnull Long accountId) throws ApiException {
     return getPlayersByAccountIdSelectRecentMatchesWithHttpInfo(accountId).getData();
   }
 
@@ -859,7 +859,7 @@ public class PlayersApi {
    * GET /players/{account_id}/recentMatches
    * Recent matches played (limited number of results)
    * @param accountId Steam32 account ID (required)
-   * @return ApiResponse&lt;List&lt;List&lt;PlayerRecentMatchesResponse&gt;&gt;&gt;
+   * @return ApiResponse&lt;List&lt;PlayerRecentMatchesResponse&gt;&gt;
    * @throws ApiException if fails to make API call
    * @http.response.details
      <table border="1">
@@ -868,7 +868,7 @@ public class PlayersApi {
        <tr><td> 200 </td><td> Success </td><td>  -  </td></tr>
      </table>
    */
-  public ApiResponse<List<List<PlayerRecentMatchesResponse>>> getPlayersByAccountIdSelectRecentMatchesWithHttpInfo(@jakarta.annotation.Nonnull Long accountId) throws ApiException {
+  public ApiResponse<List<PlayerRecentMatchesResponse>> getPlayersByAccountIdSelectRecentMatchesWithHttpInfo(@jakarta.annotation.Nonnull Long accountId) throws ApiException {
     // Check required parameters
     if (accountId == null) {
       throw new ApiException(400, "Missing the required parameter 'accountId' when calling getPlayersByAccountIdSelectRecentMatches");
@@ -880,7 +880,7 @@ public class PlayersApi {
 
     String localVarAccept = apiClient.selectHeaderAccept("application/json; charset=utf-8");
     String localVarContentType = apiClient.selectHeaderContentType();
-    GenericType<List<List<PlayerRecentMatchesResponse>>> localVarReturnType = new GenericType<List<List<PlayerRecentMatchesResponse>>>() {};
+    GenericType<List<PlayerRecentMatchesResponse>> localVarReturnType = new GenericType<List<PlayerRecentMatchesResponse>>() {};
     return apiClient.invokeAPI("PlayersApi.getPlayersByAccountIdSelectRecentMatches", localVarPath, "GET", new ArrayList<>(), null,
                                new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>(), localVarAccept, localVarContentType,
                                null, localVarReturnType, false);

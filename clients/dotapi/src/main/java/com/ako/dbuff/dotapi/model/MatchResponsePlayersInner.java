@@ -172,7 +172,10 @@ import com.ako.dbuff.dotapi.invoker.JSON;
   MatchResponsePlayersInner.JSON_PROPERTY_COSMETICS,
   MatchResponsePlayersInner.JSON_PROPERTY_BENCHMARKS,
   MatchResponsePlayersInner.JSON_PROPERTY_NEUTRAL_TOKENS_LOG,
-  MatchResponsePlayersInner.JSON_PROPERTY_NEUTRAL_ITEM_HISTORY
+  MatchResponsePlayersInner.JSON_PROPERTY_NEUTRAL_ITEM_HISTORY,
+  MatchResponsePlayersInner.JSON_PROPERTY_AGHANIMS_SCEPTER,
+  MatchResponsePlayersInner.JSON_PROPERTY_AGHANIMS_SHARD,
+  MatchResponsePlayersInner.JSON_PROPERTY_MOONSHARD
 })
 @JsonTypeName("MatchResponse_players_inner")
 @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
@@ -668,6 +671,18 @@ public class MatchResponsePlayersInner {
   public static final String JSON_PROPERTY_NEUTRAL_ITEM_HISTORY = "neutral_item_history";
   @jakarta.annotation.Nullable
   private List<MatchResponsePlayersInnerNeutralItemHistoryInner> neutralItemHistory = new ArrayList<>();
+
+  public static final String JSON_PROPERTY_AGHANIMS_SCEPTER = "aghanims_scepter";
+  @jakarta.annotation.Nullable
+  private Long aghanimsScepter;
+
+  public static final String JSON_PROPERTY_AGHANIMS_SHARD = "aghanims_shard";
+  @jakarta.annotation.Nullable
+  private Long aghanimsShard;
+
+  public static final String JSON_PROPERTY_MOONSHARD = "moonshard";
+  @jakarta.annotation.Nullable
+  private Long moonshard;
 
   public MatchResponsePlayersInner() { 
   }
@@ -4041,6 +4056,81 @@ public class MatchResponsePlayersInner {
   }
 
 
+  public MatchResponsePlayersInner aghanimsScepter(@jakarta.annotation.Nullable Long aghanimsScepter) {
+    this.aghanimsScepter = aghanimsScepter;
+    return this;
+  }
+
+  /**
+   * Whether the player has Aghanim&#39;s Scepter (0 or 1)
+   * @return aghanimsScepter
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_AGHANIMS_SCEPTER)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Long getAghanimsScepter() {
+    return aghanimsScepter;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_AGHANIMS_SCEPTER)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setAghanimsScepter(@jakarta.annotation.Nullable Long aghanimsScepter) {
+    this.aghanimsScepter = aghanimsScepter;
+  }
+
+
+  public MatchResponsePlayersInner aghanimsShard(@jakarta.annotation.Nullable Long aghanimsShard) {
+    this.aghanimsShard = aghanimsShard;
+    return this;
+  }
+
+  /**
+   * Whether the player has Aghanim&#39;s Shard (0 or 1)
+   * @return aghanimsShard
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_AGHANIMS_SHARD)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Long getAghanimsShard() {
+    return aghanimsShard;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_AGHANIMS_SHARD)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setAghanimsShard(@jakarta.annotation.Nullable Long aghanimsShard) {
+    this.aghanimsShard = aghanimsShard;
+  }
+
+
+  public MatchResponsePlayersInner moonshard(@jakarta.annotation.Nullable Long moonshard) {
+    this.moonshard = moonshard;
+    return this;
+  }
+
+  /**
+   * Whether the player has consumed Moon Shard (0 or 1)
+   * @return moonshard
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_MOONSHARD)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Long getMoonshard() {
+    return moonshard;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_MOONSHARD)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setMoonshard(@jakarta.annotation.Nullable Long moonshard) {
+    this.moonshard = moonshard;
+  }
+
+
   /**
    * Return true if this MatchResponse_players_inner object is equal to o.
    */
@@ -4177,7 +4267,10 @@ public class MatchResponsePlayersInner {
         Objects.equals(this.cosmetics, matchResponsePlayersInner.cosmetics) &&
         Objects.equals(this.benchmarks, matchResponsePlayersInner.benchmarks) &&
         Objects.equals(this.neutralTokensLog, matchResponsePlayersInner.neutralTokensLog) &&
-        Objects.equals(this.neutralItemHistory, matchResponsePlayersInner.neutralItemHistory);
+        Objects.equals(this.neutralItemHistory, matchResponsePlayersInner.neutralItemHistory) &&
+        Objects.equals(this.aghanimsScepter, matchResponsePlayersInner.aghanimsScepter) &&
+        Objects.equals(this.aghanimsShard, matchResponsePlayersInner.aghanimsShard) &&
+        Objects.equals(this.moonshard, matchResponsePlayersInner.moonshard);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -4186,7 +4279,7 @@ public class MatchResponsePlayersInner {
 
   @Override
   public int hashCode() {
-    return Objects.hash(matchId, hashCodeNullable(playerSlot), abilityUpgradesArr, abilityUses, abilityTargets, damageTargets, accountId, actions, hashCodeNullable(additionalUnits), assists, backpack0, backpack1, backpack2, buybackLog, campsStacked, connectionLog, creepsStacked, damage, damageInflictor, damageInflictorReceived, damageTaken, deaths, denies, dnT, gold, goldPerMin, goldReasons, goldSpent, goldT, heroDamage, heroHealing, heroHits, heroId, item0, item1, item2, item3, item4, item5, itemUses, killStreaks, killed, killedBy, kills, killsLog, lanePos, lastHits, leaverStatus, level, lhT, lifeState, maxHeroHit, multiKills, obs, obsLeftLog, obsLog, obsPlaced, partyId, permanentBuffs, heroVariant, pings, purchase, purchaseLog, runePickups, runes, runesLog, sen, senLeftLog, senLog, senPlaced, stuns, times, towerDamage, xpPerMin, xpReasons, xpT, hashCodeNullable(personaname), hashCodeNullable(name), hashCodeNullable(lastLogin), hashCodeNullable(radiantWin), startTime, duration, cluster, lobbyType, gameMode, patch, region, isRadiant, win, lose, totalGold, totalXp, killsPerMin, kda, abandons, neutralKills, towerKills, courierKills, laneKills, heroKills, observerKills, sentryKills, roshanKills, necronomiconKills, ancientKills, buybackCount, observerUses, sentryUses, laneEfficiency, laneEfficiencyPct, hashCodeNullable(lane), hashCodeNullable(laneRole), hashCodeNullable(isRoaming), purchaseTime, firstPurchaseTime, itemWin, itemUsage, purchaseTpscroll, actionsPerMin, lifeStateDead, rankTier, cosmetics, benchmarks, neutralTokensLog, neutralItemHistory);
+    return Objects.hash(matchId, hashCodeNullable(playerSlot), abilityUpgradesArr, abilityUses, abilityTargets, damageTargets, accountId, actions, hashCodeNullable(additionalUnits), assists, backpack0, backpack1, backpack2, buybackLog, campsStacked, connectionLog, creepsStacked, damage, damageInflictor, damageInflictorReceived, damageTaken, deaths, denies, dnT, gold, goldPerMin, goldReasons, goldSpent, goldT, heroDamage, heroHealing, heroHits, heroId, item0, item1, item2, item3, item4, item5, itemUses, killStreaks, killed, killedBy, kills, killsLog, lanePos, lastHits, leaverStatus, level, lhT, lifeState, maxHeroHit, multiKills, obs, obsLeftLog, obsLog, obsPlaced, partyId, permanentBuffs, heroVariant, pings, purchase, purchaseLog, runePickups, runes, runesLog, sen, senLeftLog, senLog, senPlaced, stuns, times, towerDamage, xpPerMin, xpReasons, xpT, hashCodeNullable(personaname), hashCodeNullable(name), hashCodeNullable(lastLogin), hashCodeNullable(radiantWin), startTime, duration, cluster, lobbyType, gameMode, patch, region, isRadiant, win, lose, totalGold, totalXp, killsPerMin, kda, abandons, neutralKills, towerKills, courierKills, laneKills, heroKills, observerKills, sentryKills, roshanKills, necronomiconKills, ancientKills, buybackCount, observerUses, sentryUses, laneEfficiency, laneEfficiencyPct, hashCodeNullable(lane), hashCodeNullable(laneRole), hashCodeNullable(isRoaming), purchaseTime, firstPurchaseTime, itemWin, itemUsage, purchaseTpscroll, actionsPerMin, lifeStateDead, rankTier, cosmetics, benchmarks, neutralTokensLog, neutralItemHistory, aghanimsScepter, aghanimsShard, moonshard);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -4325,6 +4418,9 @@ public class MatchResponsePlayersInner {
     sb.append("    benchmarks: ").append(toIndentedString(benchmarks)).append("\n");
     sb.append("    neutralTokensLog: ").append(toIndentedString(neutralTokensLog)).append("\n");
     sb.append("    neutralItemHistory: ").append(toIndentedString(neutralItemHistory)).append("\n");
+    sb.append("    aghanimsScepter: ").append(toIndentedString(aghanimsScepter)).append("\n");
+    sb.append("    aghanimsShard: ").append(toIndentedString(aghanimsShard)).append("\n");
+    sb.append("    moonshard: ").append(toIndentedString(moonshard)).append("\n");
     sb.append("}");
     return sb.toString();
   }
