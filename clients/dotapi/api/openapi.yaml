@@ -252,9 +252,7 @@ paths:
             application/json; charset=utf-8:
               schema:
                 items:
-                  items:
-                    $ref: "#/components/schemas/PlayerRecentMatchesResponse"
-                  type: array
+                  $ref: "#/components/schemas/PlayerRecentMatchesResponse"
                 type: array
           description: Success
       summary: "GET /players/{account_id}/recentMatches"
@@ -3669,16 +3667,16 @@ components:
         series_type: 7
         barracks_status_radiant: 6
         radiant_team: "{}"
-        comeback: 6
+        comeback: 2
         cosmetics:
           key: 7
         duration: 1
-        patch: 9
-        loss: 4
+        patch: 6
+        loss: 6
         pauses:
-        - duration: 6
+        - duration: 5
           time: 2
-        - duration: 6
+        - duration: 5
           time: 2
         radiant_win: true
         radiant_xp_adv:
@@ -3697,7 +3695,7 @@ components:
           team: 9
           is_pick: true
           order: 6
-        win: 8
+        win: 0
         dire_team: "{}"
         replay_url: replay_url
         tower_status_radiant: 5
@@ -3809,6 +3807,7 @@ components:
           abandons: 6
           player_slot: 7
           damage_taken: "{}"
+          moonshard: 8
           start_time: 3
           last_hits: 8
           sentry_uses: 1
@@ -3829,6 +3828,7 @@ components:
           creeps_stacked: 6
           item_0: 4
           region: 0
+          aghanims_shard: 4
           kills: 2
           hero_damage: 0
           tower_kills: 6
@@ -3897,6 +3897,7 @@ components:
           - "{}"
           - "{}"
           is_roaming: true
+          aghanims_scepter: 9
           purchase: "{}"
           lobby_type: 8
           ability_targets: "{}"
@@ -4017,6 +4018,7 @@ components:
           abandons: 6
           player_slot: 7
           damage_taken: "{}"
+          moonshard: 8
           start_time: 3
           last_hits: 8
           sentry_uses: 1
@@ -4037,6 +4039,7 @@ components:
           creeps_stacked: 6
           item_0: 4
           region: 0
+          aghanims_shard: 4
           kills: 2
           hero_damage: 0
           tower_kills: 6
@@ -4105,6 +4108,7 @@ components:
           - "{}"
           - "{}"
           is_roaming: true
+          aghanims_scepter: 9
           purchase: "{}"
           lobby_type: 8
           ability_targets: "{}"
@@ -6061,6 +6065,7 @@ components:
         abandons: 6
         player_slot: 7
         damage_taken: "{}"
+        moonshard: 8
         start_time: 3
         last_hits: 8
         sentry_uses: 1
@@ -6081,6 +6086,7 @@ components:
         creeps_stacked: 6
         item_0: 4
         region: 0
+        aghanims_shard: 4
         kills: 2
         hero_damage: 0
         tower_kills: 6
@@ -6149,6 +6155,7 @@ components:
         - "{}"
         - "{}"
         is_roaming: true
+        aghanims_scepter: 9
         purchase: "{}"
         lobby_type: 8
         ability_targets: "{}"
@@ -6632,10 +6639,19 @@ components:
           items:
             $ref: "#/components/schemas/MatchResponse_players_inner_neutral_item_history_inner"
           type: array
+        aghanims_scepter:
+          description: Whether the player has Aghanim's Scepter (0 or 1)
+          type: integer
+        aghanims_shard:
+          description: Whether the player has Aghanim's Shard (0 or 1)
+          type: integer
+        moonshard:
+          description: Whether the player has consumed Moon Shard (0 or 1)
+          type: integer
       type: object
     MatchResponse_pauses_inner:
       example:
-        duration: 6
+        duration: 5
         time: 2
       properties:
         time:

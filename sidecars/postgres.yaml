@@ -1,0 +1,41 @@
+schemaVersion: "2.0"
+name: postgres
+description: PostgreSQL database for dbuff application
+
+image: postgres:16-alpine
+
+ports:
+  - name: PG_PORT
+    containerPort: 5432
+    hostPort: 5432
+    protocol: TCP
+
+environment:
+  - name: POSTGRES_USER
+    value: postgres
+  - name: POSTGRES_PASSWORD
+    value: password
+  - name: POSTGRES_DB
+    value: dbuff
+  - name: PGDATA
+    value: /var/lib/postgresql/data/pgdata
+
+volumes:
+  - name: postgres-data
+    mountPath: /var/lib/postgresql/data
+    persistent: true
+
+healthcheck:
+  command: ["pg_isready", "-U", "postgres", "-d", "dbuff"]
+  interval: 10s
+  timeout: 5s
+  retries: 5
+  startPeriod: 30s
+
+resources:
+  limits:
+    memory: 512Mi
+    cpu: 500m
+  requests:
+    memory: 256Mi
+    cpu: 100m

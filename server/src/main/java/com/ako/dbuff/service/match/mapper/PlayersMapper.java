@@ -121,9 +121,9 @@ public class PlayersMapper {
   }
 
   private void setPlayerStats(PlayerMatchStatisticDomain stats, MatchResponsePlayersInner player) {
-    //    stats.setAganim(player.getAghanimsScepter()); // todo add
-    //    stats.setAganimShard(player.getAghanimsShard());
-    //    stats.setMoonshard(player.getMoonshard());
+    stats.setAganim(player.getAghanimsScepter());
+    stats.setAganimShard(player.getAghanimsShard());
+    stats.setMoonshard(player.getMoonshard());
     stats.setWin(player.getWin());
     stats.setTotalGold(player.getTotalGold());
     stats.setTotalXp(player.getTotalXp());

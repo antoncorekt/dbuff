@@ -1,0 +1,808 @@
+openapi: 3.0.3
+info:
+  title: DBuff API
+  description: |
+    DBuff is a Dota 2 analytics backend that fetches, analyzes, and stores match data 
+    using the OpenDota API. It provides endpoints for player statistics, item rankings, 
+    ability rankings, and match history. Works as pet project only for limited player ids.
+  version: 1.0.0
+  contact:
+    name: kozlovsky.anton@gmail.com
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Players
+    description: Player management and listing
+  - name: Player Statistics
+    description: Aggregated player statistics and rankings
+  - name: Matches
+    description: Match parsing and processing
+  - name: History
+    description: Match history fetching and processing
+  - name: Search
+    description: Player search functionality
+
+paths:
+  /api/v1/players/:
+    get:
+      tags:
+        - Players
+      summary: List all players
+      description: Returns a paginated list of all players in the database
+      operationId: listPlayers
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedPlayerResponse'
+
+  /api/v1/player/{playerId}/itemRanking:
+    get:
+      tags:
+        - Player Statistics
+      summary: Get item rankings for a player
+      description: |
+        Returns a list of items ordered by pick count, with statistics including:
+        - Pick count - number of matches where the item was purchased
+        - Pick rate - percentage of matches where the item was purchased
+        - Win rate - percentage of wins when the item was purchased
+        - Average purchase time - average time in seconds when the item was purchased
+      operationId: getItemRanking
+      parameters:
+        - $ref: '#/components/parameters/PlayerIdParam'
+        - $ref: '#/components/parameters/StartDateParam'
+        - $ref: '#/components/parameters/EndDateParam'
+        - name: items
+          in: query
+          description: Set of item dnames to include
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+        - name: excludedItems
+          in: query
+          description: Set of item dnames to exclude
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ItemRankingResponse'
+
+  /api/v1/player/{playerId}/abilityRanking:
+    get:
+      tags:
+        - Player Statistics
+      summary: Get ability rankings for a player
+      description: |
+        Returns a list of abilities ordered by pick count, with statistics including:
+        - Pick count - number of matches where the ability was picked
+        - Pick rate - percentage of matches where the ability was picked
+        - Win rate - percentage of wins when the ability was picked
+      operationId: getAbilityRanking
+      parameters:
+        - $ref: '#/components/parameters/PlayerIdParam'
+        - $ref: '#/components/parameters/StartDateParam'
+        - $ref: '#/components/parameters/EndDateParam'
+        - name: abilities
+          in: query
+          description: Set of ability names to include
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+        - name: excludedAbilities
+          in: query
+          description: Set of ability names to exclude
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AbilityRankingResponse'
+
+  /api/v1/player/{playerId}/statistic:
+    get:
+      tags:
+        - Player Statistics
+      summary: Get aggregated player statistics
+      description: |
+        Returns aggregated statistics including:
+        - N most popular heroes (default 3)
+        - Average/max/min for various metrics (last hits, KDA, gold per min, etc.)
+        - Win/loss statistics
+        - Ward placement statistics
+        - Objective statistics (tower kills, roshan kills)
+      operationId: getPlayerStatistics
+      parameters:
+        - $ref: '#/components/parameters/PlayerIdParam'
+        - $ref: '#/components/parameters/StartDateParam'
+        - $ref: '#/components/parameters/EndDateParam'
+        - name: heroLimit
+          in: query
+          description: Number of popular heroes to return
+          required: false
+          schema:
+            type: integer
+            default: 3
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerStatisticResponse'
+
+  /api/v1/player/{playerId}/statistic/persist:
+    post:
+      tags:
+        - Player Statistics
+      summary: Persist player statistics
+      description: Persists player statistics for a specific date range for weekly/monthly comparisons
+      operationId: persistPlayerStatistics
+      parameters:
+        - $ref: '#/components/parameters/PlayerIdParam'
+        - name: startDate
+          in: query
+          description: Start date of the period
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          description: End date of the period
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: heroLimit
+          in: query
+          description: Number of popular heroes to include
+          required: false
+          schema:
+            type: integer
+            default: 3
+      responses:
+        '201':
+          description: Statistics persisted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerStatisticSummary'
+
+  /api/v1/player/{playerId}/statistic/persist/weekly:
+    post:
+      tags:
+        - Player Statistics
+      summary: Persist weekly statistics
+      description: Calculates and persists statistics for the last 7 days
+      operationId: persistWeeklyStatistics
+      parameters:
+        - $ref: '#/components/parameters/PlayerIdParam'
+      responses:
+        '201':
+          description: Weekly statistics persisted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerStatisticSummary'
+
+  /api/v1/player/{playerId}/statistic/history:
+    get:
+      tags:
+        - Player Statistics
+      summary: Get persisted statistics history
+      description: Returns all persisted statistics summaries for a player
+      operationId: getPersistedStatistics
+      parameters:
+        - $ref: '#/components/parameters/PlayerIdParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlayerStatisticSummary'
+
+  /api/v1/player/{playerId}/statistic/history/range:
+    get:
+      tags:
+        - Player Statistics
+      summary: Get persisted statistics in date range
+      description: Returns persisted statistics summaries within a date range
+      operationId: getPersistedStatisticsInRange
+      parameters:
+        - $ref: '#/components/parameters/PlayerIdParam'
+        - name: startDate
+          in: query
+          description: Start date to search from
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          description: End date to search to
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlayerStatisticSummary'
+
+  /api/v1/matches/{id}/parse:
+    post:
+      tags:
+        - Matches
+      summary: Parse a match
+      description: Fetches and parses match details from OpenDota API
+      operationId: parseMatch
+      parameters:
+        - name: id
+          in: path
+          description: Match ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Match parsed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchDomain'
+
+  /api/v1/matches/processLast:
+    post:
+      tags:
+        - Matches
+      summary: Process last matches
+      description: Fetches and processes recent matches for configured players
+      operationId: processLastMatches
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: integer
+                  format: int64
+                description: Set of processed match IDs
+
+  /api/v1/history/processAll:
+    post:
+      tags:
+        - History
+      summary: Process all match history
+      description: |
+        Fetches and processes complete match history for specified players.
+        If no players specified, uses default configured players.
+      operationId: processAllHistory
+      parameters:
+        - name: players
+          in: query
+          description: List of player IDs to process
+          required: false
+          schema:
+            type: array
+            items:
+              type: integer
+              format: int64
+        - name: startPage
+          in: query
+          description: Starting page number
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: endPage
+          in: query
+          description: Ending page number (-1 for all pages)
+          required: false
+          schema:
+            type: integer
+            default: -1
+      responses:
+        '200':
+          description: History processing started
+
+  /api/v1/findPlayer/{playerName}:
+    get:
+      tags:
+        - Search
+      summary: Find player matches by name
+      description: |
+        Returns a list of matches where the player participated, ordered by match date descending.
+        Each match includes statistics for the searched player and default players.
+      operationId: findPlayerMatches
+      parameters:
+        - name: playerName
+          in: path
+          description: Player name to search for
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FindPlayerMatchesResponse'
+
+components:
+  parameters:
+    PlayerIdParam:
+      name: playerId
+      in: path
+      description: Player account ID
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+    StartDateParam:
+      name: startDate
+      in: query
+      description: Start date filter (inclusive)
+      required: false
+      schema:
+        type: string
+        format: date
+
+    EndDateParam:
+      name: endDate
+      in: query
+      description: End date filter (inclusive)
+      required: false
+      schema:
+        type: string
+        format: date
+
+    LimitParam:
+      name: limit
+      in: query
+      description: Maximum number of results to return
+      required: false
+      schema:
+        type: integer
+        default: 10
+
+    PageParam:
+      name: page
+      in: query
+      description: Page number (0-indexed)
+      required: false
+      schema:
+        type: integer
+        default: 0
+
+    SizeParam:
+      name: size
+      in: query
+      description: Page size
+      required: false
+      schema:
+        type: integer
+        default: 20
+
+    SortParam:
+      name: sort
+      in: query
+      description: Sort field and direction (e.g., "name,asc")
+      required: false
+      schema:
+        type: string
+
+  schemas:
+    ItemRankingResponse:
+      type: object
+      description: Item ranking statistics for a player
+      properties:
+        itemId:
+          type: integer
+          format: int64
+          description: Item ID
+        itemName:
+          type: string
+          description: Item internal name
+        itemPrettyName:
+          type: string
+          description: Item display name
+        playerId:
+          type: integer
+          format: int64
+          description: Player account ID
+        playerName:
+          type: string
+          description: Player name
+        pickCount:
+          type: integer
+          format: int64
+          description: Number of matches where this item was picked
+        pickRate:
+          type: number
+          description: Percentage of matches where this item was picked (0-100)
+        winRate:
+          type: number
+          description: Win rate when this item was picked (0-100)
+        avgPurchaseTime:
+          type: number
+          description: Average purchase time in seconds
+
+    AbilityRankingResponse:
+      type: object
+      description: Ability ranking statistics for a player
+      properties:
+        abilityId:
+          type: integer
+          format: int64
+          description: Ability ID
+        abilityName:
+          type: string
+          description: Ability internal name
+        abilityPrettyName:
+          type: string
+          description: Ability display name
+        playerId:
+          type: integer
+          format: int64
+          description: Player account ID
+        playerName:
+          type: string
+          description: Player name
+        pickCount:
+          type: integer
+          format: int64
+          description: Number of matches where this ability was picked
+        pickRate:
+          type: number
+          description: Percentage of matches where this ability was picked (0-100)
+        winRate:
+          type: number
+          description: Win rate when this ability was picked (0-100)
+
+    PlayerStatisticResponse:
+      type: object
+      description: Aggregated player statistics
+      properties:
+        playerId:
+          type: integer
+          format: int64
+          description: Player account ID
+        playerName:
+          type: string
+          description: Player name
+        startDate:
+          type: string
+          format: date
+          description: Start date of the statistics period
+        endDate:
+          type: string
+          format: date
+          description: End date of the statistics period
+        totalMatches:
+          type: integer
+          format: int64
+          description: Total number of matches in the period
+        popularHeroes:
+          type: array
+          description: Most popular heroes
+          items:
+            $ref: '#/components/schemas/HeroStatistic'
+        avgObsPlaced:
+          type: number
+          description: Average observer wards placed
+        avgSenPlaced:
+          type: number
+          description: Average sentry wards placed
+        avgCreepsStacked:
+          type: number
+          description: Average creeps stacked
+        avgLastHits:
+          type: number
+          description: Average last hits
+        maxLastHits:
+          type: integer
+          format: int64
+          description: Maximum last hits
+        minLastHits:
+          type: integer
+          format: int64
+          description: Minimum last hits
+        avgDenies:
+          type: number
+          description: Average denies
+        avgCampsStacked:
+          type: number
+          description: Average camps stacked
+        avgRunePickups:
+          type: number
+          description: Average rune pickups
+        avgTowerKills:
+          type: number
+          description: Average tower kills
+        avgRoshanKills:
+          type: number
+          description: Average roshan kills
+        avgWinRate:
+          type: number
+          description: Average win rate (0-100)
+        wins:
+          type: integer
+          format: int64
+          description: Total wins
+        losses:
+          type: integer
+          format: int64
+          description: Total losses
+        avgKda:
+          type: number
+          description: Average KDA ratio
+        maxKda:
+          type: number
+          description: Maximum KDA ratio
+        minKda:
+          type: number
+          description: Minimum KDA ratio
+        avgNeutralKills:
+          type: number
+          description: Average neutral kills
+        avgCourierKills:
+          type: number
+          description: Average courier kills
+        avgLaneEfficiency:
+          type: number
+          description: Average lane efficiency
+        avgGoldPerMin:
+          type: number
+          description: Average gold per minute
+        maxGoldPerMin:
+          type: integer
+          format: int64
+          description: Maximum gold per minute
+        minGoldPerMin:
+          type: integer
+          format: int64
+          description: Minimum gold per minute
+        avgXpPerMin:
+          type: number
+          description: Average XP per minute
+
+    HeroStatistic:
+      type: object
+      description: Hero statistics
+      properties:
+        heroId:
+          type: integer
+          format: int64
+          description: Hero ID
+        heroName:
+          type: string
+          description: Hero internal name
+        heroPrettyName:
+          type: string
+          description: Hero display name
+        pickCount:
+          type: integer
+          format: int64
+          description: Number of times picked
+        winRate:
+          type: number
+          description: Win rate (0-100)
+
+    FindPlayerMatchesResponse:
+      type: object
+      description: Player match search result
+      properties:
+        matchId:
+          type: integer
+          format: int64
+          description: Match ID
+        matchDate:
+          type: string
+          format: date
+          description: Match date
+        dotabuffUrl:
+          type: string
+          description: Dotabuff URL for the match builds
+        playerId:
+          type: integer
+          format: int64
+          description: Searched player ID
+        playerName:
+          type: string
+          description: Searched player name
+        statistics:
+          type: array
+          description: Statistics for players in this match
+          items:
+            $ref: '#/components/schemas/PlayerMatchStatistic'
+
+    PlayerMatchStatistic:
+      type: object
+      description: Player statistics in a match
+      properties:
+        playerId:
+          type: integer
+          format: int64
+          description: Player ID
+        playerName:
+          type: string
+          description: Player name
+        playerSlot:
+          type: integer
+          format: int64
+          description: Player slot (0-4 Radiant, 128-132 Dire)
+        heroPrettyName:
+          type: string
+          description: Hero display name
+        kda:
+          type: number
+          description: KDA ratio
+        win:
+          type: integer
+          format: int64
+          description: Win (1) or Loss (0)
+        goldPerMin:
+          type: integer
+          format: int64
+          description: Gold per minute
+
+    PlayerStatisticSummary:
+      type: object
+      description: Persisted player statistics summary
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Summary ID
+        playerId:
+          type: integer
+          format: int64
+          description: Player account ID
+        startDate:
+          type: string
+          format: date
+          description: Start date of the period
+        endDate:
+          type: string
+          format: date
+          description: End date of the period
+        totalMatches:
+          type: integer
+          format: int64
+          description: Total matches in period
+        wins:
+          type: integer
+          format: int64
+          description: Total wins
+        losses:
+          type: integer
+          format: int64
+          description: Total losses
+        avgKda:
+          type: number
+          description: Average KDA
+        avgGoldPerMin:
+          type: number
+          description: Average gold per minute
+        createdAt:
+          type: string
+          format: date-time
+          description: When the summary was created
+
+    MatchDomain:
+      type: object
+      description: Match domain object
+      properties:
+        matchId:
+          type: integer
+          format: int64
+          description: Match ID
+        startTime:
+          type: string
+          format: date-time
+          description: Match start time
+        duration:
+          type: integer
+          description: Match duration in seconds
+        radiantWin:
+          type: boolean
+          description: Whether Radiant won
+        gameMode:
+          type: integer
+          description: Game mode ID
+        lobbyType:
+          type: integer
+          description: Lobby type ID
+
+    PlayerDomain:
+      type: object
+      description: Player domain object
+      properties:
+        accountId:
+          type: integer
+          format: int64
+          description: Player account ID
+        personaName:
+          type: string
+          description: Player persona name
+        avatarUrl:
+          type: string
+          description: Avatar URL
+
+    PagedPlayerResponse:
+      type: object
+      description: Paginated player response
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerDomain'
+        totalElements:
+          type: integer
+          format: int64
+          description: Total number of elements
+        totalPages:
+          type: integer
+          description: Total number of pages
+        size:
+          type: integer
+          description: Page size
+        number:
+          type: integer
+          description: Current page number
+        first:
+          type: boolean
+          description: Is first page
+        last:
+          type: boolean
+          description: Is last page
+        empty:
+          type: boolean
+          description: Is page empty
