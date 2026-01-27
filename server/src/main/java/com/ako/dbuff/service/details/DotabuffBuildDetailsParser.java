@@ -47,7 +47,11 @@ public class DotabuffBuildDetailsParser {
     KNOWN_ITEM_MAPPER.put("dagon_level_3", "dagon_3");
     KNOWN_ITEM_MAPPER.put("dagon_level_2", "dagon_2");
     KNOWN_ITEM_MAPPER.put("dagon_level_1", "dagon_1");
+    KNOWN_ITEM_MAPPER.put("vladmirs_offering", "vladmir");
     KNOWN_ITEM_MAPPER.put("euls_scepter_of_divinity", "cyclone");
+    KNOWN_ITEM_MAPPER.put("tumblers_toy", "pogo_stick");
+    KNOWN_ITEM_MAPPER.put("brigands_blade", "misericorde");
+    KNOWN_ITEM_MAPPER.put("mysterious_hat", "fairys_trinket");
     KNOWN_ITEM_MAPPER.put("linkens_sphere", "sphere");
   }
 
@@ -209,12 +213,12 @@ public class DotabuffBuildDetailsParser {
       Element linkToAvatar = avatarContainer.first().select("a").first();
 
       String href = linkToAvatar.attr("href");
-      String hero = href.substring(href.lastIndexOf('/') + 1).replace("_", " ").replace("-", " ");
+      String hero = href.substring(href.lastIndexOf('/') + 1).replace("_", "").replace("-", "");
 
       log.info("Trying to parse hero {} for matchId: {}", hero, matchId);
 
       return allByMatchId.stream()
-          .filter(x -> x.getHeroPrettyName().toLowerCase().equals(hero))
+          .filter(x -> x.getHeroPrettyName().replace(" ", "").toLowerCase().equals(hero))
           .findAny()
           .orElseThrow(
               () ->
