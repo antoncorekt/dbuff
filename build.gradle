@@ -115,6 +115,9 @@ project('server') {
         implementation("io.hypersistence:hypersistence-utils-hibernate-60:3.9.4")
         implementation 'org.apache.commons:commons-collections4:4.5.0'
         
+        // OpenAI Java SDK for AI-based match analysis
+        implementation 'com.openai:openai-java:0.8.1'
+        
         // JBoss Logging - required by Hibernate
         implementation 'org.jboss.logging:jboss-logging:3.6.1.Final'
         
@@ -126,6 +129,9 @@ project('server') {
         
         // .env file support
         implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+
+        // discord support
+        implementation 'net.dv8tion:JDA:6.3.0'
 
         implementation("javax.annotation:javax.annotation-api:1.3.2")
         compileOnly 'org.projectlombok:lombok:1.18.38'
@@ -163,7 +169,7 @@ task cleanupodtaClient(type: Delete) {
 task generateDotapiClient(type: org.openapitools.generator.gradle.plugin.tasks.GenerateTask) {
     mustRunAfter cleanupodtaClient
     generatorName = "java"
-    inputSpec = "$rootDir/clients/dota_api.json"
+    inputSpec = "$rootDir/clients/dota_api_formatted.json"
     outputDir = "$rootDir/clients/dotapi"
     apiPackage = "com.ako.dbuff.dotapi.api"
     invokerPackage = "com.ako.dbuff.dotapi.invoker"

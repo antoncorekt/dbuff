@@ -42,4 +42,13 @@ public class ItemDomain {
 
   private boolean isNeutral;
   private String neutralEnhancement;
+
+  /** Damage dealt by this item (from damage_inflictor). */
+  private Long damageDealt;
+
+  /** Damage received from this item (from damage_inflictor_received). */
+  private Long damageReceived;
+
+  /** Number of times this item was used/activated (from item_uses). */
+  private Long useCount;
 }

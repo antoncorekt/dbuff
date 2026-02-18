@@ -88,6 +88,22 @@ public class GetConstantsByResource200Response extends AbstractOpenApiSchema {
             boolean typeCoercion = ctxt.isEnabled(MapperFeature.ALLOW_COERCION_OF_SCALARS);
             int match = 0;
             JsonToken token = tree.traverse(jp.getCodec()).nextToken();
+            // deserialize List<GetConstantsByResource200ResponseOneOfInner>
+            try {
+                if (token == JsonToken.START_ARRAY) {
+                    final TypeReference<List<GetConstantsByResource200ResponseOneOfInner>> ref = new TypeReference<List<GetConstantsByResource200ResponseOneOfInner>>(){};
+                    deserialized = tree.traverse(jp.getCodec()).readValueAs(ref);
+                    // TODO: there is no validation against JSON schema constraints
+                    // (min, max, enum, pattern...), this does not perform a strict JSON
+                    // validation, which means the 'match' count may be higher than it should be.
+                    match++;
+                    log.log(Level.FINER, "Input data matches schema 'List<GetConstantsByResource200ResponseOneOfInner>'");
+                }
+            } catch (Exception e) {
+                // deserialization failed, continue
+                log.log(Level.FINER, "Input data does not match schema 'List<GetConstantsByResource200ResponseOneOfInner>'", e);
+            }
+
             // deserialize Map<String, Object>
             try {
                 boolean attemptParsing = true;
@@ -106,22 +122,6 @@ public class GetConstantsByResource200Response extends AbstractOpenApiSchema {
             } catch (Exception e) {
                 // deserialization failed, continue
                 log.log(Level.FINER, "Input data does not match schema 'Map<String, Object>'", e);
-            }
-
-            // deserialize List<GetConstantsByResource200ResponseOneOfInner>
-            try {
-                if (token == JsonToken.START_ARRAY) {
-                    final TypeReference<List<GetConstantsByResource200ResponseOneOfInner>> ref = new TypeReference<List<GetConstantsByResource200ResponseOneOfInner>>(){};
-                    deserialized = tree.traverse(jp.getCodec()).readValueAs(ref);
-                    // TODO: there is no validation against JSON schema constraints
-                    // (min, max, enum, pattern...), this does not perform a strict JSON
-                    // validation, which means the 'match' count may be higher than it should be.
-                    match++;
-                    log.log(Level.FINER, "Input data matches schema 'List<GetConstantsByResource200ResponseOneOfInner>'");
-                }
-            } catch (Exception e) {
-                // deserialization failed, continue
-                log.log(Level.FINER, "Input data does not match schema 'List<GetConstantsByResource200ResponseOneOfInner>'", e);
             }
 
             if (match == 1) {
@@ -148,12 +148,12 @@ public class GetConstantsByResource200Response extends AbstractOpenApiSchema {
         super("oneOf", Boolean.TRUE);
     }
 
-    public GetConstantsByResource200Response(Map o) {
+    public GetConstantsByResource200Response(List o) {
         super("oneOf", Boolean.FALSE);
         setActualInstance(o);
     }
 
-    public GetConstantsByResource200Response(List o) {
+    public GetConstantsByResource200Response(Map o) {
         super("oneOf", Boolean.FALSE);
         setActualInstance(o);
     }
@@ -186,12 +186,12 @@ public class GetConstantsByResource200Response extends AbstractOpenApiSchema {
            return;
         }
 
-        if (JSON.isInstanceOf(Map.class, instance, new HashSet<>())) {
+        if (JSON.isInstanceOf(List.class, instance, new HashSet<>())) {
             super.setActualInstance(instance);
             return;
         }
 
-        if (JSON.isInstanceOf(List.class, instance, new HashSet<>())) {
+        if (JSON.isInstanceOf(Map.class, instance, new HashSet<>())) {
             super.setActualInstance(instance);
             return;
         }
@@ -211,17 +211,6 @@ public class GetConstantsByResource200Response extends AbstractOpenApiSchema {
     }
 
     /**
-     * Get the actual instance of `Map<String, Object>`. If the actual instance is not `Map<String, Object>`,
-     * the ClassCastException will be thrown.
-     *
-     * @return The actual instance of `Map<String, Object>`
-     * @throws ClassCastException if the instance is not `Map<String, Object>`
-     */
-    public Map<String, Object> getMapStringObject() throws ClassCastException {
-        return (Map<String, Object>)super.getActualInstance();
-    }
-
-    /**
      * Get the actual instance of `List<GetConstantsByResource200ResponseOneOfInner>`. If the actual instance is not `List<GetConstantsByResource200ResponseOneOfInner>`,
      * the ClassCastException will be thrown.
      *
@@ -230,6 +219,17 @@ public class GetConstantsByResource200Response extends AbstractOpenApiSchema {
      */
     public List<GetConstantsByResource200ResponseOneOfInner> getListGetConstantsByResource200ResponseOneOfInner() throws ClassCastException {
         return (List<GetConstantsByResource200ResponseOneOfInner>)super.getActualInstance();
+    }
+
+    /**
+     * Get the actual instance of `Map<String, Object>`. If the actual instance is not `Map<String, Object>`,
+     * the ClassCastException will be thrown.
+     *
+     * @return The actual instance of `Map<String, Object>`
+     * @throws ClassCastException if the instance is not `Map<String, Object>`
+     */
+    public Map<String, Object> getMapStringObject() throws ClassCastException {
+        return (Map<String, Object>)super.getActualInstance();
     }
 
 }

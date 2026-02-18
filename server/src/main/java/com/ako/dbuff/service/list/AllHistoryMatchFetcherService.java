@@ -22,7 +22,8 @@ public class AllHistoryMatchFetcherService {
       Long playerId, int gameMode, AllHistoryService.ScrapperParams scrapperParams) {
 
     List<MatchDomain> allByEndProcessIsNull = matchRepo.findAllByEndProcessIsNull();
-    matchProcessorService.process(allByEndProcessIsNull);
+    // Wait for all unprocessed matches to be processed before fetching new ones
+    matchProcessorService.process(allByEndProcessIsNull).join();
 
     List<MatchDomain> allMatches =
         allHistoryService.findAllUserMatches(playerId, gameMode, scrapperParams);

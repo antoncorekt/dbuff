@@ -3667,17 +3667,17 @@ components:
         series_type: 7
         barracks_status_radiant: 6
         radiant_team: "{}"
-        comeback: 2
+        comeback: 9
         cosmetics:
           key: 7
         duration: 1
-        patch: 6
-        loss: 6
+        patch: 4
+        loss: 9
         pauses:
-        - duration: 5
-          time: 2
-        - duration: 5
-          time: 2
+        - duration: 0
+          time: 6
+        - duration: 0
+          time: 6
         radiant_win: true
         radiant_xp_adv:
         - 2.8841621266687802
@@ -3695,7 +3695,7 @@ components:
           team: 9
           is_pick: true
           order: 6
-        win: 0
+        win: 7
         dire_team: "{}"
         replay_url: replay_url
         tower_status_radiant: 5
@@ -3703,24 +3703,27 @@ components:
         - "{}"
         - "{}"
         players:
-        - obs: "{}"
-          cluster: 3
+        - observers_placed: 2
+          item_neutral2: 0
+          obs: "{}"
+          cluster: 2
+          net_worth: 7
           gold_spent: 0
           obs_left_log:
           - "{}"
           - "{}"
           runes:
             key: 5
-          observer_kills: 3
+          observer_kills: 1
           purchase_tpscroll: 7
           obs_log:
           - "{}"
           - "{}"
           lane_role: 7
-          observer_uses: 3
-          patch: 0
-          neutral_kills: 4
-          roshan_kills: 1
+          observer_uses: 5
+          patch: 4
+          neutral_kills: 6
+          roshan_kills: 5
           item_uses: "{}"
           pings: 9
           deaths: 4
@@ -3733,14 +3736,17 @@ components:
             key: key
           gold_per_min: 9
           last_login: 2000-01-23T04:56:07.000+00:00
-          lose: 4
-          kda: 2.535258963197524
+          team_slot: 2
+          lose: 7
+          is_subscriber: true
+          kda: 0.58919091925136
+          party_size: 6
           lane_pos: "{}"
-          kills_per_min: 0.58919091925136
+          kills_per_min: 9.386524999783381
           xp_reasons: "{}"
           hero_variant: 3
           buyback_count: 5
-          necronomicon_kills: 4
+          necronomicon_kills: 1
           multi_kills: "{}"
           kills_log:
           - time: 1
@@ -3760,37 +3766,43 @@ components:
           additional_units:
           - "{}"
           - "{}"
+          randomed: true
           gold: 7
           radiant_win: true
           camps_stacked: 3
           runes_log:
           - time: 8
-            key: 7
+            key: key
           - time: 8
-            key: 7
+            key: key
+          team_number: 0
           purchase_time: "{}"
           sen: "{}"
-          ancient_kills: 5
-          actions_per_min: 9
+          ancient_kills: 4
+          actions_per_min: 7
+          roshans_killed: 8
           match_id: 3703866531
-          life_state_dead: 1
-          lane_kills: 1
+          life_state_dead: 9
+          lane_kills: 9
           hero_kills: 1
-          stuns: 3.111202833403195
+          stuns: 3.7814124730767915
           account_id: 0
           leaver_status: 6
           hero_healing: 7
           max_hero_hit: "{}"
           killed_by: "{}"
-          game_mode: 4
+          game_mode: 8
           obs_placed: 9
-          total_xp: 9
+          item_neutral: 5
+          total_xp: 2
           item_win: "{}"
           gold_reasons: "{}"
           personaname: 420 booty wizard
+          is_contributor: true
           damage_inflictor_received: "{}"
+          healing: "{}"
           damage_inflictor: "{}"
-          total_gold: 2
+          total_gold: 4
           buyback_log:
           - player_slot: 5
             time: 3
@@ -3798,52 +3810,53 @@ components:
           - player_slot: 5
             time: 3
             slot: 7
-          sentry_kills: 5
+          sentry_kills: 3
           kill_streaks: "{}"
           hero_hits: "{}"
-          xp_per_min: 7
+          xp_per_min: 5
           benchmarks: "{}"
+          towers_killed: 4
           level: 4
-          abandons: 6
+          abandons: 2
           player_slot: 7
           damage_taken: "{}"
-          moonshard: 8
-          start_time: 3
+          moonshard: 4
+          start_time: 0
           last_hits: 8
-          sentry_uses: 1
+          sentry_uses: 3
           ability_uses: "{}"
           item_5: 0
           item_4: 3
           item_usage: "{}"
           neutral_tokens_log:
-          - time: 8
+          - time: 3
             key: key
-          - time: 8
+          - time: 3
             key: key
           item_3: 4
           name: name
           item_2: 8
           item_1: 6
-          lane_efficiency: 3.2841216543560217
+          lane_efficiency: 1.0639121808530916
           creeps_stacked: 6
           item_0: 4
           region: 0
-          aghanims_shard: 4
+          aghanims_shard: 9
           kills: 2
           hero_damage: 0
-          tower_kills: 6
+          tower_kills: 4
           backpack_1: 7
           damage_targets: "{}"
           backpack_2: 3
           denies: 1
           backpack_0: 8
           life_state: "{}"
-          courier_kills: 9
+          courier_kills: 6
           cosmetics:
           - prefab: prefab
             image_inventory: image_inventory
             item_type_name: item_type_name
-            item_id: 3
+            item_id: 4
             image_path: image_path
             name: name
             item_name: item_name
@@ -3854,7 +3867,7 @@ components:
           - prefab: prefab
             image_inventory: image_inventory
             item_type_name: item_type_name
-            item_id: 3
+            item_id: 4
             image_path: image_path
             name: name
             item_name: item_name
@@ -3865,20 +3878,20 @@ components:
           dn_t:
           - 4
           - 4
-          duration: 2
+          duration: 3
           permanent_buffs:
           - "{}"
           - "{}"
           times:
-          - 9
-          - 9
-          lane_efficiency_pct: 9.785002165136461
+          - 3
+          - 3
+          lane_efficiency_pct: 3.2841216543560217
           assists: 4
-          tower_damage: 5
+          tower_damage: 9
           xp_t:
-          - 0
-          - 0
-          rank_tier: 4
+          - 7
+          - 7
+          rank_tier: 1
           connection_log:
           - player_slot: 0
             time: 4
@@ -3888,50 +3901,57 @@ components:
             event: event
           isRadiant: true
           hero_id: 5
-          win: 7
-          lane: 7
+          win: 0
+          lane: 9
           sen_log:
           - "{}"
           - "{}"
+          pred_vict: true
           sen_left_log:
           - "{}"
           - "{}"
           is_roaming: true
-          aghanims_scepter: 9
+          aghanims_scepter: 2
           purchase: "{}"
-          lobby_type: 8
+          lobby_type: 3
           ability_targets: "{}"
           killed: "{}"
-          sen_placed: 3
+          sen_placed: 7
           ability_upgrades_arr:
           - 6
           - 6
+          firstblood_claimed: 8
+          computed_mmr: 6.749525837406151
           party_id: 1
           neutral_item_history:
           - item_neutral: item_neutral
-            time: 2
+            time: 8
             item_neutral_enhancement: item_neutral_enhancement
           - item_neutral: item_neutral
-            time: 2
+            time: 8
             item_neutral_enhancement: item_neutral_enhancement
-        - obs: "{}"
-          cluster: 3
+          teamfight_participation: 6.458262756685686
+        - observers_placed: 2
+          item_neutral2: 0
+          obs: "{}"
+          cluster: 2
+          net_worth: 7
           gold_spent: 0
           obs_left_log:
           - "{}"
           - "{}"
           runes:
             key: 5
-          observer_kills: 3
+          observer_kills: 1
           purchase_tpscroll: 7
           obs_log:
           - "{}"
           - "{}"
           lane_role: 7
-          observer_uses: 3
-          patch: 0
-          neutral_kills: 4
-          roshan_kills: 1
+          observer_uses: 5
+          patch: 4
+          neutral_kills: 6
+          roshan_kills: 5
           item_uses: "{}"
           pings: 9
           deaths: 4
@@ -3944,14 +3964,17 @@ components:
             key: key
           gold_per_min: 9
           last_login: 2000-01-23T04:56:07.000+00:00
-          lose: 4
-          kda: 2.535258963197524
+          team_slot: 2
+          lose: 7
+          is_subscriber: true
+          kda: 0.58919091925136
+          party_size: 6
           lane_pos: "{}"
-          kills_per_min: 0.58919091925136
+          kills_per_min: 9.386524999783381
           xp_reasons: "{}"
           hero_variant: 3
           buyback_count: 5
-          necronomicon_kills: 4
+          necronomicon_kills: 1
           multi_kills: "{}"
           kills_log:
           - time: 1
@@ -3971,37 +3994,43 @@ components:
           additional_units:
           - "{}"
           - "{}"
+          randomed: true
           gold: 7
           radiant_win: true
           camps_stacked: 3
           runes_log:
           - time: 8
-            key: 7
+            key: key
           - time: 8
-            key: 7
+            key: key
+          team_number: 0
           purchase_time: "{}"
           sen: "{}"
-          ancient_kills: 5
-          actions_per_min: 9
+          ancient_kills: 4
+          actions_per_min: 7
+          roshans_killed: 8
           match_id: 3703866531
-          life_state_dead: 1
-          lane_kills: 1
+          life_state_dead: 9
+          lane_kills: 9
           hero_kills: 1
-          stuns: 3.111202833403195
+          stuns: 3.7814124730767915
           account_id: 0
           leaver_status: 6
           hero_healing: 7
           max_hero_hit: "{}"
           killed_by: "{}"
-          game_mode: 4
+          game_mode: 8
           obs_placed: 9
-          total_xp: 9
+          item_neutral: 5
+          total_xp: 2
           item_win: "{}"
           gold_reasons: "{}"
           personaname: 420 booty wizard
+          is_contributor: true
           damage_inflictor_received: "{}"
+          healing: "{}"
           damage_inflictor: "{}"
-          total_gold: 2
+          total_gold: 4
           buyback_log:
           - player_slot: 5
             time: 3
@@ -4009,52 +4038,53 @@ components:
           - player_slot: 5
             time: 3
             slot: 7
-          sentry_kills: 5
+          sentry_kills: 3
           kill_streaks: "{}"
           hero_hits: "{}"
-          xp_per_min: 7
+          xp_per_min: 5
           benchmarks: "{}"
+          towers_killed: 4
           level: 4
-          abandons: 6
+          abandons: 2
           player_slot: 7
           damage_taken: "{}"
-          moonshard: 8
-          start_time: 3
+          moonshard: 4
+          start_time: 0
           last_hits: 8
-          sentry_uses: 1
+          sentry_uses: 3
           ability_uses: "{}"
           item_5: 0
           item_4: 3
           item_usage: "{}"
           neutral_tokens_log:
-          - time: 8
+          - time: 3
             key: key
-          - time: 8
+          - time: 3
             key: key
           item_3: 4
           name: name
           item_2: 8
           item_1: 6
-          lane_efficiency: 3.2841216543560217
+          lane_efficiency: 1.0639121808530916
           creeps_stacked: 6
           item_0: 4
           region: 0
-          aghanims_shard: 4
+          aghanims_shard: 9
           kills: 2
           hero_damage: 0
-          tower_kills: 6
+          tower_kills: 4
           backpack_1: 7
           damage_targets: "{}"
           backpack_2: 3
           denies: 1
           backpack_0: 8
           life_state: "{}"
-          courier_kills: 9
+          courier_kills: 6
           cosmetics:
           - prefab: prefab
             image_inventory: image_inventory
             item_type_name: item_type_name
-            item_id: 3
+            item_id: 4
             image_path: image_path
             name: name
             item_name: item_name
@@ -4065,7 +4095,7 @@ components:
           - prefab: prefab
             image_inventory: image_inventory
             item_type_name: item_type_name
-            item_id: 3
+            item_id: 4
             image_path: image_path
             name: name
             item_name: item_name
@@ -4076,20 +4106,20 @@ components:
           dn_t:
           - 4
           - 4
-          duration: 2
+          duration: 3
           permanent_buffs:
           - "{}"
           - "{}"
           times:
-          - 9
-          - 9
-          lane_efficiency_pct: 9.785002165136461
+          - 3
+          - 3
+          lane_efficiency_pct: 3.2841216543560217
           assists: 4
-          tower_damage: 5
+          tower_damage: 9
           xp_t:
-          - 0
-          - 0
-          rank_tier: 4
+          - 7
+          - 7
+          rank_tier: 1
           connection_log:
           - player_slot: 0
             time: 4
@@ -4099,32 +4129,36 @@ components:
             event: event
           isRadiant: true
           hero_id: 5
-          win: 7
-          lane: 7
+          win: 0
+          lane: 9
           sen_log:
           - "{}"
           - "{}"
+          pred_vict: true
           sen_left_log:
           - "{}"
           - "{}"
           is_roaming: true
-          aghanims_scepter: 9
+          aghanims_scepter: 2
           purchase: "{}"
-          lobby_type: 8
+          lobby_type: 3
           ability_targets: "{}"
           killed: "{}"
-          sen_placed: 3
+          sen_placed: 7
           ability_upgrades_arr:
           - 6
           - 6
+          firstblood_claimed: 8
+          computed_mmr: 6.749525837406151
           party_id: 1
           neutral_item_history:
           - item_neutral: item_neutral
-            time: 2
+            time: 8
             item_neutral_enhancement: item_neutral_enhancement
           - item_neutral: item_neutral
-            time: 2
+            time: 8
             item_neutral_enhancement: item_neutral_enhancement
+          teamfight_participation: 6.458262756685686
         match_id: 3703866531
         league: "{}"
         lobby_type: 9
@@ -4146,7 +4180,7 @@ components:
           total_time_taken: 1
           order: 3
           extra_time: 1
-        throw: 8
+        throw: 0
         chat:
         - unit: unit
           player_slot: 5
@@ -4168,7 +4202,7 @@ components:
         - "{}"
         - "{}"
         barracks_status_dire: 0
-        region: 4
+        region: 0
         radiant_gold_adv:
         - 6.965117697638846
         - 6.965117697638846
@@ -5537,12 +5571,12 @@ components:
     get_constants_by_resource_200_response:
       nullable: true
       oneOf:
-      - additionalProperties:
-          title: ConstantResourceResponse
-        type: object
       - items:
           $ref: "#/components/schemas/get_constants_by_resource_200_response_oneOf_inner"
         type: array
+      - additionalProperties:
+          title: ConstantResourceResponse
+        type: object
     BenchmarksResponse_result_gold_per_min_inner:
       example:
         percentile: 6.027456183070403
@@ -5874,21 +5908,21 @@ components:
     MatchResponse_players_inner_runes_log_inner:
       example:
         time: 8
-        key: 7
+        key: key
       properties:
         time:
           description: Time in seconds rune picked up
           type: integer
         key:
           description: key
-          type: integer
+          type: string
       type: object
     MatchResponse_players_inner_cosmetics_inner:
       example:
         prefab: prefab
         image_inventory: image_inventory
         item_type_name: item_type_name
-        item_id: 3
+        item_id: 4
         image_path: image_path
         name: name
         item_name: item_name
@@ -5932,7 +5966,7 @@ components:
       type: object
     MatchResponse_players_inner_neutral_tokens_log_inner:
       example:
-        time: 8
+        time: 3
         key: key
       properties:
         time:
@@ -5945,7 +5979,7 @@ components:
     MatchResponse_players_inner_neutral_item_history_inner:
       example:
         item_neutral: item_neutral
-        time: 2
+        time: 8
         item_neutral_enhancement: item_neutral_enhancement
       properties:
         time:
@@ -5961,24 +5995,27 @@ components:
     MatchResponse_players_inner:
       description: player
       example:
+        observers_placed: 2
+        item_neutral2: 0
         obs: "{}"
-        cluster: 3
+        cluster: 2
+        net_worth: 7
         gold_spent: 0
         obs_left_log:
         - "{}"
         - "{}"
         runes:
           key: 5
-        observer_kills: 3
+        observer_kills: 1
         purchase_tpscroll: 7
         obs_log:
         - "{}"
         - "{}"
         lane_role: 7
-        observer_uses: 3
-        patch: 0
-        neutral_kills: 4
-        roshan_kills: 1
+        observer_uses: 5
+        patch: 4
+        neutral_kills: 6
+        roshan_kills: 5
         item_uses: "{}"
         pings: 9
         deaths: 4
@@ -5991,14 +6028,17 @@ components:
           key: key
         gold_per_min: 9
         last_login: 2000-01-23T04:56:07.000+00:00
-        lose: 4
-        kda: 2.535258963197524
+        team_slot: 2
+        lose: 7
+        is_subscriber: true
+        kda: 0.58919091925136
+        party_size: 6
         lane_pos: "{}"
-        kills_per_min: 0.58919091925136
+        kills_per_min: 9.386524999783381
         xp_reasons: "{}"
         hero_variant: 3
         buyback_count: 5
-        necronomicon_kills: 4
+        necronomicon_kills: 1
         multi_kills: "{}"
         kills_log:
         - time: 1
@@ -6018,37 +6058,43 @@ components:
         additional_units:
         - "{}"
         - "{}"
+        randomed: true
         gold: 7
         radiant_win: true
         camps_stacked: 3
         runes_log:
         - time: 8
-          key: 7
+          key: key
         - time: 8
-          key: 7
+          key: key
+        team_number: 0
         purchase_time: "{}"
         sen: "{}"
-        ancient_kills: 5
-        actions_per_min: 9
+        ancient_kills: 4
+        actions_per_min: 7
+        roshans_killed: 8
         match_id: 3703866531
-        life_state_dead: 1
-        lane_kills: 1
+        life_state_dead: 9
+        lane_kills: 9
         hero_kills: 1
-        stuns: 3.111202833403195
+        stuns: 3.7814124730767915
         account_id: 0
         leaver_status: 6
         hero_healing: 7
         max_hero_hit: "{}"
         killed_by: "{}"
-        game_mode: 4
+        game_mode: 8
         obs_placed: 9
-        total_xp: 9
+        item_neutral: 5
+        total_xp: 2
         item_win: "{}"
         gold_reasons: "{}"
         personaname: 420 booty wizard
+        is_contributor: true
         damage_inflictor_received: "{}"
+        healing: "{}"
         damage_inflictor: "{}"
-        total_gold: 2
+        total_gold: 4
         buyback_log:
         - player_slot: 5
           time: 3
@@ -6056,52 +6102,53 @@ components:
         - player_slot: 5
           time: 3
           slot: 7
-        sentry_kills: 5
+        sentry_kills: 3
         kill_streaks: "{}"
         hero_hits: "{}"
-        xp_per_min: 7
+        xp_per_min: 5
         benchmarks: "{}"
+        towers_killed: 4
         level: 4
-        abandons: 6
+        abandons: 2
         player_slot: 7
         damage_taken: "{}"
-        moonshard: 8
-        start_time: 3
+        moonshard: 4
+        start_time: 0
         last_hits: 8
-        sentry_uses: 1
+        sentry_uses: 3
         ability_uses: "{}"
         item_5: 0
         item_4: 3
         item_usage: "{}"
         neutral_tokens_log:
-        - time: 8
+        - time: 3
           key: key
-        - time: 8
+        - time: 3
           key: key
         item_3: 4
         name: name
         item_2: 8
         item_1: 6
-        lane_efficiency: 3.2841216543560217
+        lane_efficiency: 1.0639121808530916
         creeps_stacked: 6
         item_0: 4
         region: 0
-        aghanims_shard: 4
+        aghanims_shard: 9
         kills: 2
         hero_damage: 0
-        tower_kills: 6
+        tower_kills: 4
         backpack_1: 7
         damage_targets: "{}"
         backpack_2: 3
         denies: 1
         backpack_0: 8
         life_state: "{}"
-        courier_kills: 9
+        courier_kills: 6
         cosmetics:
         - prefab: prefab
           image_inventory: image_inventory
           item_type_name: item_type_name
-          item_id: 3
+          item_id: 4
           image_path: image_path
           name: name
           item_name: item_name
@@ -6112,7 +6159,7 @@ components:
         - prefab: prefab
           image_inventory: image_inventory
           item_type_name: item_type_name
-          item_id: 3
+          item_id: 4
           image_path: image_path
           name: name
           item_name: item_name
@@ -6123,20 +6170,20 @@ components:
         dn_t:
         - 4
         - 4
-        duration: 2
+        duration: 3
         permanent_buffs:
         - "{}"
         - "{}"
         times:
-        - 9
-        - 9
-        lane_efficiency_pct: 9.785002165136461
+        - 3
+        - 3
+        lane_efficiency_pct: 3.2841216543560217
         assists: 4
-        tower_damage: 5
+        tower_damage: 9
         xp_t:
-        - 0
-        - 0
-        rank_tier: 4
+        - 7
+        - 7
+        rank_tier: 1
         connection_log:
         - player_slot: 0
           time: 4
@@ -6146,32 +6193,36 @@ components:
           event: event
         isRadiant: true
         hero_id: 5
-        win: 7
-        lane: 7
+        win: 0
+        lane: 9
         sen_log:
         - "{}"
         - "{}"
+        pred_vict: true
         sen_left_log:
         - "{}"
         - "{}"
         is_roaming: true
-        aghanims_scepter: 9
+        aghanims_scepter: 2
         purchase: "{}"
-        lobby_type: 8
+        lobby_type: 3
         ability_targets: "{}"
         killed: "{}"
-        sen_placed: 3
+        sen_placed: 7
         ability_upgrades_arr:
         - 6
         - 6
+        firstblood_claimed: 8
+        computed_mmr: 6.749525837406151
         party_id: 1
         neutral_item_history:
         - item_neutral: item_neutral
-          time: 2
+          time: 8
           item_neutral_enhancement: item_neutral_enhancement
         - item_neutral: item_neutral
-          time: 2
+          time: 8
           item_neutral_enhancement: item_neutral_enhancement
+        teamfight_participation: 6.458262756685686
       properties:
         match_id:
           description: The ID number of the match assigned by Valve
@@ -6648,11 +6699,62 @@ components:
         moonshard:
           description: Whether the player has consumed Moon Shard (0 or 1)
           type: integer
+        firstblood_claimed:
+          description: Whether the player claimed first blood (0 or 1)
+          type: integer
+        teamfight_participation:
+          description: Player's teamfight participation percentage
+          type: number
+        towers_killed:
+          description: Number of towers killed by the player
+          type: integer
+        roshans_killed:
+          description: Number of Roshans killed by the player
+          type: integer
+        observers_placed:
+          description: Number of observer wards placed
+          type: integer
+        healing:
+          description: Object containing healing done to different units
+          type: object
+        randomed:
+          description: Whether the player randomed their hero
+          type: boolean
+        pred_vict:
+          description: Prediction victory
+          type: boolean
+        party_size:
+          description: Size of the player's party
+          type: integer
+        team_number:
+          description: "Team number (0 = Radiant, 1 = Dire)"
+          type: integer
+        team_slot:
+          description: Player's slot within their team (0-4)
+          type: integer
+        item_neutral:
+          description: ID of the neutral item in slot 1
+          type: integer
+        item_neutral2:
+          description: ID of the neutral item in slot 2
+          type: integer
+        net_worth:
+          description: Player's net worth at end of game
+          type: integer
+        computed_mmr:
+          description: Computed MMR for the player
+          type: number
+        is_subscriber:
+          description: Whether the player is a subscriber
+          type: boolean
+        is_contributor:
+          description: Whether the player is a contributor
+          type: boolean
       type: object
     MatchResponse_pauses_inner:
       example:
-        duration: 5
-        time: 2
+        duration: 0
+        time: 6
       properties:
         time:
           description: Time in seconds at which pause started
