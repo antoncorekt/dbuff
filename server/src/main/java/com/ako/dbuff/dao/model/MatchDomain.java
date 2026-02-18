@@ -2,6 +2,8 @@ package com.ako.dbuff.dao.model;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
@@ -40,4 +42,12 @@ public class MatchDomain {
 
   private Boolean dotaApiFailed;
   private Boolean abadon;
+
+  /**
+   * Reference to the AI analysis for this match. Multiple matches can share the same analysis when
+   * analyzed together.
+   */
+  @ManyToOne
+  @JoinColumn(name = "analysis_id")
+  private MatchAnalysisDomain analysis;
 }

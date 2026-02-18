@@ -175,7 +175,24 @@ import com.ako.dbuff.dotapi.invoker.JSON;
   MatchResponsePlayersInner.JSON_PROPERTY_NEUTRAL_ITEM_HISTORY,
   MatchResponsePlayersInner.JSON_PROPERTY_AGHANIMS_SCEPTER,
   MatchResponsePlayersInner.JSON_PROPERTY_AGHANIMS_SHARD,
-  MatchResponsePlayersInner.JSON_PROPERTY_MOONSHARD
+  MatchResponsePlayersInner.JSON_PROPERTY_MOONSHARD,
+  MatchResponsePlayersInner.JSON_PROPERTY_FIRSTBLOOD_CLAIMED,
+  MatchResponsePlayersInner.JSON_PROPERTY_TEAMFIGHT_PARTICIPATION,
+  MatchResponsePlayersInner.JSON_PROPERTY_TOWERS_KILLED,
+  MatchResponsePlayersInner.JSON_PROPERTY_ROSHANS_KILLED,
+  MatchResponsePlayersInner.JSON_PROPERTY_OBSERVERS_PLACED,
+  MatchResponsePlayersInner.JSON_PROPERTY_HEALING,
+  MatchResponsePlayersInner.JSON_PROPERTY_RANDOMED,
+  MatchResponsePlayersInner.JSON_PROPERTY_PRED_VICT,
+  MatchResponsePlayersInner.JSON_PROPERTY_PARTY_SIZE,
+  MatchResponsePlayersInner.JSON_PROPERTY_TEAM_NUMBER,
+  MatchResponsePlayersInner.JSON_PROPERTY_TEAM_SLOT,
+  MatchResponsePlayersInner.JSON_PROPERTY_ITEM_NEUTRAL,
+  MatchResponsePlayersInner.JSON_PROPERTY_ITEM_NEUTRAL2,
+  MatchResponsePlayersInner.JSON_PROPERTY_NET_WORTH,
+  MatchResponsePlayersInner.JSON_PROPERTY_COMPUTED_MMR,
+  MatchResponsePlayersInner.JSON_PROPERTY_IS_SUBSCRIBER,
+  MatchResponsePlayersInner.JSON_PROPERTY_IS_CONTRIBUTOR
 })
 @JsonTypeName("MatchResponse_players_inner")
 @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
@@ -683,6 +700,74 @@ public class MatchResponsePlayersInner {
   public static final String JSON_PROPERTY_MOONSHARD = "moonshard";
   @jakarta.annotation.Nullable
   private Long moonshard;
+
+  public static final String JSON_PROPERTY_FIRSTBLOOD_CLAIMED = "firstblood_claimed";
+  @jakarta.annotation.Nullable
+  private Long firstbloodClaimed;
+
+  public static final String JSON_PROPERTY_TEAMFIGHT_PARTICIPATION = "teamfight_participation";
+  @jakarta.annotation.Nullable
+  private BigDecimal teamfightParticipation;
+
+  public static final String JSON_PROPERTY_TOWERS_KILLED = "towers_killed";
+  @jakarta.annotation.Nullable
+  private Long towersKilled;
+
+  public static final String JSON_PROPERTY_ROSHANS_KILLED = "roshans_killed";
+  @jakarta.annotation.Nullable
+  private Long roshansKilled;
+
+  public static final String JSON_PROPERTY_OBSERVERS_PLACED = "observers_placed";
+  @jakarta.annotation.Nullable
+  private Long observersPlaced;
+
+  public static final String JSON_PROPERTY_HEALING = "healing";
+  @jakarta.annotation.Nullable
+  private Object healing;
+
+  public static final String JSON_PROPERTY_RANDOMED = "randomed";
+  @jakarta.annotation.Nullable
+  private Boolean randomed;
+
+  public static final String JSON_PROPERTY_PRED_VICT = "pred_vict";
+  @jakarta.annotation.Nullable
+  private Boolean predVict;
+
+  public static final String JSON_PROPERTY_PARTY_SIZE = "party_size";
+  @jakarta.annotation.Nullable
+  private Long partySize;
+
+  public static final String JSON_PROPERTY_TEAM_NUMBER = "team_number";
+  @jakarta.annotation.Nullable
+  private Long teamNumber;
+
+  public static final String JSON_PROPERTY_TEAM_SLOT = "team_slot";
+  @jakarta.annotation.Nullable
+  private Long teamSlot;
+
+  public static final String JSON_PROPERTY_ITEM_NEUTRAL = "item_neutral";
+  @jakarta.annotation.Nullable
+  private Long itemNeutral;
+
+  public static final String JSON_PROPERTY_ITEM_NEUTRAL2 = "item_neutral2";
+  @jakarta.annotation.Nullable
+  private Long itemNeutral2;
+
+  public static final String JSON_PROPERTY_NET_WORTH = "net_worth";
+  @jakarta.annotation.Nullable
+  private Long netWorth;
+
+  public static final String JSON_PROPERTY_COMPUTED_MMR = "computed_mmr";
+  @jakarta.annotation.Nullable
+  private BigDecimal computedMmr;
+
+  public static final String JSON_PROPERTY_IS_SUBSCRIBER = "is_subscriber";
+  @jakarta.annotation.Nullable
+  private Boolean isSubscriber;
+
+  public static final String JSON_PROPERTY_IS_CONTRIBUTOR = "is_contributor";
+  @jakarta.annotation.Nullable
+  private Boolean isContributor;
 
   public MatchResponsePlayersInner() { 
   }
@@ -4131,6 +4216,431 @@ public class MatchResponsePlayersInner {
   }
 
 
+  public MatchResponsePlayersInner firstbloodClaimed(@jakarta.annotation.Nullable Long firstbloodClaimed) {
+    this.firstbloodClaimed = firstbloodClaimed;
+    return this;
+  }
+
+  /**
+   * Whether the player claimed first blood (0 or 1)
+   * @return firstbloodClaimed
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_FIRSTBLOOD_CLAIMED)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Long getFirstbloodClaimed() {
+    return firstbloodClaimed;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_FIRSTBLOOD_CLAIMED)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setFirstbloodClaimed(@jakarta.annotation.Nullable Long firstbloodClaimed) {
+    this.firstbloodClaimed = firstbloodClaimed;
+  }
+
+
+  public MatchResponsePlayersInner teamfightParticipation(@jakarta.annotation.Nullable BigDecimal teamfightParticipation) {
+    this.teamfightParticipation = teamfightParticipation;
+    return this;
+  }
+
+  /**
+   * Player&#39;s teamfight participation percentage
+   * @return teamfightParticipation
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_TEAMFIGHT_PARTICIPATION)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public BigDecimal getTeamfightParticipation() {
+    return teamfightParticipation;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_TEAMFIGHT_PARTICIPATION)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setTeamfightParticipation(@jakarta.annotation.Nullable BigDecimal teamfightParticipation) {
+    this.teamfightParticipation = teamfightParticipation;
+  }
+
+
+  public MatchResponsePlayersInner towersKilled(@jakarta.annotation.Nullable Long towersKilled) {
+    this.towersKilled = towersKilled;
+    return this;
+  }
+
+  /**
+   * Number of towers killed by the player
+   * @return towersKilled
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_TOWERS_KILLED)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Long getTowersKilled() {
+    return towersKilled;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_TOWERS_KILLED)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setTowersKilled(@jakarta.annotation.Nullable Long towersKilled) {
+    this.towersKilled = towersKilled;
+  }
+
+
+  public MatchResponsePlayersInner roshansKilled(@jakarta.annotation.Nullable Long roshansKilled) {
+    this.roshansKilled = roshansKilled;
+    return this;
+  }
+
+  /**
+   * Number of Roshans killed by the player
+   * @return roshansKilled
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_ROSHANS_KILLED)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Long getRoshansKilled() {
+    return roshansKilled;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_ROSHANS_KILLED)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setRoshansKilled(@jakarta.annotation.Nullable Long roshansKilled) {
+    this.roshansKilled = roshansKilled;
+  }
+
+
+  public MatchResponsePlayersInner observersPlaced(@jakarta.annotation.Nullable Long observersPlaced) {
+    this.observersPlaced = observersPlaced;
+    return this;
+  }
+
+  /**
+   * Number of observer wards placed
+   * @return observersPlaced
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_OBSERVERS_PLACED)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Long getObserversPlaced() {
+    return observersPlaced;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_OBSERVERS_PLACED)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setObserversPlaced(@jakarta.annotation.Nullable Long observersPlaced) {
+    this.observersPlaced = observersPlaced;
+  }
+
+
+  public MatchResponsePlayersInner healing(@jakarta.annotation.Nullable Object healing) {
+    this.healing = healing;
+    return this;
+  }
+
+  /**
+   * Object containing healing done to different units
+   * @return healing
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_HEALING)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Object getHealing() {
+    return healing;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_HEALING)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setHealing(@jakarta.annotation.Nullable Object healing) {
+    this.healing = healing;
+  }
+
+
+  public MatchResponsePlayersInner randomed(@jakarta.annotation.Nullable Boolean randomed) {
+    this.randomed = randomed;
+    return this;
+  }
+
+  /**
+   * Whether the player randomed their hero
+   * @return randomed
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_RANDOMED)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Boolean getRandomed() {
+    return randomed;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_RANDOMED)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setRandomed(@jakarta.annotation.Nullable Boolean randomed) {
+    this.randomed = randomed;
+  }
+
+
+  public MatchResponsePlayersInner predVict(@jakarta.annotation.Nullable Boolean predVict) {
+    this.predVict = predVict;
+    return this;
+  }
+
+  /**
+   * Prediction victory
+   * @return predVict
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_PRED_VICT)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Boolean getPredVict() {
+    return predVict;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_PRED_VICT)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setPredVict(@jakarta.annotation.Nullable Boolean predVict) {
+    this.predVict = predVict;
+  }
+
+
+  public MatchResponsePlayersInner partySize(@jakarta.annotation.Nullable Long partySize) {
+    this.partySize = partySize;
+    return this;
+  }
+
+  /**
+   * Size of the player&#39;s party
+   * @return partySize
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_PARTY_SIZE)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Long getPartySize() {
+    return partySize;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_PARTY_SIZE)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setPartySize(@jakarta.annotation.Nullable Long partySize) {
+    this.partySize = partySize;
+  }
+
+
+  public MatchResponsePlayersInner teamNumber(@jakarta.annotation.Nullable Long teamNumber) {
+    this.teamNumber = teamNumber;
+    return this;
+  }
+
+  /**
+   * Team number (0 &#x3D; Radiant, 1 &#x3D; Dire)
+   * @return teamNumber
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_TEAM_NUMBER)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Long getTeamNumber() {
+    return teamNumber;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_TEAM_NUMBER)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setTeamNumber(@jakarta.annotation.Nullable Long teamNumber) {
+    this.teamNumber = teamNumber;
+  }
+
+
+  public MatchResponsePlayersInner teamSlot(@jakarta.annotation.Nullable Long teamSlot) {
+    this.teamSlot = teamSlot;
+    return this;
+  }
+
+  /**
+   * Player&#39;s slot within their team (0-4)
+   * @return teamSlot
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_TEAM_SLOT)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Long getTeamSlot() {
+    return teamSlot;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_TEAM_SLOT)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setTeamSlot(@jakarta.annotation.Nullable Long teamSlot) {
+    this.teamSlot = teamSlot;
+  }
+
+
+  public MatchResponsePlayersInner itemNeutral(@jakarta.annotation.Nullable Long itemNeutral) {
+    this.itemNeutral = itemNeutral;
+    return this;
+  }
+
+  /**
+   * ID of the neutral item in slot 1
+   * @return itemNeutral
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_ITEM_NEUTRAL)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Long getItemNeutral() {
+    return itemNeutral;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_ITEM_NEUTRAL)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setItemNeutral(@jakarta.annotation.Nullable Long itemNeutral) {
+    this.itemNeutral = itemNeutral;
+  }
+
+
+  public MatchResponsePlayersInner itemNeutral2(@jakarta.annotation.Nullable Long itemNeutral2) {
+    this.itemNeutral2 = itemNeutral2;
+    return this;
+  }
+
+  /**
+   * ID of the neutral item in slot 2
+   * @return itemNeutral2
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_ITEM_NEUTRAL2)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Long getItemNeutral2() {
+    return itemNeutral2;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_ITEM_NEUTRAL2)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setItemNeutral2(@jakarta.annotation.Nullable Long itemNeutral2) {
+    this.itemNeutral2 = itemNeutral2;
+  }
+
+
+  public MatchResponsePlayersInner netWorth(@jakarta.annotation.Nullable Long netWorth) {
+    this.netWorth = netWorth;
+    return this;
+  }
+
+  /**
+   * Player&#39;s net worth at end of game
+   * @return netWorth
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_NET_WORTH)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Long getNetWorth() {
+    return netWorth;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_NET_WORTH)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setNetWorth(@jakarta.annotation.Nullable Long netWorth) {
+    this.netWorth = netWorth;
+  }
+
+
+  public MatchResponsePlayersInner computedMmr(@jakarta.annotation.Nullable BigDecimal computedMmr) {
+    this.computedMmr = computedMmr;
+    return this;
+  }
+
+  /**
+   * Computed MMR for the player
+   * @return computedMmr
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_COMPUTED_MMR)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public BigDecimal getComputedMmr() {
+    return computedMmr;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_COMPUTED_MMR)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setComputedMmr(@jakarta.annotation.Nullable BigDecimal computedMmr) {
+    this.computedMmr = computedMmr;
+  }
+
+
+  public MatchResponsePlayersInner isSubscriber(@jakarta.annotation.Nullable Boolean isSubscriber) {
+    this.isSubscriber = isSubscriber;
+    return this;
+  }
+
+  /**
+   * Whether the player is a subscriber
+   * @return isSubscriber
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_IS_SUBSCRIBER)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Boolean getIsSubscriber() {
+    return isSubscriber;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_IS_SUBSCRIBER)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setIsSubscriber(@jakarta.annotation.Nullable Boolean isSubscriber) {
+    this.isSubscriber = isSubscriber;
+  }
+
+
+  public MatchResponsePlayersInner isContributor(@jakarta.annotation.Nullable Boolean isContributor) {
+    this.isContributor = isContributor;
+    return this;
+  }
+
+  /**
+   * Whether the player is a contributor
+   * @return isContributor
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_IS_CONTRIBUTOR)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Boolean getIsContributor() {
+    return isContributor;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_IS_CONTRIBUTOR)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setIsContributor(@jakarta.annotation.Nullable Boolean isContributor) {
+    this.isContributor = isContributor;
+  }
+
+
   /**
    * Return true if this MatchResponse_players_inner object is equal to o.
    */
@@ -4270,7 +4780,24 @@ public class MatchResponsePlayersInner {
         Objects.equals(this.neutralItemHistory, matchResponsePlayersInner.neutralItemHistory) &&
         Objects.equals(this.aghanimsScepter, matchResponsePlayersInner.aghanimsScepter) &&
         Objects.equals(this.aghanimsShard, matchResponsePlayersInner.aghanimsShard) &&
-        Objects.equals(this.moonshard, matchResponsePlayersInner.moonshard);
+        Objects.equals(this.moonshard, matchResponsePlayersInner.moonshard) &&
+        Objects.equals(this.firstbloodClaimed, matchResponsePlayersInner.firstbloodClaimed) &&
+        Objects.equals(this.teamfightParticipation, matchResponsePlayersInner.teamfightParticipation) &&
+        Objects.equals(this.towersKilled, matchResponsePlayersInner.towersKilled) &&
+        Objects.equals(this.roshansKilled, matchResponsePlayersInner.roshansKilled) &&
+        Objects.equals(this.observersPlaced, matchResponsePlayersInner.observersPlaced) &&
+        Objects.equals(this.healing, matchResponsePlayersInner.healing) &&
+        Objects.equals(this.randomed, matchResponsePlayersInner.randomed) &&
+        Objects.equals(this.predVict, matchResponsePlayersInner.predVict) &&
+        Objects.equals(this.partySize, matchResponsePlayersInner.partySize) &&
+        Objects.equals(this.teamNumber, matchResponsePlayersInner.teamNumber) &&
+        Objects.equals(this.teamSlot, matchResponsePlayersInner.teamSlot) &&
+        Objects.equals(this.itemNeutral, matchResponsePlayersInner.itemNeutral) &&
+        Objects.equals(this.itemNeutral2, matchResponsePlayersInner.itemNeutral2) &&
+        Objects.equals(this.netWorth, matchResponsePlayersInner.netWorth) &&
+        Objects.equals(this.computedMmr, matchResponsePlayersInner.computedMmr) &&
+        Objects.equals(this.isSubscriber, matchResponsePlayersInner.isSubscriber) &&
+        Objects.equals(this.isContributor, matchResponsePlayersInner.isContributor);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -4279,7 +4806,7 @@ public class MatchResponsePlayersInner {
 
   @Override
   public int hashCode() {
-    return Objects.hash(matchId, hashCodeNullable(playerSlot), abilityUpgradesArr, abilityUses, abilityTargets, damageTargets, accountId, actions, hashCodeNullable(additionalUnits), assists, backpack0, backpack1, backpack2, buybackLog, campsStacked, connectionLog, creepsStacked, damage, damageInflictor, damageInflictorReceived, damageTaken, deaths, denies, dnT, gold, goldPerMin, goldReasons, goldSpent, goldT, heroDamage, heroHealing, heroHits, heroId, item0, item1, item2, item3, item4, item5, itemUses, killStreaks, killed, killedBy, kills, killsLog, lanePos, lastHits, leaverStatus, level, lhT, lifeState, maxHeroHit, multiKills, obs, obsLeftLog, obsLog, obsPlaced, partyId, permanentBuffs, heroVariant, pings, purchase, purchaseLog, runePickups, runes, runesLog, sen, senLeftLog, senLog, senPlaced, stuns, times, towerDamage, xpPerMin, xpReasons, xpT, hashCodeNullable(personaname), hashCodeNullable(name), hashCodeNullable(lastLogin), hashCodeNullable(radiantWin), startTime, duration, cluster, lobbyType, gameMode, patch, region, isRadiant, win, lose, totalGold, totalXp, killsPerMin, kda, abandons, neutralKills, towerKills, courierKills, laneKills, heroKills, observerKills, sentryKills, roshanKills, necronomiconKills, ancientKills, buybackCount, observerUses, sentryUses, laneEfficiency, laneEfficiencyPct, hashCodeNullable(lane), hashCodeNullable(laneRole), hashCodeNullable(isRoaming), purchaseTime, firstPurchaseTime, itemWin, itemUsage, purchaseTpscroll, actionsPerMin, lifeStateDead, rankTier, cosmetics, benchmarks, neutralTokensLog, neutralItemHistory, aghanimsScepter, aghanimsShard, moonshard);
+    return Objects.hash(matchId, hashCodeNullable(playerSlot), abilityUpgradesArr, abilityUses, abilityTargets, damageTargets, accountId, actions, hashCodeNullable(additionalUnits), assists, backpack0, backpack1, backpack2, buybackLog, campsStacked, connectionLog, creepsStacked, damage, damageInflictor, damageInflictorReceived, damageTaken, deaths, denies, dnT, gold, goldPerMin, goldReasons, goldSpent, goldT, heroDamage, heroHealing, heroHits, heroId, item0, item1, item2, item3, item4, item5, itemUses, killStreaks, killed, killedBy, kills, killsLog, lanePos, lastHits, leaverStatus, level, lhT, lifeState, maxHeroHit, multiKills, obs, obsLeftLog, obsLog, obsPlaced, partyId, permanentBuffs, heroVariant, pings, purchase, purchaseLog, runePickups, runes, runesLog, sen, senLeftLog, senLog, senPlaced, stuns, times, towerDamage, xpPerMin, xpReasons, xpT, hashCodeNullable(personaname), hashCodeNullable(name), hashCodeNullable(lastLogin), hashCodeNullable(radiantWin), startTime, duration, cluster, lobbyType, gameMode, patch, region, isRadiant, win, lose, totalGold, totalXp, killsPerMin, kda, abandons, neutralKills, towerKills, courierKills, laneKills, heroKills, observerKills, sentryKills, roshanKills, necronomiconKills, ancientKills, buybackCount, observerUses, sentryUses, laneEfficiency, laneEfficiencyPct, hashCodeNullable(lane), hashCodeNullable(laneRole), hashCodeNullable(isRoaming), purchaseTime, firstPurchaseTime, itemWin, itemUsage, purchaseTpscroll, actionsPerMin, lifeStateDead, rankTier, cosmetics, benchmarks, neutralTokensLog, neutralItemHistory, aghanimsScepter, aghanimsShard, moonshard, firstbloodClaimed, teamfightParticipation, towersKilled, roshansKilled, observersPlaced, healing, randomed, predVict, partySize, teamNumber, teamSlot, itemNeutral, itemNeutral2, netWorth, computedMmr, isSubscriber, isContributor);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -4421,6 +4948,23 @@ public class MatchResponsePlayersInner {
     sb.append("    aghanimsScepter: ").append(toIndentedString(aghanimsScepter)).append("\n");
     sb.append("    aghanimsShard: ").append(toIndentedString(aghanimsShard)).append("\n");
     sb.append("    moonshard: ").append(toIndentedString(moonshard)).append("\n");
+    sb.append("    firstbloodClaimed: ").append(toIndentedString(firstbloodClaimed)).append("\n");
+    sb.append("    teamfightParticipation: ").append(toIndentedString(teamfightParticipation)).append("\n");
+    sb.append("    towersKilled: ").append(toIndentedString(towersKilled)).append("\n");
+    sb.append("    roshansKilled: ").append(toIndentedString(roshansKilled)).append("\n");
+    sb.append("    observersPlaced: ").append(toIndentedString(observersPlaced)).append("\n");
+    sb.append("    healing: ").append(toIndentedString(healing)).append("\n");
+    sb.append("    randomed: ").append(toIndentedString(randomed)).append("\n");
+    sb.append("    predVict: ").append(toIndentedString(predVict)).append("\n");
+    sb.append("    partySize: ").append(toIndentedString(partySize)).append("\n");
+    sb.append("    teamNumber: ").append(toIndentedString(teamNumber)).append("\n");
+    sb.append("    teamSlot: ").append(toIndentedString(teamSlot)).append("\n");
+    sb.append("    itemNeutral: ").append(toIndentedString(itemNeutral)).append("\n");
+    sb.append("    itemNeutral2: ").append(toIndentedString(itemNeutral2)).append("\n");
+    sb.append("    netWorth: ").append(toIndentedString(netWorth)).append("\n");
+    sb.append("    computedMmr: ").append(toIndentedString(computedMmr)).append("\n");
+    sb.append("    isSubscriber: ").append(toIndentedString(isSubscriber)).append("\n");
+    sb.append("    isContributor: ").append(toIndentedString(isContributor)).append("\n");
     sb.append("}");
     return sb.toString();
   }

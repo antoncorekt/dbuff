@@ -1080,4 +1080,140 @@ public class MatchResponsePlayersInnerTest {
         // TODO: test moonshard
     }
 
+    /**
+     * Test the property 'firstbloodClaimed'
+     */
+    @Test
+    public void firstbloodClaimedTest() {
+        // TODO: test firstbloodClaimed
+    }
+
+    /**
+     * Test the property 'teamfightParticipation'
+     */
+    @Test
+    public void teamfightParticipationTest() {
+        // TODO: test teamfightParticipation
+    }
+
+    /**
+     * Test the property 'towersKilled'
+     */
+    @Test
+    public void towersKilledTest() {
+        // TODO: test towersKilled
+    }
+
+    /**
+     * Test the property 'roshansKilled'
+     */
+    @Test
+    public void roshansKilledTest() {
+        // TODO: test roshansKilled
+    }
+
+    /**
+     * Test the property 'observersPlaced'
+     */
+    @Test
+    public void observersPlacedTest() {
+        // TODO: test observersPlaced
+    }
+
+    /**
+     * Test the property 'healing'
+     */
+    @Test
+    public void healingTest() {
+        // TODO: test healing
+    }
+
+    /**
+     * Test the property 'randomed'
+     */
+    @Test
+    public void randomedTest() {
+        // TODO: test randomed
+    }
+
+    /**
+     * Test the property 'predVict'
+     */
+    @Test
+    public void predVictTest() {
+        // TODO: test predVict
+    }
+
+    /**
+     * Test the property 'partySize'
+     */
+    @Test
+    public void partySizeTest() {
+        // TODO: test partySize
+    }
+
+    /**
+     * Test the property 'teamNumber'
+     */
+    @Test
+    public void teamNumberTest() {
+        // TODO: test teamNumber
+    }
+
+    /**
+     * Test the property 'teamSlot'
+     */
+    @Test
+    public void teamSlotTest() {
+        // TODO: test teamSlot
+    }
+
+    /**
+     * Test the property 'itemNeutral'
+     */
+    @Test
+    public void itemNeutralTest() {
+        // TODO: test itemNeutral
+    }
+
+    /**
+     * Test the property 'itemNeutral2'
+     */
+    @Test
+    public void itemNeutral2Test() {
+        // TODO: test itemNeutral2
+    }
+
+    /**
+     * Test the property 'netWorth'
+     */
+    @Test
+    public void netWorthTest() {
+        // TODO: test netWorth
+    }
+
+    /**
+     * Test the property 'computedMmr'
+     */
+    @Test
+    public void computedMmrTest() {
+        // TODO: test computedMmr
+    }
+
+    /**
+     * Test the property 'isSubscriber'
+     */
+    @Test
+    public void isSubscriberTest() {
+        // TODO: test isSubscriber
+    }
+
+    /**
+     * Test the property 'isContributor'
+     */
+    @Test
+    public void isContributorTest() {
+        // TODO: test isContributor
+    }
+
 }

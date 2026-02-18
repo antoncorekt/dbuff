@@ -38,4 +38,13 @@ public class AbilityDomain {
 
   private String name;
   private String prettyName;
+
+  /** Damage dealt by this ability (from damage_inflictor). */
+  private Long damageDealt;
+
+  /** Damage received from this ability (from damage_inflictor_received). */
+  private Long damageReceived;
+
+  /** Number of times this ability was used (from ability_uses). */
+  private Long useCount;
 }

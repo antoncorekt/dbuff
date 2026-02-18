@@ -140,7 +140,8 @@ public class AllHistoryService {
                   pageNum,
                   userId);
 
-              matchProcessorService.process(matchesOnPage);
+              // Wait for all matches on this page to be processed
+              matchProcessorService.process(matchesOnPage).join();
 
               log.info("{} Completed processing page {} for user {}", ctx, pageNum, userId);
             } finally {

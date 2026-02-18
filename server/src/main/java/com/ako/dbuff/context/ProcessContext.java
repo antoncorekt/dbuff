@@ -98,6 +98,26 @@ public class ProcessContext {
   }
 
   /**
+   * Calls a task with full context (process type, match ID, player ID) in scope and returns the
+   * result.
+   *
+   * @param processType the process type
+   * @param matchId the match ID to set in scope
+   * @param playerId the player ID to set in scope (can be null)
+   * @param task the task to call
+   * @param <T> the return type
+   * @return the result of the task
+   * @throws Exception if the task throws an exception
+   */
+  public static <T> T callWithFullContext(
+      String processType, Long matchId, Long playerId, Callable<T> task) throws Exception {
+    return ScopedValue.where(PROCESS_TYPE, processType)
+        .where(MATCH_ID, matchId)
+        .where(PLAYER_ID, playerId)
+        .call(task);
+  }
+
+  /**
    * Calls a task with the specified match ID in scope and returns the result.
    *
    * @param matchId the match ID to set in scope

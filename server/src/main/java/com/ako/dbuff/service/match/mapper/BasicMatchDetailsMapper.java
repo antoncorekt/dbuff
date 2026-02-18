@@ -5,17 +5,23 @@ import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dotapi.model.MatchResponse;
+import com.ako.dbuff.dotapi.model.MatchResponsePlayersInner;
 import com.ako.dbuff.service.constant.ConstantsManagers;
+import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.constant.data.MatchTypeConstant;
 import com.ako.dbuff.service.constant.data.PatchConstant;
 import com.ako.dbuff.service.details.DotabuffBuildDetailsParser;
 import com.ako.dbuff.service.details.ScrapperService;
+import com.ako.dbuff.service.match.mapper.PlayersMapper.PlayerHeroInfo;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -52,18 +58,53 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
     mapPatchInfo(matchResponse, matchDomain);
     mapScoreInfo(matchResponse, matchDomain);
 
-    log.debug(
-        "{} Processing {} players for match {}",
-        ctx,
-        CollectionUtils.size(matchResponse.getPlayers()),
-        matchDomain.getId());
+    List<MatchResponsePlayersInner> players =
+        CollectionUtils.emptyIfNull(matchResponse.getPlayers()).stream().toList();
 
-    CollectionUtils.emptyIfNull(matchResponse.getPlayers())
-        .forEach(player -> playersMapper.handle(matchDomain, player));
+    log.debug("{} Processing {} players for match {}", ctx, players.size(), matchDomain.getId());
+
+    // Build hero name to player info map for kill log processing
+    Map<String, PlayerHeroInfo> heroToPlayerMap = buildHeroToPlayerMap(players);
+
+    players.forEach(player -> playersMapper.handle(matchDomain, player, heroToPlayerMap));
 
     matchRepo.save(matchDomain);
 
     checkAndScrapeAdditionalData(matchDomain);
+  }
+
+  /**
+   * Builds a map from hero internal name (e.g., "npc_dota_hero_monkey_king") to player info. This
+   * is used to map killed hero names in kills_log to the killed player's details.
+   *
+   * @param players list of players in the match
+   * @return map of hero internal name to PlayerHeroInfo
+   */
+  private Map<String, PlayerHeroInfo> buildHeroToPlayerMap(
+      List<MatchResponsePlayersInner> players) {
+    Map<String, PlayerHeroInfo> heroToPlayerMap = new HashMap<>();
+    Map<String, HeroConstant> heroConstantMap = constantsManagers.getHeroConstantMap();
+
+    for (MatchResponsePlayersInner player : players) {
+      Long heroId = player.getHeroId();
+      if (heroId == null) {
+        continue;
+      }
+
+      HeroConstant hero = heroConstantMap.get(String.valueOf(heroId));
+      if (hero == null) {
+        continue;
+      }
+
+      String heroName = hero.getName(); // e.g., "npc_dota_hero_monkey_king"
+      String heroPrettyName = hero.getLocalized_name(); // e.g., "Monkey King"
+      Long playerSlot = player.getPlayerSlot();
+      Long accountId = Optional.ofNullable(player.getAccountId()).orElse(-1L);
+
+      heroToPlayerMap.put(heroName, new PlayerHeroInfo(playerSlot, accountId, heroPrettyName));
+    }
+
+    return heroToPlayerMap;
   }
 
   private void mapGameMode(MatchResponse matchResponse, MatchDomain matchDomain) {

@@ -43,7 +43,7 @@ public class MatchResponsePlayersInnerRunesLogInner {
 
   public static final String JSON_PROPERTY_KEY = "key";
   @jakarta.annotation.Nullable
-  private Long key;
+  private String key;
 
   public MatchResponsePlayersInnerRunesLogInner() { 
   }
@@ -73,7 +73,7 @@ public class MatchResponsePlayersInnerRunesLogInner {
   }
 
 
-  public MatchResponsePlayersInnerRunesLogInner key(@jakarta.annotation.Nullable Long key) {
+  public MatchResponsePlayersInnerRunesLogInner key(@jakarta.annotation.Nullable String key) {
     this.key = key;
     return this;
   }
@@ -86,14 +86,14 @@ public class MatchResponsePlayersInnerRunesLogInner {
   @JsonProperty(JSON_PROPERTY_KEY)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public Long getKey() {
+  public String getKey() {
     return key;
   }
 
 
   @JsonProperty(JSON_PROPERTY_KEY)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setKey(@jakarta.annotation.Nullable Long key) {
+  public void setKey(@jakarta.annotation.Nullable String key) {
     this.key = key;
   }
 
