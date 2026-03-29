@@ -38,6 +38,7 @@ public class MatchDomain {
 
   private String error;
 
+  private Long gameModeId;
   private String gameModeName;
 
   private Boolean dotaApiFailed;

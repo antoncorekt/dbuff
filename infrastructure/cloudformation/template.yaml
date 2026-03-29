@@ -1,0 +1,458 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: DBuff - Dota 2 match analytics backend on AWS
+
+Parameters:
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 key pair for SSH access
+
+  DbPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    Description: Password for the RDS PostgreSQL database
+
+  DotaApiKey:
+    Type: String
+    NoEcho: true
+    Description: OpenDota API key
+
+  ScrapperApiKey:
+    Type: String
+    NoEcho: true
+    Description: ScraperAPI key
+
+  OpenAiApiKey:
+    Type: String
+    NoEcho: true
+    Description: OpenAI API key
+
+  DiscordBotToken:
+    Type: String
+    NoEcho: true
+    Description: Discord bot token
+
+  InstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues: [t3.micro, t3.small, t3.medium]
+    Description: EC2 instance type
+
+  AllowedSshCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: CIDR block allowed for SSH access
+
+# ---------- VPC ----------
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: dbuff-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: dbuff-igw
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # --- Public Subnets ---
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: dbuff-public-1
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: dbuff-public-2
+
+  # --- Private Subnets (for RDS) ---
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.10.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: dbuff-private-1
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.11.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: dbuff-private-2
+
+  # --- Route Tables ---
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: dbuff-public-rt
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  # ---------- Security Groups ----------
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: DBuff application server
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AllowedSshCidr
+          Description: SSH access
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+          Description: Spring Boot application
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: dbuff-app-sg
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: DBuff database
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+          Description: PostgreSQL from app
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref AllowedSshCidr
+          Description: PostgreSQL external access
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: dbuff-db-sg
+
+  # ---------- SSM Parameter Store ----------
+  SsmDotaApiKey:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /dbuff/DOTA_API_KEY
+      Type: String
+      Value: !Ref DotaApiKey
+      Description: OpenDota API key
+
+  SsmScrapperApiKey:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /dbuff/SCRAPPER_API_KEY
+      Type: String
+      Value: !Ref ScrapperApiKey
+      Description: ScraperAPI key
+
+  SsmOpenAiApiKey:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /dbuff/OPENAI_API_KEY
+      Type: String
+      Value: !Ref OpenAiApiKey
+      Description: OpenAI API key
+
+  SsmDiscordBotToken:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /dbuff/DISCORD_BOT_TOKEN
+      Type: String
+      Value: !Ref DiscordBotToken
+      Description: Discord bot token
+
+  # ---------- S3 Bucket ----------
+  # The deploy bucket is created by deploy.sh on first upload.
+  # We reference it by name in IAM policies and UserData.
+
+  # ---------- IAM ----------
+  Ec2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: dbuff-ec2-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: dbuff-ssm-s3-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/dbuff/*'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::dbuff-deploy-${AWS::AccountId}'
+                  - !Sub 'arn:aws:s3:::dbuff-deploy-${AWS::AccountId}/*'
+
+  Ec2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: dbuff-ec2-profile
+      Roles:
+        - !Ref Ec2Role
+
+  # ---------- RDS ----------
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: DBuff subnets for RDS
+      SubnetIds:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      Tags:
+        - Key: Name
+          Value: dbuff-db-subnet-group
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: dbuff-postgres
+      Engine: postgres
+      EngineVersion: '16'
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: 20
+      StorageType: gp3
+      StorageEncrypted: true
+      DBName: dbuff
+      MasterUsername: dbuffuser
+      MasterUserPassword: !Ref DbPassword
+      VPCSecurityGroups:
+        - !Ref DbSecurityGroup
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      PubliclyAccessible: true
+      BackupRetentionPeriod: 7
+      PreferredBackupWindow: '03:00-04:00'
+      PreferredMaintenanceWindow: 'sun:04:00-sun:05:00'
+      DeletionProtection: false
+      Tags:
+        - Key: Name
+          Value: dbuff-postgres
+
+  # ---------- EC2 ----------
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: dbuff-eip
+
+  AppInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: Database
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+      SubnetId: !Ref PublicSubnet1
+      SecurityGroupIds:
+        - !Ref AppSecurityGroup
+      IamInstanceProfile: !Ref Ec2InstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp3
+            Encrypted: true
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+          exec > /var/log/user-data.log 2>&1
+
+          # Install Amazon Corretto 21
+          dnf install -y java-21-amazon-corretto-headless
+
+          # Install CloudWatch agent
+          dnf install -y amazon-cloudwatch-agent
+          cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWEOF'
+          {
+            "logs": {
+              "logs_collected": {
+                "files": {
+                  "collect_list": [
+                    {
+                      "file_path": "/var/log/dbuff/dbuff.log",
+                      "log_group_name": "/aws/ec2/dbuff",
+                      "log_stream_name": "{instance_id}/app",
+                      "retention_in_days": 30
+                    },
+                    {
+                      "file_path": "/var/log/user-data.log",
+                      "log_group_name": "/aws/ec2/dbuff",
+                      "log_stream_name": "{instance_id}/user-data",
+                      "retention_in_days": 30
+                    }
+                  ]
+                }
+              }
+            }
+          }
+          CWEOF
+          /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+            -a fetch-config -m ec2 \
+            -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
+
+          # Fetch secrets from SSM Parameter Store
+          REGION=${AWS::Region}
+          DOTA_API_KEY=$(aws ssm get-parameter --name /dbuff/DOTA_API_KEY --region $REGION --query 'Parameter.Value' --output text)
+          SCRAPPER_API_KEY=$(aws ssm get-parameter --name /dbuff/SCRAPPER_API_KEY --region $REGION --query 'Parameter.Value' --output text)
+          OPENAI_API_KEY=$(aws ssm get-parameter --name /dbuff/OPENAI_API_KEY --region $REGION --query 'Parameter.Value' --output text)
+          DISCORD_BOT_TOKEN=$(aws ssm get-parameter --name /dbuff/DISCORD_BOT_TOKEN --region $REGION --query 'Parameter.Value' --output text)
+
+          # Prepare directories
+          mkdir -p /opt/dbuff /var/log/dbuff
+          useradd -r -s /sbin/nologin dbuff || true
+          chown dbuff:dbuff /opt/dbuff /var/log/dbuff
+
+          # Download JAR from S3
+          aws s3 cp s3://dbuff-deploy-${AWS::AccountId}/server.jar /opt/dbuff/server.jar
+          chown dbuff:dbuff /opt/dbuff/server.jar
+
+          # Create systemd service
+          cat > /etc/systemd/system/dbuff.service <<EOF
+          [Unit]
+          Description=DBuff Application
+          After=network.target
+
+          [Service]
+          Type=simple
+          User=dbuff
+          WorkingDirectory=/opt/dbuff
+          ExecStart=/usr/bin/java --enable-preview -Xms256m -Xmx512m -Dspring.datasource.hikari.maximum-pool-size=30 -jar /opt/dbuff/server.jar
+          Restart=on-failure
+          RestartSec=10
+          StandardOutput=append:/var/log/dbuff/dbuff.log
+          StandardError=append:/var/log/dbuff/dbuff.log
+
+          Environment=SPRING_PROFILES_ACTIVE=prod
+          Environment=DB_HOST=${Database.Endpoint.Address}
+          Environment=DB_PORT=${Database.Endpoint.Port}
+          Environment=DB_PASSWORD=${DbPassword}
+          Environment=DOTA_API_KEY=$DOTA_API_KEY
+          Environment=SCRAPPER_API_KEY=$SCRAPPER_API_KEY
+          Environment=OPENAI_API_KEY=$OPENAI_API_KEY
+          Environment=DISCORD_BOT_TOKEN=$DISCORD_BOT_TOKEN
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          systemctl daemon-reload
+          systemctl enable dbuff
+          systemctl start dbuff
+      Tags:
+        - Key: Name
+          Value: dbuff-instance
+
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref AppInstance
+      AllocationId: !GetAtt ElasticIP.AllocationId
+
+  # ---------- CloudWatch ----------
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/ec2/dbuff
+      RetentionInDays: 30
+
+# ---------- Outputs ----------
+Outputs:
+  PublicIP:
+    Description: EC2 public IP address
+    Value: !Ref ElasticIP
+
+  AppUrl:
+    Description: Application URL
+    Value: !Sub 'http://${ElasticIP}:8080'
+
+  RdsEndpoint:
+    Description: RDS PostgreSQL endpoint
+    Value: !GetAtt Database.Endpoint.Address
+
+  S3Bucket:
+    Description: S3 bucket for deployment artifacts
+    Value: !Sub 'dbuff-deploy-${AWS::AccountId}'
+
+  HealthCheckUrl:
+    Description: Health check endpoint
+    Value: !Sub 'http://${ElasticIP}:8080/actuator/health'

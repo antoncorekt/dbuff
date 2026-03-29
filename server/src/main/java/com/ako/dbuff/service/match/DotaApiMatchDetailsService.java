@@ -13,23 +13,43 @@ import org.springframework.stereotype.Service;
 @AllArgsConstructor
 public class DotaApiMatchDetailsService {
 
+  private static final int MAX_RETRIES = 4;
+  private static final long INITIAL_BACKOFF_MS = 30_000; // 30s, 60s, 120s, 240s
+
   private final RateLimiter dotaApiRateLimiter;
   private final MatchesApi matchesApi;
 
   public MatchResponse fetchMatchDetails(long matchId) {
-    MatchResponse matchResponse = null;
-    try {
-      log.debug("Try to fetch match {}", matchId);
-      dotaApiRateLimiter.acquire();
-      log.info("Fetching match {}", matchId);
-      matchResponse = matchesApi.getMatchesByMatchId(matchId);
-      log.info("Finished fetching match {}", matchId);
+    ApiException lastException = null;
 
-    } catch (ApiException e) {
-      // todo custom exception
-      throw new RuntimeException(e);
+    for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        dotaApiRateLimiter.acquire();
+        log.info("Fetching match {} (attempt {})", matchId, attempt + 1);
+        MatchResponse response = matchesApi.getMatchesByMatchId(matchId);
+        log.info("Finished fetching match {}", matchId);
+        return response;
+      } catch (ApiException e) {
+        lastException = e;
+        if (attempt < MAX_RETRIES) {
+          long waitMs = INITIAL_BACKOFF_MS * (1L << attempt);
+          log.warn(
+              "DotaAPI error for match {} (attempt {}), retrying in {}s: {}",
+              matchId,
+              attempt + 1,
+              waitMs / 1000,
+              e.getMessage());
+          try {
+            Thread.sleep(waitMs);
+          } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted while retrying match " + matchId, ie);
+          }
+        }
+      }
     }
 
-    return matchResponse;
+    log.error("DotaAPI failed for match {} after {} attempts", matchId, MAX_RETRIES + 1);
+    throw new RuntimeException(lastException);
   }
 }

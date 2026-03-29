@@ -1,6 +1,5 @@
 package com.ako.dbuff.service.ai.config;
 
-import com.ako.dbuff.config.PlayerConfiguration;
 import com.ako.dbuff.dao.model.AbilityDomain;
 import com.ako.dbuff.dao.model.ItemDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
@@ -17,19 +16,16 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-/**
- * Service for building AI prompts based on configurable field selection.
- */
+/** Service for building AI prompts based on configurable field selection. */
 @Component
 public class AiPromptBuilder {
 
-  /**
-   * Builds the system prompt based on configuration.
-   */
+  /** Builds the system prompt based on configuration. */
   public String buildSystemPrompt(MatchAnalysisRequest request, AiPromptFieldConfig config) {
     StringBuilder sb = new StringBuilder();
     sb.append("You are an expert Dota 2 Ability Draft game analyst. ");
-    sb.append("This is an Ability Draft mode where players pick abilities and heroes from a shared pool, not standard Dota 2. ");
+    sb.append(
+        "This is an Ability Draft mode where players pick abilities and heroes from a shared pool, not standard Dota 2. ");
     sb.append("Average skill level players are playing.\n\n");
 
     if (config.isIncludeSarcasm()) {
@@ -40,9 +36,12 @@ public class AiPromptBuilder {
 
     if (config.isIncludeAbilities()) {
       sb.append("1. ABILITY DRAFT STRATEGY ANALYSIS:\n");
-      sb.append("   - Analyze the chosen abilities for each player and explain the strategy behind their picks\n");
-      sb.append("   - Identify ability synergies and combos (e.g., abilities that work well together)\n");
-      sb.append("   - Evaluate how well the picked abilities match the hero's base stats and attack type\n");
+      sb.append(
+          "   - Analyze the chosen abilities for each player and explain the strategy behind their picks\n");
+      sb.append(
+          "   - Identify ability synergies and combos (e.g., abilities that work well together)\n");
+      sb.append(
+          "   - Evaluate how well the picked abilities match the hero's base stats and attack type\n");
       sb.append("   - Highlight creative or unusual ability combinations\n");
       sb.append("   - Point out missed opportunities or suboptimal ability choices\n\n");
     }
@@ -50,15 +49,18 @@ public class AiPromptBuilder {
     if (config.isIncludeItems()) {
       sb.append("2. ITEM BUILD ANALYSIS:\n");
       sb.append("   - Analyze item choices and how they synergize with the picked abilities\n");
-      sb.append("   - IMPORTANT: Evaluate item purchase timing - highlight if items were bought faster or slower than typical benchmarks\n");
-      sb.append("   - Common benchmarks: Boots (2-3 min), first major item (12-15 min), second major item (20-25 min)\n");
+      sb.append(
+          "   - IMPORTANT: Evaluate item purchase timing - highlight if items were bought faster or slower than typical benchmarks\n");
+      sb.append(
+          "   - Common benchmarks: Boots (2-3 min), first major item (12-15 min), second major item (20-25 min)\n");
       sb.append("   - Identify if item builds properly support the ability draft strategy\n");
       sb.append("   - Note any neutral items and their impact\n\n");
     }
 
     sb.append("3. PERFORMANCE STATISTICS:\n");
     sb.append("   - Analyze KDA (Kills/Deaths/Assists) and what it tells about player impact\n");
-    sb.append("   - Evaluate GPM (Gold Per Minute) and XPM (Experience Per Minute) - are they farming efficiently?\n");
+    sb.append(
+        "   - Evaluate GPM (Gold Per Minute) and XPM (Experience Per Minute) - are they farming efficiently?\n");
     sb.append("   - Last hits and denies - laning phase performance\n");
     sb.append("   - Compare statistics between teams and identify key performers\n");
     sb.append("   - Highlight exceptional or poor performances with specific numbers\n\n");
@@ -79,11 +81,15 @@ public class AiPromptBuilder {
       sb.append("\n--- TRACKED PLAYERS (PRIORITY FOCUS) ---\n");
       sb.append("Pay SPECIAL attention to these players:\n");
 
-      if (focusPlayerNames != null && focusPlayerIds != null
+      if (focusPlayerNames != null
+          && focusPlayerIds != null
           && focusPlayerNames.size() == focusPlayerIds.size()) {
         for (int i = 0; i < focusPlayerNames.size(); i++) {
-          sb.append("  - ").append(focusPlayerNames.get(i))
-              .append(" (ID: ").append(focusPlayerIds.get(i)).append(")\n");
+          sb.append("  - ")
+              .append(focusPlayerNames.get(i))
+              .append(" (ID: ")
+              .append(focusPlayerIds.get(i))
+              .append(")\n");
         }
       } else if (focusPlayerNames != null && !focusPlayerNames.isEmpty()) {
         for (String name : focusPlayerNames) {
@@ -96,7 +102,8 @@ public class AiPromptBuilder {
         }
       }
 
-      sb.append("\nProvide detailed analysis of their ability choices, item builds, and performance. ");
+      sb.append(
+          "\nProvide detailed analysis of their ability choices, item builds, and performance. ");
       sb.append("Give specific recommendations for improvement.\n");
     }
 
@@ -113,25 +120,25 @@ public class AiPromptBuilder {
     return sb.toString();
   }
 
-  /**
-   * Builds the data prompt based on configuration.
-   */
+  /** Builds the data prompt based on configuration. */
   public String buildDataPrompt(MatchAnalysisRequest request, AiPromptFieldConfig config) {
     StringBuilder sb = new StringBuilder();
     sb.append("Please analyze the following Dota 2 match statistics:\n\n");
 
-    MatchFieldConfig matchConfig = config.getMatchFields() != null
-        ? config.getMatchFields()
-        : MatchFieldConfig.defaultConfig();
-    PlayerStatisticFieldConfig playerConfig = config.getPlayerStatisticFields() != null
-        ? config.getPlayerStatisticFields()
-        : PlayerStatisticFieldConfig.defaultConfig();
-    ItemFieldConfig itemConfig = config.getItemFields() != null
-        ? config.getItemFields()
-        : ItemFieldConfig.defaultConfig();
-    AbilityFieldConfig abilityConfig = config.getAbilityFields() != null
-        ? config.getAbilityFields()
-        : AbilityFieldConfig.defaultConfig();
+    MatchFieldConfig matchConfig =
+        config.getMatchFields() != null
+            ? config.getMatchFields()
+            : MatchFieldConfig.defaultConfig();
+    PlayerStatisticFieldConfig playerConfig =
+        config.getPlayerStatisticFields() != null
+            ? config.getPlayerStatisticFields()
+            : PlayerStatisticFieldConfig.defaultConfig();
+    ItemFieldConfig itemConfig =
+        config.getItemFields() != null ? config.getItemFields() : ItemFieldConfig.defaultConfig();
+    AbilityFieldConfig abilityConfig =
+        config.getAbilityFields() != null
+            ? config.getAbilityFields()
+            : AbilityFieldConfig.defaultConfig();
 
     for (MatchWithPlayerStatistics matchWithStats : request.getMatchesWithStatistics()) {
       MatchDomain match = matchWithStats.getMatch();
@@ -143,13 +150,15 @@ public class AiPromptBuilder {
       sb.append(buildPlayerStatisticsTable(matchWithStats, playerConfig, request));
 
       // Build abilities section
-      if (config.isIncludeAbilities() && matchWithStats.getAbilities() != null
+      if (config.isIncludeAbilities()
+          && matchWithStats.getAbilities() != null
           && !matchWithStats.getAbilities().isEmpty()) {
         sb.append(buildAbilitiesSection(matchWithStats, abilityConfig));
       }
 
       // Build items section
-      if (config.isIncludeItems() && matchWithStats.getItems() != null
+      if (config.isIncludeItems()
+          && matchWithStats.getItems() != null
           && !matchWithStats.getItems().isEmpty()) {
         sb.append(buildItemsSection(matchWithStats, itemConfig, config, request));
       }
@@ -194,8 +203,10 @@ public class AiPromptBuilder {
     return sb.toString();
   }
 
-  private String buildPlayerStatisticsTable(MatchWithPlayerStatistics matchWithStats,
-      PlayerStatisticFieldConfig config, MatchAnalysisRequest request) {
+  private String buildPlayerStatisticsTable(
+      MatchWithPlayerStatistics matchWithStats,
+      PlayerStatisticFieldConfig config,
+      MatchAnalysisRequest request) {
     StringBuilder sb = new StringBuilder();
     sb.append("PLAYER STATISTICS:\n");
 
@@ -305,9 +316,8 @@ public class AiPromptBuilder {
       row.append(String.format("%-30s", playerNameWithId));
 
       if (config.isIncludeHero()) {
-        String heroName = player.getHeroPrettyName() != null
-            ? player.getHeroPrettyName()
-            : player.getHeroName();
+        String heroName =
+            player.getHeroPrettyName() != null ? player.getHeroPrettyName() : player.getHeroName();
         row.append(" | ").append(String.format("%-15s", heroName != null ? heroName : "N/A"));
       }
       if (config.isIncludeTeam()) {
@@ -315,79 +325,92 @@ public class AiPromptBuilder {
         row.append(" | ").append(String.format("%-8s", team));
       }
       if (config.isIncludeKda()) {
-        row.append(" | ").append(String.format("%-6s",
-            player.getKda() != null ? player.getKda().toString() : "N/A"));
+        row.append(" | ")
+            .append(
+                String.format(
+                    "%-6s", player.getKda() != null ? player.getKda().toString() : "N/A"));
       }
       if (config.isIncludeKills()) {
-        row.append(" | ").append(String.format("%-4d",
-            player.getKills() != null ? player.getKills() : 0));
+        row.append(" | ")
+            .append(String.format("%-4d", player.getKills() != null ? player.getKills() : 0));
       }
       if (config.isIncludeDeaths()) {
-        row.append(" | ").append(String.format("%-4d",
-            player.getDeaths() != null ? player.getDeaths() : 0));
+        row.append(" | ")
+            .append(String.format("%-4d", player.getDeaths() != null ? player.getDeaths() : 0));
       }
       if (config.isIncludeAssists()) {
-        row.append(" | ").append(String.format("%-4d",
-            player.getAssists() != null ? player.getAssists() : 0));
+        row.append(" | ")
+            .append(String.format("%-4d", player.getAssists() != null ? player.getAssists() : 0));
       }
       if (config.isIncludeGoldPerMin()) {
-        row.append(" | ").append(String.format("%-6d",
-            player.getGoldPerMin() != null ? player.getGoldPerMin() : 0));
+        row.append(" | ")
+            .append(
+                String.format("%-6d", player.getGoldPerMin() != null ? player.getGoldPerMin() : 0));
       }
       if (config.isIncludeXpPerMin()) {
-        row.append(" | ").append(String.format("%-6d",
-            player.getXpPerMin() != null ? player.getXpPerMin() : 0));
+        row.append(" | ")
+            .append(String.format("%-6d", player.getXpPerMin() != null ? player.getXpPerMin() : 0));
       }
       if (config.isIncludeLastHits()) {
-        row.append(" | ").append(String.format("%-6d",
-            player.getLastHits() != null ? player.getLastHits() : 0));
+        row.append(" | ")
+            .append(String.format("%-6d", player.getLastHits() != null ? player.getLastHits() : 0));
       }
       if (config.isIncludeDenies()) {
-        row.append(" | ").append(String.format("%-8d",
-            player.getDenies() != null ? player.getDenies() : 0));
+        row.append(" | ")
+            .append(String.format("%-8d", player.getDenies() != null ? player.getDenies() : 0));
       }
       if (config.isIncludeWin()) {
-        row.append(" | ").append(String.format("%-6s",
-            player.getWin() != null && player.getWin() == 1 ? "Yes" : "No"));
+        row.append(" | ")
+            .append(
+                String.format(
+                    "%-6s", player.getWin() != null && player.getWin() == 1 ? "Yes" : "No"));
       }
       if (config.isIncludeLane()) {
-        row.append(" | ").append(String.format("%-6d",
-            player.getLane() != null ? player.getLane() : 0));
+        row.append(" | ")
+            .append(String.format("%-6d", player.getLane() != null ? player.getLane() : 0));
       }
       if (config.isIncludeNetWorth()) {
-        row.append(" | ").append(String.format("%-8d",
-            player.getNetWorth() != null ? player.getNetWorth() : 0));
+        row.append(" | ")
+            .append(String.format("%-8d", player.getNetWorth() != null ? player.getNetWorth() : 0));
       }
       if (config.isIncludeLevel()) {
-        row.append(" | ").append(String.format("%-4d",
-            player.getLevel() != null ? player.getLevel() : 0));
+        row.append(" | ")
+            .append(String.format("%-4d", player.getLevel() != null ? player.getLevel() : 0));
       }
       if (config.isIncludeHeroDamage()) {
-        row.append(" | ").append(String.format("%-8d",
-            player.getHeroDamage() != null ? player.getHeroDamage() : 0));
+        row.append(" | ")
+            .append(
+                String.format("%-8d", player.getHeroDamage() != null ? player.getHeroDamage() : 0));
       }
       if (config.isIncludeTowerDamage()) {
-        row.append(" | ").append(String.format("%-8d",
-            player.getTowerDamage() != null ? player.getTowerDamage() : 0));
+        row.append(" | ")
+            .append(
+                String.format(
+                    "%-8d", player.getTowerDamage() != null ? player.getTowerDamage() : 0));
       }
       if (config.isIncludeHeroHealing()) {
-        row.append(" | ").append(String.format("%-8d",
-            player.getHeroHealing() != null ? player.getHeroHealing() : 0));
+        row.append(" | ")
+            .append(
+                String.format(
+                    "%-8d", player.getHeroHealing() != null ? player.getHeroHealing() : 0));
       }
       if (config.isIncludeObsPlaced()) {
-        row.append(" | ").append(String.format("%-4d",
-            player.getObsPlaced() != null ? player.getObsPlaced() : 0));
+        row.append(" | ")
+            .append(
+                String.format("%-4d", player.getObsPlaced() != null ? player.getObsPlaced() : 0));
       }
       if (config.isIncludeSenPlaced()) {
-        row.append(" | ").append(String.format("%-4d",
-            player.getSenPlaced() != null ? player.getSenPlaced() : 0));
+        row.append(" | ")
+            .append(
+                String.format("%-4d", player.getSenPlaced() != null ? player.getSenPlaced() : 0));
       }
 
       sb.append(row).append("\n");
     }
 
     // Add timeline stats if configured
-    if (config.isIncludeGoldTimeline() || config.isIncludeLastHitsTimeline()
+    if (config.isIncludeGoldTimeline()
+        || config.isIncludeLastHitsTimeline()
         || config.isIncludeXpTimeline()) {
       sb.append("\nTIMELINE STATISTICS:\n");
       sb.append(buildTimelineStats(matchWithStats, config));
@@ -397,8 +420,8 @@ public class AiPromptBuilder {
     return sb.toString();
   }
 
-  private String buildTimelineStats(MatchWithPlayerStatistics matchWithStats,
-      PlayerStatisticFieldConfig config) {
+  private String buildTimelineStats(
+      MatchWithPlayerStatistics matchWithStats, PlayerStatisticFieldConfig config) {
     StringBuilder sb = new StringBuilder();
 
     for (PlayerMatchStatisticDomain player : matchWithStats.getPlayerStatistics()) {
@@ -408,17 +431,24 @@ public class AiPromptBuilder {
       if (config.isIncludeGoldTimeline()) {
         sb.append("  Gold: ");
         sb.append("5m=").append(player.getGoldAt5Min() != null ? player.getGoldAt5Min() : "N/A");
-        sb.append(", 10m=").append(player.getGoldAt10Min() != null ? player.getGoldAt10Min() : "N/A");
-        sb.append(", 15m=").append(player.getGoldAt15Min() != null ? player.getGoldAt15Min() : "N/A");
-        sb.append(", 20m=").append(player.getGoldAt20Min() != null ? player.getGoldAt20Min() : "N/A");
+        sb.append(", 10m=")
+            .append(player.getGoldAt10Min() != null ? player.getGoldAt10Min() : "N/A");
+        sb.append(", 15m=")
+            .append(player.getGoldAt15Min() != null ? player.getGoldAt15Min() : "N/A");
+        sb.append(", 20m=")
+            .append(player.getGoldAt20Min() != null ? player.getGoldAt20Min() : "N/A");
         sb.append("\n");
       }
       if (config.isIncludeLastHitsTimeline()) {
         sb.append("  LH: ");
-        sb.append("5m=").append(player.getLastHitsAt5Min() != null ? player.getLastHitsAt5Min() : "N/A");
-        sb.append(", 10m=").append(player.getLastHitsAt10Min() != null ? player.getLastHitsAt10Min() : "N/A");
-        sb.append(", 15m=").append(player.getLastHitsAt15Min() != null ? player.getLastHitsAt15Min() : "N/A");
-        sb.append(", 20m=").append(player.getLastHitsAt20Min() != null ? player.getLastHitsAt20Min() : "N/A");
+        sb.append("5m=")
+            .append(player.getLastHitsAt5Min() != null ? player.getLastHitsAt5Min() : "N/A");
+        sb.append(", 10m=")
+            .append(player.getLastHitsAt10Min() != null ? player.getLastHitsAt10Min() : "N/A");
+        sb.append(", 15m=")
+            .append(player.getLastHitsAt15Min() != null ? player.getLastHitsAt15Min() : "N/A");
+        sb.append(", 20m=")
+            .append(player.getLastHitsAt20Min() != null ? player.getLastHitsAt20Min() : "N/A");
         sb.append("\n");
       }
       if (config.isIncludeXpTimeline()) {
@@ -434,41 +464,47 @@ public class AiPromptBuilder {
     return sb.toString();
   }
 
-  private String buildAbilitiesSection(MatchWithPlayerStatistics matchWithStats,
-      AbilityFieldConfig config) {
+  private String buildAbilitiesSection(
+      MatchWithPlayerStatistics matchWithStats, AbilityFieldConfig config) {
     StringBuilder sb = new StringBuilder();
     sb.append("PLAYER ABILITIES:\n");
     sb.append(String.format("%-30s | %-15s | %s%n", "Player (ID)", "Hero", "Abilities"));
     sb.append("-".repeat(120)).append("\n");
 
-    Map<Long, List<AbilityDomain>> abilitiesByPlayerSlot = matchWithStats.getAbilities().stream()
-        .collect(Collectors.groupingBy(AbilityDomain::getPlayerSlot));
+    Map<Long, List<AbilityDomain>> abilitiesByPlayerSlot =
+        matchWithStats.getAbilities().stream()
+            .collect(Collectors.groupingBy(AbilityDomain::getPlayerSlot));
 
     for (PlayerMatchStatisticDomain player : matchWithStats.getPlayerStatistics()) {
       String playerNameWithId = getPlayerNameWithId(player.getPlayerId());
-      String heroName = player.getHeroPrettyName() != null
-          ? player.getHeroPrettyName()
-          : player.getHeroName();
+      String heroName =
+          player.getHeroPrettyName() != null ? player.getHeroPrettyName() : player.getHeroName();
 
       List<AbilityDomain> playerAbilities =
           abilitiesByPlayerSlot.getOrDefault(player.getPlayerSlot().longValue(), List.of());
 
-      String abilitiesStr = playerAbilities.stream()
-          .map(a -> {
-            StringBuilder abilityStr = new StringBuilder();
-            String name = a.getPrettyName() != null ? a.getPrettyName() : a.getName();
-            abilityStr.append(name);
+      String abilitiesStr =
+          playerAbilities.stream()
+              .map(
+                  a -> {
+                    StringBuilder abilityStr = new StringBuilder();
+                    String name = a.getPrettyName() != null ? a.getPrettyName() : a.getName();
+                    abilityStr.append(name);
 
-            if (config.isIncludeDamageDealt() && a.getDamageDealt() != null && a.getDamageDealt() > 0) {
-              abilityStr.append(" [dmg:").append(a.getDamageDealt()).append("]");
-            }
-            if (config.isIncludeUseCount() && a.getUseCount() != null && a.getUseCount() > 0) {
-              abilityStr.append(" [uses:").append(a.getUseCount()).append("]");
-            }
+                    if (config.isIncludeDamageDealt()
+                        && a.getDamageDealt() != null
+                        && a.getDamageDealt() > 0) {
+                      abilityStr.append(" [dmg:").append(a.getDamageDealt()).append("]");
+                    }
+                    if (config.isIncludeUseCount()
+                        && a.getUseCount() != null
+                        && a.getUseCount() > 0) {
+                      abilityStr.append(" [uses:").append(a.getUseCount()).append("]");
+                    }
 
-            return abilityStr.toString();
-          })
-          .collect(Collectors.joining(", "));
+                    return abilityStr.toString();
+                  })
+              .collect(Collectors.joining(", "));
 
       if (!abilitiesStr.isEmpty()) {
         sb.append(String.format("%-30s | %-15s | %s%n", playerNameWithId, heroName, abilitiesStr));
@@ -479,63 +515,80 @@ public class AiPromptBuilder {
     return sb.toString();
   }
 
-  private String buildItemsSection(MatchWithPlayerStatistics matchWithStats,
-      ItemFieldConfig itemConfig, AiPromptFieldConfig config, MatchAnalysisRequest request) {
+  private String buildItemsSection(
+      MatchWithPlayerStatistics matchWithStats,
+      ItemFieldConfig itemConfig,
+      AiPromptFieldConfig config,
+      MatchAnalysisRequest request) {
     StringBuilder sb = new StringBuilder();
     sb.append("PLAYER ITEMS:\n");
-    sb.append(String.format("%-30s | %-15s | %s%n", "Player (ID)", "Hero", "Items (with purchase time)"));
+    sb.append(
+        String.format("%-30s | %-15s | %s%n", "Player (ID)", "Hero", "Items (with purchase time)"));
     sb.append("-".repeat(140)).append("\n");
 
     // Filter items based on configuration
-    List<ItemDomain> filteredItems = matchWithStats.getItems().stream()
-        .filter(item -> config.isIncludeNeutralItems() || !item.isNeutral())
-        .filter(item -> !config.isFilterItemsToFocusPlayers()
-            || request.getFocusPlayerIds() == null
-            || request.getFocusPlayerIds().isEmpty()
-            || request.getFocusPlayerIds().contains(item.getPlayerId()))
-        .collect(Collectors.toList());
+    List<ItemDomain> filteredItems =
+        matchWithStats.getItems().stream()
+            .filter(item -> config.isIncludeNeutralItems() || !item.isNeutral())
+            .filter(
+                item ->
+                    !config.isFilterItemsToFocusPlayers()
+                        || request.getFocusPlayerIds() == null
+                        || request.getFocusPlayerIds().isEmpty()
+                        || request.getFocusPlayerIds().contains(item.getPlayerId()))
+            .collect(Collectors.toList());
 
-    Map<Long, List<ItemDomain>> itemsByPlayerSlot = filteredItems.stream()
-        .collect(Collectors.groupingBy(ItemDomain::getPlayerSlot));
+    Map<Long, List<ItemDomain>> itemsByPlayerSlot =
+        filteredItems.stream().collect(Collectors.groupingBy(ItemDomain::getPlayerSlot));
 
     for (PlayerMatchStatisticDomain player : matchWithStats.getPlayerStatistics()) {
       String playerNameWithId = getPlayerNameWithId(player.getPlayerId());
-      String heroName = player.getHeroPrettyName() != null
-          ? player.getHeroPrettyName()
-          : player.getHeroName();
+      String heroName =
+          player.getHeroPrettyName() != null ? player.getHeroPrettyName() : player.getHeroName();
 
       List<ItemDomain> playerItems =
           itemsByPlayerSlot.getOrDefault(player.getPlayerSlot().longValue(), List.of());
 
-      String itemsStr = playerItems.stream()
-          .sorted((a, b) -> {
-            Long timeA = a.getItemPurchaseTime() != null ? a.getItemPurchaseTime() : 0L;
-            Long timeB = b.getItemPurchaseTime() != null ? b.getItemPurchaseTime() : 0L;
-            return timeA.compareTo(timeB);
-          })
-          .map(item -> {
-            StringBuilder itemStr = new StringBuilder();
-            String itemName = item.getItemPrettyName() != null
-                ? item.getItemPrettyName()
-                : item.getItemName();
-            itemStr.append(itemName);
+      String itemsStr =
+          playerItems.stream()
+              .sorted(
+                  (a, b) -> {
+                    Long timeA = a.getItemPurchaseTime() != null ? a.getItemPurchaseTime() : 0L;
+                    Long timeB = b.getItemPurchaseTime() != null ? b.getItemPurchaseTime() : 0L;
+                    return timeA.compareTo(timeB);
+                  })
+              .map(
+                  item -> {
+                    StringBuilder itemStr = new StringBuilder();
+                    String itemName =
+                        item.getItemPrettyName() != null
+                            ? item.getItemPrettyName()
+                            : item.getItemName();
+                    itemStr.append(itemName);
 
-            if (itemConfig.isIncludePurchaseTime()) {
-              itemStr.append(" (").append(formatItemPurchaseTime(item.getItemPurchaseTime())).append(")");
-            }
-            if (itemConfig.isIncludeIsNeutral() && item.isNeutral()) {
-              itemStr.append(" [Neutral]");
-            }
-            if (itemConfig.isIncludeDamageDealt() && item.getDamageDealt() != null && item.getDamageDealt() > 0) {
-              itemStr.append(" [dmg:").append(item.getDamageDealt()).append("]");
-            }
-            if (itemConfig.isIncludeUseCount() && item.getUseCount() != null && item.getUseCount() > 0) {
-              itemStr.append(" [uses:").append(item.getUseCount()).append("]");
-            }
+                    if (itemConfig.isIncludePurchaseTime()) {
+                      itemStr
+                          .append(" (")
+                          .append(formatItemPurchaseTime(item.getItemPurchaseTime()))
+                          .append(")");
+                    }
+                    if (itemConfig.isIncludeIsNeutral() && item.isNeutral()) {
+                      itemStr.append(" [Neutral]");
+                    }
+                    if (itemConfig.isIncludeDamageDealt()
+                        && item.getDamageDealt() != null
+                        && item.getDamageDealt() > 0) {
+                      itemStr.append(" [dmg:").append(item.getDamageDealt()).append("]");
+                    }
+                    if (itemConfig.isIncludeUseCount()
+                        && item.getUseCount() != null
+                        && item.getUseCount() > 0) {
+                      itemStr.append(" [uses:").append(item.getUseCount()).append("]");
+                    }
 
-            return itemStr.toString();
-          })
-          .collect(Collectors.joining(", "));
+                    return itemStr.toString();
+                  })
+              .collect(Collectors.joining(", "));
 
       if (!itemsStr.isEmpty()) {
         sb.append(String.format("%-30s | %-15s | %s%n", playerNameWithId, heroName, itemsStr));
@@ -576,15 +629,14 @@ public class AiPromptBuilder {
     if (playerId == null || playerId == -1) {
       return "Anonymous";
     }
-    return PlayerConfiguration.DEFAULT_PLAYERS.getOrDefault(playerId, "Player " + playerId);
+    return "Player " + playerId;
   }
 
   private String getPlayerNameWithId(Long playerId) {
     if (playerId == null || playerId == -1) {
       return "Anonymous";
     }
-    String name = PlayerConfiguration.DEFAULT_PLAYERS.getOrDefault(playerId, "Player");
-    return name + " (" + playerId + ")";
+    return "Player (" + playerId + ")";
   }
 
   private String formatDuration(Long durationSeconds) {

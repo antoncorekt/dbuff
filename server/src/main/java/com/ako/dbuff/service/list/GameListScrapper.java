@@ -14,8 +14,7 @@ public class GameListScrapper {
 
     String url =
         String.format(
-            "https://www.dotabuff.com/players/%d/matches?enhance=overview&game_mode=ability_draft&page=%d",
-            userId, page);
+            "https://www.dotabuff.com/players/%d/matches?enhance=overview&page=%d", userId, page);
 
     return scrapperApiService.scrap(url);
   }

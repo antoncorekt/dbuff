@@ -7,8 +7,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Request body for the analyze matches endpoint.
- * Contains optional custom prompt and field configuration for AI analysis.
+ * Request body for the analyze matches endpoint. Contains optional custom prompt and field
+ * configuration for AI analysis.
  */
 @Data
 @Builder
@@ -17,16 +17,17 @@ import lombok.NoArgsConstructor;
 public class AnalyzeMatchesRequest {
 
   /**
-   * Optional custom prompt to append to the AI analysis context.
-   * Can be used to ask specific questions or focus on particular aspects.
+   * Optional custom prompt to append to the AI analysis context. Can be used to ask specific
+   * questions or focus on particular aspects.
    */
   private String customPrompt;
 
   /**
-   * Optional configuration for which fields to include in the AI prompt.
-   * If null, default configuration will be used.
+   * Optional configuration for which fields to include in the AI prompt. If null, default
+   * configuration will be used.
    *
    * <p>Example configuration:
+   *
    * <pre>
    * {
    *   "fieldConfig": {
@@ -73,9 +74,8 @@ public class AnalyzeMatchesRequest {
   private AiPromptFieldConfig fieldConfig;
 
   /**
-   * Preset configuration name to use.
-   * Available presets: "default", "minimal", "full".
-   * If both fieldConfig and preset are provided, fieldConfig takes precedence.
+   * Preset configuration name to use. Available presets: "default", "minimal", "full". If both
+   * fieldConfig and preset are provided, fieldConfig takes precedence.
    */
   private String preset;
 }

@@ -32,15 +32,11 @@ public class OpenAiConfig {
   private Boolean enabled = true;
 
   /**
-   * Maximum context window size for the model in tokens.
-   * gpt-4o-mini: 128k, gpt-4: 8k, gpt-3.5-turbo: 16k
-   * Set conservatively to leave room for response.
+   * Maximum context window size for the model in tokens. gpt-4o-mini: 128k, gpt-4: 8k,
+   * gpt-3.5-turbo: 16k Set conservatively to leave room for response.
    */
   private Integer maxContextTokens = 120000;
 
-  /**
-   * Approximate characters per token ratio.
-   * English text averages ~4 characters per token.
-   */
+  /** Approximate characters per token ratio. English text averages ~4 characters per token. */
   private Double charsPerToken = 4.0;
 }

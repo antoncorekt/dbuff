@@ -14,8 +14,8 @@ import lombok.NoArgsConstructor;
  * playerSlot (0-9) is always unique within a match
  *
  * <p>The composite key includes: - matchId: the match this kill occurred in - playerSlot: the
- * killer's slot (0-9) - time: the game time in seconds when the kill occurred - killedHeroName:
- * the internal name of the killed hero (e.g., "npc_dota_hero_monkey_king")
+ * killer's slot (0-9) - time: the game time in seconds when the kill occurred - killedHeroName: the
+ * internal name of the killed hero (e.g., "npc_dota_hero_monkey_king")
  */
 @Data
 @Builder

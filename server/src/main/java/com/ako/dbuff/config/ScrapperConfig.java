@@ -1,14 +1,17 @@
 package com.ako.dbuff.config;
 
+import com.ako.dbuff.service.scrapper.ScraperApiProvider;
+import com.ako.dbuff.service.scrapper.ScrapflyProvider;
+import com.ako.dbuff.service.scrapper.ScrapperProvider;
+import com.ako.dbuff.service.scrapper.ZenRowsProvider;
 import com.google.common.util.concurrent.RateLimiter;
-import java.util.HashMap;
-import java.util.Map;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.retry.policy.SimpleRetryPolicy;
+import org.springframework.retry.policy.NeverRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
@@ -21,6 +24,8 @@ public class ScrapperConfig {
 
   public ScrapperConfig(ScrapperConfigurationProperties scrapperConfigurationProperties) {
     this.scrapperConfigurationProperties = scrapperConfigurationProperties;
+    log.info("Scrapper enabled: {}", scrapperConfigurationProperties.getEnabled());
+    log.info("Scrapper provider: {}", scrapperConfigurationProperties.getProvider());
     log.info(
         "Use api_key for scrapper service: {}",
         StringUtils.hasLength(scrapperConfigurationProperties.getApiKey()));
@@ -31,11 +36,12 @@ public class ScrapperConfig {
   @Bean
   public RetryTemplate getRetryTemplate() {
     RetryTemplate retryTemplate = new RetryTemplate();
-    retryTemplate.setRetryPolicy(new SimpleRetryPolicy());
+    retryTemplate.setRetryPolicy(new NeverRetryPolicy());
     return retryTemplate;
   }
 
   @Bean
+  @ConditionalOnProperty(name = "scrapper.enabled", havingValue = "true", matchIfMissing = true)
   public RateLimiter scrapperRateLimiter() {
     double permitsPerSec = scrapperConfigurationProperties.getRequestPerMinute() / 60d;
     log.info("scrapper api permitsPerSec: {}", permitsPerSec);
@@ -43,6 +49,7 @@ public class ScrapperConfig {
   }
 
   @Bean
+  @ConditionalOnProperty(name = "scrapper.enabled", havingValue = "true", matchIfMissing = true)
   public RestClient scrapperApiRestClient() {
     return RestClient.builder()
         .baseUrl(scrapperConfigurationProperties.getUrl())
@@ -60,29 +67,38 @@ public class ScrapperConfig {
         .build();
   }
 
-  private Map<String, String> getDefaultUriVariables() {
-    Map<String, String> defaultUriVariables = new HashMap<>();
-    // api key can be null for free tier
-    if (scrapperConfigurationProperties.getApiKey() != null) {
-      defaultUriVariables.put("api_key", scrapperConfigurationProperties.getApiKey());
-    }
-    // use render for return all HTML dom
-    defaultUriVariables.put("render", "true");
+  @Bean
+  @ConditionalOnProperty(name = "scrapper.enabled", havingValue = "true", matchIfMissing = true)
+  public ScrapperProvider scrapperProvider(
+      RateLimiter scrapperRateLimiter,
+      RestClient scrapperApiRestClient,
+      RetryTemplate getRetryTemplate) {
+    String provider = scrapperConfigurationProperties.getProvider();
+    log.info("Creating scrapper provider: {}", provider);
 
-    // premium option is better but consume 10 credits instead of 1, use this when API key is
-    // available
-    if (StringUtils.hasLength(scrapperConfigurationProperties.getApiKey())) {
-      defaultUriVariables.put("premium", "true");
+    if ("scraperapi".equalsIgnoreCase(provider)) {
+      return new ScraperApiProvider(
+          scrapperRateLimiter,
+          scrapperApiRestClient,
+          getRetryTemplate,
+          scrapperConfigurationProperties);
+    }
+    if ("scrapfly".equalsIgnoreCase(provider)) {
+      return new ScrapflyProvider();
+    }
+    if ("zenrows".equalsIgnoreCase(provider)) {
+      return new ZenRowsProvider();
     }
 
-    log.debug("Default URI variables: {}", defaultUriVariables);
-    return defaultUriVariables;
+    throw new IllegalArgumentException("Unknown scrapper provider: " + provider);
   }
 
   @Data
   @Configuration
   @ConfigurationProperties(prefix = "scrapper")
   public static class ScrapperConfigurationProperties {
+    private Boolean enabled = true;
+    private String provider = "scraperapi";
     private String url;
     private String apiKey;
     private Boolean premium;

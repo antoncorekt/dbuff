@@ -7,9 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Request object for AI analysis containing match statistics and context information.
- */
+/** Request object for AI analysis containing match statistics and context information. */
 @Data
 @Builder
 @AllArgsConstructor
@@ -29,15 +27,14 @@ public class MatchAnalysisRequest {
   private List<String> focusPlayerNames;
 
   /**
-   * Whether to analyze each match individually or all matches together.
-   * If true, AI will be called once per match.
-   * If false, AI will be called once for all matches.
+   * Whether to analyze each match individually or all matches together. If true, AI will be called
+   * once per match. If false, AI will be called once for all matches.
    */
   private boolean analyzePerMatch;
 
   /**
-   * Configuration for which fields to include in the AI prompt.
-   * If null, default configuration will be used.
+   * Configuration for which fields to include in the AI prompt. If null, default configuration will
+   * be used.
    */
   private AiPromptFieldConfig fieldConfig;
 }

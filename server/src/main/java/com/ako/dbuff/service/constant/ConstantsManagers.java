@@ -64,6 +64,13 @@ public class ConstantsManagers {
     return matchTypeConstantService.getConstantMap();
   }
 
+  @Cacheable(CacheConfig.MATCH_TYPE_BY_NAME_CACHE)
+  public Map<String, MatchTypeConstant> getMatchTypeByNameConstantMap() {
+    return matchTypeConstantService.getConstantMap().values().stream()
+        .collect(
+            Collectors.toMap(x -> x.getName().replace("game_mode_", "").replace("_", " "), x -> x));
+  }
+
   @Cacheable(CacheConfig.PATCH_CACHE)
   public Map<String, PatchConstant> getPatchConstantMap() {
     return patchConstantService.getConstantMap();

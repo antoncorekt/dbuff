@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.MatchAnalysisDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.ItemRepository;
+import com.ako.dbuff.dao.repo.KillLogRepo;
 import com.ako.dbuff.dao.repo.MatchAnalysisRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
@@ -35,6 +36,7 @@ public class MatchDeletionService {
   private final PlayerGameStatisticRepo playerGameStatisticRepo;
   private final ItemRepository itemRepository;
   private final AbilityRepo abilityRepo;
+  private final KillLogRepo killLogRepo;
   private final MatchAnalysisRepo matchAnalysisRepo;
 
   /**
@@ -50,8 +52,7 @@ public class MatchDeletionService {
     MatchDomain match =
         matchRepo
             .findById(matchId)
-            .orElseThrow(
-                () -> new EntityNotFoundException("Match not found with id: " + matchId));
+            .orElseThrow(() -> new EntityNotFoundException("Match not found with id: " + matchId));
 
     // Delete items associated with the match
     log.debug("Deleting items for match {}", matchId);
@@ -60,6 +61,10 @@ public class MatchDeletionService {
     // Delete abilities associated with the match
     log.debug("Deleting abilities for match {}", matchId);
     abilityRepo.deleteByMatchId(matchId);
+
+    // Delete kill logs associated with the match
+    log.debug("Deleting kill logs for match {}", matchId);
+    killLogRepo.deleteByMatchId(matchId);
 
     // Delete player statistics associated with the match
     log.debug("Deleting player statistics for match {}", matchId);
@@ -76,7 +81,8 @@ public class MatchDeletionService {
       // Check if any other matches reference this analysis
       long matchesWithSameAnalysis =
           matchRepo.findAll().stream()
-              .filter(m -> m.getAnalysis() != null && m.getAnalysis().getId().equals(analysis.getId()))
+              .filter(
+                  m -> m.getAnalysis() != null && m.getAnalysis().getId().equals(analysis.getId()))
               .count();
 
       if (matchesWithSameAnalysis == 0) {

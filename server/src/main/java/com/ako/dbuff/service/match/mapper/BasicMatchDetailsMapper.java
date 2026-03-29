@@ -6,6 +6,7 @@ import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dotapi.model.MatchResponse;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInner;
+import com.ako.dbuff.service.ScrapperApiService;
 import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.constant.data.MatchTypeConstant;
@@ -39,6 +40,7 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
   private final MatchRepo matchRepo;
   private final ScrapperService dotaBuffMatchDetailsScrapper;
   private final DotabuffBuildDetailsParser dotabuffBuildDetailsParser;
+  private final ScrapperApiService scrapperApiService;
 
   private final Cache<Long, Document> scrappedDotabufPage = Caffeine.newBuilder().build();
 
@@ -113,6 +115,7 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
     MatchTypeConstant matchType = gameModeConstants.get(String.valueOf(gameModeId));
     String gameModeName = matchType.getName();
     matchDomain.setGameModeName(gameModeName);
+    matchDomain.setGameModeId(gameModeId);
   }
 
   private void mapTimeInfo(MatchResponse matchResponse, MatchDomain matchDomain) {
@@ -147,6 +150,14 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
 
   private void checkAndScrapeAdditionalData(MatchDomain matchDomain) {
     String ctx = ProcessContext.getContextString();
+
+    if (!scrapperApiService.isEnabled()) {
+      log.debug(
+          "{} Scrapper disabled, skipping Dotabuff build details for match {}",
+          ctx,
+          matchDomain.getId());
+      return;
+    }
 
     playerGameStatisticRepo.findAllByMatchId(matchDomain.getId()).stream()
         .findAny()

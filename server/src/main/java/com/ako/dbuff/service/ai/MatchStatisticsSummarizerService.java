@@ -1,7 +1,8 @@
 package com.ako.dbuff.service.ai;
 
-import com.ako.dbuff.config.PlayerConfiguration;
+import com.ako.dbuff.context.ProcessContext;
 import com.ako.dbuff.dao.model.AbilityDomain;
+import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.dao.model.ItemDomain;
 import com.ako.dbuff.dao.model.MatchAnalysisDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
@@ -14,9 +15,12 @@ import com.ako.dbuff.executors.Executors;
 import com.ako.dbuff.service.ai.config.AiPromptFieldConfig;
 import com.ako.dbuff.service.ai.model.MatchAnalysisRequest;
 import com.ako.dbuff.service.ai.model.MatchWithPlayerStatistics;
+import com.ako.dbuff.service.instance.DbufInstanceConfigService;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,6 +40,20 @@ public class MatchStatisticsSummarizerService {
   private final ItemRepository itemRepository;
   private final MatchRepo matchRepo;
   private final MatchAnalysisAiService matchAnalysisAiService;
+  private final DbufInstanceConfigService instanceConfigService;
+
+  /**
+   * Summarizes and analyzes a list of processed matches using instance context.
+   *
+   * @param matches the list of processed matches to analyze
+   * @param analyzePerMatch if true, each match is analyzed individually
+   * @param focusPlayerIds the player IDs to focus on
+   * @return CompletableFuture containing the analysis result(s)
+   */
+  public CompletableFuture<List<MatchAnalysisDomain>> summarizeAndAnalyze(
+      List<MatchDomain> matches, boolean analyzePerMatch, Set<Long> focusPlayerIds) {
+    return summarizeAndAnalyze(matches, analyzePerMatch, null, null, focusPlayerIds);
+  }
 
   /**
    * Summarizes and analyzes a list of processed matches. Collects player statistics for each match
@@ -48,12 +66,12 @@ public class MatchStatisticsSummarizerService {
    */
   public CompletableFuture<List<MatchAnalysisDomain>> summarizeAndAnalyze(
       List<MatchDomain> matches, boolean analyzePerMatch) {
-    return summarizeAndAnalyze(matches, analyzePerMatch, null, null);
+    return summarizeAndAnalyze(matches, analyzePerMatch, null, null, getContextPlayerIds());
   }
 
   /**
-   * Summarizes and analyzes a list of processed matches with an optional custom prompt.
-   * Collects player statistics for each match and sends them to AI for comprehensive analysis.
+   * Summarizes and analyzes a list of processed matches with an optional custom prompt. Collects
+   * player statistics for each match and sends them to AI for comprehensive analysis.
    *
    * @param matches the list of processed matches to analyze
    * @param analyzePerMatch if true, each match is analyzed individually; if false, all matches are
@@ -63,23 +81,47 @@ public class MatchStatisticsSummarizerService {
    */
   public CompletableFuture<List<MatchAnalysisDomain>> summarizeAndAnalyze(
       List<MatchDomain> matches, boolean analyzePerMatch, String customPrompt) {
-    return summarizeAndAnalyze(matches, analyzePerMatch, customPrompt, null);
+    return summarizeAndAnalyze(matches, analyzePerMatch, customPrompt, null, getContextPlayerIds());
   }
 
   /**
-   * Summarizes and analyzes a list of processed matches with optional custom prompt and field configuration.
-   * Collects player statistics for each match and sends them to AI for comprehensive analysis.
+   * Summarizes and analyzes a list of processed matches with optional custom prompt and field
+   * configuration. Collects player statistics for each match and sends them to AI for comprehensive
+   * analysis.
    *
    * @param matches the list of processed matches to analyze
    * @param analyzePerMatch if true, each match is analyzed individually; if false, all matches are
    *     analyzed together
    * @param customPrompt optional additional prompt to append to the context (can be null)
-   * @param fieldConfig optional configuration for which fields to include in the AI prompt (can be null)
+   * @param fieldConfig optional configuration for which fields to include in the AI prompt (can be
+   *     null)
    * @return CompletableFuture containing the analysis result(s)
    */
   public CompletableFuture<List<MatchAnalysisDomain>> summarizeAndAnalyze(
-      List<MatchDomain> matches, boolean analyzePerMatch, String customPrompt,
+      List<MatchDomain> matches,
+      boolean analyzePerMatch,
+      String customPrompt,
       AiPromptFieldConfig fieldConfig) {
+    return summarizeAndAnalyze(
+        matches, analyzePerMatch, customPrompt, fieldConfig, getContextPlayerIds());
+  }
+
+  /**
+   * Summarizes and analyzes a list of processed matches with all options.
+   *
+   * @param matches the list of processed matches to analyze
+   * @param analyzePerMatch if true, each match is analyzed individually
+   * @param customPrompt optional additional prompt
+   * @param fieldConfig optional field configuration
+   * @param focusPlayerIds the player IDs to focus on
+   * @return CompletableFuture containing the analysis result(s)
+   */
+  public CompletableFuture<List<MatchAnalysisDomain>> summarizeAndAnalyze(
+      List<MatchDomain> matches,
+      boolean analyzePerMatch,
+      String customPrompt,
+      AiPromptFieldConfig fieldConfig,
+      Set<Long> focusPlayerIds) {
     return CompletableFuture.supplyAsync(
         () -> {
           List<MatchWithPlayerStatistics> matchesWithStats = collectMatchStatistics(matches);
@@ -89,8 +131,9 @@ public class MatchStatisticsSummarizerService {
             return List.of();
           }
 
-          MatchAnalysisRequest request = buildAnalysisRequest(
-              matchesWithStats, analyzePerMatch, customPrompt, fieldConfig);
+          MatchAnalysisRequest request =
+              buildAnalysisRequest(
+                  matchesWithStats, analyzePerMatch, customPrompt, fieldConfig, focusPlayerIds);
 
           List<MatchAnalysisDomain> analyses;
           if (analyzePerMatch) {
@@ -189,67 +232,37 @@ public class MatchStatisticsSummarizerService {
    *
    * @param matchesWithStats the matches with their statistics
    * @param analyzePerMatch whether to analyze each match individually
+   * @param customPrompt optional additional prompt
+   * @param fieldConfig optional field configuration
+   * @param focusPlayerIds the player IDs to focus on
    * @return the analysis request
    */
   private MatchAnalysisRequest buildAnalysisRequest(
-      List<MatchWithPlayerStatistics> matchesWithStats, boolean analyzePerMatch) {
-    return buildAnalysisRequest(matchesWithStats, analyzePerMatch, null, null);
-  }
+      List<MatchWithPlayerStatistics> matchesWithStats,
+      boolean analyzePerMatch,
+      String customPrompt,
+      AiPromptFieldConfig fieldConfig,
+      Set<Long> focusPlayerIds) {
 
-  /**
-   * Builds the analysis request with context about tracked players and optional custom prompt.
-   *
-   * @param matchesWithStats the matches with their statistics
-   * @param analyzePerMatch whether to analyze each match individually
-   * @param customPrompt optional additional prompt to append to the context (can be null)
-   * @return the analysis request
-   */
-  private MatchAnalysisRequest buildAnalysisRequest(
-      List<MatchWithPlayerStatistics> matchesWithStats, boolean analyzePerMatch, String customPrompt) {
-    return buildAnalysisRequest(matchesWithStats, analyzePerMatch, customPrompt, null);
-  }
+    List<Long> playerIdList =
+        focusPlayerIds != null ? new ArrayList<>(focusPlayerIds) : new ArrayList<>();
 
-  /**
-   * Builds the analysis request with context about tracked players, optional custom prompt,
-   * and optional field configuration.
-   *
-   * @param matchesWithStats the matches with their statistics
-   * @param analyzePerMatch whether to analyze each match individually
-   * @param customPrompt optional additional prompt to append to the context (can be null)
-   * @param fieldConfig optional configuration for which fields to include in the AI prompt (can be null)
-   * @return the analysis request
-   */
-  private MatchAnalysisRequest buildAnalysisRequest(
-      List<MatchWithPlayerStatistics> matchesWithStats, boolean analyzePerMatch,
-      String customPrompt, AiPromptFieldConfig fieldConfig) {
-
-    List<Long> focusPlayerIds = new ArrayList<>(PlayerConfiguration.DEFAULT_PLAYERS.keySet());
-    List<String> focusPlayerNames = new ArrayList<>(PlayerConfiguration.DEFAULT_PLAYERS.values());
+    // Generate player names from IDs (could be enhanced to fetch from DB)
+    List<String> focusPlayerNames =
+        playerIdList.stream().map(id -> "Player " + id).collect(Collectors.toList());
 
     String contextPrompt =
-        buildContextPrompt(matchesWithStats.size(), focusPlayerNames, analyzePerMatch, customPrompt);
+        buildContextPrompt(
+            matchesWithStats.size(), focusPlayerNames, analyzePerMatch, customPrompt);
 
     return MatchAnalysisRequest.builder()
         .matchesWithStatistics(matchesWithStats)
         .contextPrompt(contextPrompt)
-        .focusPlayerIds(focusPlayerIds)
+        .focusPlayerIds(playerIdList)
         .focusPlayerNames(focusPlayerNames)
         .analyzePerMatch(analyzePerMatch)
         .fieldConfig(fieldConfig)
         .build();
-  }
-
-  /**
-   * Builds the context prompt for the AI.
-   *
-   * @param matchCount number of matches being analyzed
-   * @param focusPlayerNames names of players to focus on
-   * @param analyzePerMatch whether analyzing per match or together
-   * @return the context prompt
-   */
-  private String buildContextPrompt(
-      int matchCount, List<String> focusPlayerNames, boolean analyzePerMatch) {
-    return buildContextPrompt(matchCount, focusPlayerNames, analyzePerMatch, null);
   }
 
   /**
@@ -348,10 +361,7 @@ public class MatchStatisticsSummarizerService {
    * @return the analysis if found, null otherwise
    */
   public MatchAnalysisDomain getAnalysisForMatch(Long matchId) {
-    return matchRepo
-        .findById(matchId)
-        .map(MatchDomain::getAnalysis)
-        .orElse(null);
+    return matchRepo.findById(matchId).map(MatchDomain::getAnalysis).orElse(null);
   }
 
   /**
@@ -361,39 +371,65 @@ public class MatchStatisticsSummarizerService {
    * @return true if the match has an analysis
    */
   public boolean hasAnalysis(Long matchId) {
-    return matchRepo
-        .findById(matchId)
-        .map(match -> match.getAnalysis() != null)
-        .orElse(false);
+    return matchRepo.findById(matchId).map(match -> match.getAnalysis() != null).orElse(false);
+  }
+
+  /**
+   * Gets statistics summary for logging purposes using context player IDs.
+   *
+   * @param matches the matches to summarize
+   * @return a summary string
+   */
+  public String getStatisticsSummary(List<MatchDomain> matches) {
+    return getStatisticsSummary(matches, getContextPlayerIds());
   }
 
   /**
    * Gets statistics summary for logging purposes.
    *
    * @param matches the matches to summarize
+   * @param focusPlayerIds the player IDs to focus on
    * @return a summary string
    */
-  public String getStatisticsSummary(List<MatchDomain> matches) {
+  public String getStatisticsSummary(List<MatchDomain> matches, Set<Long> focusPlayerIds) {
     List<MatchWithPlayerStatistics> matchesWithStats = collectMatchStatistics(matches);
 
     long totalPlayers =
         matchesWithStats.stream().mapToLong(MatchWithPlayerStatistics::getPlayerCount).sum();
 
+    Set<Long> playerIds = focusPlayerIds != null ? focusPlayerIds : Set.of();
+
     long trackedPlayerMatches =
         matchesWithStats.stream()
             .flatMap(m -> m.getPlayerStatistics().stream())
-            .filter(p -> PlayerConfiguration.DEFAULT_PLAYERS.containsKey(p.getPlayerId()))
+            .filter(p -> playerIds.contains(p.getPlayerId()))
             .count();
 
     long wins =
         matchesWithStats.stream()
             .flatMap(m -> m.getPlayerStatistics().stream())
-            .filter(p -> PlayerConfiguration.DEFAULT_PLAYERS.containsKey(p.getPlayerId()))
+            .filter(p -> playerIds.contains(p.getPlayerId()))
             .filter(p -> p.getWin() != null && p.getWin() == 1)
             .count();
 
     return String.format(
         "Matches: %d, Total players: %d, Tracked player appearances: %d, Wins: %d",
         matchesWithStats.size(), totalPlayers, trackedPlayerMatches, wins);
+  }
+
+  /**
+   * Gets player IDs from the current instance context.
+   *
+   * @return set of player IDs from context, or empty set if no context
+   */
+  private Set<Long> getContextPlayerIds() {
+    String instanceId = ProcessContext.getCurrentInstanceId();
+    if (instanceId != null) {
+      return instanceConfigService
+          .getDomainById(instanceId)
+          .map(DbufInstanceConfigDomain::getPlayerIds)
+          .orElse(Set.of());
+    }
+    return Set.of();
   }
 }

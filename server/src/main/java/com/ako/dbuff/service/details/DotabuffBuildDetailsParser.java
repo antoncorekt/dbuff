@@ -5,6 +5,8 @@ import com.ako.dbuff.dao.model.AbilityDomain;
 import com.ako.dbuff.dao.model.ItemDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
+import com.ako.dbuff.dao.model.id.AbilityId;
+import com.ako.dbuff.dao.model.id.ItemId;
 import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.ItemRepository;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
@@ -300,7 +302,10 @@ public class DotabuffBuildDetailsParser {
       parseItemTime(timeElement, itemDomain);
     }
 
-    itemRepo.save(itemDomain);
+    if (!itemRepo.existsById(
+        new ItemId(itemDomain.getItemId(), itemDomain.getMatchId(), itemDomain.getPlayerSlot()))) {
+      itemRepo.save(itemDomain);
+    }
   }
 
   private void parseItemTime(Element timeElement, ItemDomain itemDomain) {
@@ -388,6 +393,12 @@ public class DotabuffBuildDetailsParser {
             .prettyName(skillName)
             .build();
 
-    abilityRepo.save(abilityDomain);
+    if (!abilityRepo.existsById(
+        new AbilityId(
+            abilityDomain.getMatchId(),
+            abilityDomain.getPlayerSlot(),
+            abilityDomain.getAbilityId()))) {
+      abilityRepo.save(abilityDomain);
+    }
   }
 }

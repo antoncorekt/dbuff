@@ -24,6 +24,9 @@ public class ProcessContext {
   /** User ID for request tracing (kept for backward compatibility) */
   public static final ScopedValue<String> USER_ID = ScopedValue.newInstance();
 
+  /** The Dbuf instance configuration ID - used for multi-tenant processing */
+  public static final ScopedValue<String> INSTANCE_ID = ScopedValue.newInstance();
+
   /**
    * Runs a task with the specified match ID in scope. The match ID will be available via
    * MATCH_ID.get() within the task.
@@ -182,13 +185,116 @@ public class ProcessContext {
   }
 
   /**
+   * Gets the current instance ID from the scoped context.
+   *
+   * @return the current instance ID, or null if not set
+   */
+  public static String getCurrentInstanceId() {
+    return INSTANCE_ID.isBound() ? INSTANCE_ID.get() : null;
+  }
+
+  /**
+   * Runs a task with the specified instance ID in scope.
+   *
+   * @param instanceId the instance ID to set in scope
+   * @param task the task to run
+   */
+  public static void runWithInstanceId(String instanceId, Runnable task) {
+    ScopedValue.runWhere(INSTANCE_ID, instanceId, task);
+  }
+
+  /**
+   * Calls a task with the specified instance ID in scope and returns the result.
+   *
+   * @param instanceId the instance ID to set in scope
+   * @param task the task to call
+   * @param <T> the return type
+   * @return the result of the task
+   * @throws Exception if the task throws an exception
+   */
+  public static <T> T callWithInstanceId(String instanceId, Callable<T> task) throws Exception {
+    return ScopedValue.callWhere(INSTANCE_ID, instanceId, task);
+  }
+
+  /**
+   * Runs a task with instance ID and match ID in scope.
+   *
+   * @param instanceId the instance ID to set in scope
+   * @param matchId the match ID to set in scope
+   * @param task the task to run
+   */
+  public static void runWithInstanceContext(String instanceId, Long matchId, Runnable task) {
+    ScopedValue.where(INSTANCE_ID, instanceId).where(MATCH_ID, matchId).run(task);
+  }
+
+  /**
+   * Calls a task with instance ID and match ID in scope and returns the result.
+   *
+   * @param instanceId the instance ID to set in scope
+   * @param matchId the match ID to set in scope
+   * @param task the task to call
+   * @param <T> the return type
+   * @return the result of the task
+   * @throws Exception if the task throws an exception
+   */
+  public static <T> T callWithInstanceContext(String instanceId, Long matchId, Callable<T> task)
+      throws Exception {
+    return ScopedValue.where(INSTANCE_ID, instanceId).where(MATCH_ID, matchId).call(task);
+  }
+
+  /**
+   * Runs a task with full instance context (instance ID, process type, match ID, player ID) in
+   * scope.
+   *
+   * @param instanceId the instance ID to set in scope
+   * @param processType the process type
+   * @param matchId the match ID to set in scope
+   * @param playerId the player ID to set in scope
+   * @param task the task to run
+   */
+  public static void runWithFullInstanceContext(
+      String instanceId, String processType, Long matchId, Long playerId, Runnable task) {
+    ScopedValue.where(INSTANCE_ID, instanceId)
+        .where(PROCESS_TYPE, processType)
+        .where(MATCH_ID, matchId)
+        .where(PLAYER_ID, playerId)
+        .run(task);
+  }
+
+  /**
+   * Calls a task with full instance context and returns the result.
+   *
+   * @param instanceId the instance ID to set in scope
+   * @param processType the process type
+   * @param matchId the match ID to set in scope
+   * @param playerId the player ID to set in scope
+   * @param task the task to call
+   * @param <T> the return type
+   * @return the result of the task
+   * @throws Exception if the task throws an exception
+   */
+  public static <T> T callWithFullInstanceContext(
+      String instanceId, String processType, Long matchId, Long playerId, Callable<T> task)
+      throws Exception {
+    return ScopedValue.where(INSTANCE_ID, instanceId)
+        .where(PROCESS_TYPE, processType)
+        .where(MATCH_ID, matchId)
+        .where(PLAYER_ID, playerId)
+        .call(task);
+  }
+
+  /**
    * Creates a formatted context string for logging purposes.
    *
    * @return a formatted string with current context values
    */
   public static String getContextString() {
     StringBuilder sb = new StringBuilder("[");
+    if (INSTANCE_ID.isBound()) {
+      sb.append("instanceId=").append(INSTANCE_ID.get());
+    }
     if (PROCESS_TYPE.isBound()) {
+      if (sb.length() > 1) sb.append(", ");
       sb.append("process=").append(PROCESS_TYPE.get());
     }
     if (MATCH_ID.isBound()) {

@@ -5,6 +5,7 @@ import com.ako.dbuff.service.ranking.FindPlayerMatchesService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,24 +25,29 @@ public class FindPlayerResource {
   private final FindPlayerMatchesService findPlayerMatchesService;
 
   /**
-   * Finds matches for a player by their name.
+   * Finds matches for a player by their name for a specific instance.
    *
    * <p>Returns a list of matches where the player participated, ordered by match date descending.
-   * Each match includes statistics for the searched player and default players (from
-   * PlayerConfiguration.DEFAULT_PLAYERS).
+   * Each match includes statistics for the searched player and tracked players from the instance.
    *
    * <p>If the player is not found, returns an empty list.
    *
+   * @param instanceId The instance configuration ID (required)
    * @param playerName The player's name to search for
    * @param limit Maximum number of matches to return. Defaults to 20 if not specified.
    * @return List of FindPlayerMatchesResponse ordered by match date descending
    */
   @GetMapping("/findPlayer/{playerName}")
-  public List<FindPlayerMatchesResponse> findPlayerMatches(
-      @PathVariable String playerName, @RequestParam(required = false) Integer limit) {
+  public ResponseEntity<List<FindPlayerMatchesResponse>> findPlayerMatches(
+      @RequestParam("instanceId") String instanceId,
+      @PathVariable String playerName,
+      @RequestParam(required = false) Integer limit) {
 
-    log.info("GET /api/v1/findPlayer/{} - limit={}", playerName, limit);
+    log.info("GET /api/v1/findPlayer/{} - instanceId={}, limit={}", playerName, instanceId, limit);
 
-    return findPlayerMatchesService.findPlayerMatches(playerName, limit);
+    List<FindPlayerMatchesResponse> matches =
+        findPlayerMatchesService.findPlayerMatchesForInstance(instanceId, playerName, limit);
+
+    return ResponseEntity.ok(matches);
   }
 }

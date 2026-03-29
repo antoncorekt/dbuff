@@ -1,15 +1,13 @@
 package com.ako.dbuff.service.ai.config;
 
-import java.util.List;
-import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Configuration for AI prompt field selection.
- * Allows customization of which fields from each entity should be included in the AI prompt.
+ * Configuration for AI prompt field selection. Allows customization of which fields from each
+ * entity should be included in the AI prompt.
  */
 @Data
 @Builder
@@ -17,78 +15,43 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class AiPromptFieldConfig {
 
-  /**
-   * Configuration for Match entity fields.
-   */
+  /** Configuration for Match entity fields. */
   private MatchFieldConfig matchFields;
 
-  /**
-   * Configuration for PlayerMatchStatistic entity fields.
-   */
+  /** Configuration for PlayerMatchStatistic entity fields. */
   private PlayerStatisticFieldConfig playerStatisticFields;
 
-  /**
-   * Configuration for Item entity fields.
-   */
+  /** Configuration for Item entity fields. */
   private ItemFieldConfig itemFields;
 
-  /**
-   * Configuration for Ability entity fields.
-   */
+  /** Configuration for Ability entity fields. */
   private AbilityFieldConfig abilityFields;
 
-  /**
-   * Custom system prompt additions.
-   * Will be appended to the default system prompt.
-   */
+  /** Custom system prompt additions. Will be appended to the default system prompt. */
   private String customSystemPrompt;
 
-  /**
-   * Custom analysis instructions.
-   * Will be appended to the analysis request section.
-   */
+  /** Custom analysis instructions. Will be appended to the analysis request section. */
   private String customAnalysisInstructions;
 
-  /**
-   * Language for the AI response.
-   * Default is "Russian".
-   */
-  @Builder.Default
-  private String responseLanguage = "Russian";
+  /** Language for the AI response. Default is "Russian". */
+  @Builder.Default private String responseLanguage = "Russian";
 
-  /**
-   * Whether to include sarcasm and jokes in the response.
-   */
-  @Builder.Default
-  private boolean includeSarcasm = true;
+  /** Whether to include sarcasm and jokes in the response. */
+  @Builder.Default private boolean includeSarcasm = true;
 
-  /**
-   * Whether to include abilities section in the prompt.
-   */
-  @Builder.Default
-  private boolean includeAbilities = true;
+  /** Whether to include abilities section in the prompt. */
+  @Builder.Default private boolean includeAbilities = true;
 
-  /**
-   * Whether to include items section in the prompt.
-   */
-  @Builder.Default
-  private boolean includeItems = true;
+  /** Whether to include items section in the prompt. */
+  @Builder.Default private boolean includeItems = true;
 
-  /**
-   * Whether to filter items to only focus players.
-   */
-  @Builder.Default
-  private boolean filterItemsToFocusPlayers = true;
+  /** Whether to filter items to only focus players. */
+  @Builder.Default private boolean filterItemsToFocusPlayers = true;
 
-  /**
-   * Whether to include neutral items.
-   */
-  @Builder.Default
-  private boolean includeNeutralItems = false;
+  /** Whether to include neutral items. */
+  @Builder.Default private boolean includeNeutralItems = false;
 
-  /**
-   * Creates a default configuration with all fields enabled.
-   */
+  /** Creates a default configuration with all fields enabled. */
   public static AiPromptFieldConfig defaultConfig() {
     return AiPromptFieldConfig.builder()
         .matchFields(MatchFieldConfig.defaultConfig())
@@ -98,9 +61,7 @@ public class AiPromptFieldConfig {
         .build();
   }
 
-  /**
-   * Creates a minimal configuration with only essential fields.
-   */
+  /** Creates a minimal configuration with only essential fields. */
   public static AiPromptFieldConfig minimalConfig() {
     return AiPromptFieldConfig.builder()
         .matchFields(MatchFieldConfig.minimalConfig())
@@ -111,30 +72,20 @@ public class AiPromptFieldConfig {
         .build();
   }
 
-  /**
-   * Configuration for Match entity fields.
-   */
+  /** Configuration for Match entity fields. */
   @Data
   @Builder
   @AllArgsConstructor
   @NoArgsConstructor
   public static class MatchFieldConfig {
-    @Builder.Default
-    private boolean includeDuration = true;
-    @Builder.Default
-    private boolean includeRadiantScore = true;
-    @Builder.Default
-    private boolean includeDireScore = true;
-    @Builder.Default
-    private boolean includeRadiantWin = true;
-    @Builder.Default
-    private boolean includePatch = true;
-    @Builder.Default
-    private boolean includeGameMode = true;
-    @Builder.Default
-    private boolean includeFirstBloodTime = false;
-    @Builder.Default
-    private boolean includeStartTime = false;
+    @Builder.Default private boolean includeDuration = true;
+    @Builder.Default private boolean includeRadiantScore = true;
+    @Builder.Default private boolean includeDireScore = true;
+    @Builder.Default private boolean includeRadiantWin = true;
+    @Builder.Default private boolean includePatch = true;
+    @Builder.Default private boolean includeGameMode = true;
+    @Builder.Default private boolean includeFirstBloodTime = false;
+    @Builder.Default private boolean includeStartTime = false;
 
     public static MatchFieldConfig defaultConfig() {
       return MatchFieldConfig.builder().build();
@@ -152,123 +103,77 @@ public class AiPromptFieldConfig {
     }
   }
 
-  /**
-   * Configuration for PlayerMatchStatistic entity fields.
-   */
+  /** Configuration for PlayerMatchStatistic entity fields. */
   @Data
   @Builder
   @AllArgsConstructor
   @NoArgsConstructor
   public static class PlayerStatisticFieldConfig {
     // Core stats - always recommended
-    @Builder.Default
-    private boolean includeKda = true;
-    @Builder.Default
-    private boolean includeKills = true;
-    @Builder.Default
-    private boolean includeDeaths = true;
-    @Builder.Default
-    private boolean includeAssists = true;
-    @Builder.Default
-    private boolean includeHero = true;
-    @Builder.Default
-    private boolean includeTeam = true;
-    @Builder.Default
-    private boolean includeWin = true;
+    @Builder.Default private boolean includeKda = true;
+    @Builder.Default private boolean includeKills = true;
+    @Builder.Default private boolean includeDeaths = true;
+    @Builder.Default private boolean includeAssists = true;
+    @Builder.Default private boolean includeHero = true;
+    @Builder.Default private boolean includeTeam = true;
+    @Builder.Default private boolean includeWin = true;
 
     // Economy stats
-    @Builder.Default
-    private boolean includeGoldPerMin = true;
-    @Builder.Default
-    private boolean includeXpPerMin = true;
-    @Builder.Default
-    private boolean includeNetWorth = false;
-    @Builder.Default
-    private boolean includeTotalGold = false;
-    @Builder.Default
-    private boolean includeGoldSpent = false;
+    @Builder.Default private boolean includeGoldPerMin = true;
+    @Builder.Default private boolean includeXpPerMin = true;
+    @Builder.Default private boolean includeNetWorth = false;
+    @Builder.Default private boolean includeTotalGold = false;
+    @Builder.Default private boolean includeGoldSpent = false;
 
     // Farming stats
-    @Builder.Default
-    private boolean includeLastHits = true;
-    @Builder.Default
-    private boolean includeDenies = true;
-    @Builder.Default
-    private boolean includeNeutralKills = false;
-    @Builder.Default
-    private boolean includeCampsStacked = false;
-    @Builder.Default
-    private boolean includeCreepsStacked = false;
+    @Builder.Default private boolean includeLastHits = true;
+    @Builder.Default private boolean includeDenies = true;
+    @Builder.Default private boolean includeNeutralKills = false;
+    @Builder.Default private boolean includeCampsStacked = false;
+    @Builder.Default private boolean includeCreepsStacked = false;
 
     // Combat stats
-    @Builder.Default
-    private boolean includeHeroDamage = false;
-    @Builder.Default
-    private boolean includeTowerDamage = false;
-    @Builder.Default
-    private boolean includeHeroHealing = false;
-    @Builder.Default
-    private boolean includeDamageTaken = false;
-    @Builder.Default
-    private boolean includeStuns = false;
+    @Builder.Default private boolean includeHeroDamage = false;
+    @Builder.Default private boolean includeTowerDamage = false;
+    @Builder.Default private boolean includeHeroHealing = false;
+    @Builder.Default private boolean includeDamageTaken = false;
+    @Builder.Default private boolean includeStuns = false;
 
     // Lane stats
-    @Builder.Default
-    private boolean includeLane = true;
-    @Builder.Default
-    private boolean includeLaneRole = false;
-    @Builder.Default
-    private boolean includeLaneEfficiency = false;
+    @Builder.Default private boolean includeLane = true;
+    @Builder.Default private boolean includeLaneRole = false;
+    @Builder.Default private boolean includeLaneEfficiency = false;
 
     // Level and progression
-    @Builder.Default
-    private boolean includeLevel = false;
-    @Builder.Default
-    private boolean includeHeroVariant = false;
+    @Builder.Default private boolean includeLevel = false;
+    @Builder.Default private boolean includeHeroVariant = false;
 
     // Support stats
-    @Builder.Default
-    private boolean includeObsPlaced = false;
-    @Builder.Default
-    private boolean includeSenPlaced = false;
+    @Builder.Default private boolean includeObsPlaced = false;
+    @Builder.Default private boolean includeSenPlaced = false;
 
     // Timeline stats
-    @Builder.Default
-    private boolean includeGoldTimeline = false;
-    @Builder.Default
-    private boolean includeLastHitsTimeline = false;
-    @Builder.Default
-    private boolean includeXpTimeline = false;
+    @Builder.Default private boolean includeGoldTimeline = false;
+    @Builder.Default private boolean includeLastHitsTimeline = false;
+    @Builder.Default private boolean includeXpTimeline = false;
 
     // Other stats
-    @Builder.Default
-    private boolean includeTowerKills = false;
-    @Builder.Default
-    private boolean includeRoshanKills = false;
-    @Builder.Default
-    private boolean includeCourierKills = false;
-    @Builder.Default
-    private boolean includeRunePickups = false;
-    @Builder.Default
-    private boolean includeBuybackCount = false;
-    @Builder.Default
-    private boolean includeActionsPerMin = false;
-    @Builder.Default
-    private boolean includeTeamfightParticipation = false;
-    @Builder.Default
-    private boolean includeRankTier = false;
+    @Builder.Default private boolean includeTowerKills = false;
+    @Builder.Default private boolean includeRoshanKills = false;
+    @Builder.Default private boolean includeCourierKills = false;
+    @Builder.Default private boolean includeRunePickups = false;
+    @Builder.Default private boolean includeBuybackCount = false;
+    @Builder.Default private boolean includeActionsPerMin = false;
+    @Builder.Default private boolean includeTeamfightParticipation = false;
+    @Builder.Default private boolean includeRankTier = false;
 
     // Item flags
-    @Builder.Default
-    private boolean includeAganim = false;
-    @Builder.Default
-    private boolean includeAganimShard = false;
-    @Builder.Default
-    private boolean includeMoonshard = false;
+    @Builder.Default private boolean includeAganim = false;
+    @Builder.Default private boolean includeAganimShard = false;
+    @Builder.Default private boolean includeMoonshard = false;
 
     // Hand damage
-    @Builder.Default
-    private boolean includeHandDamage = false;
+    @Builder.Default private boolean includeHandDamage = false;
 
     public static PlayerStatisticFieldConfig defaultConfig() {
       return PlayerStatisticFieldConfig.builder().build();
@@ -329,28 +234,19 @@ public class AiPromptFieldConfig {
     }
   }
 
-  /**
-   * Configuration for Item entity fields.
-   */
+  /** Configuration for Item entity fields. */
   @Data
   @Builder
   @AllArgsConstructor
   @NoArgsConstructor
   public static class ItemFieldConfig {
-    @Builder.Default
-    private boolean includeItemName = true;
-    @Builder.Default
-    private boolean includePurchaseTime = true;
-    @Builder.Default
-    private boolean includeIsNeutral = true;
-    @Builder.Default
-    private boolean includeNeutralEnhancement = false;
-    @Builder.Default
-    private boolean includeDamageDealt = false;
-    @Builder.Default
-    private boolean includeDamageReceived = false;
-    @Builder.Default
-    private boolean includeUseCount = false;
+    @Builder.Default private boolean includeItemName = true;
+    @Builder.Default private boolean includePurchaseTime = true;
+    @Builder.Default private boolean includeIsNeutral = true;
+    @Builder.Default private boolean includeNeutralEnhancement = false;
+    @Builder.Default private boolean includeDamageDealt = false;
+    @Builder.Default private boolean includeDamageReceived = false;
+    @Builder.Default private boolean includeUseCount = false;
 
     public static ItemFieldConfig defaultConfig() {
       return ItemFieldConfig.builder().build();
@@ -374,31 +270,23 @@ public class AiPromptFieldConfig {
     }
   }
 
-  /**
-   * Configuration for Ability entity fields.
-   */
+  /** Configuration for Ability entity fields. */
   @Data
   @Builder
   @AllArgsConstructor
   @NoArgsConstructor
   public static class AbilityFieldConfig {
-    @Builder.Default
-    private boolean includeAbilityName = true;
-    @Builder.Default
-    private boolean includeDamageDealt = false;
-    @Builder.Default
-    private boolean includeDamageReceived = false;
-    @Builder.Default
-    private boolean includeUseCount = false;
+    @Builder.Default private boolean includeAbilityName = true;
+    @Builder.Default private boolean includeDamageDealt = false;
+    @Builder.Default private boolean includeDamageReceived = false;
+    @Builder.Default private boolean includeUseCount = false;
 
     public static AbilityFieldConfig defaultConfig() {
       return AbilityFieldConfig.builder().build();
     }
 
     public static AbilityFieldConfig minimalConfig() {
-      return AbilityFieldConfig.builder()
-          .includeAbilityName(true)
-          .build();
+      return AbilityFieldConfig.builder().includeAbilityName(true).build();
     }
 
     public static AbilityFieldConfig fullConfig() {

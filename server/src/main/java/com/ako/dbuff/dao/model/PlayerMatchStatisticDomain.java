@@ -247,14 +247,14 @@ public class PlayerMatchStatisticDomain {
   // ==================== Hand Attack Damage Stats ====================
 
   /**
-   * Damage dealt by hand attacks (auto-attacks without abilities/items).
-   * Extracted from damage_inflictor where key is "null".
+   * Damage dealt by hand attacks (auto-attacks without abilities/items). Extracted from
+   * damage_inflictor where key is "null".
    */
   private Long handDamageDealt;
 
   /**
-   * Damage received from hand attacks (auto-attacks without abilities/items).
-   * Extracted from damage_inflictor_received where key is "null".
+   * Damage received from hand attacks (auto-attacks without abilities/items). Extracted from
+   * damage_inflictor_received where key is "null".
    */
   private Long handDamageReceived;
 }

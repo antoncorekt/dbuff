@@ -4,7 +4,6 @@ import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.repo.PlayerRepo;
 import com.ako.dbuff.dotapi.api.PlayersApi;
 import jakarta.annotation.PostConstruct;
-
 import java.util.HashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -30,25 +29,6 @@ public class PlayerConfiguration {
 
   @PostConstruct
   public void setUpPlayers() {
-
-//    DEFAULT_PLAYERS.keySet()
-//            .forEach(
-//                id -> {
-//                  try {
-//                    String name = playersApi.getPlayersByAccountId(id)
-//                        .getProfile().getPersonaname();
-//                    if (!DEFAULT_PLAYERS.get(id).equals(name) && name != null) {
-//                      log.info("Looks like {} changed name to {}", DEFAULT_PLAYERS.get(id), name);
-//                      DEFAULT_PLAYERS.put(id, name);
-////                      if (playerRepo.existsById(id)) {
-////                        playerRepo.deleteById(id);
-////                      }
-//                    }
-//                  }catch (Exception e){
-//                    log.error("error during getting player name {}",e.getMessage(), e);
-//                  }
-//                }
-//            );
 
     DEFAULT_PLAYERS.forEach(
         (id, name) -> {

@@ -12,5 +12,4 @@ public class DiscordConfig {
   private String apiKey;
 
   private String matchSummaryChannelId;
-
 }
