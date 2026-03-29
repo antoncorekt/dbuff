@@ -7,6 +7,9 @@ import com.ako.dbuff.dao.model.KillLogDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
+import com.ako.dbuff.dao.model.id.AbilityId;
+import com.ako.dbuff.dao.model.id.ItemId;
+import com.ako.dbuff.dao.model.id.KillLogId;
 import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.ItemRepository;
 import com.ako.dbuff.dao.repo.KillLogRepo;
@@ -64,7 +67,8 @@ public class PlayersMapper {
 
     // Run player processing with playerId in scope for logging
     ProcessContext.runWithPlayerId(
-        accountId, () -> processPlayer(matchDomain, player, accountId, personaname, heroToPlayerMap));
+        accountId,
+        () -> processPlayer(matchDomain, player, accountId, personaname, heroToPlayerMap));
   }
 
   /**
@@ -324,7 +328,8 @@ public class PlayersMapper {
 
     purchaseLogs.forEach(
         item ->
-            addItemPurchase(item, itemsConstant, matchDomain, playerDomain, playerSlot, damageData));
+            addItemPurchase(
+                item, itemsConstant, matchDomain, playerDomain, playerSlot, damageData));
     stats.setHasItems(!purchaseLogs.isEmpty());
 
     Collection<MatchResponsePlayersInnerNeutralItemHistoryInner> neutralItemHistory =
@@ -412,7 +417,14 @@ public class PlayersMapper {
           killedHeroName);
     }
 
-    return killLogRepo.save(killLog);
+    return killLogRepo.existsById(
+            new KillLogId(
+                killLog.getMatchId(),
+                killLog.getPlayerSlot(),
+                killLog.getTime(),
+                killLog.getKilledHeroName()))
+        ? killLog
+        : killLogRepo.save(killLog);
   }
 
   /**
@@ -446,7 +458,13 @@ public class PlayersMapper {
     // Set use count from ability_uses data
     abilityDomain.setUseCount(damageData.abilityUseCounts().get(abilityName));
 
-    return abilityRepo.save(abilityDomain);
+    return abilityRepo.existsById(
+            new AbilityId(
+                abilityDomain.getMatchId(),
+                abilityDomain.getPlayerSlot(),
+                abilityDomain.getAbilityId()))
+        ? abilityDomain
+        : abilityRepo.save(abilityDomain);
   }
 
   private void setUpBenchmarks(
@@ -541,7 +559,10 @@ public class PlayersMapper {
     // Set use count from item_uses data
     itemDomain.setUseCount(damageData.itemUseCounts().get(itemName));
 
-    return itemRepository.save(itemDomain);
+    return itemRepository.existsById(
+            new ItemId(itemDomain.getItemId(), itemDomain.getMatchId(), itemDomain.getPlayerSlot()))
+        ? itemDomain
+        : itemRepository.save(itemDomain);
   }
 
   // ==================== Damage Inflictor Parsing ====================
@@ -562,12 +583,10 @@ public class PlayersMapper {
 
   /**
    * Parses damage_inflictor, damage_inflictor_received, and ability_uses from player data.
-   * Categorizes each damage source as:
-   * - "null" key -> hand attack damage
-   * - ability name (from AbilityDomain.name) -> ability damage
-   * - item name (from ItemDomain.itemName) -> item damage
+   * Categorizes each damage source as: - "null" key -> hand attack damage - ability name (from
+   * AbilityDomain.name) -> ability damage - item name (from ItemDomain.itemName) -> item damage
    *
-   * Also parses ability_uses to get the number of times each ability was used.
+   * <p>Also parses ability_uses to get the number of times each ability was used.
    *
    * @param player the player data from API
    * @return DamageInflictorData containing categorized damage values and ability use counts
@@ -622,7 +641,8 @@ public class PlayersMapper {
     Object damageInflictorReceivedObj = player.getDamageInflictorReceived();
     if (damageInflictorReceivedObj != null) {
       @SuppressWarnings("unchecked")
-      Map<String, Number> damageInflictorReceived = (Map<String, Number>) damageInflictorReceivedObj;
+      Map<String, Number> damageInflictorReceived =
+          (Map<String, Number>) damageInflictorReceivedObj;
 
       for (Map.Entry<String, Number> entry : damageInflictorReceived.entrySet()) {
         String key = entry.getKey();

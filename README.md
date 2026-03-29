@@ -154,6 +154,128 @@ docker-compose down
 docker-compose down -v
 ```
 
+## AWS Deployment
+
+Deploy DBuff to a single EC2 instance with RDS PostgreSQL. Estimated cost: ~$28/mo.
+
+```
+Internet → EC2 t3.small (:8080) → RDS PostgreSQL (private subnet)
+                   ↓
+           SSM Parameter Store (API keys)
+           S3 bucket (JAR artifact)
+```
+
+### Prerequisites
+
+- AWS CLI installed and configured (`brew install awscli && aws configure`)
+- An AWS account with admin access
+
+### First-Time Setup
+
+**1. Create an EC2 key pair** (for SSH access):
+
+```bash
+aws ec2 create-key-pair --key-name dbuff-key \
+  --query 'KeyMaterial' --output text > ~/.ssh/dbuff-key.pem
+chmod 400 ~/.ssh/dbuff-key.pem
+```
+
+**2. Configure `.env`** with your API keys and deployment settings:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and fill in all values:
+
+```properties
+# API keys (you likely already have these)
+DOTA_API_KEY=...
+SCRAPPER_API_KEY=...
+OPENAI_API_KEY=...
+DISCORD_BOT_TOKEN=...
+
+# AWS deployment
+KEY_PAIR_NAME=dbuff-key
+DB_PASSWORD=YourStrongPassword123
+```
+
+**3. Deploy everything:**
+
+```bash
+./infrastructure/cloudformation/deploy.sh all
+```
+
+This builds the JAR, uploads it to S3, and creates the full CloudFormation stack (VPC, EC2, RDS, security groups, etc.). Takes ~15 minutes on first run (mostly RDS creation).
+
+**4. Verify:**
+
+```bash
+# Get the public IP from stack outputs
+aws cloudformation describe-stacks --stack-name dbuff \
+  --query 'Stacks[0].Outputs[?OutputKey==`PublicIP`].OutputValue' --output text
+
+# Health check
+curl http://<EC2-IP>:8080/actuator/health
+
+# Test an endpoint
+curl "http://<EC2-IP>:8080/find/player?search=dendi"
+```
+
+### Redeploying (Code Updates)
+
+After making code changes:
+
+```bash
+# 1. Build and upload new JAR
+./infrastructure/cloudformation/deploy.sh build
+./infrastructure/cloudformation/deploy.sh upload
+
+# 2. SSH in and restart the service
+ssh -i ~/.ssh/dbuff-key.pem ec2-user@<EC2-IP>
+sudo aws s3 cp s3://dbuff-deploy-$(aws sts get-caller-identity --query Account --output text)/server.jar /opt/dbuff/server.jar
+sudo systemctl restart dbuff
+```
+
+### Redeploying (Infrastructure Changes)
+
+If you modify `template.yaml`:
+
+```bash
+./infrastructure/cloudformation/deploy.sh deploy
+```
+
+### Troubleshooting
+
+```bash
+# SSH into the instance
+ssh -i ~/.ssh/dbuff-key.pem ec2-user@<EC2-IP>
+
+# App logs
+sudo tail -f /var/log/dbuff/dbuff.log
+
+# Service status
+sudo systemctl status dbuff
+
+# Bootstrap log (user-data script)
+cat /var/log/user-data.log
+```
+
+### Tearing Down
+
+```bash
+# Disable deletion protection on RDS first (via AWS Console or CLI)
+aws rds modify-db-instance --db-instance-identifier dbuff-postgres \
+  --no-deletion-protection --apply-immediately
+
+# Delete the stack
+aws cloudformation delete-stack --stack-name dbuff
+aws cloudformation wait stack-delete-complete --stack-name dbuff
+
+# Optionally delete the S3 bucket
+aws s3 rb s3://dbuff-deploy-$(aws sts get-caller-identity --query Account --output text) --force
+```
+
 ## License
 
 MIT

@@ -8,6 +8,7 @@ import com.ako.dbuff.utils.Utils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.stream.IntStream;
@@ -53,7 +54,7 @@ public class AllHistoryService {
    * @return list of all found matches
    */
   public List<MatchDomain> findAllUserMatches(
-      long userId, long gameMode, ScrapperParams scrapperParams) {
+      long userId, Set<Long> gameMode, ScrapperParams scrapperParams) {
 
     String ctx = ProcessContext.getContextString();
 
@@ -84,9 +85,9 @@ public class AllHistoryService {
             .mapToObj(
                 pageNum ->
                     CompletableFuture.runAsync(
-                        () -> processPage(userId, pageNum, allUserMatches),
+                        () -> processPage(userId, pageNum, allUserMatches, gameMode),
                         Executors.PROCESSOR_VIRT_EXECUTOR_SERVICE))
-            .collect(java.util.stream.Collectors.toList());
+            .toList();
 
     // Wait for all pages to complete
     CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
@@ -109,7 +110,8 @@ public class AllHistoryService {
    * @param pageNum the page number to process
    * @param allUserMatches the synchronized list to add matches to
    */
-  private void processPage(long userId, int pageNum, List<MatchDomain> allUserMatches) {
+  private void processPage(
+      long userId, int pageNum, List<MatchDomain> allUserMatches, Set<Long> gameModes) {
     ProcessContext.runWithPageNum(
         pageNum,
         () -> {
@@ -122,7 +124,14 @@ public class AllHistoryService {
               log.info("{} Start scraping page {} for user {}", ctx, pageNum, userId);
 
               Document document = gameListScrapper.scrap(userId, pageNum);
-              List<MatchDomain> matchesOnPage = gameListParser.parse(document);
+              List<MatchDomain> matchesOnPage =
+                  gameListParser.parse(document).stream()
+                      .filter(
+                          matchDomain ->
+                              gameModes.isEmpty()
+                                  || matchDomain.getGameModeId() == null
+                                  || gameModes.contains(matchDomain.getGameModeId()))
+                      .toList();
 
               log.info(
                   "{} Found {} matches on page {} for user {}",

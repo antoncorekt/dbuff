@@ -34,7 +34,7 @@ public class JSON implements ContextResolver<ObjectMapper> {
   public JSON() {
     mapper = JsonMapper.builder()
             .serializationInclusion(JsonInclude.Include.NON_NULL)
-            .configure(MapperFeature.ALLOW_COERCION_OF_SCALARS, false)
+            .configure(MapperFeature.ALLOW_COERCION_OF_SCALARS, true)  // Required for proper oneOf deserialization
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
             .configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, true)
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)

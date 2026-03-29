@@ -12,6 +12,10 @@ plugins {
     id("org.openapi.generator") version "7.14.0"
 }
 
+// Spring Boot plugin is applied here for dependency management only;
+// bootJar is only enabled on the server subproject.
+tasks.named('bootJar') { enabled = false }
+
 group = 'com.ako'
 version = '0.0.1-SNAPSHOT'
 description = 'dbuff'
@@ -104,6 +108,7 @@ project('server') {
         implementation 'org.openapitools:jackson-databind-nullable:0.2.6'
 
         implementation 'org.springframework.boot:spring-boot-starter'
+        implementation 'org.springframework.boot:spring-boot-starter-actuator'
         implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
         implementation 'org.springframework.boot:spring-boot-starter-web'
         implementation 'org.springframework.retry:spring-retry:2.0.12'
@@ -129,9 +134,13 @@ project('server') {
         
         // .env file support
         implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+        implementation 'io.github.cdimascio:dotenv-java:3.1.0'
 
         // discord support
         implementation 'net.dv8tion:JDA:6.3.0'
+
+        // Quartz scheduler for persistent per-instance jobs
+        implementation 'org.springframework.boot:spring-boot-starter-quartz'
 
         implementation("javax.annotation:javax.annotation-api:1.3.2")
         compileOnly 'org.projectlombok:lombok:1.18.38'

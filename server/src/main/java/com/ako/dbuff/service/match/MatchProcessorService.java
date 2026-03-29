@@ -24,9 +24,9 @@ public class MatchProcessorService {
   private final Semaphore matchProcessingSemaphore;
 
   /**
-   * Processes a list of matches asynchronously using virtual threads with StructuredTaskScope.
-   * Each match is processed in its own virtual thread with the matchId available via ScopedValue
-   * for logging and tracing.
+   * Processes a list of matches asynchronously using virtual threads with StructuredTaskScope. Each
+   * match is processed in its own virtual thread with the matchId available via ScopedValue for
+   * logging and tracing.
    *
    * <p>Uses a semaphore to limit concurrent database operations and prevent exhausting the
    * connection pool.
@@ -68,9 +68,9 @@ public class MatchProcessorService {
   }
 
   /**
-   * Processes a single match asynchronously using virtual threads with StructuredTaskScope.
-   * The match is processed in a virtual thread with the matchId available via ScopedValue
-   * for logging and tracing.
+   * Processes a single match asynchronously using virtual threads with StructuredTaskScope. The
+   * match is processed in a virtual thread with the matchId available via ScopedValue for logging
+   * and tracing.
    *
    * @param matchDomain the match to process
    * @return a CompletableFuture containing the processed MatchDomain object
@@ -88,8 +88,7 @@ public class MatchProcessorService {
             log.error("Interrupted while processing match {}", matchDomain.getId());
             throw new RuntimeException("Match processing interrupted", e);
           } catch (Exception e) {
-            log.error(
-                "Error processing match {}: {}", matchDomain.getId(), e.getMessage(), e);
+            log.error("Error processing match {}: {}", matchDomain.getId(), e.getMessage(), e);
             throw new RuntimeException("Match processing failed", e);
           }
         },

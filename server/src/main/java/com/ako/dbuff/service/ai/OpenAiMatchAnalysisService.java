@@ -43,10 +43,7 @@ public class OpenAiMatchAnalysisService implements MatchAnalysisAiService {
     this.aiPromptBuilder = aiPromptBuilder;
 
     if (openAiConfig.getApiKey() != null && !openAiConfig.getApiKey().isBlank()) {
-      this.openAIClient =
-          OpenAIOkHttpClient.builder()
-              .apiKey(openAiConfig.getApiKey())
-              .build();
+      this.openAIClient = OpenAIOkHttpClient.builder().apiKey(openAiConfig.getApiKey()).build();
     } else {
       this.openAIClient = null;
       log.warn("OpenAI API key not configured. OpenAI service will not be available.");
@@ -66,9 +63,10 @@ public class OpenAiMatchAnalysisService implements MatchAnalysisAiService {
 
     try {
       // Get field configuration from request or use default
-      AiPromptFieldConfig config = request.getFieldConfig() != null
-          ? request.getFieldConfig()
-          : AiPromptFieldConfig.defaultConfig();
+      AiPromptFieldConfig config =
+          request.getFieldConfig() != null
+              ? request.getFieldConfig()
+              : AiPromptFieldConfig.defaultConfig();
 
       // Build prompts using the configurable prompt builder
       String systemPrompt = aiPromptBuilder.buildSystemPrompt(request, config);
@@ -83,17 +81,18 @@ public class OpenAiMatchAnalysisService implements MatchAnalysisAiService {
       fullPrompt = truncatePromptIfNeeded(fullPrompt, request, config);
 
       int estimatedTokens = estimateTokenCount(fullPrompt);
-      log.info("Prompt length: {} chars, estimated tokens: {}", fullPrompt.length(), estimatedTokens);
+      log.info(
+          "Prompt length: {} chars, estimated tokens: {}", fullPrompt.length(), estimatedTokens);
 
       // Build messages list using the proper API
       List<ChatCompletionMessageParam> messages = new ArrayList<>();
 
-      messages.add(ChatCompletionMessageParam.ofChatCompletionUserMessageParam(
-          ChatCompletionUserMessageParam.builder()
-              .content(ChatCompletionUserMessageParam.Content.ofTextContent(fullPrompt))
-              .role(ChatCompletionUserMessageParam.Role.USER)
-              .build()
-      ));
+      messages.add(
+          ChatCompletionMessageParam.ofChatCompletionUserMessageParam(
+              ChatCompletionUserMessageParam.builder()
+                  .content(ChatCompletionUserMessageParam.Content.ofTextContent(fullPrompt))
+                  .role(ChatCompletionUserMessageParam.Role.USER)
+                  .build()));
 
       ChatCompletionCreateParams params =
           ChatCompletionCreateParams.builder()
@@ -115,8 +114,7 @@ public class OpenAiMatchAnalysisService implements MatchAnalysisAiService {
 
       log.info("analysisText: {}", analysisText);
 
-      Integer tokensUsed =
-          completion.usage().map(usage -> (int) usage.totalTokens()).orElse(null);
+      Integer tokensUsed = completion.usage().map(usage -> (int) usage.totalTokens()).orElse(null);
 
       String matchIds =
           request.getMatchesWithStatistics().stream()
@@ -208,8 +206,8 @@ public class OpenAiMatchAnalysisService implements MatchAnalysisAiService {
   }
 
   /**
-   * Estimates the number of tokens in a text string.
-   * Uses a simple character-based estimation (approximately 4 chars per token for English).
+   * Estimates the number of tokens in a text string. Uses a simple character-based estimation
+   * (approximately 4 chars per token for English).
    */
   private int estimateTokenCount(String text) {
     if (text == null || text.isEmpty()) {
@@ -219,11 +217,11 @@ public class OpenAiMatchAnalysisService implements MatchAnalysisAiService {
   }
 
   /**
-   * Truncates the prompt if it exceeds the model's context window.
-   * Prioritizes keeping the system prompt and essential match data.
+   * Truncates the prompt if it exceeds the model's context window. Prioritizes keeping the system
+   * prompt and essential match data.
    */
-  private String truncatePromptIfNeeded(String fullPrompt, MatchAnalysisRequest request,
-      AiPromptFieldConfig config) {
+  private String truncatePromptIfNeeded(
+      String fullPrompt, MatchAnalysisRequest request, AiPromptFieldConfig config) {
     int maxInputTokens = openAiConfig.getMaxContextTokens() - openAiConfig.getMaxTokens();
     int estimatedTokens = estimateTokenCount(fullPrompt);
 
@@ -231,8 +229,10 @@ public class OpenAiMatchAnalysisService implements MatchAnalysisAiService {
       return fullPrompt;
     }
 
-    log.warn("Prompt exceeds context limit. Estimated: {} tokens, Max: {} tokens. Truncating...",
-        estimatedTokens, maxInputTokens);
+    log.warn(
+        "Prompt exceeds context limit. Estimated: {} tokens, Max: {} tokens. Truncating...",
+        estimatedTokens,
+        maxInputTokens);
 
     // Calculate how many characters we can keep
     int maxChars = (int) (maxInputTokens * openAiConfig.getCharsPerToken());
@@ -242,8 +242,9 @@ public class OpenAiMatchAnalysisService implements MatchAnalysisAiService {
     int systemPromptLength = systemPrompt.length();
 
     // Reserve space for system prompt + separator + truncation notice
-    String truncationNotice = "\n\n[NOTE: Some match data was truncated due to length limits. " +
-        "Analysis is based on available data.]\n\n";
+    String truncationNotice =
+        "\n\n[NOTE: Some match data was truncated due to length limits. "
+            + "Analysis is based on available data.]\n\n";
     int reservedLength = systemPromptLength + truncationNotice.length() + 100;
 
     int availableForData = maxChars - reservedLength;
@@ -262,22 +263,25 @@ public class OpenAiMatchAnalysisService implements MatchAnalysisAiService {
 
     String result = systemPrompt + truncationNotice + truncatedData;
 
-    log.info("Truncated prompt from {} to {} chars (estimated {} tokens)",
-        fullPrompt.length(), result.length(), estimateTokenCount(result));
+    log.info(
+        "Truncated prompt from {} to {} chars (estimated {} tokens)",
+        fullPrompt.length(),
+        result.length(),
+        estimateTokenCount(result));
 
     return result;
   }
 
-  /**
-   * Truncates the data section while trying to preserve complete match blocks.
-   */
+  /** Truncates the data section while trying to preserve complete match blocks. */
   private String truncateDataSection(String dataPrompt, int maxLength, AiPromptFieldConfig config) {
     if (dataPrompt.length() <= maxLength) {
       return dataPrompt;
     }
 
     // Try to find a good break point - look for match separators or section headers
-    String[] breakPoints = {"=== MATCH ID:", "PLAYER STATISTICS:", "PLAYER ABILITIES:", "PLAYER ITEMS:", "\n\n"};
+    String[] breakPoints = {
+      "=== MATCH ID:", "PLAYER STATISTICS:", "PLAYER ABILITIES:", "PLAYER ITEMS:", "\n\n"
+    };
 
     String truncated = dataPrompt.substring(0, maxLength);
 
@@ -300,10 +304,12 @@ public class OpenAiMatchAnalysisService implements MatchAnalysisAiService {
     analysisRequest.append("2. Standout performances (both positive and negative)\n");
     analysisRequest.append("3. Key statistics highlights\n");
     if (config.isIncludeAbilities()) {
-      analysisRequest.append("4. Ability draft analysis - synergies and strategy behind ability choices\n");
+      analysisRequest.append(
+          "4. Ability draft analysis - synergies and strategy behind ability choices\n");
     }
     if (config.isIncludeItems()) {
-      analysisRequest.append("5. Item build analysis - timing, effectiveness, and alignment with abilities\n");
+      analysisRequest.append(
+          "5. Item build analysis - timing, effectiveness, and alignment with abilities\n");
     }
     analysisRequest.append("6. Recommendations for tracked players\n");
 

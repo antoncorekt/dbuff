@@ -17,6 +17,7 @@ public class CacheConfig {
   public static final String ALL_HERO_ABILITIES_CACHE = "all_hero_abilities";
   public static final String ALL_ABILITIES_CACHE = "all_abilities";
   public static final String MATCH_TYPE_CACHE = "match_type";
+  public static final String MATCH_TYPE_BY_NAME_CACHE = "match_type_by_name";
   public static final String PATCH_CACHE = "patch_cache";
   public static final String DOTA_CONSTANTS_CACHE = "dotaConstants";
 
@@ -31,6 +32,7 @@ public class CacheConfig {
             ALL_HERO_ABILITIES_CACHE,
             ALL_ABILITIES_CACHE,
             MATCH_TYPE_CACHE,
+            MATCH_TYPE_BY_NAME_CACHE,
             PATCH_CACHE,
             DOTA_CONSTANTS_CACHE);
     return cacheManager;

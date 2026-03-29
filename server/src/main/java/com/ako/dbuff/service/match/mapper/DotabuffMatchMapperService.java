@@ -2,6 +2,7 @@ package com.ako.dbuff.service.match.mapper;
 
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.repo.MatchRepo;
+import com.ako.dbuff.service.ScrapperApiService;
 import com.ako.dbuff.service.details.DotabuffBuildDetailsParser;
 import com.ako.dbuff.service.details.ScrapperService;
 import java.time.LocalDateTime;
@@ -23,14 +24,20 @@ public class DotabuffMatchMapperService {
   private final ScrapperService dotaBuffMatchDetailsScrapper;
   private final DotabuffBuildDetailsParser dotabuffBuildDetailsParser;
   private final MatchRepo matchRepo;
+  private final ScrapperApiService scrapperApiService;
 
   public MatchDomain parse(Document document, MatchDomain matchDomain) {
 
-    try {
-      Document buildDetails = dotaBuffMatchDetailsScrapper.scrap(matchDomain);
-      dotabuffBuildDetailsParser.parse(buildDetails, matchDomain);
-    } catch (Exception e) {
-      log.error("Build details dotabuff parse error.", e);
+    if (scrapperApiService.isEnabled()) {
+      try {
+        Document buildDetails = dotaBuffMatchDetailsScrapper.scrap(matchDomain);
+        dotabuffBuildDetailsParser.parse(buildDetails, matchDomain);
+      } catch (Exception e) {
+        log.error("Build details dotabuff parse error.", e);
+      }
+    } else {
+      log.debug(
+          "Scrapper disabled, skipping Dotabuff build details for match {}", matchDomain.getId());
     }
 
     Elements select = document.select("div.footnote-container");
