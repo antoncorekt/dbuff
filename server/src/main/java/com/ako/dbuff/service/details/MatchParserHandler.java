@@ -50,8 +50,8 @@ public class MatchParserHandler {
     Optional<MatchDomain> matchOpt = matchRepo.findById(matchId);
 
     if (matchOpt.filter(match -> match.getEndProcess() != null).isPresent()) {
-        log.info("{} Match {} is already scrapped and has Items and has Abilities", ctx, matchId);
-        return null;
+      log.info("{} Match {} is already scrapped and has Items and has Abilities", ctx, matchId);
+      return null;
     }
 
     MatchDomain matchDomain = matchOpt.orElseGet(() -> createNewMatch(matchId));
