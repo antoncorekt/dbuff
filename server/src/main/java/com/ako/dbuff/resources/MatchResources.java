@@ -10,6 +10,7 @@ import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.resources.model.AnalyzeMatchesRequest;
 import com.ako.dbuff.resources.model.MatchDetailResponse;
+import com.ako.dbuff.resources.model.MatchReportResponse;
 import com.ako.dbuff.service.ai.MatchStatisticsSummarizerService;
 import com.ako.dbuff.service.ai.config.AiPromptFieldConfig;
 import com.ako.dbuff.service.details.MatchParserHandler;
@@ -18,6 +19,9 @@ import com.ako.dbuff.service.match.LastMatchesProcessorService;
 import com.ako.dbuff.service.match.MatchCompletenessService;
 import com.ako.dbuff.service.match.MatchDeletionService;
 import com.ako.dbuff.service.match.MatchProcessorService;
+import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
+import com.ako.dbuff.service.match.report.analyzer.PerPlayerReport;
+import com.ako.dbuff.service.match.report.analyzer.Report;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -56,6 +60,7 @@ public class MatchResources {
   private final DbufInstanceConfigService instanceConfigService;
   private final MatchCompletenessService matchCompletenessService;
   private final MatchProcessorService matchProcessorService;
+  private final MatchReportOrchestrator matchReportOrchestrator;
 
   @GetMapping("/{id}")
   public ResponseEntity<MatchDetailResponse> getMatch(@PathVariable Long id) {
@@ -306,6 +311,40 @@ public class MatchResources {
 
     log.info("total incompletedMatches: {}", incompletedMatches.size());
     return ResponseEntity.ok(incompletedMatches);
+  }
+
+  @GetMapping("/{id}/report")
+  public ResponseEntity<MatchReportResponse> getMatchReport(
+      @PathVariable Long id,
+      @RequestParam("instanceId") String instanceId,
+      @RequestParam(name = "playerIds", required = false) Set<Long> filterPlayerIds) {
+
+    var instanceOpt = instanceConfigService.getDomainById(instanceId);
+    if (instanceOpt.isEmpty()) {
+      return ResponseEntity.notFound().build();
+    }
+
+    var matchOpt = matchRepo.findById(id);
+    if (matchOpt.isEmpty()) {
+      return ResponseEntity.notFound().build();
+    }
+
+    List<Report> reports = matchReportOrchestrator.analyzeMatch(matchOpt.get(), instanceOpt.get());
+
+    if (filterPlayerIds != null && !filterPlayerIds.isEmpty()) {
+      reports =
+          reports.stream()
+              .filter(
+                  r ->
+                      !(r instanceof PerPlayerReport perPlayer)
+                          || filterPlayerIds.contains(perPlayer.getPlayerId()))
+              .toList();
+    }
+
+    MatchReportResponse response =
+        MatchReportResponse.builder().matchId(id).reports(reports).build();
+
+    return ResponseEntity.ok(response);
   }
 
   private MatchDetailResponse buildMatchDetailResponse(MatchDomain match) {

@@ -9,6 +9,8 @@ import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.Builder;
 import lombok.Data;
 
@@ -23,6 +25,36 @@ public class MatchReportContext {
   private List<KillLogDomain> killLogs;
   private DbufInstanceConfigDomain instanceConfig;
   private Set<Long> focusPlayerIds;
-  /** Map of playerId -> player name for display purposes. */
   private Map<Long, String> playerNames;
+
+  private Map<Long, PlayerMatchStatisticDomain> statPerPlayer;
+  private Map<Long, List<AbilityDomain>> abilitiesByPlayers;
+  private Map<Long, List<ItemDomain>> itemsByPlayers;
+  private boolean isWon;
+
+  public void computeDerivedFields() {
+    this.statPerPlayer =
+        playerStatistics.stream()
+            .collect(
+                Collectors.toMap(
+                    PlayerMatchStatisticDomain::getPlayerId, Function.identity(), (a, b) -> a));
+
+    this.abilitiesByPlayers =
+        abilities.stream().collect(Collectors.groupingBy(AbilityDomain::getPlayerId));
+
+    this.itemsByPlayers = items.stream().collect(Collectors.groupingBy(ItemDomain::getPlayerId));
+
+    this.isWon = determineIsWon();
+  }
+
+  private boolean determineIsWon() {
+    List<PlayerMatchStatisticDomain> focusStats =
+        playerStatistics.stream().filter(s -> focusPlayerIds.contains(s.getPlayerId())).toList();
+
+    if (focusStats.isEmpty()) {
+      return false;
+    }
+
+    return focusStats.stream().allMatch(s -> s.getWin() != null && s.getWin() == 1);
+  }
 }
