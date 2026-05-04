@@ -11,10 +11,13 @@ import org.springframework.context.annotation.Configuration;
 public class BotConfiguration {
 
   @Bean
-  public JDA jdaApi(DiscordConfig config, RegistrationDiscordListener registrationListener) {
+  public JDA jdaApi(
+      DiscordConfig config,
+      RegistrationDiscordListener registrationListener,
+      PingPongListener pingPongListener) {
     JDA api =
         JDABuilder.createDefault(config.getApiKey())
-            .addEventListeners(new PingPongListener())
+            .addEventListeners(pingPongListener)
             .addEventListeners(registrationListener)
             .enableIntents(GatewayIntent.MESSAGE_CONTENT)
             .build();

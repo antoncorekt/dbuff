@@ -12,9 +12,13 @@ import com.ako.dbuff.dao.repo.ItemRepository;
 import com.ako.dbuff.dao.repo.KillLogRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.service.discord.DiscordMessageService;
+import com.ako.dbuff.service.match.report.analyzer.Report;
+import com.ako.dbuff.service.match.report.analyzer.ReportAnalyzer;
+import com.ako.dbuff.service.match.report.formatter.ReportFormatter;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -35,19 +39,13 @@ public class MatchReportOrchestrator {
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
   private final DiscordMessageService discordMessageService;
-  private final List<MatchReportHandler> handlers;
+  private final List<ReportAnalyzer> analyzers;
+  private final ReportFormatter reportFormatter;
   private final PlayerGameStatisticRepo playerGameStatisticRepo;
   private final AbilityRepo abilityRepo;
   private final ItemRepository itemRepository;
   private final KillLogRepo killLogRepo;
 
-  /**
-   * Processes a list of matches and sends reports to Discord. Each match gets its own header message
-   * in the channel and a thread for detailed reports.
-   *
-   * @param processedMatches the matches to report on
-   * @param config the instance configuration
-   */
   public void processAndReport(
       List<MatchDomain> processedMatches, DbufInstanceConfigDomain config) {
 
@@ -56,35 +54,63 @@ public class MatchReportOrchestrator {
       return;
     }
 
-    List<MatchReportHandler> sortedHandlers =
-        handlers.stream().sorted(Comparator.comparingInt(MatchReportHandler::getOrder)).toList();
+    List<ReportAnalyzer> sortedAnalyzers =
+        analyzers.stream().sorted(Comparator.comparingInt(ReportAnalyzer::getOrder)).toList();
 
     Set<Long> focusPlayerIds = config.getPlayerIds();
 
     for (MatchDomain match : processedMatches) {
       try {
-        reportMatch(match, config, focusPlayerIds, sortedHandlers);
+        MatchReportContext context = buildContext(match, config, focusPlayerIds);
+        List<Report> allReports = runAnalyzers(context, sortedAnalyzers);
+        sendToDiscord(match, config, context, allReports, sortedAnalyzers);
       } catch (Exception e) {
         log.error("Failed to report match {}: {}", match.getId(), e.getMessage(), e);
       }
     }
   }
 
-  private void reportMatch(
+  public List<Report> analyzeMatch(MatchDomain match, DbufInstanceConfigDomain config) {
+    Set<Long> focusPlayerIds = config.getPlayerIds();
+    MatchReportContext context = buildContext(match, config, focusPlayerIds);
+
+    List<ReportAnalyzer> sortedAnalyzers =
+        analyzers.stream().sorted(Comparator.comparingInt(ReportAnalyzer::getOrder)).toList();
+
+    return runAnalyzers(context, sortedAnalyzers);
+  }
+
+  private List<Report> runAnalyzers(
+      MatchReportContext context, List<ReportAnalyzer> sortedAnalyzers) {
+    List<Report> allReports = new ArrayList<>();
+
+    for (ReportAnalyzer analyzer : sortedAnalyzers) {
+      try {
+        List<Report> reports = analyzer.analyze(context);
+        if (reports != null) {
+          allReports.addAll(reports);
+        }
+      } catch (Exception e) {
+        log.error(
+            "Analyzer {} failed for match {}: {}",
+            analyzer.getAnalyzerName(),
+            context.getMatch().getId(),
+            e.getMessage(),
+            e);
+      }
+    }
+
+    return allReports;
+  }
+
+  private void sendToDiscord(
       MatchDomain match,
       DbufInstanceConfigDomain config,
-      Set<Long> focusPlayerIds,
-      List<MatchReportHandler> sortedHandlers) {
+      MatchReportContext context,
+      List<Report> allReports,
+      List<ReportAnalyzer> sortedAnalyzers) {
 
-    List<PlayerMatchStatisticDomain> playerStats =
-        playerGameStatisticRepo.findAllByMatchId(match.getId());
-    List<AbilityDomain> abilities = abilityRepo.findAllByMatchId(match.getId());
-    List<ItemDomain> items = itemRepository.findAllByMatchId(match.getId());
-    List<KillLogDomain> killLogs = killLogRepo.findAllByMatchId(match.getId());
-
-    Map<Long, String> playerNames = buildPlayerNameMap(config);
-
-    String winLoss = determineWinLoss(playerStats, focusPlayerIds);
+    String winLoss = determineWinLoss(context);
     String header = buildHeader(match, winLoss);
 
     Message headerMessage =
@@ -100,6 +126,25 @@ public class MatchReportOrchestrator {
     String threadName = "Match " + match.getId();
     ThreadChannel thread = discordMessageService.createThread(headerMessage, threadName);
 
+    List<String> formatted = reportFormatter.formatForDiscord(allReports, context.getPlayerNames());
+    for (String message : formatted) {
+      if (message != null && !message.isEmpty()) {
+        discordMessageService.sendThreadMessageBlocking(thread, message);
+      }
+    }
+  }
+
+  private MatchReportContext buildContext(
+      MatchDomain match, DbufInstanceConfigDomain config, Set<Long> focusPlayerIds) {
+
+    List<PlayerMatchStatisticDomain> playerStats =
+        playerGameStatisticRepo.findAllByMatchId(match.getId());
+    List<AbilityDomain> abilities = abilityRepo.findAllByMatchId(match.getId());
+    List<ItemDomain> items = itemRepository.findAllByMatchId(match.getId());
+    List<KillLogDomain> killLogs = killLogRepo.findAllByMatchId(match.getId());
+
+    Map<Long, String> playerNames = buildPlayerNameMap(config);
+
     MatchReportContext context =
         MatchReportContext.builder()
             .match(match)
@@ -112,21 +157,8 @@ public class MatchReportOrchestrator {
             .playerNames(playerNames)
             .build();
 
-    for (MatchReportHandler handler : sortedHandlers) {
-      try {
-        String result = handler.handle(context);
-        if (result != null && !result.isEmpty()) {
-          discordMessageService.sendThreadMessageBlocking(thread, result);
-        }
-      } catch (Exception e) {
-        log.error(
-            "Handler {} failed for match {}: {}",
-            handler.getHandlerName(),
-            match.getId(),
-            e.getMessage(),
-            e);
-      }
-    }
+    context.computeDerivedFields();
+    return context;
   }
 
   private String buildHeader(MatchDomain match, String winLoss) {
@@ -140,7 +172,11 @@ public class MatchReportOrchestrator {
     sb.append(" - ").append(winLoss);
 
     if (match.getRadiantScore() != null && match.getDireScore() != null) {
-      sb.append(" (").append(match.getRadiantScore()).append("-").append(match.getDireScore()).append(")");
+      sb.append(" (")
+          .append(match.getRadiantScore())
+          .append("-")
+          .append(match.getDireScore())
+          .append(")");
     }
 
     if (match.getStartTime() != null) {
@@ -161,10 +197,11 @@ public class MatchReportOrchestrator {
     return sb.toString();
   }
 
-  private String determineWinLoss(
-      List<PlayerMatchStatisticDomain> playerStats, Set<Long> focusPlayerIds) {
+  private static String determineWinLoss(MatchReportContext context) {
     List<PlayerMatchStatisticDomain> focusStats =
-        playerStats.stream().filter(s -> focusPlayerIds.contains(s.getPlayerId())).toList();
+        context.getPlayerStatistics().stream()
+            .filter(s -> context.getFocusPlayerIds().contains(s.getPlayerId()))
+            .toList();
 
     if (focusStats.isEmpty()) {
       return "Unknown";

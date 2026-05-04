@@ -16,22 +16,26 @@ public interface PlayerGameStatisticRepo
 
   List<PlayerMatchStatisticDomain> findAllByMatchId(long matchId);
 
-  /**
-   * Find player statistics by matchId and playerId. Used when we don't have the playerSlot (e.g.,
-   * when scraping from Dotabuff).
-   *
-   * @param matchId the match ID
-   * @param playerId the player account ID
-   * @return the player statistics if found
-   */
   Optional<PlayerMatchStatisticDomain> findByMatchIdAndPlayerId(Long matchId, Long playerId);
 
-  /**
-   * Delete all player statistics associated with a specific match.
-   *
-   * @param matchId the match ID
-   */
   @Modifying
   @Query("DELETE FROM PlayerMatchStatisticDomain p WHERE p.matchId = :matchId")
   void deleteByMatchId(@Param("matchId") Long matchId);
+
+  @Query(
+      """
+      SELECT AVG(p.heroDamage), AVG(p.towerDamage), AVG(p.heroHealing),
+             AVG(p.damageTaken), COUNT(p)
+      FROM PlayerMatchStatisticDomain p
+      JOIN MatchDomain m ON p.matchId = m.id
+      WHERE p.playerId = :playerId
+        AND p.heroId = :heroId
+        AND p.matchId != :excludeMatchId
+        AND m.startTime >= :sinceEpoch
+      """)
+  List<Object[]> findAvgDamageStatsByPlayerAndHero(
+      @Param("playerId") Long playerId,
+      @Param("heroId") Long heroId,
+      @Param("excludeMatchId") Long excludeMatchId,
+      @Param("sinceEpoch") Long sinceEpoch);
 }

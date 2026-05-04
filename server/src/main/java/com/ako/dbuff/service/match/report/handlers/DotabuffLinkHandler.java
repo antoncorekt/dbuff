@@ -1,33 +1,31 @@
 package com.ako.dbuff.service.match.report.handlers;
 
 import com.ako.dbuff.service.match.report.MatchReportContext;
+import com.ako.dbuff.service.match.report.analyzer.LinkReport;
 import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.ReportAnalyzer;
-import com.ako.dbuff.service.match.report.analyzer.TextReport;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
-public class AiSummaryReportHandler implements ReportAnalyzer {
+public class DotabuffLinkHandler implements ReportAnalyzer {
 
   @Override
   public List<Report> analyze(MatchReportContext context) {
-    log.info("AI analysis not yet implemented for match {}", context.getMatch().getId());
-    return List.of(
-        new TextReport(
-            "AiSummary",
-            "AI analysis for match " + context.getMatch().getId() + " — coming soon."));
+    Long matchId = context.getMatch().getId();
+    String url = String.format("https://dotabuff.com/matches/%d/builds", matchId);
+    return List.of(new LinkReport("DotabuffLink", url, "Link to dotabuff"));
   }
 
   @Override
   public String getAnalyzerName() {
-    return "AiSummary";
+    return "DotabuffLink";
   }
 
   @Override
   public int getOrder() {
-    return 5;
+    return -1;
   }
 }
