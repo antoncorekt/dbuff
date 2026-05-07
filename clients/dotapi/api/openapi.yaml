@@ -4181,6 +4181,11 @@ components:
           order: 3
           extra_time: 1
         throw: 0
+        od_data:
+          has_parsed: true
+          has_api: true
+          has_gcdata: true
+          has_archive: true
         chat:
         - unit: unit
           player_slot: 5
@@ -4393,6 +4398,8 @@ components:
           items:
             $ref: "#/components/schemas/MatchResponse_pauses_inner"
           type: array
+        od_data:
+          $ref: "#/components/schemas/MatchResponse_od_data"
       title: MatchResponse
       type: object
     MetadataResponse:
@@ -6762,6 +6769,27 @@ components:
         duration:
           description: The duration of the pause
           type: integer
+      type: object
+    MatchResponse_od_data:
+      description: OpenDota data availability status
+      example:
+        has_parsed: true
+        has_api: true
+        has_gcdata: true
+        has_archive: true
+      properties:
+        has_api:
+          description: Whether API data is available
+          type: boolean
+        has_gcdata:
+          description: Whether GC data is available
+          type: boolean
+        has_parsed:
+          description: Whether the match replay has been parsed
+          type: boolean
+        has_archive:
+          description: Whether the match has been archived
+          type: boolean
       type: object
     PlayersResponse_aliases_inner:
       example:

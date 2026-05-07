@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.ItemDomain;
 import com.ako.dbuff.dao.model.KillLogDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.service.match.report.MatchReportContext;
+import com.ako.dbuff.service.match.report.analyzer.FullDataAvailable;
 import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.ReportAnalyzer;
 import java.util.ArrayList;
@@ -17,7 +18,7 @@ import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
-public class LaneAnalyzer implements ReportAnalyzer {
+public class LaneAnalyzer implements ReportAnalyzer, FullDataAvailable {
 
   private static final long LANE_PHASE_END = 600;
   private static final long EARLY_ITEM_CUTOFF = 1200;

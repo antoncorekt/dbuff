@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.match.report.handlers;
 
 import com.ako.dbuff.service.match.report.MatchReportContext;
+import com.ako.dbuff.service.match.report.analyzer.FullDataAvailable;
 import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.ReportAnalyzer;
 import com.ako.dbuff.service.match.report.analyzer.TextReport;
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
-public class AiSummaryReportHandler implements ReportAnalyzer {
+public class AiSummaryReportHandler implements ReportAnalyzer, FullDataAvailable {
 
   @Override
   public List<Report> analyze(MatchReportContext context) {

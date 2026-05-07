@@ -11,7 +11,7 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 
 @Service
-public class OtherPlayerAnalyzer implements ReportAnalyzer {
+public class OtherPlayerAnalyzer implements ReportAnalyzer, FullDataAvailable {
 
   @Override
   public List<Report> analyze(MatchReportContext context) {

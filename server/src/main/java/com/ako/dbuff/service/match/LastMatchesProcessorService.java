@@ -6,6 +6,8 @@ import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.service.instance.DbufInstanceConfigService;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
+import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -24,6 +26,8 @@ public class LastMatchesProcessorService {
   private final MatchRepo matchRepo;
   private final MatchReportOrchestrator matchReportOrchestrator;
   private final DbufInstanceConfigService instanceConfigService;
+  private final DotaApiParseRequestService parseRequestService;
+  private final MatchParseSchedulerService matchParseSchedulerService;
 
   /**
    * Processes the last matches for a specific instance configuration.
@@ -158,27 +162,30 @@ public class LastMatchesProcessorService {
       log.info("Processing all game modes (no filtering)");
     }
 
-    final List<MatchDomain> matchesToProcess = filteredMatches;
-    final Set<Long> contextPlayerIds = playerIds;
+    // For new matches: request parsing, send partial report, schedule Quartz parse-check jobs
+    List<MatchDomain> newMatches =
+        filteredMatches.stream()
+            .filter(m -> m.getEndProcess() == null)
+            .filter(m -> !Boolean.TRUE.equals(m.getParseRequested()))
+            .toList();
 
-    matchProcessorService
-        .process(matchesToProcess)
-        .thenAccept(
-            listMatches -> {
-              if (config.getDiscordChannelId() == null) {
-                log.info("Discord channel id null, skip match reporting");
-                return;
-              }
-              if (listMatches.isEmpty()) {
-                log.info("No new matches to report");
-                return;
-              }
-              try {
-                matchReportOrchestrator.processAndReport(listMatches, config);
-              } catch (Exception e) {
-                log.error("Failed to generate match reports: {}", e.getMessage(), e);
-              }
-            });
+    for (MatchDomain match : newMatches) {
+      parseRequestService.submitParseRequest(match.getId());
+      match.setParseRequested(true);
+      match.setParseRequestedAt(LocalDateTime.now());
+      matchRepo.save(match);
+
+      // Send partial report (header + thread + partial-data analyzers)
+      Long discordThreadId = matchReportOrchestrator.processAndReportPartial(match, config);
+
+      // Schedule parse-wait job with discord thread ID for full report later
+      matchParseSchedulerService.scheduleParseWait(match.getId(), config.getId(), discordThreadId);
+    }
+
+    if (!newMatches.isEmpty()) {
+      log.info(
+          "Submitted parse requests and scheduled wait jobs for {} new matches", newMatches.size());
+    }
 
     return matchesToFetch;
   }

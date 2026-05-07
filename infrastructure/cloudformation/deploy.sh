@@ -96,7 +96,6 @@ cmd_deploy() {
     --stack-name "$STACK_NAME" \
     --template-body "file://$TEMPLATE" \
     --region "$REGION" \
-    --disable-rollback \
     --parameters \
       ParameterKey=KeyPairName,ParameterValue="$KEY_PAIR_NAME" \
       ParameterKey=DbPassword,ParameterValue="$DB_PASSWORD" \

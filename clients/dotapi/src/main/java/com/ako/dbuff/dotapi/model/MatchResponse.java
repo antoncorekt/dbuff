@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.HashMap;
 import com.ako.dbuff.dotapi.model.MatchResponseChatInner;
 import com.ako.dbuff.dotapi.model.MatchResponseDraftTimingsInner;
+import com.ako.dbuff.dotapi.model.MatchResponseOdData;
 import com.ako.dbuff.dotapi.model.MatchResponsePausesInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePicksBansInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInner;
@@ -90,7 +91,8 @@ import com.ako.dbuff.dotapi.invoker.JSON;
   MatchResponse.JSON_PROPERTY_LOSS,
   MatchResponse.JSON_PROPERTY_WIN,
   MatchResponse.JSON_PROPERTY_REPLAY_URL,
-  MatchResponse.JSON_PROPERTY_PAUSES
+  MatchResponse.JSON_PROPERTY_PAUSES,
+  MatchResponse.JSON_PROPERTY_OD_DATA
 })
 @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.14.0")
@@ -279,6 +281,10 @@ public class MatchResponse {
   public static final String JSON_PROPERTY_PAUSES = "pauses";
   @jakarta.annotation.Nullable
   private List<MatchResponsePausesInner> pauses = new ArrayList<>();
+
+  public static final String JSON_PROPERTY_OD_DATA = "od_data";
+  @jakarta.annotation.Nullable
+  private MatchResponseOdData odData;
 
   public MatchResponse() { 
   }
@@ -1566,6 +1572,31 @@ public class MatchResponse {
   }
 
 
+  public MatchResponse odData(@jakarta.annotation.Nullable MatchResponseOdData odData) {
+    this.odData = odData;
+    return this;
+  }
+
+  /**
+   * Get odData
+   * @return odData
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_OD_DATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public MatchResponseOdData getOdData() {
+    return odData;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_OD_DATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setOdData(@jakarta.annotation.Nullable MatchResponseOdData odData) {
+    this.odData = odData;
+  }
+
+
   /**
    * Return true if this MatchResponse object is equal to o.
    */
@@ -1624,7 +1655,8 @@ public class MatchResponse {
         Objects.equals(this.loss, matchResponse.loss) &&
         Objects.equals(this.win, matchResponse.win) &&
         Objects.equals(this.replayUrl, matchResponse.replayUrl) &&
-        Objects.equals(this.pauses, matchResponse.pauses);
+        Objects.equals(this.pauses, matchResponse.pauses) &&
+        Objects.equals(this.odData, matchResponse.odData);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -1633,7 +1665,7 @@ public class MatchResponse {
 
   @Override
   public int hashCode() {
-    return Objects.hash(matchId, barracksStatusDire, barracksStatusRadiant, chat, cluster, cosmetics, direScore, draftTimings, duration, engine, firstBloodTime, gameMode, humanPlayers, leagueid, lobbyType, matchSeqNum, negativeVotes, objectives, picksBans, positiveVotes, radiantGoldAdv, radiantScore, hashCodeNullable(radiantWin), radiantXpAdv, startTime, hashCodeNullable(teamfights), towerStatusDire, towerStatusRadiant, version, replaySalt, seriesId, seriesType, radiantTeam, direTeam, league, hashCodeNullable(skill), players, patch, region, allWordCounts, myWordCounts, _throw, comeback, loss, win, replayUrl, pauses);
+    return Objects.hash(matchId, barracksStatusDire, barracksStatusRadiant, chat, cluster, cosmetics, direScore, draftTimings, duration, engine, firstBloodTime, gameMode, humanPlayers, leagueid, lobbyType, matchSeqNum, negativeVotes, objectives, picksBans, positiveVotes, radiantGoldAdv, radiantScore, hashCodeNullable(radiantWin), radiantXpAdv, startTime, hashCodeNullable(teamfights), towerStatusDire, towerStatusRadiant, version, replaySalt, seriesId, seriesType, radiantTeam, direTeam, league, hashCodeNullable(skill), players, patch, region, allWordCounts, myWordCounts, _throw, comeback, loss, win, replayUrl, pauses, odData);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -1694,6 +1726,7 @@ public class MatchResponse {
     sb.append("    win: ").append(toIndentedString(win)).append("\n");
     sb.append("    replayUrl: ").append(toIndentedString(replayUrl)).append("\n");
     sb.append("    pauses: ").append(toIndentedString(pauses)).append("\n");
+    sb.append("    odData: ").append(toIndentedString(odData)).append("\n");
     sb.append("}");
     return sb.toString();
   }

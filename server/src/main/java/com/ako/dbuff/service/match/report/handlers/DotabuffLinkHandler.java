@@ -2,6 +2,7 @@ package com.ako.dbuff.service.match.report.handlers;
 
 import com.ako.dbuff.service.match.report.MatchReportContext;
 import com.ako.dbuff.service.match.report.analyzer.LinkReport;
+import com.ako.dbuff.service.match.report.analyzer.PartialDataAvailable;
 import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.ReportAnalyzer;
 import java.util.List;
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
-public class DotabuffLinkHandler implements ReportAnalyzer {
+public class DotabuffLinkHandler implements ReportAnalyzer, PartialDataAvailable {
 
   @Override
   public List<Report> analyze(MatchReportContext context) {

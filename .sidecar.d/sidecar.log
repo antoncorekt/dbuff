@@ -1,0 +1,7 @@
+logutil.py:50 2026-03-28 18:54:17 [DEBUG] root: Logging initialized (pid 85854)
+updater.py:38 2026-03-28 18:54:17 [DEBUG] sidecar.updater: latest version check was: 2026-03-28T17:54:04.231720Z (currently is: 2026-03-28 17:54:17.664990)
+updater.py:32 2026-03-28 18:54:17 [DEBUG] sidecar.updater: skipping check for latest version
+cli.py:84 2026-03-28 18:54:17 [DEBUG] root: No valid sidecar yamls in current directory, using sidecars directory instead.
+core.py:190 2026-03-28 18:54:17 [ERROR] pykwalify.core: validation.invalid
+core.py:191 2026-03-28 18:54:17 [ERROR] pykwalify.core:  --- All found errors ---
+core.py:192 2026-03-28 18:54:17 [ERROR] pykwalify.core: ["Cannot find required key 'host'. Path: ''", "Cannot find required key 'commands'. Path: ''", "Key 'name' was not defined. Path: ''", "Key 'description' was not defined. Path: ''", "Value 'postgres:16-alpine' does not match pattern '\\w+://\\w+'. Path: '/image'", "Key 'containerPort' was not defined. Path: '/ports/0'", "Key 'hostPort' was not defined. Path: '/ports/0'", "Key 'protocol' was not defined. Path: '/ports/0'", "Key 'environment' was not defined. Path: ''", "Key 'volumes' was not defined. Path: ''", "Key 'healthcheck' was not defined. Path: ''", "Key 'resources' was not defined. Path: ''"]

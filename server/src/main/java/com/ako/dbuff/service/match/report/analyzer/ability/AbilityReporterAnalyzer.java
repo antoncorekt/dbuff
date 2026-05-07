@@ -3,6 +3,7 @@ package com.ako.dbuff.service.match.report.analyzer.ability;
 import com.ako.dbuff.dao.model.AbilityDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.service.match.report.MatchReportContext;
+import com.ako.dbuff.service.match.report.analyzer.FullDataAvailable;
 import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.ReportAnalyzer;
 import java.util.ArrayList;
@@ -12,7 +13,7 @@ import org.springframework.stereotype.Service;
 
 @AllArgsConstructor
 @Service
-public class AbilityReporterAnalyzer implements ReportAnalyzer {
+public class AbilityReporterAnalyzer implements ReportAnalyzer, FullDataAvailable {
 
   private final List<AbilityAnalyzer> abilityAnalyzers;
 

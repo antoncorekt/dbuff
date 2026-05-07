@@ -12,6 +12,8 @@ import com.ako.dbuff.dao.repo.ItemRepository;
 import com.ako.dbuff.dao.repo.KillLogRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.service.discord.DiscordMessageService;
+import com.ako.dbuff.service.match.report.analyzer.FullDataAvailable;
+import com.ako.dbuff.service.match.report.analyzer.PartialDataAvailable;
 import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.ReportAnalyzer;
 import com.ako.dbuff.service.match.report.formatter.ReportFormatter;
@@ -68,6 +70,92 @@ public class MatchReportOrchestrator {
         log.error("Failed to report match {}: {}", match.getId(), e.getMessage(), e);
       }
     }
+  }
+
+  /**
+   * Phase 1: Send partial report with header + thread + partial-data analyzers. Returns the Discord
+   * thread ID for later use.
+   */
+  public Long processAndReportPartial(MatchDomain match, DbufInstanceConfigDomain config) {
+    if (config.getDiscordChannelId() == null) {
+      log.info("Discord channel ID is null, skipping partial report");
+      return null;
+    }
+
+    Set<Long> focusPlayerIds = config.getPlayerIds();
+    MatchReportContext context = buildContext(match, config, focusPlayerIds);
+
+    List<ReportAnalyzer> partialAnalyzers =
+        analyzers.stream()
+            .filter(a -> a instanceof PartialDataAvailable)
+            .filter(a -> ((PartialDataAvailable) a).isApplicable(context))
+            .sorted(Comparator.comparingInt(ReportAnalyzer::getOrder))
+            .toList();
+
+    String winLoss = determineWinLoss(context);
+    String header = buildHeader(match, winLoss);
+
+    Message headerMessage =
+        discordMessageService.sendChannelMessage(config.getDiscordChannelId(), header);
+    if (headerMessage == null) {
+      log.warn("Failed to send header for match {}", match.getId());
+      return null;
+    }
+
+    String threadName = "Match " + match.getId();
+    ThreadChannel thread = discordMessageService.createThread(headerMessage, threadName);
+
+    List<Report> partialReports = runAnalyzers(context, partialAnalyzers);
+    List<String> formatted =
+        reportFormatter.formatForDiscord(partialReports, context.getPlayerNames());
+    for (String message : formatted) {
+      if (message != null && !message.isEmpty()) {
+        discordMessageService.sendThreadMessageBlocking(thread, message);
+      }
+    }
+
+    log.info("Partial report sent for match {} in thread {}", match.getId(), thread.getIdLong());
+    return thread.getIdLong();
+  }
+
+  /** Phase 2: Send full-data reports to an existing Discord thread. */
+  public void processAndReportFull(
+      MatchDomain match, DbufInstanceConfigDomain config, long threadId) {
+    if (config.getDiscordChannelId() == null) {
+      return;
+    }
+
+    Set<Long> focusPlayerIds = config.getPlayerIds();
+    MatchReportContext context = buildContext(match, config, focusPlayerIds);
+
+    List<ReportAnalyzer> fullAnalyzers =
+        analyzers.stream()
+            .filter(a -> a instanceof FullDataAvailable)
+            .filter(a -> ((FullDataAvailable) a).isApplicable(context))
+            .sorted(Comparator.comparingInt(ReportAnalyzer::getOrder))
+            .toList();
+
+    List<Report> fullReports = runAnalyzers(context, fullAnalyzers);
+    if (fullReports.isEmpty()) {
+      log.debug("No full-data reports for match {}", match.getId());
+      return;
+    }
+
+    ThreadChannel thread = discordMessageService.getThreadById(threadId);
+    if (thread == null) {
+      log.warn("Discord thread {} not found for match {}", threadId, match.getId());
+      return;
+    }
+
+    List<String> formatted =
+        reportFormatter.formatForDiscord(fullReports, context.getPlayerNames());
+    for (String message : formatted) {
+      if (message != null && !message.isEmpty()) {
+        discordMessageService.sendThreadMessageBlocking(thread, message);
+      }
+    }
+
+    log.info("Full report sent for match {} in thread {}", match.getId(), threadId);
   }
 
   public List<Report> analyzeMatch(MatchDomain match, DbufInstanceConfigDomain config) {

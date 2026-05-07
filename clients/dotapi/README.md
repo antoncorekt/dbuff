@@ -204,6 +204,7 @@ Class | Method | HTTP request | Description
  - [MatchResponse](docs/MatchResponse.md)
  - [MatchResponseChatInner](docs/MatchResponseChatInner.md)
  - [MatchResponseDraftTimingsInner](docs/MatchResponseDraftTimingsInner.md)
+ - [MatchResponseOdData](docs/MatchResponseOdData.md)
  - [MatchResponsePausesInner](docs/MatchResponsePausesInner.md)
  - [MatchResponsePicksBansInner](docs/MatchResponsePicksBansInner.md)
  - [MatchResponsePlayersInner](docs/MatchResponsePlayersInner.md)

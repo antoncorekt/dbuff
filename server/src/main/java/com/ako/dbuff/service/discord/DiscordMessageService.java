@@ -62,4 +62,8 @@ public class DiscordMessageService {
   public Message sendThreadMessageBlocking(ThreadChannel thread, String message) {
     return thread.sendMessage(message).complete();
   }
+
+  public ThreadChannel getThreadById(long threadId) {
+    return jda.getThreadChannelById(threadId);
+  }
 }

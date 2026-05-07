@@ -4,6 +4,7 @@ import com.ako.dbuff.dotapi.api.ConstantsApi;
 import com.ako.dbuff.dotapi.api.MatchesApi;
 import com.ako.dbuff.dotapi.api.PlayersApi;
 import com.ako.dbuff.dotapi.api.PublicMatchesApi;
+import com.ako.dbuff.dotapi.api.RequestApi;
 import com.ako.dbuff.dotapi.invoker.ApiClient;
 import com.google.common.util.concurrent.RateLimiter;
 import jakarta.ws.rs.client.ClientRequestFilter;
@@ -70,6 +71,10 @@ public class DotaApiConfig {
     private String apiKey;
     private Integer requestPerMinute = 60;
     private Boolean isDebugEnabled = false;
+    private Boolean parseWaitEnabled = true;
+    private Integer parsePollIntervalSeconds = 30;
+    private Integer parseMaxWaitHours = 48;
+    private Integer parseRequestRateLimitCost = 10;
   }
 
   @Bean
@@ -90,5 +95,10 @@ public class DotaApiConfig {
   @Bean
   public PublicMatchesApi publicMatchesApi(@Autowired ApiClient apiClient) {
     return new PublicMatchesApi(apiClient);
+  }
+
+  @Bean
+  public RequestApi requestApi(@Autowired ApiClient apiClient) {
+    return new RequestApi(apiClient);
   }
 }

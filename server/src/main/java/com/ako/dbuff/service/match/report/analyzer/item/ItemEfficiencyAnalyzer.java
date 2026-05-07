@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.ItemDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.repo.ItemRepository;
 import com.ako.dbuff.service.match.report.MatchReportContext;
+import com.ako.dbuff.service.match.report.analyzer.FullDataAvailable;
 import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.ReportAnalyzer;
 import java.time.Instant;
@@ -23,7 +24,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @AllArgsConstructor
 @Service
-public class ItemEfficiencyAnalyzer implements ReportAnalyzer {
+public class ItemEfficiencyAnalyzer implements ReportAnalyzer, FullDataAvailable {
 
   private static final int HISTORY_MONTHS = 12;
 

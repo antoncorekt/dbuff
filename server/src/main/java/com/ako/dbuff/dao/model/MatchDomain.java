@@ -44,6 +44,9 @@ public class MatchDomain {
   private Boolean dotaApiFailed;
   private Boolean abadon;
 
+  private Boolean parseRequested;
+  private LocalDateTime parseRequestedAt;
+
   /**
    * Reference to the AI analysis for this match. Multiple matches can share the same analysis when
    * analyzed together.

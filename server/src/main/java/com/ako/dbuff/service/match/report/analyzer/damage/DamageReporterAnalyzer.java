@@ -2,6 +2,7 @@ package com.ako.dbuff.service.match.report.analyzer.damage;
 
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.service.match.report.MatchReportContext;
+import com.ako.dbuff.service.match.report.analyzer.FullDataAvailable;
 import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.ReportAnalyzer;
 import java.util.ArrayList;
@@ -11,7 +12,7 @@ import org.springframework.stereotype.Service;
 
 @AllArgsConstructor
 @Service
-public class DamageReporterAnalyzer implements ReportAnalyzer {
+public class DamageReporterAnalyzer implements ReportAnalyzer, FullDataAvailable {
 
   private final List<DamageAnalyzer> damageAnalyzers;
 
