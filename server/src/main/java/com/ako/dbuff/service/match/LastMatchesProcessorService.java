@@ -176,10 +176,13 @@ public class LastMatchesProcessorService {
       matchRepo.save(match);
 
       // Send partial report (header + thread + partial-data analyzers)
-      Long discordThreadId = matchReportOrchestrator.processAndReportPartial(match, config);
+      var partialResult = matchReportOrchestrator.processAndReportPartial(match, config);
 
-      // Schedule parse-wait job with discord thread ID for full report later
-      matchParseSchedulerService.scheduleParseWait(match.getId(), config.getId(), discordThreadId);
+      // Schedule parse-wait job with discord thread ID and header message ID for full report later
+      Long discordThreadId = partialResult != null ? partialResult.threadId() : null;
+      Long headerMessageId = partialResult != null ? partialResult.headerMessageId() : null;
+      matchParseSchedulerService.scheduleParseWait(
+          match.getId(), config.getId(), discordThreadId, headerMessageId);
     }
 
     if (!newMatches.isEmpty()) {

@@ -13,6 +13,7 @@ import com.ako.dbuff.service.match.report.analyzer.item.ItemEfficiencyReport;
 import com.ako.dbuff.service.match.report.analyzer.item.ItemHistoryStatReport;
 import com.ako.dbuff.service.match.report.analyzer.lane.LaneMatchupReport;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,12 +77,28 @@ public class DiscordReportFormatter implements ReportFormatter {
       splitAndAdd(messages, sb.toString());
     }
 
-    StringBuilder others = new StringBuilder();
-    others.append("### Other Players\n");
-    for (OtherPlayerReport r : otherPlayers) {
-      others.append(formatOtherPlayer(r));
+    if (!otherPlayers.isEmpty()) {
+      List<OtherPlayerReport> radiant =
+          otherPlayers.stream().filter(OtherPlayerReport::isRadiant).toList();
+      List<OtherPlayerReport> dire = otherPlayers.stream().filter(r -> !r.isRadiant()).toList();
+
+      StringBuilder others = new StringBuilder();
+      if (!radiant.isEmpty()) {
+        others.append("### Radiant\n```\n");
+        for (OtherPlayerReport r : radiant) {
+          others.append(formatOtherPlayer(r));
+        }
+        others.append("```\n");
+      }
+      if (!dire.isEmpty()) {
+        others.append("### Dire\n```\n");
+        for (OtherPlayerReport r : dire) {
+          others.append(formatOtherPlayer(r));
+        }
+        others.append("```\n");
+      }
+      splitAndAdd(messages, others.toString());
     }
-    splitAndAdd(messages, others.toString());
 
     for (TextReport text : textReports) {
       splitAndAdd(messages, text.getText() + "\n");
@@ -101,19 +118,28 @@ public class DiscordReportFormatter implements ReportFormatter {
               .append("mo):\n```\n");
           sb.append(
               String.format(
-                  "Hero DMG:  %6d (avg %6.0f)\n", d.getCurrentHeroDamage(), d.getAvgHeroDamage()));
+                  "Hero DMG:  %6d (avg %6.0f)%s\n",
+                  d.getCurrentHeroDamage(),
+                  d.getAvgHeroDamage(),
+                  indicator(d.getCurrentHeroDamage(), d.getAvgHeroDamage(), false)));
           sb.append(
               String.format(
-                  "Tower DMG: %6d (avg %6.0f)\n",
-                  d.getCurrentTowerDamage(), d.getAvgTowerDamage()));
+                  "Tower DMG: %6d (avg %6.0f)%s\n",
+                  d.getCurrentTowerDamage(),
+                  d.getAvgTowerDamage(),
+                  indicator(d.getCurrentTowerDamage(), d.getAvgTowerDamage(), false)));
           sb.append(
               String.format(
-                  "Healing:   %6d (avg %6.0f)\n",
-                  d.getCurrentHeroHealing(), d.getAvgHeroHealing()));
+                  "Healing:   %6d (avg %6.0f)%s\n",
+                  d.getCurrentHeroHealing(),
+                  d.getAvgHeroHealing(),
+                  indicator(d.getCurrentHeroHealing(), d.getAvgHeroHealing(), false)));
           sb.append(
               String.format(
-                  "DMG Taken: %6d (avg %6.0f)\n",
-                  d.getCurrentDamageTaken(), d.getAvgDamageTaken()));
+                  "DMG Taken: %6d (avg %6.0f)%s\n",
+                  d.getCurrentDamageTaken(),
+                  d.getAvgDamageTaken(),
+                  indicator(d.getCurrentDamageTaken(), d.getAvgDamageTaken(), true)));
         } else {
           sb.append("**Damage:**\n```\n");
           sb.append(String.format("Hero DMG:  %6d\n", d.getCurrentHeroDamage()));
@@ -127,18 +153,20 @@ public class DiscordReportFormatter implements ReportFormatter {
   }
 
   private void formatAbilitySection(StringBuilder sb, List<PerPlayerReport> reports) {
-    List<String> lines = new ArrayList<>();
+    List<String> winLossLines = new ArrayList<>();
+    List<String> usageLines = new ArrayList<>();
 
     for (PerPlayerReport r : reports) {
       if (r instanceof ChosenAbilityPlayerReport a && a.getTotalMatches() > 0) {
         String name = a.getPrettyAbilityName() != null ? a.getPrettyAbilityName() : "Ability";
-        lines.add(
+        winLossLines.add(
             String.format(
-                "%-20s %dW/%dL (%.0f%%) %dmo",
+                "%-20s %dW/%dL (%.0f%%)%s %dmo",
                 name,
                 a.getWinCount(),
                 a.getLoseCount(),
                 a.getWinRate() * 100,
+                winRateIndicator(a.getWinRate(), a.getTotalMatches()),
                 a.getHistoryMonths()));
       }
     }
@@ -148,21 +176,42 @@ public class DiscordReportFormatter implements ReportFormatter {
         String name = h.getPrettyAbilityName() != null ? h.getPrettyAbilityName() : "Ability";
         StringBuilder line = new StringBuilder();
         line.append(String.format("%-20s", name));
+        boolean hasData = false;
         if (h.getCurrentDamageDealt() > 0 || h.getAvgDamageDealt() > 0) {
           line.append(
-              String.format(" DMG %d(avg %.0f)", h.getCurrentDamageDealt(), h.getAvgDamageDealt()));
+              String.format(
+                  " DMG %d(avg %.0f)%s",
+                  h.getCurrentDamageDealt(),
+                  h.getAvgDamageDealt(),
+                  indicator(h.getCurrentDamageDealt(), h.getAvgDamageDealt(), false)));
+          hasData = true;
         }
         if (h.getCurrentUseCount() > 0 || h.getAvgUseCount() > 0) {
           line.append(
-              String.format(" Uses %d(avg %.0f)", h.getCurrentUseCount(), h.getAvgUseCount()));
+              String.format(
+                  " Uses %d(avg %.0f)%s",
+                  h.getCurrentUseCount(),
+                  h.getAvgUseCount(),
+                  indicator(h.getCurrentUseCount(), h.getAvgUseCount(), false)));
+          hasData = true;
         }
-        lines.add(line.toString());
+        if (hasData) {
+          usageLines.add(line.toString());
+        }
       }
     }
 
-    if (!lines.isEmpty()) {
-      sb.append("**Abilities:**\n```\n");
-      for (String line : lines) {
+    if (!winLossLines.isEmpty()) {
+      sb.append("**Abilities (win rate):**\n```\n");
+      for (String line : winLossLines) {
+        sb.append(line).append("\n");
+      }
+      sb.append("```\n");
+    }
+
+    if (!usageLines.isEmpty()) {
+      sb.append("**Abilities (usage):**\n```\n");
+      for (String line : usageLines) {
         sb.append(line).append("\n");
       }
       sb.append("```\n");
@@ -170,18 +219,34 @@ public class DiscordReportFormatter implements ReportFormatter {
   }
 
   private void formatItemSection(StringBuilder sb, List<PerPlayerReport> reports) {
-    List<String> lines = new ArrayList<>();
+    List<ChosenItemPlayerReport> chosenItems = new ArrayList<>();
+    List<String> usageLines = new ArrayList<>();
 
     for (PerPlayerReport r : reports) {
       if (r instanceof ChosenItemPlayerReport i && i.getTotalMatches() > 0) {
-        String name = i.getPrettyItemName() != null ? i.getPrettyItemName() : "Item";
-        String prefix = i.isNeutral() ? "*" : " ";
-        String time = i.getPurchaseTime() != null ? formatTime(i.getPurchaseTime()) : "";
-        lines.add(
-            String.format(
-                "%s%-20s %dW/%dL (%.0f%%) %s",
-                prefix, name, i.getWinCount(), i.getLoseCount(), i.getWinRate() * 100, time));
+        chosenItems.add(i);
       }
+    }
+
+    chosenItems.sort(
+        Comparator.comparingLong(
+            i -> i.getPurchaseTime() != null ? i.getPurchaseTime() : Long.MAX_VALUE));
+
+    List<String> winLossLines = new ArrayList<>();
+    for (ChosenItemPlayerReport i : chosenItems) {
+      String name = i.getPrettyItemName() != null ? i.getPrettyItemName() : "Item";
+      String prefix = i.isNeutral() ? "*" : " ";
+      String time = i.getPurchaseTime() != null ? formatTime(i.getPurchaseTime()) : "";
+      winLossLines.add(
+          String.format(
+              "%s%-20s %dW/%dL (%.0f%%)%s %s",
+              prefix,
+              name,
+              i.getWinCount(),
+              i.getLoseCount(),
+              i.getWinRate() * 100,
+              winRateIndicator(i.getWinRate(), i.getTotalMatches()),
+              time));
     }
 
     for (PerPlayerReport r : reports) {
@@ -196,19 +261,35 @@ public class DiscordReportFormatter implements ReportFormatter {
         line.append(String.format(" %-20s", name));
         if (h.getCurrentDamageDealt() > 0 || h.getAvgDamageDealt() > 0) {
           line.append(
-              String.format(" DMG %d(avg %.0f)", h.getCurrentDamageDealt(), h.getAvgDamageDealt()));
+              String.format(
+                  " DMG %d(avg %.0f)%s",
+                  h.getCurrentDamageDealt(),
+                  h.getAvgDamageDealt(),
+                  indicator(h.getCurrentDamageDealt(), h.getAvgDamageDealt(), false)));
         }
         if (h.getCurrentUseCount() > 0 || h.getAvgUseCount() > 0) {
           line.append(
-              String.format(" Uses %d(avg %.0f)", h.getCurrentUseCount(), h.getAvgUseCount()));
+              String.format(
+                  " Uses %d(avg %.0f)%s",
+                  h.getCurrentUseCount(),
+                  h.getAvgUseCount(),
+                  indicator(h.getCurrentUseCount(), h.getAvgUseCount(), false)));
         }
-        lines.add(line.toString());
+        usageLines.add(line.toString());
       }
     }
 
-    if (!lines.isEmpty()) {
-      sb.append("**Items:**\n```\n");
-      for (String line : lines) {
+    if (!winLossLines.isEmpty()) {
+      sb.append("**Items (win rate):**\n```\n");
+      for (String line : winLossLines) {
+        sb.append(line).append("\n");
+      }
+      sb.append("```\n");
+    }
+
+    if (!usageLines.isEmpty()) {
+      sb.append("**Items (usage):**\n```\n");
+      for (String line : usageLines) {
         sb.append(line).append("\n");
       }
       sb.append("```\n");
@@ -249,6 +330,9 @@ public class DiscordReportFormatter implements ReportFormatter {
             if (avg != null) {
               sb.append(String.format(" (avg %s)", formatTime(avg.longValue())));
             }
+            if (current != null && avg != null) {
+              sb.append(indicator(current, avg, true));
+            }
             sb.append("\n");
           }
           sb.append("```\n");
@@ -259,28 +343,28 @@ public class DiscordReportFormatter implements ReportFormatter {
 
   private String formatOtherPlayer(OtherPlayerReport r) {
     String hero = r.getHeroPrettyName() != null ? r.getHeroPrettyName() : "Unknown";
-    String team = r.isRadiant() ? "Rad" : "Dire";
 
     StringBuilder sb = new StringBuilder();
-    sb.append(String.format("**%s** (%s)", hero, team));
+    sb.append(String.format("%-16s", hero));
     if (r.getHeroDamage() > 0 || r.getTowerDamage() > 0 || r.getHeroHealing() > 0) {
-      sb.append(String.format(" DMG:%d Heal:%d", r.getHeroDamage(), r.getHeroHealing()));
+      sb.append(String.format(" DMG:%-6d Heal:%-5d", r.getHeroDamage(), r.getHeroHealing()));
     }
     sb.append("\n");
 
     if (r.getAbilities() != null && !r.getAbilities().isEmpty()) {
       for (OtherPlayerReport.AbilitySummary a : r.getAbilities()) {
         String name = a.getPrettyName() != null ? a.getPrettyName() : "?";
-        sb.append(String.format("  %-20s", name));
+        sb.append(String.format("  %-18s", name));
         if (a.getDamageDealt() != null && a.getDamageDealt() > 0) {
-          sb.append(String.format(" DMG:%d", a.getDamageDealt()));
+          sb.append(String.format(" DMG:%-5d", a.getDamageDealt()));
         }
         if (a.getUseCount() != null && a.getUseCount() > 0) {
-          sb.append(String.format(" Uses:%d", a.getUseCount()));
+          sb.append(String.format(" Uses:%-3d", a.getUseCount()));
         }
         sb.append("\n");
       }
     }
+    sb.append("\n");
 
     return sb.toString();
   }
@@ -371,5 +455,21 @@ public class DiscordReportFormatter implements ReportFormatter {
       return String.format("-%d:%02d", Math.abs(m), s);
     }
     return String.format("%d:%02d", m, s);
+  }
+
+  private static String indicator(double current, double avg, boolean lowerIsBetter) {
+    if (avg <= 0) return "";
+    double ratio = current / avg;
+    if (lowerIsBetter) {
+      return ratio <= 0.8 ? " ▲" : ratio >= 1.3 ? " ▼" : "";
+    }
+    return ratio >= 1.3 ? " ▲" : ratio <= 0.7 ? " ▼" : "";
+  }
+
+  private static String winRateIndicator(double winRate, int totalMatches) {
+    if (totalMatches < 5) return "";
+    if (winRate >= 0.65) return " ▲";
+    if (winRate <= 0.35) return " ▼";
+    return "";
   }
 }

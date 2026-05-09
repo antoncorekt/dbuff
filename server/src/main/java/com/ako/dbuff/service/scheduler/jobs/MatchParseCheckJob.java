@@ -12,6 +12,7 @@ import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import lombok.extern.slf4j.Slf4j;
+import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
+@DisallowConcurrentExecution
 public class MatchParseCheckJob implements Job {
 
   @Autowired private DotaApiParseRequestService parseRequestService;
@@ -35,6 +37,7 @@ public class MatchParseCheckJob implements Job {
     long matchId = context.getJobDetail().getJobDataMap().getLong("matchId");
     String instanceId = context.getJobDetail().getJobDataMap().getString("instanceId");
     long discordThreadId = context.getJobDetail().getJobDataMap().getLong("discordThreadId");
+    long headerMessageId = context.getJobDetail().getJobDataMap().getLong("headerMessageId");
 
     log.debug("Checking parse status for match {}", matchId);
 
@@ -64,7 +67,7 @@ public class MatchParseCheckJob implements Job {
     try {
       MatchDomain processed = matchParserHandler.handle(matchId);
       if (processed != null && instanceId != null) {
-        triggerFullReport(processed, instanceId, discordThreadId);
+        triggerFullReport(processed, instanceId, discordThreadId, headerMessageId);
       }
     } catch (Exception e) {
       log.error("Failed to process parsed match {}: {}", matchId, e.getMessage(), e);
@@ -80,7 +83,8 @@ public class MatchParseCheckJob implements Job {
     return elapsed.toHours() >= config.getParseMaxWaitHours();
   }
 
-  private void triggerFullReport(MatchDomain match, String instanceId, long discordThreadId) {
+  private void triggerFullReport(
+      MatchDomain match, String instanceId, long discordThreadId, long headerMessageId) {
     try {
       DbufInstanceConfigDomain instanceConfig =
           instanceConfigService.getDomainById(instanceId).orElse(null);
@@ -89,7 +93,8 @@ public class MatchParseCheckJob implements Job {
         return;
       }
       if (discordThreadId > 0) {
-        matchReportOrchestrator.processAndReportFull(match, instanceConfig, discordThreadId);
+        matchReportOrchestrator.processAndReportFull(
+            match, instanceConfig, discordThreadId, headerMessageId);
       }
     } catch (Exception e) {
       log.error("Failed to send full report for match {}: {}", match.getId(), e.getMessage(), e);

@@ -26,7 +26,8 @@ public class MatchParseSchedulerService {
   private final Scheduler scheduler;
   private final DotaApiConfigurationProperties config;
 
-  public void scheduleParseWait(long matchId, String instanceId, Long discordThreadId) {
+  public void scheduleParseWait(
+      long matchId, String instanceId, Long discordThreadId, Long headerMessageId) {
     String name = "parse-wait-" + matchId;
     JobKey jobKey = JobKey.jobKey(name, GROUP);
     TriggerKey triggerKey = TriggerKey.triggerKey(name, GROUP);
@@ -45,6 +46,9 @@ public class MatchParseSchedulerService {
 
       if (discordThreadId != null) {
         jobDataMap.usingJobData("discordThreadId", discordThreadId);
+      }
+      if (headerMessageId != null) {
+        jobDataMap.usingJobData("headerMessageId", headerMessageId);
       }
 
       JobDetail jobDetail = jobDataMap.storeDurably().build();

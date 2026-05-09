@@ -66,4 +66,13 @@ public class DiscordMessageService {
   public ThreadChannel getThreadById(long threadId) {
     return jda.getThreadChannelById(threadId);
   }
+
+  public void editMessage(String channelId, long messageId, String newContent) {
+    TextChannel channel = jda.getTextChannelById(channelId);
+    if (channel == null) {
+      log.warn("Discord text channel not found for edit: {}", channelId);
+      return;
+    }
+    channel.editMessageById(messageId, newContent).queue();
+  }
 }

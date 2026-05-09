@@ -72,11 +72,14 @@ public class MatchReportOrchestrator {
     }
   }
 
+  public record PartialReportResult(long threadId, long headerMessageId) {}
+
   /**
    * Phase 1: Send partial report with header + thread + partial-data analyzers. Returns the Discord
-   * thread ID for later use.
+   * thread ID and header message ID for later use.
    */
-  public Long processAndReportPartial(MatchDomain match, DbufInstanceConfigDomain config) {
+  public PartialReportResult processAndReportPartial(
+      MatchDomain match, DbufInstanceConfigDomain config) {
     if (config.getDiscordChannelId() == null) {
       log.info("Discord channel ID is null, skipping partial report");
       return null;
@@ -92,8 +95,7 @@ public class MatchReportOrchestrator {
             .sorted(Comparator.comparingInt(ReportAnalyzer::getOrder))
             .toList();
 
-    String winLoss = determineWinLoss(context);
-    String header = buildHeader(match, winLoss);
+    String header = buildPartialHeader(match);
 
     Message headerMessage =
         discordMessageService.sendChannelMessage(config.getDiscordChannelId(), header);
@@ -115,18 +117,25 @@ public class MatchReportOrchestrator {
     }
 
     log.info("Partial report sent for match {} in thread {}", match.getId(), thread.getIdLong());
-    return thread.getIdLong();
+    return new PartialReportResult(thread.getIdLong(), headerMessage.getIdLong());
   }
 
-  /** Phase 2: Send full-data reports to an existing Discord thread. */
+  /** Phase 2: Send full-data reports to an existing Discord thread and update header. */
   public void processAndReportFull(
-      MatchDomain match, DbufInstanceConfigDomain config, long threadId) {
+      MatchDomain match, DbufInstanceConfigDomain config, long threadId, long headerMessageId) {
     if (config.getDiscordChannelId() == null) {
       return;
     }
 
     Set<Long> focusPlayerIds = config.getPlayerIds();
     MatchReportContext context = buildContext(match, config, focusPlayerIds);
+
+    // Update header with full match info
+    if (headerMessageId > 0) {
+      String winLoss = determineWinLoss(context);
+      String fullHeader = buildHeader(match, winLoss);
+      discordMessageService.editMessage(config.getDiscordChannelId(), headerMessageId, fullHeader);
+    }
 
     List<ReportAnalyzer> fullAnalyzers =
         analyzers.stream()
@@ -283,6 +292,10 @@ public class MatchReportOrchestrator {
     }
 
     return sb.toString();
+  }
+
+  private String buildPartialHeader(MatchDomain match) {
+    return "Match " + match.getId() + " — waiting for parsed data...";
   }
 
   private static String determineWinLoss(MatchReportContext context) {
