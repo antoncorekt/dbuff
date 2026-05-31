@@ -4,9 +4,12 @@ import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.repo.DbufInstanceConfigRepository;
 import com.ako.dbuff.dao.repo.MatchRepo;
-import com.ako.dbuff.service.match.LastMatchesProcessorService;
+import com.ako.dbuff.service.match.DotaApiParseRequestService;
 import com.ako.dbuff.service.match.MatchDeletionService;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
+import com.ako.dbuff.service.match.report.MatchReportOrchestrator.PartialReportResult;
+import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
@@ -25,19 +28,22 @@ public class PingPongListener extends ListenerAdapter {
   private final DbufInstanceConfigRepository instanceConfigRepo;
   private final MatchReportOrchestrator matchReportOrchestrator;
   private final MatchDeletionService matchDeletionService;
-  private final LastMatchesProcessorService lastMatchesProcessorService;
+  private final DotaApiParseRequestService parseRequestService;
+  private final MatchParseSchedulerService matchParseSchedulerService;
 
   public PingPongListener(
       MatchRepo matchRepo,
       DbufInstanceConfigRepository instanceConfigRepo,
       @Lazy MatchReportOrchestrator matchReportOrchestrator,
       @Lazy MatchDeletionService matchDeletionService,
-      @Lazy LastMatchesProcessorService lastMatchesProcessorService) {
+      @Lazy DotaApiParseRequestService parseRequestService,
+      @Lazy MatchParseSchedulerService matchParseSchedulerService) {
     this.matchRepo = matchRepo;
     this.instanceConfigRepo = instanceConfigRepo;
     this.matchReportOrchestrator = matchReportOrchestrator;
     this.matchDeletionService = matchDeletionService;
-    this.lastMatchesProcessorService = lastMatchesProcessorService;
+    this.parseRequestService = parseRequestService;
+    this.matchParseSchedulerService = matchParseSchedulerService;
   }
 
   @Override
@@ -124,7 +130,20 @@ public class PingPongListener extends ListenerAdapter {
       }
 
       DbufInstanceConfigDomain config = configOpt.get();
-      lastMatchesProcessorService.processLastMatchesForInstance(config.getId(), false);
+
+      MatchDomain match = matchRepo.save(MatchDomain.builder().id(matchId).build());
+      parseRequestService.submitParseRequest(matchId);
+      match.setParseRequested(true);
+      match.setParseRequestedAt(LocalDateTime.now());
+      matchRepo.save(match);
+
+      PartialReportResult partialResult =
+          matchReportOrchestrator.processAndReportPartial(match, config);
+
+      Long discordThreadId = partialResult != null ? partialResult.threadId() : thread.getIdLong();
+      Long headerMessageId = partialResult != null ? partialResult.headerMessageId() : null;
+      matchParseSchedulerService.scheduleParseWait(
+          matchId, config.getId(), discordThreadId, headerMessageId);
 
       thread
           .sendMessage("Parse requested. Full analysis will appear when parsing completes.")

@@ -33,8 +33,8 @@ allprojects {
 subprojects {
     apply plugin: "idea"
     apply plugin: "java"
-    
-    // Skip Spotless for generated client to avoid conflicts
+
+    // Apply Spotless only to non-generated projects
     if (project.name != 'dotapi') {
         apply plugin: "com.diffplug.spotless"
     }
@@ -67,18 +67,16 @@ subprojects {
     }
 
     // Apply Spotless configuration only to non-generated projects
-    if (project.name != 'dotapi') {
+    plugins.withId('com.diffplug.spotless') {
         spotless {
-            // don't run spotlessCheck during gradle check task
             enforceCheck = true
             java {
                 target 'src/main/java/**/*.java', 'src/test/java/**/*.java', 'src/testFixtures/java/**/*.java'
-                // Use google-java-format 1.19.2 for Java 21 support
-                googleJavaFormat('1.19.2')
+                googleJavaFormat('1.25.2')
                 removeUnusedImports()
                 importOrder '', 'static '
                 trimTrailingWhitespace()
-                indentWithSpaces 2
+                leadingTabsToSpaces(2)
                 endWithNewline()
                 toggleOffOn()
             }

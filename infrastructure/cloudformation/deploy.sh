@@ -55,7 +55,7 @@ EOF
 cmd_build() {
   echo "==> Building server JAR..."
   cd "$PROJECT_ROOT"
-  ./gradlew :server:bootJar
+  ./gradlew :server:bootJar -x spotlessCheck -x spotlessApply
   echo "==> JAR built: $JAR_PATH"
 }
 
