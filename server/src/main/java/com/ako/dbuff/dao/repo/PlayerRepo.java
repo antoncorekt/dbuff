@@ -1,6 +1,7 @@
 package com.ako.dbuff.dao.repo;
 
 import com.ako.dbuff.dao.model.PlayerDomain;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -25,6 +26,16 @@ public interface PlayerRepo
    * @return Optional containing the player if found
    */
   Optional<PlayerDomain> findByName(String name);
+
+  /**
+   * Finds players by their OpenDota account IDs (the {@code id} column, not the {@code name}
+   * primary key).
+   *
+   * @param ids the account IDs
+   * @return the matching players
+   */
+  @Query("SELECT p FROM PlayerDomain p WHERE p.id IN :ids")
+  List<PlayerDomain> findByAccountIds(@Param("ids") Collection<Long> ids);
 
   /**
    * Finds players whose name matches the given POSIX regular expression, case-insensitively (the

@@ -120,6 +120,11 @@ project('server') {
         
         // OpenAI Java SDK for AI-based match analysis
         implementation 'com.openai:openai-java:0.8.1'
+
+        // Google Cloud Vision (OCR / text detection) for extracting player names from images.
+        // Managed via the Google Cloud libraries BOM to keep transitive versions aligned.
+        implementation platform('com.google.cloud:libraries-bom:26.44.0')
+        implementation 'com.google.cloud:google-cloud-vision'
         
         // JBoss Logging - required by Hibernate
         implementation 'org.jboss.logging:jboss-logging:3.6.1.Final'
