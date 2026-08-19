@@ -8,6 +8,7 @@ import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.model.PlayerDomain_;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain_;
+import com.ako.dbuff.resources.model.ItemComboStatisticResponse;
 import com.ako.dbuff.resources.model.ItemRankingResponse;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -20,6 +21,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Repository;
@@ -148,6 +150,185 @@ public class ItemRankingRepository {
     return results.stream()
         .map(tuple -> mapToItemRankingResponse(tuple, totalMatches, playerId, playerName))
         .toList();
+  }
+
+  /**
+   * Finds statistics over the games in which the player held EVERY one of {@code itemIds}.
+   *
+   * <p>Two-step by design: step one asks {@code item_domain} alone which matches contain the full
+   * set, step two aggregates the player's statistics over those matches with the date and hero
+   * filters applied. Doing it in one query would need a correlated having-clause across three cross
+   * joins, which is harder to read and less portable.
+   *
+   * @param playerId the player's account ID
+   * @param itemIds the items that must ALL be present; empty or null yields zero games
+   * @param heroIds optional hero restriction
+   * @param startDate optional inclusive lower bound on match date
+   * @param endDate optional inclusive upper bound on match date
+   * @return combo statistics, never null; {@code gamesFound} is 0 when nothing matched
+   */
+  public ItemComboStatisticResponse findItemComboStatistics(
+      Long playerId, Set<Long> itemIds, Set<Long> heroIds, LocalDate startDate, LocalDate endDate) {
+
+    String playerName = getPlayerName(playerId);
+    ItemComboStatisticResponse empty =
+        ItemComboStatisticResponse.builder()
+            .playerId(playerId)
+            .playerName(playerName)
+            .gamesFound(0L)
+            .matchIds(Set.of())
+            .winRate(BigDecimal.ZERO)
+            .members(List.of())
+            .build();
+
+    if (itemIds == null || itemIds.isEmpty()) {
+      return empty;
+    }
+
+    Set<Long> candidateMatchIds = findMatchesContainingAllItems(playerId, itemIds);
+    if (candidateMatchIds.isEmpty()) {
+      return empty;
+    }
+
+    Set<Long> comboMatchIds =
+        applyDateAndHeroFilters(playerId, candidateMatchIds, heroIds, startDate, endDate);
+    if (comboMatchIds.isEmpty()) {
+      return empty;
+    }
+
+    CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+
+    // Win rate and average KDA over the combo games.
+    CriteriaQuery<Tuple> statsQuery = cb.createTupleQuery();
+    Root<PlayerMatchStatisticDomain> statsRoot = statsQuery.from(PlayerMatchStatisticDomain.class);
+    statsQuery.multiselect(
+        cb.sum(statsRoot.get(PlayerMatchStatisticDomain_.win)).alias("winCount"),
+        cb.avg(statsRoot.get(PlayerMatchStatisticDomain_.kda)).alias("avgKda"));
+    statsQuery.where(
+        cb.equal(statsRoot.get(PlayerMatchStatisticDomain_.playerId), playerId),
+        statsRoot.get(PlayerMatchStatisticDomain_.matchId).in(comboMatchIds));
+
+    Tuple stats = entityManager.createQuery(statsQuery).getSingleResult();
+    Long winCount = stats.get("winCount", Long.class);
+    Double avgKda = stats.get("avgKda", Double.class);
+
+    long gamesFound = comboMatchIds.size();
+    BigDecimal winRate =
+        BigDecimal.valueOf(winCount != null ? winCount : 0L)
+            .multiply(BigDecimal.valueOf(100))
+            .divide(BigDecimal.valueOf(gamesFound), 2, RoundingMode.HALF_UP);
+
+    // Per-item averages over the combo games only.
+    CriteriaQuery<Tuple> memberQuery = cb.createTupleQuery();
+    Root<ItemDomain> itemRoot = memberQuery.from(ItemDomain.class);
+    memberQuery.multiselect(
+        itemRoot.get(ItemDomain_.itemId).alias("itemId"),
+        itemRoot.get(ItemDomain_.itemName).alias("itemName"),
+        itemRoot.get(ItemDomain_.itemPrettyName).alias("itemPrettyName"),
+        cb.avg(itemRoot.get(ItemDomain_.itemPurchaseTime)).alias("avgPurchaseTime"),
+        cb.avg(itemRoot.get(ItemDomain_.useCount)).alias("avgUseCount"));
+    memberQuery.where(
+        cb.equal(itemRoot.get(ItemDomain_.playerId), playerId),
+        cb.equal(itemRoot.get(ItemDomain_.isNeutral), false),
+        itemRoot.get(ItemDomain_.itemId).in(itemIds),
+        itemRoot.get(ItemDomain_.matchId).in(comboMatchIds));
+    memberQuery.groupBy(
+        itemRoot.get(ItemDomain_.itemId),
+        itemRoot.get(ItemDomain_.itemName),
+        itemRoot.get(ItemDomain_.itemPrettyName));
+
+    List<ItemComboStatisticResponse.Member> members =
+        entityManager.createQuery(memberQuery).getResultList().stream()
+            .map(
+                tuple -> {
+                  Double avgPurchase = tuple.get("avgPurchaseTime", Double.class);
+                  Double avgUse = tuple.get("avgUseCount", Double.class);
+                  return ItemComboStatisticResponse.Member.builder()
+                      .itemId(tuple.get("itemId", Long.class))
+                      .itemName(tuple.get("itemName", String.class))
+                      .itemPrettyName(tuple.get("itemPrettyName", String.class))
+                      .avgPurchaseTime(
+                          avgPurchase != null
+                              ? BigDecimal.valueOf(avgPurchase).setScale(2, RoundingMode.HALF_UP)
+                              : null)
+                      .avgUseCount(
+                          avgUse != null
+                              ? BigDecimal.valueOf(avgUse).setScale(2, RoundingMode.HALF_UP)
+                              : null)
+                      .build();
+                })
+            .toList();
+
+    return ItemComboStatisticResponse.builder()
+        .playerId(playerId)
+        .playerName(playerName)
+        .gamesFound(gamesFound)
+        .matchIds(comboMatchIds)
+        .winRate(winRate)
+        .avgKda(
+            avgKda != null ? BigDecimal.valueOf(avgKda).setScale(2, RoundingMode.HALF_UP) : null)
+        .members(members)
+        .build();
+  }
+
+  /**
+   * Match IDs where the player held every one of {@code itemIds}.
+   *
+   * <p>{@code countDistinct(itemId)} rather than {@code count(itemId)} is essential: a game with
+   * two rows for the same item would otherwise satisfy a two-item request.
+   */
+  private Set<Long> findMatchesContainingAllItems(Long playerId, Set<Long> itemIds) {
+    CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+    CriteriaQuery<Long> query = cb.createQuery(Long.class);
+    Root<ItemDomain> itemRoot = query.from(ItemDomain.class);
+
+    query.select(itemRoot.get(ItemDomain_.matchId));
+    query.where(
+        cb.equal(itemRoot.get(ItemDomain_.playerId), playerId),
+        cb.equal(itemRoot.get(ItemDomain_.isNeutral), false),
+        itemRoot.get(ItemDomain_.itemId).in(itemIds));
+    query.groupBy(itemRoot.get(ItemDomain_.matchId));
+    query.having(
+        cb.equal(cb.countDistinct(itemRoot.get(ItemDomain_.itemId)), Long.valueOf(itemIds.size())));
+
+    return new LinkedHashSet<>(entityManager.createQuery(query).getResultList());
+  }
+
+  /** Narrows candidate match IDs by match date and hero. */
+  private Set<Long> applyDateAndHeroFilters(
+      Long playerId,
+      Set<Long> candidateMatchIds,
+      Set<Long> heroIds,
+      LocalDate startDate,
+      LocalDate endDate) {
+
+    CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+    CriteriaQuery<Long> query = cb.createQuery(Long.class);
+    Root<PlayerMatchStatisticDomain> statsRoot = query.from(PlayerMatchStatisticDomain.class);
+    Root<MatchDomain> matchRoot = query.from(MatchDomain.class);
+
+    List<Predicate> predicates = new ArrayList<>();
+    predicates.add(cb.equal(statsRoot.get(PlayerMatchStatisticDomain_.playerId), playerId));
+    predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.matchId).in(candidateMatchIds));
+    predicates.add(
+        cb.equal(
+            statsRoot.get(PlayerMatchStatisticDomain_.matchId), matchRoot.get(MatchDomain_.id)));
+
+    if (startDate != null) {
+      predicates.add(
+          cb.greaterThanOrEqualTo(matchRoot.get(MatchDomain_.startLocalDate), startDate));
+    }
+    if (endDate != null) {
+      predicates.add(cb.lessThanOrEqualTo(matchRoot.get(MatchDomain_.startLocalDate), endDate));
+    }
+    if (heroIds != null && !heroIds.isEmpty()) {
+      predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.heroId).in(heroIds));
+    }
+
+    query.select(statsRoot.get(PlayerMatchStatisticDomain_.matchId)).distinct(true);
+    query.where(predicates.toArray(new Predicate[0]));
+
+    return new LinkedHashSet<>(entityManager.createQuery(query).getResultList());
   }
 
   /** Gets the total number of matches for a player within the date range and hero filter. */

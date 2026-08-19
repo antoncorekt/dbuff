@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.ranking;
 
 import com.ako.dbuff.dao.repo.ItemRankingRepository;
+import com.ako.dbuff.resources.model.ItemComboStatisticResponse;
 import com.ako.dbuff.resources.model.ItemRankingResponse;
 import com.ako.dbuff.service.constant.ConstantNameResolver;
 import com.ako.dbuff.service.constant.NameResolution;
@@ -79,6 +80,35 @@ public class ItemRankingService {
 
     log.info("Found {} item rankings for player {}", rankings.size(), playerId);
     return rankings;
+  }
+
+  /**
+   * Gets statistics over the games in which the player held every one of the named items.
+   *
+   * @throws UnknownConstantNameException if any supplied name matches no known constant
+   */
+  @Transactional(readOnly = true)
+  public ItemComboStatisticResponse getItemComboStatistics(
+      Long playerId,
+      LocalDate startDate,
+      LocalDate endDate,
+      Set<String> itemNames,
+      Set<String> heroNames) {
+
+    Set<Long> itemIds = resolveItemsOrThrow(itemNames);
+    Set<Long> heroIds = resolveHeroesOrThrow(heroNames);
+    LocalDate effectiveEndDate = endDate != null ? endDate : LocalDate.now();
+
+    log.info(
+        "Fetching item combo statistics for player {}: items={}, heroes={}, {} to {}",
+        playerId,
+        itemIds,
+        heroIds,
+        startDate,
+        effectiveEndDate);
+
+    return itemRankingRepository.findItemComboStatistics(
+        playerId, itemIds, heroIds, startDate, effectiveEndDate);
   }
 
   /**
