@@ -20,6 +20,21 @@ public interface AutocompleteProvider {
   String getCommandName();
 
   /**
+   * The subcommand this provider is restricted to, or null to serve the option across every
+   * subcommand.
+   *
+   * <p>Needed because one option name can mean different things per subcommand: {@code /dbuff
+   * players add player:} searches all of OpenDota, while {@code /dbuff players remove player:} must
+   * offer only the players already tracked. The adapter prefers a subcommand-specific provider over
+   * a general one.
+   *
+   * @return the subcommand name, or null for any
+   */
+  default String getSubcommandName() {
+    return null;
+  }
+
+  /**
    * Choices for the current partial input.
    *
    * @param currentInput what the user has typed into this option so far

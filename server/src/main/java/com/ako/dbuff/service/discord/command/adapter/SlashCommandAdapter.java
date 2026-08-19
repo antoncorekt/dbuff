@@ -38,7 +38,11 @@ public class SlashCommandAdapter extends ListenerAdapter {
         providers.stream()
             .collect(
                 Collectors.toMap(
-                    provider -> providerKey(provider.getCommandName(), provider.getOptionName()),
+                    provider ->
+                        providerKey(
+                            provider.getCommandName(),
+                            provider.getSubcommandName(),
+                            provider.getOptionName()),
                     Function.identity(),
                     (first, second) -> first));
   }
@@ -91,8 +95,9 @@ public class SlashCommandAdapter extends ListenerAdapter {
 
   @Override
   public void onCommandAutoCompleteInteraction(CommandAutoCompleteInteractionEvent event) {
-    String key = providerKey(event.getName(), event.getFocusedOption().getName());
-    AutocompleteProvider provider = providersByKey.get(key);
+    String option = event.getFocusedOption().getName();
+    AutocompleteProvider provider =
+        resolveProvider(event.getName(), event.getSubcommandName(), option);
     if (provider == null) {
       event.replyChoices(List.of()).queue();
       return;
@@ -105,7 +110,7 @@ public class SlashCommandAdapter extends ListenerAdapter {
               event.getFocusedOption().getValue(), new AutocompleteCommandContext(event));
     } catch (Exception e) {
       // A broken picker with no explanation is worse than an empty one.
-      log.debug("Autocomplete provider {} failed: {}", key, e.getMessage());
+      log.debug("Autocomplete for {}:{} failed: {}", event.getName(), option, e.getMessage());
       choices = List.of();
     }
     event.replyChoices(choices).queue();
@@ -128,7 +133,28 @@ public class SlashCommandAdapter extends ListenerAdapter {
     }
   }
 
-  private static String providerKey(String commandName, String optionName) {
-    return commandName.toLowerCase() + ":" + optionName.toLowerCase();
+  /**
+   * Most-specific-first lookup: a provider registered for this exact subcommand wins over one
+   * registered for the whole command. That is what lets {@code /dbuff players add player:} search
+   * OpenDota while {@code /dbuff players remove player:} offers only tracked players.
+   */
+  private AutocompleteProvider resolveProvider(
+      String commandName, String subcommandName, String optionName) {
+    if (subcommandName != null) {
+      AutocompleteProvider specific =
+          providersByKey.get(providerKey(commandName, subcommandName, optionName));
+      if (specific != null) {
+        return specific;
+      }
+    }
+    return providersByKey.get(providerKey(commandName, null, optionName));
+  }
+
+  private static String providerKey(String commandName, String subcommandName, String optionName) {
+    return commandName.toLowerCase()
+        + ":"
+        + (subcommandName == null ? "*" : subcommandName.toLowerCase())
+        + ":"
+        + optionName.toLowerCase();
   }
 }
