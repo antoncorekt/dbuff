@@ -1,4 +1,10 @@
 buildscript {
+    // Declared explicitly so the plugin classpath resolves on a machine with no
+    // ~/.gradle/init.gradle injecting a mirror - a CI runner, for instance.
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
     dependencies {
         classpath "org.springframework.boot:spring-boot-gradle-plugin:3.5.3"
         classpath 'com.diffplug.spotless:spotless-plugin-gradle:7.2.1'
@@ -28,14 +34,25 @@ java {
 
 allprojects {
     apply plugin: 'idea'
+
+    // Must be allprojects, not just the root project. Every subproject resolves
+    // dependencies of its own - ':server' its Spring Boot stack, and the Spotless
+    // projects google-java-format - and a repository declared on the root project
+    // does not reach them. This was previously supplied by an Artifactory mirror in
+    // ~/.gradle/init.gradle, so the build only worked on a machine that had one.
+    repositories {
+        mavenCentral()
+    }
 }
 
 subprojects {
     apply plugin: "idea"
     apply plugin: "java"
 
-    // Apply Spotless only to non-generated projects
-    if (project.name != 'dotapi') {
+    // Apply Spotless only to non-generated projects. ':clients' is skipped too: it
+    // exists only as the implicit parent of ':clients:dotapi' and holds no sources,
+    // so formatting it resolves a formatter to check nothing.
+    if (project.name != 'dotapi' && project.name != 'clients') {
         apply plugin: "com.diffplug.spotless"
     }
 
@@ -88,10 +105,6 @@ configurations {
     compileOnly {
         extendsFrom annotationProcessor
     }
-}
-
-repositories {
-    mavenCentral()
 }
 
 project('server') {
