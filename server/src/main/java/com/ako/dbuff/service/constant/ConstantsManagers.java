@@ -4,6 +4,7 @@ import com.ako.dbuff.config.CacheConfig;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.AbilityIdsConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import com.ako.dbuff.service.constant.data.HeroesAbilityConstant;
 import com.ako.dbuff.service.constant.data.ItemConstant;
 import com.ako.dbuff.service.constant.data.MatchTypeConstant;
 import com.ako.dbuff.service.constant.data.PatchConstant;
@@ -52,6 +53,19 @@ public class ConstantsManagers {
     return heroAbilitiesConstantService.getConstantMap().values().stream()
         .flatMap(x -> x.getAbilities().stream())
         .collect(Collectors.toSet());
+  }
+
+  /**
+   * Hero abilities keyed by internal hero name, e.g. {@code npc_dota_hero_invoker}.
+   *
+   * <p>{@link #getAllHeroAbilities()} flattens every hero into one set, which loses the association
+   * needed to narrow ability autocomplete to a chosen hero.
+   *
+   * @return internal hero name to that hero's abilities
+   */
+  @Cacheable(CacheConfig.HERO_ABILITIES_BY_HERO_CACHE)
+  public Map<String, HeroesAbilityConstant> getHeroAbilitiesMap() {
+    return heroAbilitiesConstantService.getConstantMap();
   }
 
   @Cacheable(CacheConfig.ALL_ABILITIES_CACHE)

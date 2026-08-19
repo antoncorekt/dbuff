@@ -5,6 +5,7 @@ import com.ako.dbuff.dotapi.api.MatchesApi;
 import com.ako.dbuff.dotapi.api.PlayersApi;
 import com.ako.dbuff.dotapi.api.PublicMatchesApi;
 import com.ako.dbuff.dotapi.api.RequestApi;
+import com.ako.dbuff.dotapi.api.SearchApi;
 import com.ako.dbuff.dotapi.invoker.ApiClient;
 import com.google.common.util.concurrent.RateLimiter;
 import jakarta.ws.rs.client.ClientRequestFilter;
@@ -100,5 +101,11 @@ public class DotaApiConfig {
   @Bean
   public RequestApi requestApi(@Autowired ApiClient apiClient) {
     return new RequestApi(apiClient);
+  }
+
+  /** Used by the {@code /dbuff players add} autocomplete to search OpenDota for accounts. */
+  @Bean
+  public SearchApi searchApi(@Autowired ApiClient apiClient) {
+    return new SearchApi(apiClient);
   }
 }

@@ -15,6 +15,7 @@ public class CacheConfig {
   public static final String HERO_CONSTANT_CACHE = "hero_constant";
   public static final String ABILITY_ID_CONSTANT_CACHE = "ability_it_constant";
   public static final String ALL_HERO_ABILITIES_CACHE = "all_hero_abilities";
+  public static final String HERO_ABILITIES_BY_HERO_CACHE = "hero_abilities_by_hero";
   public static final String ALL_ABILITIES_CACHE = "all_abilities";
   public static final String MATCH_TYPE_CACHE = "match_type";
   public static final String MATCH_TYPE_BY_NAME_CACHE = "match_type_by_name";

@@ -41,4 +41,10 @@ public class ItemRankingResponse {
 
   /** Average purchase time in seconds */
   private BigDecimal avgPurchaseTime;
+
+  /**
+   * Average number of times the item was used per game, or null when no game in range recorded a
+   * use count. Unparsed matches leave it unset, so null means "no data", not "never used".
+   */
+  private BigDecimal avgUseCount;
 }
