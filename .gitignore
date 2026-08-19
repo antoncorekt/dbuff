@@ -38,3 +38,6 @@ out/
 
 ### Environment Variables ###
 .env
+
+### Credentials (Google service-account keys, etc.) ###
+credentials/

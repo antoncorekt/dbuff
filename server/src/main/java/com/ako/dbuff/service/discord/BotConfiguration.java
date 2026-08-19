@@ -14,11 +14,13 @@ public class BotConfiguration {
   public JDA jdaApi(
       DiscordConfig config,
       RegistrationDiscordListener registrationListener,
-      PingPongListener pingPongListener) {
+      PingPongListener pingPongListener,
+      PlayerScoutDiscordListener playerScoutListener) {
     JDA api =
         JDABuilder.createDefault(config.getApiKey())
             .addEventListeners(pingPongListener)
             .addEventListeners(registrationListener)
+            .addEventListeners(playerScoutListener)
             .enableIntents(GatewayIntent.MESSAGE_CONTENT)
             .build();
 

@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.scheduler.jobs;
 
 import com.ako.dbuff.service.match.LastMatchesProcessorService;
+import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
@@ -13,10 +14,15 @@ import org.springframework.stereotype.Component;
 public class RecentMatchesJob implements Job {
 
   @Autowired private LastMatchesProcessorService lastMatchesProcessorService;
+  @Autowired private QuietHoursGuard quietHoursGuard;
 
   @Override
   public void execute(JobExecutionContext context) throws JobExecutionException {
     String instanceId = context.getJobDetail().getJobDataMap().getString("instanceId");
+    if (quietHoursGuard.isQuietTime()) {
+      log.info("Skipping recent matches for instance {} during quiet hours", instanceId);
+      return;
+    }
     log.info("Processing last matches for instance {}", instanceId);
     try {
       lastMatchesProcessorService.processLastMatchesForInstance(instanceId);
