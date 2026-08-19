@@ -255,6 +255,40 @@ aws s3 ls "s3://dbuff-deploy-${ACCOUNT}/db-backups/" --region eu-north-1 --human
 
 Expected: `dbuff-pre-migration.dump` with a non-zero size. **Write that size down** — Task 10 compares against it.
 
+- [ ] **Step 6: Capture exact baseline row counts from RDS**
+
+Dump size alone is a weak verification signal, and `n_live_tup` is a statistics
+estimate that can be wrong by a wide margin. Capture exact per-table counts from
+the source now, while RDS is still alive, so Task 10 can diff instead of guessing.
+`query_to_xml` runs a real `count(*)` per table in a single statement.
+
+```bash
+cat > /tmp/baseline.json <<'JSON'
+{
+  "commands": [
+    "set -euo pipefail",
+    "DB_HOST=$(grep -oP 'DB_HOST=\\K.*' /etc/systemd/system/dbuff.service)",
+    "export PGPASSWORD=$(grep -oP 'DB_PASSWORD=\\K.*' /etc/systemd/system/dbuff.service)",
+    "psql -h \"$DB_HOST\" -U dbuffuser -d dbuff -At -F ',' -c \"SELECT table_name, (xpath('/row/cnt/text()', query_to_xml(format('SELECT count(*) AS cnt FROM %I.%I', table_schema, table_name), false, true, '')))[1]::text::bigint AS rows FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name;\""
+  ]
+}
+JSON
+
+CMD=$(aws ssm send-command --instance-ids "$INSTANCE" \
+  --document-name AWS-RunShellScript --parameters file:///tmp/baseline.json \
+  --region eu-north-1 --query 'Command.CommandId' --output text)
+sleep 30
+aws ssm get-command-invocation --command-id "$CMD" --instance-id "$INSTANCE" \
+  --region eu-north-1 --query 'StandardOutputContent' --output text \
+  | tee /tmp/dbuff-baseline-counts.txt
+```
+
+Expected: `table,count` lines, one per public table. **Keep
+`/tmp/dbuff-baseline-counts.txt`.** Task 9 Step 0 recaptures this on a quiesced
+database and overwrites the file — that quiesced copy is what Task 10 diffs
+against. This one is a rehearsal of the query and a floor: no count should ever
+come back *lower* than what it records here.
+
 ---
 
 ## Task 3: Switch the instance to Graviton
@@ -973,7 +1007,9 @@ cat > /tmp/final-dump.json <<'JSON'
     "pg_dump -Fc -h \"$DB_HOST\" -U dbuffuser -d dbuff -f /tmp/dbuff-final.dump",
     "pg_restore --list /tmp/dbuff-final.dump > /dev/null && echo DUMP_READABLE",
     "ls -lh /tmp/dbuff-final.dump",
-    "aws s3 cp /tmp/dbuff-final.dump s3://BUCKET/db-backups/dbuff-final.dump --region eu-north-1"
+    "aws s3 cp /tmp/dbuff-final.dump s3://BUCKET/db-backups/dbuff-final.dump --region eu-north-1",
+    "echo ---COUNTS---",
+    "psql -h \"$DB_HOST\" -U dbuffuser -d dbuff -At -F ',' -c \"SELECT table_name, (xpath('/row/cnt/text()', query_to_xml(format('SELECT count(*) AS cnt FROM %I.%I', table_schema, table_name), false, true, '')))[1]::text::bigint AS rows FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name;\""
   ]
 }
 JSON
@@ -984,11 +1020,32 @@ CMD=$(aws ssm send-command --instance-ids "$INSTANCE" \
   --region eu-north-1 --query 'Command.CommandId' --output text)
 sleep 90
 aws ssm get-command-invocation --command-id "$CMD" --instance-id "$INSTANCE" \
-  --region eu-north-1 --query '[Status,StandardOutputContent,StandardErrorContent]' --output text
+  --region eu-north-1 --query 'StandardOutputContent' --output text \
+  | tee /tmp/dbuff-final-out.txt
+aws ssm get-command-invocation --command-id "$CMD" --instance-id "$INSTANCE" \
+  --region eu-north-1 --query '[Status,StandardErrorContent]' --output text
 ```
 
-Expected: `Success`, `DUMP_READABLE`, a non-zero file size, and an upload line.
+Expected: `DUMP_READABLE`, a non-zero file size, an upload line, then
+`---COUNTS---` followed by `table,count` lines, and finally `Success`.
 Task 10 restores `dbuff-final.dump`, not `dbuff-pre-migration.dump`.
+
+The counts are captured in the same SSM call as the dump, *after* the app is
+stopped, so they describe exactly the state the dump contains — unlike Task 2's
+baseline, which the app has been writing past ever since. Extract them as the
+reference Task 10 diffs against:
+
+```bash
+sed -n '/^---COUNTS---$/,$p' /tmp/dbuff-final-out.txt | grep -v '^---COUNTS---$' \
+  | grep -v '^$' > /tmp/dbuff-baseline-counts.txt
+wc -l /tmp/dbuff-baseline-counts.txt
+```
+
+Expected: the same table count as Task 2 Step 6 produced, with per-table numbers
+equal or higher. This overwrites Task 2's baseline file deliberately — the
+quiesced one is the authoritative reference. If the two differ by a *lot* more
+than a few hours of normal traffic, or any count went *down*, stop and work out
+why before destroying RDS.
 
 - [ ] **Step 1: Build and upload the JAR**
 
@@ -1064,34 +1121,73 @@ cd /Users/akozlovskyi/Documents/dbuff/dbuff
 
 Expected: `Success` and no fatal errors in the output. Benign `pg_restore` warnings about roles or ownership are expected and are why the command tolerates a non-zero exit.
 
-- [ ] **Step 2: Verify by row count, not by exit code**
+- [ ] **Step 2: Diff exact row counts against the Task 9 Step 0 baseline**
+
+Not `n_live_tup` — that is a statistics estimate that reads zero until autovacuum
+runs and would need a `vacuumdb --analyze-only` before it meant anything. Run the
+same exact-count query used for the baseline, so the two outputs are directly
+comparable line for line.
 
 ```bash
 INSTANCE=$(aws cloudformation describe-stack-resources --stack-name dbuff \
   --region eu-north-1 \
   --query "StackResources[?LogicalResourceId=='AppInstance'].PhysicalResourceId" \
   --output text)
+
+cat > /tmp/verify.json <<'JSON'
+{
+  "commands": [
+    "set -euo pipefail",
+    "sudo -u postgres psql -d dbuff -At -c \"SELECT pg_size_pretty(pg_database_size(current_database()));\"",
+    "echo ---",
+    "sudo -u postgres psql -d dbuff -At -F ',' -c \"SELECT table_name, (xpath('/row/cnt/text()', query_to_xml(format('SELECT count(*) AS cnt FROM %I.%I', table_schema, table_name), false, true, '')))[1]::text::bigint AS rows FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name;\""
+  ]
+}
+JSON
+
 CMD=$(aws ssm send-command --instance-ids "$INSTANCE" \
-  --document-name AWS-RunShellScript --region eu-north-1 \
-  --parameters 'commands=["sudo -u postgres psql -d dbuff -At -c \"SELECT pg_size_pretty(pg_database_size(current_database()));\"","sudo -u postgres psql -d dbuff -c \"SELECT relname, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC LIMIT 15;\""]' \
-  --query 'Command.CommandId' --output text)
-sleep 20
-aws ssm get-command-invocation --command-id "$CMD" --instance-id "$INSTANCE" \
-  --region eu-north-1 --query 'StandardOutputContent' --output text
-```
-
-Expected: a database size roughly consistent with the dump size recorded in Task 2 Step 5, then a table of tables with non-zero `n_live_tup` for the match and player tables. An empty result, or every table at zero, means the restore silently failed — do not proceed; the RDS snapshot from Task 2 is still available.
-
-`n_live_tup` comes from the statistics collector and can read low or zero immediately after a restore until autovacuum has analyzed the tables. If the sizes look right but the counts look wrong, force it and re-check:
-
-```bash
-CMD=$(aws ssm send-command --instance-ids "$INSTANCE" \
-  --document-name AWS-RunShellScript --region eu-north-1 \
-  --parameters 'commands=["sudo -u postgres vacuumdb --analyze-only -d dbuff","sudo -u postgres psql -d dbuff -c \"SELECT relname, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC LIMIT 15;\""]' \
-  --query 'Command.CommandId' --output text)
+  --document-name AWS-RunShellScript --parameters file:///tmp/verify.json \
+  --region eu-north-1 --query 'Command.CommandId' --output text)
 sleep 30
 aws ssm get-command-invocation --command-id "$CMD" --instance-id "$INSTANCE" \
-  --region eu-north-1 --query 'StandardOutputContent' --output text
+  --region eu-north-1 --query 'StandardOutputContent' --output text \
+  | tee /tmp/dbuff-restored-counts.txt
+```
+
+Now diff. `sed` strips the size line and the `---` marker so only the
+`table,count` lines are compared:
+
+```bash
+sed -n '/^---$/,$p' /tmp/dbuff-restored-counts.txt | grep -v '^---$' \
+  > /tmp/restored-only.txt
+diff /tmp/dbuff-baseline-counts.txt /tmp/restored-only.txt && echo "ROW COUNTS MATCH"
+```
+
+Expected: `ROW COUNTS MATCH` with no diff output, and a database size in the same
+ballpark as the 14.8 MiB dump (expect it larger — indexes and page overhead are
+not compressed).
+
+Two kinds of diff, treated differently:
+
+- **A count is lower, or a table is missing entirely.** The restore lost data.
+  STOP. Do not proceed to Task 11 and do not delete the RDS snapshot; roll back
+  per the rollback section below.
+- **A count is higher, or a new table appears.** Almost certainly benign: the app
+  started before this check and wrote new rows, or Hibernate `ddl-auto=update`
+  created a table for one of the uncommitted entities. Confirm the *direction* of
+  every difference is upward before accepting it.
+
+If the diff is noisy because the app is live, stop it and re-check on a quiet
+database:
+
+```bash
+aws ssm send-command --instance-ids "$INSTANCE" \
+  --document-name AWS-RunShellScript --region eu-north-1 \
+  --parameters 'commands=["systemctl stop dbuff"]' >/dev/null
+# re-run the verify block above, then:
+aws ssm send-command --instance-ids "$INSTANCE" \
+  --document-name AWS-RunShellScript --region eu-north-1 \
+  --parameters 'commands=["systemctl start dbuff"]' >/dev/null
 ```
 
 - [ ] **Step 3: Confirm the application is healthy against the restored data**
