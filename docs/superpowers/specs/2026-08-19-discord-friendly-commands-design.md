@@ -251,6 +251,21 @@ embed is posted into the thread **as it completes**, so a slow fifth player does
 not hide the first four. This progressive fill is a concrete advantage of the
 thread model over `defer()`, where nothing appears until everything finishes.
 
+### Resolving names back to IDs
+
+Because `hero:`, `items:`, and `skills:` are string options, autocomplete offers
+*display* names while the repositories need numeric IDs. Each handler resolves
+submitted names through the constant maps (`getItemConstantMap()`,
+`getHeroConstantMap()`, `getAllAbilityConstants()`) before querying.
+
+Resolution can fail — autocomplete is a suggestion, not a constraint, so a user
+can submit freehand text or edit a previously-completed value. On failure the
+handler replies **ephemerally, before the ack**, naming every token that did not
+resolve and suggesting the closest match by edit distance. It never silently
+drops an unresolved token: dropping one member of a combo query would quietly
+answer a different question than the one asked, reporting a two-item combo's
+statistics as though they were a three-item combo's.
+
 ## Data Layer Changes
 
 ### 1. Hero filter on three existing query methods
@@ -367,6 +382,7 @@ Available: JUnit 5, Mockito via `spring-boot-starter-test`, H2. No Testcontainer
 | Handlers | `FakeAsyncReply` capturing posts; every handler unit-tested against mocked services with no JDA at all |
 | Text parsing | `TextCommandAdapter` as pure string → args assertions |
 | Autocomplete | Against the real in-memory `ConstantsManagers` maps; assert the 25-choice cap, match ordering, and comma-accumulation behavior |
+| Name resolution | Assert unresolved tokens produce an error rather than being dropped from a combo query |
 | Combo semantics | Assert `COUNT(DISTINCT …)` rejects a one-item game for a two-item query |
 | Rate arithmetic | Unit-test `mapToItemRankingResponse` and the hero-filtered total-match-count path — where the pick-rate trap above would surface |
 
