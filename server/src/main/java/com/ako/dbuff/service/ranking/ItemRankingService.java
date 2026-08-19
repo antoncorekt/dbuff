@@ -78,7 +78,7 @@ public class ItemRankingService {
 
     List<ItemRankingResponse> rankings =
         itemRankingRepository.findItemRankingsByPlayer(
-            playerId, startDate, effectiveEndDate, itemIds, excludedItemIds, effectiveLimit);
+            playerId, startDate, effectiveEndDate, itemIds, excludedItemIds, null, effectiveLimit);
 
     log.info("Found {} item rankings for player {}", rankings.size(), playerId);
 

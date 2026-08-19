@@ -41,6 +41,7 @@ public class ItemRankingRepository {
    * @param endDate Optional end date filter (inclusive)
    * @param itemIds Optional set of item IDs to include (if null, returns top items by pick rate)
    * @param excludedItems Optional set of item IDs to exclude
+   * @param heroIds Optional set of hero IDs to restrict the query to
    * @param limit Maximum number of items to return (default 10)
    * @return List of ItemRankingResponse ordered by pick count descending
    */
@@ -50,12 +51,13 @@ public class ItemRankingRepository {
       LocalDate endDate,
       Set<Long> itemIds,
       Set<Long> excludedItems,
+      Set<Long> heroIds,
       Integer limit) {
 
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
 
-    // First, get total match count for the player within the date range
-    Long totalMatches = getTotalMatchCount(playerId, startDate, endDate);
+    // First, get total match count for the player within the date range and hero filter
+    Long totalMatches = getTotalMatchCount(playerId, startDate, endDate, heroIds);
     if (totalMatches == null || totalMatches == 0) {
       return List.of();
     }
@@ -112,6 +114,11 @@ public class ItemRankingRepository {
     // Exclude neutral items from ranking (they are special items)
     predicates.add(cb.equal(itemRoot.get(ItemDomain_.isNeutral), false));
 
+    // Hero filter
+    if (heroIds != null && !heroIds.isEmpty()) {
+      predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.heroId).in(heroIds));
+    }
+
     // Select aggregated values
     query.multiselect(
         itemRoot.get(ItemDomain_.itemId).alias("itemId"),
@@ -119,7 +126,8 @@ public class ItemRankingRepository {
         itemRoot.get(ItemDomain_.itemPrettyName).alias("itemPrettyName"),
         cb.countDistinct(itemRoot.get(ItemDomain_.matchId)).alias("pickCount"),
         cb.sum(statsRoot.get(PlayerMatchStatisticDomain_.win)).alias("winCount"),
-        cb.avg(itemRoot.get(ItemDomain_.itemPurchaseTime)).alias("avgPurchaseTime"));
+        cb.avg(itemRoot.get(ItemDomain_.itemPurchaseTime)).alias("avgPurchaseTime"),
+        cb.avg(itemRoot.get(ItemDomain_.useCount)).alias("avgUseCount"));
 
     query.where(predicates.toArray(new Predicate[0]));
 
@@ -142,8 +150,9 @@ public class ItemRankingRepository {
         .toList();
   }
 
-  /** Gets the total number of matches for a player within the date range. */
-  private Long getTotalMatchCount(Long playerId, LocalDate startDate, LocalDate endDate) {
+  /** Gets the total number of matches for a player within the date range and hero filter. */
+  private Long getTotalMatchCount(
+      Long playerId, LocalDate startDate, LocalDate endDate, Set<Long> heroIds) {
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
     CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
     Root<PlayerMatchStatisticDomain> statsRoot = countQuery.from(PlayerMatchStatisticDomain.class);
@@ -161,6 +170,12 @@ public class ItemRankingRepository {
     }
     if (endDate != null) {
       predicates.add(cb.lessThanOrEqualTo(matchRoot.get(MatchDomain_.startLocalDate), endDate));
+    }
+    // Must mirror the main query's hero filter. Filtering only the numerator would
+    // divide hero-specific pick counts by the player's games across ALL heroes and
+    // report pick rates several times too low, with no error.
+    if (heroIds != null && !heroIds.isEmpty()) {
+      predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.heroId).in(heroIds));
     }
 
     countQuery.select(cb.countDistinct(statsRoot.get(PlayerMatchStatisticDomain_.matchId)));
@@ -188,6 +203,7 @@ public class ItemRankingRepository {
     Long pickCount = tuple.get("pickCount", Long.class);
     Long winCount = tuple.get("winCount", Long.class);
     Double avgPurchaseTime = tuple.get("avgPurchaseTime", Double.class);
+    Double avgUseCount = tuple.get("avgUseCount", Double.class);
 
     // Calculate pick rate: (pickCount / totalMatches) * 100
     BigDecimal pickRate =
@@ -215,6 +231,10 @@ public class ItemRankingRepository {
         .avgPurchaseTime(
             avgPurchaseTime != null
                 ? BigDecimal.valueOf(avgPurchaseTime).setScale(2, RoundingMode.HALF_UP)
+                : null)
+        .avgUseCount(
+            avgUseCount != null
+                ? BigDecimal.valueOf(avgUseCount).setScale(2, RoundingMode.HALF_UP)
                 : null)
         .build();
   }
