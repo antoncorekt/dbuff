@@ -1,0 +1,618 @@
+package com.ako.dbuff.service.discord.command.impl;
+
+import com.ako.dbuff.resources.model.AbilityComboStatisticResponse;
+import com.ako.dbuff.resources.model.AbilityRankingResponse;
+import com.ako.dbuff.resources.model.DbufInstanceConfigResponse;
+import com.ako.dbuff.resources.model.ItemComboStatisticResponse;
+import com.ako.dbuff.resources.model.ItemRankingResponse;
+import com.ako.dbuff.resources.model.PlayerStatisticResponse;
+import com.ako.dbuff.service.constant.ConstantNameResolver;
+import com.ako.dbuff.service.constant.CurrentPatchDateResolver;
+import com.ako.dbuff.service.constant.NameResolution;
+import com.ako.dbuff.service.discord.command.FakeCommandContext;
+import com.ako.dbuff.service.discord.command.PlayerReferenceResolver;
+import com.ako.dbuff.service.discord.command.StatsEmbedFormatter;
+import com.ako.dbuff.service.instance.DbufInstanceConfigService;
+import com.ako.dbuff.service.ranking.AbilityRankingService;
+import com.ako.dbuff.service.ranking.ItemRankingService;
+import com.ako.dbuff.service.ranking.PlayerStatisticService;
+import com.ako.dbuff.service.ranking.StatsPeriod;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class StatsCommandTest {
+
+  private static final Long TIGRESS = 201613150L;
+  private static final Long PASTUKH = 204429164L;
+
+  private DbufInstanceConfigService instanceConfigService;
+  private PlayerReferenceResolver playerResolver;
+  private ConstantNameResolver nameResolver;
+  private CurrentPatchDateResolver patchDateResolver;
+  private PlayerStatisticService playerStatisticService;
+  private ItemRankingService itemRankingService;
+  private AbilityRankingService abilityRankingService;
+  private StatsCommand command;
+
+  @BeforeEach
+  void setUp() {
+    instanceConfigService = Mockito.mock(DbufInstanceConfigService.class);
+    playerResolver = Mockito.mock(PlayerReferenceResolver.class);
+    nameResolver = Mockito.mock(ConstantNameResolver.class);
+    patchDateResolver = Mockito.mock(CurrentPatchDateResolver.class);
+    playerStatisticService = Mockito.mock(PlayerStatisticService.class);
+    itemRankingService = Mockito.mock(ItemRankingService.class);
+    abilityRankingService = Mockito.mock(AbilityRankingService.class);
+
+    command =
+        new StatsCommand(
+            instanceConfigService,
+            playerResolver,
+            nameResolver,
+            patchDateResolver,
+            playerStatisticService,
+            itemRankingService,
+            abilityRankingService,
+            new StatsEmbedFormatter());
+
+    Mockito.when(instanceConfigService.getByDiscordChannelId(Mockito.anyString()))
+        .thenReturn(Optional.of(DbufInstanceConfigResponse.builder().id("instance-1").build()));
+    resolvesTo(new PlayerReferenceResolver.ResolvedPlayer(TIGRESS, "Tigress"));
+    Mockito.when(nameResolver.resolveHeroes(Mockito.anySet())).thenReturn(NameResolution.empty());
+    Mockito.when(nameResolver.resolveItems(Mockito.anySet())).thenReturn(NameResolution.empty());
+    Mockito.when(nameResolver.resolveAbilities(Mockito.anySet()))
+        .thenReturn(NameResolution.empty());
+    Mockito.when(patchDateResolver.getCurrentPatchStartDate())
+        .thenReturn(Optional.of(LocalDate.of(2026, 8, 1)));
+    Mockito.when(
+            playerStatisticService.getPlayerStatistics(
+                Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(stats());
+    Mockito.when(
+            itemRankingService.getItemRankings(
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any()))
+        .thenReturn(
+            List.of(ItemRankingResponse.builder().itemId(1L).itemPrettyName("Blink").build()));
+    Mockito.when(
+            abilityRankingService.getAbilityRankings(
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any()))
+        .thenReturn(
+            List.of(
+                AbilityRankingResponse.builder().abilityId(1L).abilityPrettyName("Quas").build()));
+  }
+
+  private void resolvesTo(PlayerReferenceResolver.ResolvedPlayer... players) {
+    Mockito.when(playerResolver.resolve(Mockito.anyString(), Mockito.anyList()))
+        .thenReturn(new PlayerReferenceResolver.Resolution(List.of(players), List.of()));
+  }
+
+  private static PlayerStatisticResponse stats() {
+    return PlayerStatisticResponse.builder()
+        .playerId(TIGRESS)
+        .playerName("Tigress")
+        .totalMatches(42L)
+        .wins(25L)
+        .losses(17L)
+        .avgWinRate(BigDecimal.valueOf(59.52))
+        .build();
+  }
+
+  private static FakeCommandContext context() {
+    return FakeCommandContext.builder().option("player", "Tigress").build();
+  }
+
+  // ---------------------------------------------------------------- definition
+
+  @Test
+  void definitionExposesTheFourSubcommands() {
+    assertThat(command.getDefinition().getSubcommands())
+        .extracting(subcommand -> subcommand.getName())
+        .containsExactlyInAnyOrder("overall", "heroes", "items", "skills");
+  }
+
+  @Test
+  void periodOptionOffersEveryPresetAsAStaticChoice() {
+    assertThat(
+            command.getDefinition().getSubcommands().stream()
+                .filter(s -> s.getName().equals("overall"))
+                .findFirst()
+                .orElseThrow()
+                .getOptions()
+                .stream()
+                .filter(o -> o.getName().equals("period"))
+                .findFirst()
+                .orElseThrow()
+                .getChoices())
+        .hasSize(StatsPeriod.values().length);
+  }
+
+  // ---------------------------------------------------------------- validation
+
+  @Test
+  void unregisteredChannel_repliesEphemerallyAndDoesNoWork() {
+    Mockito.when(instanceConfigService.getByDiscordChannelId(Mockito.anyString()))
+        .thenReturn(Optional.empty());
+    FakeCommandContext context = context();
+
+    command.execute("overall", context);
+
+    assertThat(context.getEphemeralReplies()).hasSize(1);
+    assertThat(context.getEphemeralReplies().get(0)).contains("/dbuff register");
+    assertThat(context.getAcknowledgeSummary()).isNull();
+    assertThat(context.getEmbeds()).isEmpty();
+  }
+
+  @Test
+  void noPlayerNamed_repliesEphemerally() {
+    FakeCommandContext context = FakeCommandContext.builder().build();
+
+    command.execute("overall", context);
+
+    assertThat(context.getEphemeralReplies()).hasSize(1);
+    assertThat(context.getAcknowledgeSummary()).isNull();
+  }
+
+  @Test
+  void unknownPlayer_isNamedWithASuggestionAndNoThreadIsCreated() {
+    Mockito.when(playerResolver.resolve(Mockito.anyString(), Mockito.anyList()))
+        .thenReturn(new PlayerReferenceResolver.Resolution(List.of(), List.of("Tigres")));
+    Mockito.when(playerResolver.suggest(Mockito.anyString(), Mockito.eq("Tigres")))
+        .thenReturn(Optional.of("Tigress"));
+
+    FakeCommandContext context = FakeCommandContext.builder().option("player", "Tigres").build();
+    command.execute("overall", context);
+
+    assertThat(context.getEphemeralReplies().get(0)).contains("Tigres").contains("Tigress");
+    assertThat(context.getAcknowledgeSummary()).isNull();
+  }
+
+  @Test
+  void moreThanFivePlayers_isRejectedBeforeAnyAggregation() {
+    List<PlayerReferenceResolver.ResolvedPlayer> six = new ArrayList<>();
+    for (int i = 0; i < StatsCommand.MAX_PLAYERS + 1; i++) {
+      six.add(new PlayerReferenceResolver.ResolvedPlayer((long) i, "P" + i));
+    }
+    Mockito.when(playerResolver.resolve(Mockito.anyString(), Mockito.anyList()))
+        .thenReturn(new PlayerReferenceResolver.Resolution(six, List.of()));
+
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "P0,P1,P2,P3,P4,P5").build();
+    command.execute("overall", context);
+
+    assertThat(context.getEphemeralReplies()).hasSize(1);
+    assertThat(context.getAcknowledgeSummary()).isNull();
+    Mockito.verifyNoInteractions(playerStatisticService);
+  }
+
+  @Test
+  void unknownHero_isRejectedWithASuggestionBeforeAcknowledging() {
+    Mockito.when(nameResolver.resolveHeroes(Set.of("Invokr")))
+        .thenReturn(new NameResolution(Set.of(), Set.of("Invokr")));
+    Mockito.when(nameResolver.suggestHero("Invokr")).thenReturn(Optional.of("Invoker"));
+
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "Tigress").option("hero", "Invokr").build();
+    command.execute("overall", context);
+
+    assertThat(context.getEphemeralReplies().get(0)).contains("Invokr").contains("Invoker");
+    assertThat(context.getAcknowledgeSummary()).isNull();
+    Mockito.verifyNoInteractions(playerStatisticService);
+  }
+
+  // ------------------------------------------------------------------- overall
+
+  @Test
+  void overall_happyPathWithTwoPlayers_acknowledgesOnceAndPostsTwoEmbeds() {
+    resolvesTo(
+        new PlayerReferenceResolver.ResolvedPlayer(TIGRESS, "Tigress"),
+        new PlayerReferenceResolver.ResolvedPlayer(PASTUKH, "Пастух лолей"));
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "Tigress,Пастух лолей").build();
+
+    command.execute("overall", context);
+
+    assertThat(context.getAcknowledgeSummary()).contains("2 player(s)");
+    assertThat(context.getEmbeds()).hasSize(2);
+    assertThat(context.getFailures()).isEmpty();
+  }
+
+  @Test
+  void overall_onePlayerFailing_stillAnswersForTheOthers() {
+    resolvesTo(
+        new PlayerReferenceResolver.ResolvedPlayer(TIGRESS, "Tigress"),
+        new PlayerReferenceResolver.ResolvedPlayer(PASTUKH, "Пастух лолей"));
+    Mockito.when(
+            playerStatisticService.getPlayerStatistics(
+                Mockito.eq(TIGRESS), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenThrow(new IllegalStateException("database went away"));
+
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "Tigress,Пастух лолей").build();
+    command.execute("overall", context);
+
+    assertThat(context.getFailures()).hasSize(1);
+    assertThat(context.getFailures().get(0)).contains("Tigress");
+    assertThat(context.getEmbeds()).hasSize(1);
+  }
+
+  @Test
+  void overall_forwardsTheHeroFilterAndTheResolvedDateRange() {
+    Mockito.when(nameResolver.resolveHeroes(Set.of("Invoker")))
+        .thenReturn(new NameResolution(Set.of(74L), Set.of()));
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .option("player", "Tigress")
+            .option("hero", "Invoker")
+            .option("period", "last_7_days")
+            .build();
+
+    command.execute("overall", context);
+
+    ArgumentCaptor<LocalDate> start = ArgumentCaptor.forClass(LocalDate.class);
+    ArgumentCaptor<Set<String>> heroes = ArgumentCaptor.forClass(Set.class);
+    Mockito.verify(playerStatisticService)
+        .getPlayerStatistics(
+            Mockito.eq(TIGRESS),
+            start.capture(),
+            Mockito.eq(LocalDate.now()),
+            Mockito.isNull(),
+            heroes.capture());
+
+    assertThat(start.getValue()).isEqualTo(LocalDate.now().minusDays(7));
+    assertThat(heroes.getValue()).containsExactly("Invoker");
+  }
+
+  @Test
+  void overall_allTime_passesNoLowerBound() {
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .option("player", "Tigress")
+            .option("period", "all_time")
+            .build();
+
+    command.execute("overall", context);
+
+    Mockito.verify(playerStatisticService)
+        .getPlayerStatistics(
+            Mockito.eq(TIGRESS),
+            Mockito.isNull(),
+            Mockito.eq(LocalDate.now()),
+            Mockito.isNull(),
+            Mockito.anySet());
+  }
+
+  @Test
+  void overall_patchDateUnavailable_saysSoInTheFooterRatherThanClaimingCurrentPatch() {
+    Mockito.when(patchDateResolver.getCurrentPatchStartDate()).thenReturn(Optional.empty());
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .option("player", "Tigress")
+            .option("period", "current_patch")
+            .build();
+
+    command.execute("overall", context);
+
+    assertThat(context.getEmbeds()).hasSize(1);
+    assertThat(context.getEmbeds().get(0).getFooter().getText())
+        .contains("unavailable")
+        .contains("last 30 days");
+  }
+
+  @Test
+  void overall_heroFilteredResponse_omitsThePopularHeroesField() {
+    Mockito.when(
+            playerStatisticService.getPlayerStatistics(
+                Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(
+            PlayerStatisticResponse.builder()
+                .playerId(TIGRESS)
+                .playerName("Tigress")
+                .totalMatches(5L)
+                .heroFiltered(true)
+                .build());
+    Mockito.when(nameResolver.resolveHeroes(Set.of("Invoker")))
+        .thenReturn(new NameResolution(Set.of(74L), Set.of()));
+
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "Tigress").option("hero", "Invoker").build();
+    command.execute("overall", context);
+
+    assertThat(context.getEmbeds().get(0).getFields())
+        .extracting(field -> field.getName())
+        .doesNotContain("Popular heroes");
+  }
+
+  // -------------------------------------------------------------------- heroes
+
+  @Test
+  void heroes_limitAboveTwentyFiveIsClampedNotRejected() {
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "Tigress").option("limit", "100").build();
+
+    command.execute("heroes", context);
+
+    assertThat(context.getEphemeralReplies()).isEmpty();
+    Mockito.verify(playerStatisticService)
+        .getPlayerStatistics(
+            Mockito.eq(TIGRESS),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.eq(StatsCommand.MAX_LIMIT),
+            Mockito.anySet());
+  }
+
+  @Test
+  void heroes_limitBelowOneFallsBackToTheDefault() {
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "Tigress").option("limit", "0").build();
+
+    command.execute("heroes", context);
+
+    Mockito.verify(playerStatisticService)
+        .getPlayerStatistics(
+            Mockito.eq(TIGRESS),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.eq(StatsCommand.DEFAULT_LIMIT),
+            Mockito.anySet());
+  }
+
+  @Test
+  void heroes_noGamesInRange_saysSoRatherThanPostingAnEmptyTable() {
+    Mockito.when(
+            playerStatisticService.getPlayerStatistics(
+                Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(
+            PlayerStatisticResponse.builder()
+                .playerId(TIGRESS)
+                .playerName("Tigress")
+                .totalMatches(0L)
+                .build());
+
+    FakeCommandContext context = context();
+    command.execute("heroes", context);
+
+    assertThat(context.getEmbeds().get(0).getFields())
+        .anySatisfy(field -> assertThat(field.getValue()).contains("No hero data"));
+  }
+
+  // --------------------------------------------------------------------- items
+
+  @Test
+  void items_absent_callsTheRankingServiceAndNotTheComboService() {
+    FakeCommandContext context = context();
+
+    command.execute("items", context);
+
+    Mockito.verify(itemRankingService)
+        .getItemRankings(
+            Mockito.eq(TIGRESS),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.isNull(),
+            Mockito.isNull(),
+            Mockito.anySet(),
+            Mockito.eq(StatsCommand.DEFAULT_LIMIT));
+    Mockito.verify(itemRankingService, Mockito.never())
+        .getItemComboStatistics(
+            Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any());
+    assertThat(context.getEmbeds()).hasSize(1);
+  }
+
+  @Test
+  void items_present_callsTheComboServiceAndNotTheRankingService() {
+    Mockito.when(nameResolver.resolveItems(Set.of("Blink Dagger", "Black King Bar")))
+        .thenReturn(new NameResolution(Set.of(1L, 2L), Set.of()));
+    Mockito.when(
+            itemRankingService.getItemComboStatistics(
+                Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(
+            ItemComboStatisticResponse.builder()
+                .playerId(TIGRESS)
+                .playerName("Tigress")
+                .gamesFound(3L)
+                .winRate(BigDecimal.valueOf(66.67))
+                .members(List.of())
+                .build());
+
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .option("player", "Tigress")
+            .option("items", "Blink Dagger, Black King Bar")
+            .build();
+    command.execute("items", context);
+
+    Mockito.verify(itemRankingService)
+        .getItemComboStatistics(
+            Mockito.eq(TIGRESS),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.eq(Set.of("Blink Dagger", "Black King Bar")),
+            Mockito.anySet());
+    Mockito.verify(itemRankingService, Mockito.never())
+        .getItemRankings(
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any());
+    assertThat(context.getEmbeds()).hasSize(1);
+  }
+
+  @Test
+  void items_unknownName_repliesEphemerallyAndCallsNeitherService() {
+    Mockito.when(nameResolver.resolveItems(Set.of("blnk")))
+        .thenReturn(new NameResolution(Set.of(), Set.of("blnk")));
+    Mockito.when(nameResolver.suggestItem("blnk")).thenReturn(Optional.of("Blink Dagger"));
+
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "Tigress").option("items", "blnk").build();
+    command.execute("items", context);
+
+    assertThat(context.getEphemeralReplies().get(0)).contains("blnk").contains("Blink Dagger");
+    assertThat(context.getAcknowledgeSummary()).isNull();
+    Mockito.verifyNoInteractions(itemRankingService);
+  }
+
+  @Test
+  void items_comboWithNoMatchingGames_postsAnExplicitMessageAndNoEmbed() {
+    Mockito.when(nameResolver.resolveItems(Set.of("Blink Dagger")))
+        .thenReturn(new NameResolution(Set.of(1L), Set.of()));
+    Mockito.when(
+            itemRankingService.getItemComboStatistics(
+                Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(
+            ItemComboStatisticResponse.builder()
+                .playerId(TIGRESS)
+                .playerName("Tigress")
+                .gamesFound(0L)
+                .winRate(BigDecimal.ZERO)
+                .members(List.of())
+                .build());
+
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .option("player", "Tigress")
+            .option("items", "Blink Dagger")
+            .build();
+    command.execute("items", context);
+
+    assertThat(context.getEmbeds()).isEmpty();
+    assertThat(context.getPosts()).anySatisfy(post -> assertThat(post).contains("no games"));
+  }
+
+  /**
+   * The channel check has to come first. Told "unknown item" in a channel that was never
+   * registered, a user would go hunting for the right item name instead of running {@code /dbuff
+   * register}.
+   */
+  @Test
+  void items_unregisteredChannelWithAnItemTypo_reportsTheChannelNotTheTypo() {
+    Mockito.when(instanceConfigService.getByDiscordChannelId(Mockito.anyString()))
+        .thenReturn(Optional.empty());
+    Mockito.when(nameResolver.resolveItems(Set.of("blnk")))
+        .thenReturn(new NameResolution(Set.of(), Set.of("blnk")));
+
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "Tigress").option("items", "blnk").build();
+    command.execute("items", context);
+
+    assertThat(context.getEphemeralReplies()).hasSize(1);
+    assertThat(context.getEphemeralReplies().get(0)).contains("/dbuff register");
+  }
+
+  // -------------------------------------------------------------------- skills
+
+  @Test
+  void skills_absent_callsTheRankingService() {
+    FakeCommandContext context = context();
+
+    command.execute("skills", context);
+
+    Mockito.verify(abilityRankingService)
+        .getAbilityRankings(
+            Mockito.eq(TIGRESS),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.isNull(),
+            Mockito.isNull(),
+            Mockito.anySet(),
+            Mockito.eq(StatsCommand.DEFAULT_LIMIT));
+    assertThat(context.getEmbeds()).hasSize(1);
+  }
+
+  @Test
+  void skills_present_callsTheComboService() {
+    Mockito.when(nameResolver.resolveAbilities(Set.of("Quas", "Wex")))
+        .thenReturn(new NameResolution(Set.of(5001L, 5002L), Set.of()));
+    Mockito.when(
+            abilityRankingService.getAbilityComboStatistics(
+                Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(
+            AbilityComboStatisticResponse.builder()
+                .playerId(TIGRESS)
+                .playerName("Tigress")
+                .gamesFound(2L)
+                .winRate(BigDecimal.valueOf(50.00))
+                .members(List.of())
+                .build());
+
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .option("player", "Tigress")
+            .option("skills", "Quas, Wex")
+            .build();
+    command.execute("skills", context);
+
+    Mockito.verify(abilityRankingService)
+        .getAbilityComboStatistics(
+            Mockito.eq(TIGRESS),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.eq(Set.of("Quas", "Wex")),
+            Mockito.anySet());
+    assertThat(context.getEmbeds()).hasSize(1);
+  }
+
+  @Test
+  void skills_unknownName_repliesEphemerallyAndCallsNoService() {
+    Mockito.when(nameResolver.resolveAbilities(Set.of("Quaz")))
+        .thenReturn(new NameResolution(Set.of(), Set.of("Quaz")));
+    Mockito.when(nameResolver.suggestAbility("Quaz")).thenReturn(Optional.of("Quas"));
+
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "Tigress").option("skills", "Quaz").build();
+    command.execute("skills", context);
+
+    assertThat(context.getEphemeralReplies().get(0)).contains("Quaz").contains("Quas");
+    Mockito.verifyNoInteractions(abilityRankingService);
+  }
+
+  @Test
+  void skills_comboWithNoMatchingGames_postsAnExplicitMessage() {
+    Mockito.when(nameResolver.resolveAbilities(Set.of("Quas")))
+        .thenReturn(new NameResolution(Set.of(5001L), Set.of()));
+    Mockito.when(
+            abilityRankingService.getAbilityComboStatistics(
+                Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(
+            AbilityComboStatisticResponse.builder()
+                .playerId(TIGRESS)
+                .playerName("Tigress")
+                .gamesFound(0L)
+                .winRate(BigDecimal.ZERO)
+                .members(List.of())
+                .build());
+
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "Tigress").option("skills", "Quas").build();
+    command.execute("skills", context);
+
+    assertThat(context.getEmbeds()).isEmpty();
+    assertThat(context.getPosts()).anySatisfy(post -> assertThat(post).contains("no games"));
+  }
+}
