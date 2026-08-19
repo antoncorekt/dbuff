@@ -8,6 +8,7 @@ import com.ako.dbuff.resources.model.PlayerStatisticResponse.HeroStatistic;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -253,7 +254,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should return player statistics with correct player info")
     void shouldReturnPlayerStatisticsWithPlayerInfo() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, null);
 
       assertThat(result.getPlayerId()).isEqualTo(PLAYER_ID);
       assertThat(result.getPlayerName()).isEqualTo(PLAYER_NAME);
@@ -263,7 +264,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should return correct total match count")
     void shouldReturnCorrectTotalMatchCount() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, null);
 
       assertThat(result.getTotalMatches()).isEqualTo(5L);
     }
@@ -272,7 +273,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should return popular heroes ordered by pick count")
     void shouldReturnPopularHeroesOrderedByPickCount() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, null);
 
       assertThat(result.getPopularHeroes()).hasSize(3);
       // Anti-Mage: 2 picks, Pudge: 2 picks, Invoker: 1 pick
@@ -284,7 +285,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should calculate hero win rate correctly")
     void shouldCalculateHeroWinRateCorrectly() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, null);
 
       // Anti-Mage: 1 win out of 2 = 50%
       HeroStatistic antiMage =
@@ -307,7 +308,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should respect hero limit parameter")
     void shouldRespectHeroLimitParameter() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 2);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 2, null);
 
       assertThat(result.getPopularHeroes()).hasSize(2);
     }
@@ -321,7 +322,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should calculate average obs placed correctly")
     void shouldCalculateAvgObsPlacedCorrectly() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, null);
 
       // (5 + 3 + 8 + 6 + 4) / 5 = 5.2
       assertThat(result.getAvgObsPlaced()).isEqualByComparingTo(new BigDecimal("5.20"));
@@ -331,7 +332,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should calculate average sen placed correctly")
     void shouldCalculateAvgSenPlacedCorrectly() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, null);
 
       // (3 + 2 + 5 + 4 + 2) / 5 = 3.2
       assertThat(result.getAvgSenPlaced()).isEqualByComparingTo(new BigDecimal("3.20"));
@@ -341,7 +342,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should calculate last hits statistics correctly")
     void shouldCalculateLastHitsStatisticsCorrectly() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, null);
 
       // Avg: (300 + 200 + 100 + 80 + 250) / 5 = 186
       assertThat(result.getAvgLastHits()).isEqualByComparingTo(new BigDecimal("186.00"));
@@ -355,7 +356,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should calculate KDA statistics correctly")
     void shouldCalculateKdaStatisticsCorrectly() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, null);
 
       // Avg: (8.5 + 2.5 + 12.0 + 4.0 + 15.0) / 5 = 8.4
       assertThat(result.getAvgKda()).isEqualByComparingTo(new BigDecimal("8.40"));
@@ -369,7 +370,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should calculate gold per min statistics correctly")
     void shouldCalculateGoldPerMinStatisticsCorrectly() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, null);
 
       // Avg: (650 + 450 + 400 + 350 + 550) / 5 = 480
       assertThat(result.getAvgGoldPerMin()).isEqualByComparingTo(new BigDecimal("480.00"));
@@ -383,7 +384,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should calculate win/loss statistics correctly")
     void shouldCalculateWinLossStatisticsCorrectly() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, null);
 
       // 3 wins, 2 losses
       assertThat(result.getWins()).isEqualTo(3L);
@@ -396,7 +397,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should calculate objective statistics correctly")
     void shouldCalculateObjectiveStatisticsCorrectly() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, null);
 
       // Avg tower kills: (2 + 0 + 1 + 0 + 3) / 5 = 1.2
       assertThat(result.getAvgTowerKills()).isEqualByComparingTo(new BigDecimal("1.20"));
@@ -408,7 +409,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should calculate farming statistics correctly")
     void shouldCalculateFarmingStatisticsCorrectly() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, null);
 
       // Avg denies: (50 + 30 + 20 + 15 + 40) / 5 = 31
       assertThat(result.getAvgDenies()).isEqualByComparingTo(new BigDecimal("31.00"));
@@ -429,7 +430,7 @@ class PlayerStatisticRepositoryTest {
       // Only matches from March onwards (matches 3, 4, 5)
       PlayerStatisticResponse result =
           playerStatisticRepository.findPlayerStatistics(
-              PLAYER_ID, LocalDate.of(2024, 3, 1), null, 3);
+              PLAYER_ID, LocalDate.of(2024, 3, 1), null, 3, null);
 
       assertThat(result.getTotalMatches()).isEqualTo(3L);
       assertThat(result.getStartDate()).isEqualTo(LocalDate.of(2024, 3, 1));
@@ -441,7 +442,7 @@ class PlayerStatisticRepositoryTest {
       // Only matches until February (matches 1, 2)
       PlayerStatisticResponse result =
           playerStatisticRepository.findPlayerStatistics(
-              PLAYER_ID, null, LocalDate.of(2024, 2, 28), 3);
+              PLAYER_ID, null, LocalDate.of(2024, 2, 28), 3, null);
 
       assertThat(result.getTotalMatches()).isEqualTo(2L);
       assertThat(result.getEndDate()).isEqualTo(LocalDate.of(2024, 2, 28));
@@ -453,7 +454,7 @@ class PlayerStatisticRepositoryTest {
       // Only matches in February and March (matches 2, 3)
       PlayerStatisticResponse result =
           playerStatisticRepository.findPlayerStatistics(
-              PLAYER_ID, LocalDate.of(2024, 2, 1), LocalDate.of(2024, 3, 31), 3);
+              PLAYER_ID, LocalDate.of(2024, 2, 1), LocalDate.of(2024, 3, 31), 3, null);
 
       assertThat(result.getTotalMatches()).isEqualTo(2L);
       // 1 win (match 3), 1 loss (match 2)
@@ -467,7 +468,7 @@ class PlayerStatisticRepositoryTest {
       // Only matches in February and March (matches 2, 3)
       PlayerStatisticResponse result =
           playerStatisticRepository.findPlayerStatistics(
-              PLAYER_ID, LocalDate.of(2024, 2, 1), LocalDate.of(2024, 3, 31), 3);
+              PLAYER_ID, LocalDate.of(2024, 2, 1), LocalDate.of(2024, 3, 31), 3, null);
 
       // Avg last hits: (200 + 100) / 2 = 150
       assertThat(result.getAvgLastHits()).isEqualByComparingTo(new BigDecimal("150.00"));
@@ -486,7 +487,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should return empty response for non-existent player")
     void shouldReturnEmptyResponseForNonExistentPlayer() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(999999L, null, null, 3);
+          playerStatisticRepository.findPlayerStatistics(999999L, null, null, 3, null);
 
       assertThat(result.getPlayerId()).isEqualTo(999999L);
       assertThat(result.getTotalMatches()).isEqualTo(0L);
@@ -498,7 +499,7 @@ class PlayerStatisticRepositoryTest {
     void shouldReturnEmptyResponseWhenNoMatchesInRange() {
       PlayerStatisticResponse result =
           playerStatisticRepository.findPlayerStatistics(
-              PLAYER_ID, LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31), 3);
+              PLAYER_ID, LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31), 3, null);
 
       assertThat(result.getTotalMatches()).isEqualTo(0L);
       assertThat(result.getPopularHeroes()).isEmpty();
@@ -508,7 +509,7 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should handle hero limit of 1")
     void shouldHandleHeroLimitOfOne() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 1);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 1, null);
 
       assertThat(result.getPopularHeroes()).hasSize(1);
       // Should be either Anti-Mage or Pudge (both have 2 picks)
@@ -519,10 +520,104 @@ class PlayerStatisticRepositoryTest {
     @DisplayName("Should handle hero limit larger than available heroes")
     void shouldHandleHeroLimitLargerThanAvailable() {
       PlayerStatisticResponse result =
-          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 10);
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 10, null);
 
       // Only 3 unique heroes in test data
       assertThat(result.getPopularHeroes()).hasSize(3);
+    }
+  }
+
+  @Nested
+  @DisplayName("Hero Filter Tests")
+  class HeroFilterTests {
+
+    @Test
+    @DisplayName("Should count only the filtered hero's matches")
+    void shouldCountOnlyFilteredHeroMatches() {
+      // Anti-Mage games are matches 1 (win) and 2 (loss).
+      PlayerStatisticResponse antiMage =
+          playerStatisticRepository.findPlayerStatistics(
+              PLAYER_ID, null, null, 3, Set.of(ANTI_MAGE_ID));
+
+      assertThat(antiMage.getTotalMatches()).isEqualTo(2L);
+      assertThat(antiMage.getWins()).isEqualTo(1L);
+      assertThat(antiMage.getLosses()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("Win rate must be computed over the filtered hero's games only")
+    void winRateIsComputedOverFilteredGames() {
+      // Invoker: one game, won -> 100%.
+      PlayerStatisticResponse invoker =
+          playerStatisticRepository.findPlayerStatistics(
+              PLAYER_ID, null, null, 3, Set.of(INVOKER_ID));
+
+      assertThat(invoker.getTotalMatches()).isEqualTo(1L);
+      assertThat(invoker.getAvgWinRate()).isEqualByComparingTo(new BigDecimal("100.00"));
+    }
+
+    @Test
+    @DisplayName("Should set heroFiltered when a hero filter is applied")
+    void shouldSetHeroFilteredFlag() {
+      PlayerStatisticResponse filtered =
+          playerStatisticRepository.findPlayerStatistics(
+              PLAYER_ID, null, null, 3, Set.of(ANTI_MAGE_ID));
+
+      assertThat(filtered.getHeroFiltered()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should leave heroFiltered false when no hero filter is applied")
+    void shouldLeaveHeroFilteredFalse() {
+      PlayerStatisticResponse unfiltered =
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, null);
+
+      assertThat(unfiltered.getHeroFiltered()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Popular heroes should degenerate to the single filtered hero")
+    void popularHeroesDegeneratesToOneEntry() {
+      PlayerStatisticResponse antiMage =
+          playerStatisticRepository.findPlayerStatistics(
+              PLAYER_ID, null, null, 3, Set.of(ANTI_MAGE_ID));
+
+      // This is why heroFiltered exists: the section is meaningless when filtered.
+      assertThat(antiMage.getPopularHeroes()).hasSize(1);
+      assertThat(antiMage.getPopularHeroes().get(0).getHeroId()).isEqualTo(ANTI_MAGE_ID);
+    }
+
+    @Test
+    @DisplayName("Should return zero matches when the hero filter matches no games")
+    void heroFilterMatchingNoGamesReturnsZero() {
+      PlayerStatisticResponse none =
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, Set.of(999L));
+
+      assertThat(none.getTotalMatches()).isZero();
+      assertThat(none.getPopularHeroes()).isEmpty();
+      assertThat(none.getHeroFiltered()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Empty hero filter set should be treated as no filter")
+    void emptyHeroFilterSetIsNoFilter() {
+      PlayerStatisticResponse result =
+          playerStatisticRepository.findPlayerStatistics(PLAYER_ID, null, null, 3, Set.of());
+
+      assertThat(result.getTotalMatches()).isEqualTo(5L);
+      assertThat(result.getHeroFiltered()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Hero filter should combine with a date filter")
+    void heroFilterCombinesWithDateFilter() {
+      // Anti-Mage games from February onwards: only match 2.
+      PlayerStatisticResponse result =
+          playerStatisticRepository.findPlayerStatistics(
+              PLAYER_ID, LocalDate.of(2024, 2, 1), null, 3, Set.of(ANTI_MAGE_ID));
+
+      assertThat(result.getTotalMatches()).isEqualTo(1L);
+      assertThat(result.getWins()).isZero();
     }
   }
 }

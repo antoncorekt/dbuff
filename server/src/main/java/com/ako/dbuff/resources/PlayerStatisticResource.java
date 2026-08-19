@@ -64,7 +64,8 @@ public class PlayerStatisticResource {
         endDate,
         heroLimit);
 
-    return playerStatisticService.getPlayerStatistics(playerId, startDate, endDate, heroLimit);
+    return playerStatisticService.getPlayerStatistics(
+        playerId, startDate, endDate, heroLimit, null);
   }
 
   /**

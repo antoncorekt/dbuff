@@ -5,10 +5,13 @@ import com.ako.dbuff.dao.repo.PlayerStatisticRepository;
 import com.ako.dbuff.dao.repo.PlayerStatisticSummaryRepo;
 import com.ako.dbuff.resources.model.PlayerStatisticResponse;
 import com.ako.dbuff.resources.model.PlayerStatisticResponse.HeroStatistic;
+import com.ako.dbuff.service.constant.ConstantNameResolver;
+import com.ako.dbuff.service.constant.NameResolution;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +31,7 @@ public class PlayerStatisticService {
 
   private final PlayerStatisticRepository playerStatisticRepository;
   private final PlayerStatisticSummaryRepo playerStatisticSummaryRepo;
+  private final ConstantNameResolver nameResolver;
 
   /**
    * Gets player statistics for a specific date range.
@@ -36,18 +40,25 @@ public class PlayerStatisticService {
    * @param startDate Optional start date filter (inclusive). If null, includes all history.
    * @param endDate Optional end date filter (inclusive). If null, uses current date.
    * @param heroLimit Number of popular heroes to return. Defaults to 3 if null.
+   * @param heroNames Optional hero names to restrict the statistics to.
    * @return PlayerStatisticResponse with aggregated statistics
+   * @throws UnknownConstantNameException if any supplied hero name matches no known hero
    */
   @Transactional(readOnly = true)
   public PlayerStatisticResponse getPlayerStatistics(
-      Long playerId, LocalDate startDate, LocalDate endDate, Integer heroLimit) {
+      Long playerId,
+      LocalDate startDate,
+      LocalDate endDate,
+      Integer heroLimit,
+      Set<String> heroNames) {
 
     log.info(
-        "Fetching player statistics for player {} with startDate={}, endDate={}, heroLimit={}",
+        "Fetching player statistics for player {} with startDate={}, endDate={}, heroLimit={}, heroes={}",
         playerId,
         startDate,
         endDate,
-        heroLimit);
+        heroLimit,
+        heroNames);
 
     // Use current date as default end date if not specified
     LocalDate effectiveEndDate = endDate != null ? endDate : LocalDate.now();
@@ -55,9 +66,14 @@ public class PlayerStatisticService {
     // Use default hero limit if not specified
     int effectiveHeroLimit = heroLimit != null && heroLimit > 0 ? heroLimit : DEFAULT_HERO_LIMIT;
 
+    NameResolution heroes = nameResolver.resolveHeroes(heroNames);
+    if (heroes.hasUnresolved()) {
+      throw new UnknownConstantNameException("heroes", heroes.unresolvedNames());
+    }
+
     PlayerStatisticResponse statistics =
         playerStatisticRepository.findPlayerStatistics(
-            playerId, startDate, effectiveEndDate, effectiveHeroLimit);
+            playerId, startDate, effectiveEndDate, effectiveHeroLimit, heroes.idsOrNullIfEmpty());
 
     log.info(
         "Found statistics for player {} with {} total matches",
@@ -102,7 +118,8 @@ public class PlayerStatisticService {
     }
 
     // Calculate statistics
-    PlayerStatisticResponse stats = getPlayerStatistics(playerId, startDate, endDate, heroLimit);
+    PlayerStatisticResponse stats =
+        getPlayerStatistics(playerId, startDate, endDate, heroLimit, null);
 
     // Convert to domain entity
     PlayerStatisticSummaryDomain summary = convertToSummaryDomain(stats);
