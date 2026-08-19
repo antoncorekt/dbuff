@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.ranking;
 
 import com.ako.dbuff.dao.repo.AbilityRankingRepository;
+import com.ako.dbuff.resources.model.AbilityComboStatisticResponse;
 import com.ako.dbuff.resources.model.AbilityRankingResponse;
 import com.ako.dbuff.service.constant.ConstantNameResolver;
 import com.ako.dbuff.service.constant.NameResolution;
@@ -79,6 +80,35 @@ public class AbilityRankingService {
 
     log.info("Found {} ability rankings for player {}", rankings.size(), playerId);
     return rankings;
+  }
+
+  /**
+   * Gets statistics over the games in which the player used every one of the named abilities.
+   *
+   * @throws UnknownConstantNameException if any supplied name matches no known constant
+   */
+  @Transactional(readOnly = true)
+  public AbilityComboStatisticResponse getAbilityComboStatistics(
+      Long playerId,
+      LocalDate startDate,
+      LocalDate endDate,
+      Set<String> abilityNames,
+      Set<String> heroNames) {
+
+    Set<Long> abilityIds = resolveAbilitiesOrThrow(abilityNames);
+    Set<Long> heroIds = resolveHeroesOrThrow(heroNames);
+    LocalDate effectiveEndDate = endDate != null ? endDate : LocalDate.now();
+
+    log.info(
+        "Fetching ability combo statistics for player {}: abilities={}, heroes={}, {} to {}",
+        playerId,
+        abilityIds,
+        heroIds,
+        startDate,
+        effectiveEndDate);
+
+    return abilityRankingRepository.findAbilityComboStatistics(
+        playerId, abilityIds, heroIds, startDate, effectiveEndDate);
   }
 
   /**
