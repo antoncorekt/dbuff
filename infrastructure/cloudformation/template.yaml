@@ -99,27 +99,6 @@ Resources:
         - Key: Name
           Value: dbuff-public-2
 
-  # --- Private Subnets (for RDS) ---
-  PrivateSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: 10.0.10.0/24
-      AvailabilityZone: !Select [0, !GetAZs '']
-      Tags:
-        - Key: Name
-          Value: dbuff-private-1
-
-  PrivateSubnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: 10.0.11.0/24
-      AvailabilityZone: !Select [1, !GetAZs '']
-      Tags:
-        - Key: Name
-          Value: dbuff-private-2
-
   # --- Route Tables ---
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
@@ -172,29 +151,6 @@ Resources:
       Tags:
         - Key: Name
           Value: dbuff-app-sg
-
-  DbSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: DBuff database
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
-          SourceSecurityGroupId: !Ref AppSecurityGroup
-          Description: PostgreSQL from app
-        - IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
-          CidrIp: !Ref AllowedSshCidr
-          Description: PostgreSQL external access
-      SecurityGroupEgress:
-        - IpProtocol: '-1'
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: dbuff-db-sg
 
   # ---------- SSM Parameter Store ----------
   SsmDotaApiKey:
@@ -282,44 +238,6 @@ Resources:
       Roles:
         - !Ref Ec2Role
 
-  # ---------- RDS ----------
-  DbSubnetGroup:
-    Type: AWS::RDS::DBSubnetGroup
-    Properties:
-      DBSubnetGroupDescription: DBuff subnets for RDS
-      SubnetIds:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
-      Tags:
-        - Key: Name
-          Value: dbuff-db-subnet-group
-
-  Database:
-    Type: AWS::RDS::DBInstance
-    DeletionPolicy: Snapshot
-    Properties:
-      DBInstanceIdentifier: dbuff-postgres
-      Engine: postgres
-      EngineVersion: '16'
-      DBInstanceClass: db.t3.micro
-      AllocatedStorage: 20
-      StorageType: gp3
-      StorageEncrypted: true
-      DBName: dbuff
-      MasterUsername: dbuffuser
-      MasterUserPassword: !Ref DbPassword
-      VPCSecurityGroups:
-        - !Ref DbSecurityGroup
-      DBSubnetGroupName: !Ref DbSubnetGroup
-      PubliclyAccessible: true
-      BackupRetentionPeriod: 7
-      PreferredBackupWindow: '03:00-04:00'
-      PreferredMaintenanceWindow: 'sun:04:00-sun:05:00'
-      DeletionProtection: false
-      Tags:
-        - Key: Name
-          Value: dbuff-postgres
-
   # ---------- EC2 ----------
   ElasticIP:
     Type: AWS::EC2::EIP
@@ -332,7 +250,7 @@ Resources:
 
   AppInstance:
     Type: AWS::EC2::Instance
-    DependsOn: Database
+    DependsOn: VPCGatewayAttachment
     Properties:
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyPairName
@@ -433,8 +351,8 @@ Resources:
           StandardError=append:/var/log/dbuff/dbuff.log
 
           Environment=SPRING_PROFILES_ACTIVE=prod
-          Environment=DB_HOST=${Database.Endpoint.Address}
-          Environment=DB_PORT=${Database.Endpoint.Port}
+          Environment=DB_HOST=localhost
+          Environment=DB_PORT=5432
           Environment=DB_PASSWORD=${DbPassword}
           Environment=DOTA_API_KEY=$DOTA_API_KEY
           Environment=SCRAPPER_API_KEY=$SCRAPPER_API_KEY
@@ -475,10 +393,6 @@ Outputs:
   AppUrl:
     Description: Application URL
     Value: !Sub 'http://${ElasticIP}:8080'
-
-  RdsEndpoint:
-    Description: RDS PostgreSQL endpoint
-    Value: !GetAtt Database.Endpoint.Address
 
   S3Bucket:
     Description: S3 bucket for deployment artifacts
