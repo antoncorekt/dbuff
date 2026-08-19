@@ -254,17 +254,27 @@ thread model over `defer()`, where nothing appears until everything finishes.
 ### Resolving names back to IDs
 
 Because `hero:`, `items:`, and `skills:` are string options, autocomplete offers
-*display* names while the repositories need numeric IDs. Each handler resolves
-submitted names through the constant maps (`getItemConstantMap()`,
-`getHeroConstantMap()`, `getAllAbilityConstants()`) before querying.
+*display* names while the repositories need numeric IDs. Discord choices carry a
+separate display name and submitted value, so autocomplete shows the pretty name
+and submits the `dname` — which is exactly what the service layer already
+expects.
 
-Resolution can fail — autocomplete is a suggestion, not a constraint, so a user
-can submit freehand text or edit a previously-completed value. On failure the
-handler replies **ephemerally, before the ack**, naming every token that did not
-resolve and suggesting the closest match by edit distance. It never silently
-drops an unresolved token: dropping one member of a combo query would quietly
-answer a different question than the one asked, reporting a two-item combo's
-statistics as though they were a three-item combo's.
+**Name resolution already exists and is already broken.**
+`ItemRankingService.convertDnamesToIds` and
+`AbilityRankingService.convertNamesToIds` both resolve names to IDs, but on an
+unknown name they `log.warn` and then `filter(Objects::nonNull)` — silently
+dropping it. Worse, when *every* name is unknown they return `null`, and the
+repositories treat a null ID set as "no filter", so the query returns a top-N
+ranking instead of an error.
+
+This is a pre-existing bug, not new work, and the combo queries would amplify it:
+dropping one member of a three-item combo silently answers a two-item question.
+Fixing it is a prerequisite task, not a handler-level concern.
+
+The fix is a shared resolver returning both the resolved IDs and the unresolved
+names, so callers must decide what to do rather than being handed a lossy set.
+Handlers then reply **ephemerally, before the ack**, naming every token that did
+not resolve and suggesting the closest match by edit distance.
 
 ## Data Layer Changes
 
@@ -375,25 +385,35 @@ Centralized in the adapter layer, which fixes several current behaviors:
 
 ## Testing
 
-Available: JUnit 5, Mockito via `spring-boot-starter-test`, H2. No Testcontainers.
+Available: JUnit 5, Mockito and AssertJ via `spring-boot-starter-test`, H2. No
+Testcontainers.
+
+Repository tests are an established pattern here, not a new risk:
+`ItemRankingRepositoryTest`, `AbilityRankingRepositoryTest`,
+`PlayerStatisticRepositoryTest`, and `FindPlayerMatchesRepositoryTest` all run
+`@DataJpaTest` with `@Import(TheRepository.class)` against H2 in
+`MODE=PostgreSQL` (`application-test.properties`). New hero-filter, avg-use, and
+combo queries follow that pattern directly.
 
 | Layer | Approach |
 |---|---|
 | Handlers | `FakeAsyncReply` capturing posts; every handler unit-tested against mocked services with no JDA at all |
 | Text parsing | `TextCommandAdapter` as pure string → args assertions |
 | Autocomplete | Against the real in-memory `ConstantsManagers` maps; assert the 25-choice cap, match ordering, and comma-accumulation behavior |
-| Name resolution | Assert unresolved tokens produce an error rather than being dropped from a combo query |
-| Combo semantics | Assert `COUNT(DISTINCT …)` rejects a one-item game for a two-item query |
-| Rate arithmetic | Unit-test `mapToItemRankingResponse` and the hero-filtered total-match-count path — where the pick-rate trap above would surface |
+| Name resolution | Assert unresolved tokens are reported, never dropped, and never degrade a filtered query into an unfiltered top-N |
+| Combo semantics | `@DataJpaTest`; assert `COUNT(DISTINCT …)` rejects a one-item game for a two-item query |
+| Rate arithmetic | Assert the hero-filtered total-match-count path — where the pick-rate trap above would surface |
 
-Repository tests are the weak spot and this is stated plainly: H2 cannot run the
-`INCLUDE`/partial DDL, and `PlayerRepo.findByNameMatchingRegex` already depends
-on the Postgres-only `~*` operator. Predicate assembly and rate arithmetic are
-covered as unit tests; **actual SQL is verified against local Postgres from
-`docker-compose`**, not against H2.
+Two genuine H2 limits, neither of which blocks the above: it cannot run the
+`INCLUDE`/partial DDL from the V2 script (irrelevant, since indexes are being
+declared via `@Index` instead), and `PlayerRepo.findByNameMatchingRegex` uses the
+Postgres-only `~*` operator (untouched by this work). Everything these tasks add
+is plain SQL that H2's PostgreSQL mode handles, including
+`HAVING COUNT(DISTINCT …)`.
 
-The structural payoff: the Discord layer currently has zero test coverage. After
-this change every handler is testable without a Discord connection.
+The structural payoff: the Discord layer currently has one test file
+(`DiscordStatisticFormatterTest`) and no handler coverage at all. After this
+change every handler is testable without a Discord connection.
 
 ## Out of Scope
 
