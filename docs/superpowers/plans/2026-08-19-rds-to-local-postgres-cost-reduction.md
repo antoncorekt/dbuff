@@ -948,6 +948,48 @@ This replaces the instance (AMI, instance type, and volume size all changed) and
 
 **Files:** none (operational)
 
+- [ ] **Step 0: Stop the app and take the FINAL dump**
+
+Task 2's dump is a safety net and a rehearsal, not the dump that gets restored.
+The old app keeps writing to RDS after that dump is taken, and every one of those
+writes is lost at restore. Close the window: stop the app so writes cease, then
+dump. Downtime starts here and lasts until Task 10 finishes — roughly 15 minutes.
+
+```bash
+INSTANCE=$(aws cloudformation describe-stack-resources --stack-name dbuff \
+  --region eu-north-1 \
+  --query "StackResources[?LogicalResourceId=='AppInstance'].PhysicalResourceId" \
+  --output text)
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+
+cat > /tmp/final-dump.json <<'JSON'
+{
+  "commands": [
+    "set -euo pipefail",
+    "systemctl stop dbuff",
+    "sleep 5",
+    "DB_HOST=$(grep -oP 'DB_HOST=\\K.*' /etc/systemd/system/dbuff.service)",
+    "export PGPASSWORD=$(grep -oP 'DB_PASSWORD=\\K.*' /etc/systemd/system/dbuff.service)",
+    "pg_dump -Fc -h \"$DB_HOST\" -U dbuffuser -d dbuff -f /tmp/dbuff-final.dump",
+    "pg_restore --list /tmp/dbuff-final.dump > /dev/null && echo DUMP_READABLE",
+    "ls -lh /tmp/dbuff-final.dump",
+    "aws s3 cp /tmp/dbuff-final.dump s3://BUCKET/db-backups/dbuff-final.dump --region eu-north-1"
+  ]
+}
+JSON
+sed -i '' "s|BUCKET|dbuff-deploy-${ACCOUNT}|" /tmp/final-dump.json
+
+CMD=$(aws ssm send-command --instance-ids "$INSTANCE" \
+  --document-name AWS-RunShellScript --parameters file:///tmp/final-dump.json \
+  --region eu-north-1 --query 'Command.CommandId' --output text)
+sleep 90
+aws ssm get-command-invocation --command-id "$CMD" --instance-id "$INSTANCE" \
+  --region eu-north-1 --query '[Status,StandardOutputContent,StandardErrorContent]' --output text
+```
+
+Expected: `Success`, `DUMP_READABLE`, a non-zero file size, and an upload line.
+Task 10 restores `dbuff-final.dump`, not `dbuff-pre-migration.dump`.
+
 - [ ] **Step 1: Build and upload the JAR**
 
 The bytecode is architecture-independent, so no rebuild is strictly required — but rebuild anyway so the deployed artifact matches the committed config from Task 7.
@@ -1017,7 +1059,7 @@ The app has already started against an empty database, so `ddl-auto=update` has 
 
 ```bash
 cd /Users/akozlovskyi/Documents/dbuff/dbuff
-./infrastructure/cloudformation/deploy.sh restore dbuff-pre-migration.dump
+./infrastructure/cloudformation/deploy.sh restore dbuff-final.dump
 ```
 
 Expected: `Success` and no fatal errors in the output. Benign `pg_restore` warnings about roles or ownership are expected and are why the command tolerates a non-zero exit.
