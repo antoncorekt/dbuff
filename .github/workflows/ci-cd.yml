@@ -160,7 +160,14 @@ jobs:
           # UserData fetches server.jar at first boot, so keep it current: a
           # future instance rebuild via deploy.sh then comes up on this release
           # instead of a stale one.
-          aws s3 cp "s3://$bucket/releases/${{ github.sha }}.jar" "s3://$bucket/server.jar"
+          #
+          # --copy-props none is required, not cosmetic. A server-side copy
+          # otherwise replicates the source object's tags, and reading them needs
+          # s3:GetObjectTagging, which the deploy role deliberately does not have.
+          # A JAR carries no tags or metadata worth preserving, so copying only
+          # the bytes keeps the policy narrow instead of widening it.
+          aws s3 cp --copy-props none \
+            "s3://$bucket/releases/${{ github.sha }}.jar" "s3://$bucket/server.jar"
 
       - name: Prune old releases
         run: |
