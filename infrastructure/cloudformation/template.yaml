@@ -452,11 +452,17 @@ Resources:
           BKTMR
 
           systemctl daemon-reload
-          # With no prior run recorded, Persistent=true makes this fire straight
-          # away. That is deliberate: it smoke-tests pg_dump and the s3:PutObject
-          # grant at boot rather than 24h later. The dump is empty until the
-          # restore in the migration runbook.
           systemctl enable --now dbuff-backup.timer
+          # Run the backup once at boot, to smoke-test pg_dump and the
+          # s3:PutObject grant now rather than discovering a broken backup at
+          # 02:30 the following morning. This explicit trigger is required:
+          # Persistent=true only replays a run the timer *missed*, and on a
+          # first-ever enable systemd stamps the timer as though it had just
+          # run, so nothing fires until the next OnCalendar match. Learned the
+          # hard way - after the first boot of this instance, backup.log did not
+          # exist. Tolerates failure because a fresh instance has an empty
+          # database and a backup must never block the boot.
+          systemctl start dbuff-backup.service || true
 
           # Write the Google Vision service-account key (skip if not provided)
           GOOGLE_VISION_CREDENTIALS_PATH=/opt/dbuff/google-vision.json
