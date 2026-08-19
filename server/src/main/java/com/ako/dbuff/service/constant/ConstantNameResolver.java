@@ -3,6 +3,7 @@ package com.ako.dbuff.service.constant;
 import com.ako.dbuff.service.constant.data.AbilityIdsConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.constant.data.ItemConstant;
+import com.ako.dbuff.service.discord.command.TextSimilarity;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -183,34 +184,12 @@ public class ConstantNameResolver {
     String best = null;
     int bestDistance = Integer.MAX_VALUE;
     for (Map.Entry<String, String> candidate : candidates.entrySet()) {
-      int distance = editDistance(needle, candidate.getKey().toLowerCase());
+      int distance = TextSimilarity.editDistance(needle, candidate.getKey().toLowerCase());
       if (distance < bestDistance) {
         bestDistance = distance;
         best = candidate.getValue();
       }
     }
     return bestDistance <= MAX_SUGGESTION_DISTANCE ? Optional.ofNullable(best) : Optional.empty();
-  }
-
-  /** Standard Levenshtein distance, two-row variant. */
-  private static int editDistance(String a, String b) {
-    int[] previous = new int[b.length() + 1];
-    int[] current = new int[b.length() + 1];
-
-    for (int j = 0; j <= b.length(); j++) {
-      previous[j] = j;
-    }
-
-    for (int i = 1; i <= a.length(); i++) {
-      current[0] = i;
-      for (int j = 1; j <= b.length(); j++) {
-        int substitution = previous[j - 1] + (a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1);
-        current[j] = Math.min(Math.min(current[j - 1] + 1, previous[j] + 1), substitution);
-      }
-      int[] swap = previous;
-      previous = current;
-      current = swap;
-    }
-    return previous[b.length()];
   }
 }
