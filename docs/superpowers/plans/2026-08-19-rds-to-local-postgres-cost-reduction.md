@@ -77,7 +77,7 @@ The whole plan depends on `postgresql16-server` being installable on Amazon Linu
 
 **Files:** none (investigation only)
 
-- [ ] **Step 1: Launch a throwaway arm64 instance to test the package**
+- [x] **Step 1: Launch a throwaway arm64 instance to test the package**
 
 ```bash
 cd /Users/akozlovskyi/Documents/dbuff/dbuff
@@ -95,7 +95,7 @@ echo "Subnet: $SUBNET"
 
 Expected: a non-empty `ami-...` id and a `subnet-...` id.
 
-- [ ] **Step 2: Run the package check via SSM on a throwaway instance**
+- [x] **Step 2: Run the package check via SSM on a throwaway instance**
 
 ```bash
 INSTANCE=$(aws ec2 run-instances \
@@ -112,7 +112,7 @@ aws ec2 wait instance-status-ok --instance-ids "$INSTANCE" --region eu-north-1
 
 Expected: the wait returns after ~2 minutes with no output.
 
-- [ ] **Step 3: Query the package list**
+- [x] **Step 3: Query the package list**
 
 ```bash
 CMD=$(aws ssm send-command \
@@ -129,7 +129,7 @@ Expected: lines listing `postgresql16-server.aarch64` and `postgresql16.aarch64`
 
 **Decision point:** if `postgresql16-server` is **not** available, STOP and report. Do not fall back to `postgresql15-server` — a Postgres 16 dump cannot be restored into 15, which would silently break Task 10. The fallback in that case is to add the PGDG RHEL 9 aarch64 repository, which is a change to Task 5 that must be agreed first.
 
-- [ ] **Step 4: Terminate the probe instance**
+- [x] **Step 4: Terminate the probe instance**
 
 ```bash
 aws ec2 terminate-instances --instance-ids "$INSTANCE" --region eu-north-1 \
@@ -138,7 +138,7 @@ aws ec2 terminate-instances --instance-ids "$INSTANCE" --region eu-north-1 \
 
 Expected: `shutting-down`.
 
-- [ ] **Step 5: Commit the plan itself**
+- [x] **Step 5: Commit the plan itself**
 
 ```bash
 git add docs/superpowers/plans/2026-08-19-rds-to-local-postgres-cost-reduction.md
@@ -153,7 +153,7 @@ Two independent copies before anything is destroyed: an RDS snapshot (fast rollb
 
 **Files:** none (operational)
 
-- [ ] **Step 0: Grant the running instance permission to write to S3**
+- [x] **Step 0: Grant the running instance permission to write to S3**
 
 The deployed IAM policy allows only `s3:GetObject`/`s3:ListBucket`. The
 `s3:PutObject` grant on `db-backups/*` is part of Task 6, which does not take
@@ -184,7 +184,7 @@ becomes redundant once Task 9 deploys the Task 6 policy; remove it afterwards
 with `aws iam delete-role-policy --role-name dbuff-ec2-role --policy-name
 dbuff-migration-backup-write`.
 
-- [ ] **Step 1: Take a manual RDS snapshot**
+- [x] **Step 1: Take a manual RDS snapshot**
 
 ```bash
 aws rds create-db-snapshot \
@@ -196,7 +196,7 @@ aws rds create-db-snapshot \
 
 Expected: `creating`.
 
-- [ ] **Step 2: Wait for the snapshot to finish**
+- [x] **Step 2: Wait for the snapshot to finish**
 
 ```bash
 aws rds wait db-snapshot-available \
@@ -206,7 +206,7 @@ aws rds wait db-snapshot-available \
 
 Expected: `SNAPSHOT READY` after a few minutes. This snapshot is the rollback path and is retained manually — it is not deleted when the instance is.
 
-- [ ] **Step 3: Dump the database to S3 from the current instance**
+- [x] **Step 3: Dump the database to S3 from the current instance**
 
 Run the dump on the EC2 instance rather than locally: it is in the same AZ as RDS, needs no Postgres client on the workstation, and lands the file in S3 where the new instance can read it. Get the instance id and account id first.
 
@@ -221,7 +221,7 @@ echo "Instance: $INSTANCE  Account: $ACCOUNT"
 
 Expected: an `i-...` id and a 12-digit account id.
 
-- [ ] **Step 4: Run the dump**
+- [x] **Step 4: Run the dump**
 
 `DB_PASSWORD` must be the same value used when the stack was deployed. It is read from the running systemd unit so it does not have to be retyped or pasted into shell history.
 
@@ -247,7 +247,7 @@ aws ssm get-command-invocation --command-id "$CMD" --instance-id "$INSTANCE" \
 
 Expected: `Success`, a file listing showing a non-zero size for `/tmp/dbuff-pre-migration.dump`, and an S3 upload line. If `Status` is `Failed`, read `StandardErrorContent` and fix before continuing.
 
-- [ ] **Step 5: Verify the dump exists in S3 and record its size**
+- [x] **Step 5: Verify the dump exists in S3 and record its size**
 
 ```bash
 aws s3 ls "s3://dbuff-deploy-${ACCOUNT}/db-backups/" --region eu-north-1 --human-readable
@@ -255,7 +255,7 @@ aws s3 ls "s3://dbuff-deploy-${ACCOUNT}/db-backups/" --region eu-north-1 --human
 
 Expected: `dbuff-pre-migration.dump` with a non-zero size. **Write that size down** — Task 10 compares against it.
 
-- [ ] **Step 6: Capture exact baseline row counts from RDS**
+- [x] **Step 6: Capture exact baseline row counts from RDS**
 
 Dump size alone is a weak verification signal, and `n_live_tup` is a statistics
 estimate that can be wrong by a wide margin. Capture exact per-table counts from
@@ -298,7 +298,7 @@ come back *lower* than what it records here.
 - Modify: `infrastructure/cloudformation/template.yaml:336` (AMI)
 - Modify: `infrastructure/cloudformation/template.yaml:341-346` (volume size)
 
-- [ ] **Step 1: Change the InstanceType parameter to the t4g family**
+- [x] **Step 1: Change the InstanceType parameter to the t4g family**
 
 Replace lines 40-44:
 
@@ -325,7 +325,7 @@ with:
 
 `t4g.micro` is deliberately excluded: 1 GiB cannot hold the JVM and Postgres together.
 
-- [ ] **Step 2: Change the AMI to arm64**
+- [x] **Step 2: Change the AMI to arm64**
 
 Replace line 336:
 
@@ -339,7 +339,7 @@ with:
       ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64}}'
 ```
 
-- [ ] **Step 3: Grow the root volume to 40 GB**
+- [x] **Step 3: Grow the root volume to 40 GB**
 
 Replace lines 341-346:
 
@@ -366,7 +366,7 @@ with:
             Encrypted: true
 ```
 
-- [ ] **Step 4: Validate the template still parses**
+- [x] **Step 4: Validate the template still parses**
 
 ```bash
 aws cloudformation validate-template \
@@ -376,7 +376,7 @@ aws cloudformation validate-template \
 
 Expected: the parameter list printed with no error.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add infrastructure/cloudformation/template.yaml
@@ -390,19 +390,19 @@ git commit -m "infra: switch app instance to t4g.small arm64 with 40GB root volu
 **Files:**
 - Modify: `infrastructure/cloudformation/template.yaml` — delete `PrivateSubnet1`, `PrivateSubnet2`, `DbSecurityGroup`, `DbSubnetGroup`, `Database`, the `RdsEndpoint` output; adjust `AppInstance.DependsOn`
 
-- [ ] **Step 1: Delete the unused private subnets (lines 99-118)**
+- [x] **Step 1: Delete the unused private subnets (lines 99-118)**
 
 Delete the whole `PrivateSubnet1` and `PrivateSubnet2` blocks including the `# --- Private Subnets (for RDS) ---` comment. They are dead weight: `DbSubnetGroup` referenced `PublicSubnet1`/`PublicSubnet2`, never these, and they have no route table association.
 
-- [ ] **Step 2: Delete the `DbSecurityGroup` block (lines 173-194)**
+- [x] **Step 2: Delete the `DbSecurityGroup` block (lines 173-194)**
 
 Delete it entirely. This is what exposed port 5432 to `0.0.0.0/0`.
 
-- [ ] **Step 3: Delete `DbSubnetGroup` and `Database` (lines 282-318)**
+- [x] **Step 3: Delete `DbSubnetGroup` and `Database` (lines 282-318)**
 
 Delete from the `# ---------- RDS ----------` comment through the end of the `Database` resource.
 
-- [ ] **Step 4: Fix `AppInstance.DependsOn`**
+- [x] **Step 4: Fix `AppInstance.DependsOn`**
 
 It currently reads `DependsOn: Database` (line 332), which no longer resolves. The instance needs the internet gateway attached before UserData can reach S3 and SSM. Replace:
 
@@ -420,7 +420,7 @@ with:
     DependsOn: VPCGatewayAttachment
 ```
 
-- [ ] **Step 5: Delete the `RdsEndpoint` output (lines 473-475)**
+- [x] **Step 5: Delete the `RdsEndpoint` output (lines 473-475)**
 
 ```yaml
   RdsEndpoint:
@@ -430,7 +430,7 @@ with:
 
 Delete those three lines.
 
-- [ ] **Step 6: Confirm no dangling references remain**
+- [x] **Step 6: Confirm no dangling references remain**
 
 ```bash
 grep -n "Database\|DbSubnetGroup\|DbSecurityGroup\|PrivateSubnet" \
@@ -439,7 +439,7 @@ grep -n "Database\|DbSubnetGroup\|DbSecurityGroup\|PrivateSubnet" \
 
 Expected: **no output.** Any hit is a dangling reference that will fail the stack update. Note `DbPassword` is still a parameter and must NOT be removed — it becomes the local Postgres role password, so it will not appear in this grep.
 
-- [ ] **Step 7: Validate and commit**
+- [x] **Step 7: Validate and commit**
 
 ```bash
 aws cloudformation validate-template \
@@ -460,7 +460,7 @@ Expected: `TEMPLATE OK`.
 
 Two escaping rules for this file, both already established by the existing UserData: `${...}` is substituted by CloudFormation's `Fn::Sub`, so shell variables must be written **without** braces (`$DOTA_API_KEY`, not `${DOTA_API_KEY}`); and quoted heredocs (`<<'EOF'`) prevent shell expansion, so prefer them plus a `sed` pass over escaping every `$`.
 
-- [ ] **Step 1: Add the swapfile block**
+- [x] **Step 1: Add the swapfile block**
 
 Insert immediately after the `amazon-cloudwatch-agent-ctl ... -s` line (currently line 384):
 
@@ -477,7 +477,7 @@ Insert immediately after the `amazon-cloudwatch-agent-ctl ... -s` line (currentl
           sysctl -p /etc/sysctl.d/99-dbuff-swap.conf
 ```
 
-- [ ] **Step 2: Add the Postgres install and tuning block**
+- [x] **Step 2: Add the Postgres install and tuning block**
 
 Insert directly after the swap block:
 
@@ -520,7 +520,7 @@ Insert directly after the swap block:
 
 Note the heredoc body is indented to match the surrounding UserData block. Because `PGCONF` is quoted, the leading whitespace is preserved literally into `postgresql.conf` — Postgres tolerates leading whitespace on config lines, so this is safe.
 
-- [ ] **Step 3: Add role and database creation**
+- [x] **Step 3: Add role and database creation**
 
 Insert directly after `systemctl enable --now postgresql`:
 
@@ -537,7 +537,7 @@ Insert directly after `systemctl enable --now postgresql`:
 
 `${DbPassword}` is substituted by CloudFormation. The doubled single quotes produce a correctly quoted SQL literal. **Constraint to respect:** `DbPassword` must not contain a single quote, or this SQL breaks. Task 8 documents that constraint.
 
-- [ ] **Step 4: Point the app at localhost and fix the pool size**
+- [x] **Step 4: Point the app at localhost and fix the pool size**
 
 In the systemd unit inside UserData, replace the `ExecStart` line (currently line 423):
 
@@ -565,7 +565,7 @@ with:
           Environment=DB_PORT=5432
 ```
 
-- [ ] **Step 5: Make the app wait for Postgres**
+- [x] **Step 5: Make the app wait for Postgres**
 
 Quartz uses the JDBC job store (`spring.quartz.job-store-type=jdbc`), so the app hard-fails if the database is not up. Replace the `[Unit]` section of the `dbuff.service` heredoc:
 
@@ -584,7 +584,7 @@ with:
           Requires=postgresql.service
 ```
 
-- [ ] **Step 6: Validate and commit**
+- [x] **Step 6: Validate and commit**
 
 ```bash
 aws cloudformation validate-template \
@@ -609,7 +609,7 @@ Replaces RDS automated backups. Uses a systemd timer rather than cron, because `
 **Files:**
 - Modify: `infrastructure/cloudformation/template.yaml` — IAM policy (around line 267-273) and UserData
 
-- [ ] **Step 1: Grant the instance write access to the backup prefix**
+- [x] **Step 1: Grant the instance write access to the backup prefix**
 
 The existing policy allows only `s3:GetObject`/`s3:ListBucket`. Replace the S3 statement:
 
@@ -640,7 +640,7 @@ with:
                 Resource: !Sub 'arn:aws:s3:::dbuff-deploy-${AWS::AccountId}/db-backups/*'
 ```
 
-- [ ] **Step 2: Write the backup script in UserData**
+- [x] **Step 2: Write the backup script in UserData**
 
 Insert after the role/database creation block from Task 5 Step 3:
 
@@ -685,7 +685,7 @@ The consequence is that **no brace-delimited shell variable may appear anywhere 
 this block**: `Fn::Sub` would try to resolve it as a template reference and fail
 the deploy. Bare `$NAME` is safe; `${NAME}` is not.
 
-- [ ] **Step 3: Add the systemd service and timer**
+- [x] **Step 3: Add the systemd service and timer**
 
 Insert directly after:
 
@@ -734,7 +734,7 @@ Insert directly after:
 the boot-time smoke test on the first deploy. `Persistent=true` still earns its
 place: it covers a run missed because the instance was stopped over 02:30.
 
-- [ ] **Step 4: Validate and commit**
+- [x] **Step 4: Validate and commit**
 
 ```bash
 aws cloudformation validate-template \
@@ -753,7 +753,7 @@ git commit -m "infra: nightly pg_dump to S3 via systemd timer, replacing RDS bac
 
 A pool of 30 against a local Postgres means up to 30 backend processes, each with its own `work_mem` allocation, competing with the JVM for 2 GiB. Ten is ample: `app.concurrency.max-parallel-matches=5` and `spring.quartz.properties.org.quartz.threadPool.threadCount=5` bound real concurrency, and Hikari queues rather than failing when saturated.
 
-- [ ] **Step 1: Replace the HikariCP block**
+- [x] **Step 1: Replace the HikariCP block**
 
 Replace lines 7-12:
 
@@ -781,7 +781,7 @@ spring.datasource.hikari.idle-timeout=300000
 spring.datasource.hikari.max-lifetime=600000
 ```
 
-- [ ] **Step 2: Update the stale comment about the datasource URL**
+- [x] **Step 2: Update the stale comment about the datasource URL**
 
 Replace line 1:
 
@@ -796,7 +796,7 @@ with:
 # DB_HOST/DB_PORT are injected by the systemd unit as localhost:5432.
 ```
 
-- [ ] **Step 3: Confirm no other pool override survives**
+- [x] **Step 3: Confirm no other pool override survives**
 
 ```bash
 grep -rn "maximum-pool-size" server/src/main/resources/ infrastructure/
@@ -804,7 +804,7 @@ grep -rn "maximum-pool-size" server/src/main/resources/ infrastructure/
 
 Expected: exactly two hits — `application.properties` (50, the local-dev default, unchanged) and `application-prod.properties` (10). **No hit in `template.yaml`.** A hit in the template means the Task 5 Step 4 edit was missed and the `-D` flag will override this file.
 
-- [ ] **Step 4: Verify the build still passes**
+- [x] **Step 4: Verify the build still passes**
 
 ```bash
 cd /Users/akozlovskyi/Documents/dbuff/dbuff && ./gradlew :server:bootJar -x spotlessCheck
@@ -812,7 +812,7 @@ cd /Users/akozlovskyi/Documents/dbuff/dbuff && ./gradlew :server:bootJar -x spot
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/main/resources/application-prod.properties
@@ -828,7 +828,7 @@ The usage text is wrong in three places and there are no helpers for the new bac
 **Files:**
 - Modify: `infrastructure/cloudformation/deploy.sh:38-52` (usage), `:82` (default instance type), and add two commands
 
-- [ ] **Step 1: Fix the usage text**
+- [x] **Step 1: Fix the usage text**
 
 Replace lines 38-52:
 
@@ -874,7 +874,7 @@ EOF
 
 Two corrections here: the region default was documented as `us-east-1` but line 21 actually defaults to `eu-north-1`, and `DB_PASSWORD` is no longer an RDS password.
 
-- [ ] **Step 2: Change the default instance type**
+- [x] **Step 2: Change the default instance type**
 
 Replace line 82:
 
@@ -888,7 +888,7 @@ with:
   INSTANCE_TYPE="${INSTANCE_TYPE:-t4g.small}"
 ```
 
-- [ ] **Step 3: Add `backup-now` and `restore` commands**
+- [x] **Step 3: Add `backup-now` and `restore` commands**
 
 Insert before the `case "${1:-}" in` block (currently line 137):
 
@@ -940,7 +940,7 @@ cmd_restore() {
 
 `pg_restore` is followed by `|| true` deliberately: it exits non-zero on benign warnings such as a missing role or an already-present extension, which would otherwise abort the SSM command before the app restarts. Task 10 verifies the restore by row count rather than by exit code.
 
-- [ ] **Step 4: Wire the new commands into the dispatcher**
+- [x] **Step 4: Wire the new commands into the dispatcher**
 
 Replace the `case` block:
 
@@ -968,7 +968,7 @@ case "${1:-}" in
 esac
 ```
 
-- [ ] **Step 5: Add the new commands to the usage summary**
+- [x] **Step 5: Add the new commands to the usage summary**
 
 Replace lines 32-36:
 
@@ -992,7 +992,7 @@ Commands:
   restore     Restore a dump from s3://<bucket>/db-backups/<key> (stops the app)
 ```
 
-- [ ] **Step 6: Verify the script parses and commit**
+- [x] **Step 6: Verify the script parses and commit**
 
 ```bash
 bash -n infrastructure/cloudformation/deploy.sh && echo "SYNTAX OK"
@@ -1010,7 +1010,7 @@ This replaces the instance (AMI, instance type, and volume size all changed) and
 
 **Files:** none (operational)
 
-- [ ] **Step 0: Stop the app and take the FINAL dump**
+- [x] **Step 0: Stop the app and take the FINAL dump**
 
 Task 2's dump is a safety net and a rehearsal, not the dump that gets restored.
 The old app keeps writing to RDS after that dump is taken, and every one of those
@@ -1075,7 +1075,7 @@ quiesced one is the authoritative reference. If the two differ by a *lot* more
 than a few hours of normal traffic, or any count went *down*, stop and work out
 why before destroying RDS.
 
-- [ ] **Step 1: Build and upload the JAR**
+- [x] **Step 1: Build and upload the JAR**
 
 The bytecode is architecture-independent, so no rebuild is strictly required — but rebuild anyway so the deployed artifact matches the committed config from Task 7.
 
@@ -1087,7 +1087,7 @@ cd /Users/akozlovskyi/Documents/dbuff/dbuff
 
 Expected: `BUILD SUCCESSFUL`, then `Upload complete`.
 
-- [ ] **Step 2: Deploy the stack**
+- [x] **Step 2: Deploy the stack**
 
 `DB_PASSWORD` and the API keys must be set in `.env` or the environment, exactly as for the original deploy.
 
@@ -1105,7 +1105,7 @@ aws cloudformation describe-stack-events --stack-name dbuff --region eu-north-1 
   --output table
 ```
 
-- [ ] **Step 3: Confirm the Elastic IP is unchanged**
+- [x] **Step 3: Confirm the Elastic IP is unchanged**
 
 ```bash
 aws cloudformation describe-stacks --stack-name dbuff --region eu-north-1 \
@@ -1114,7 +1114,7 @@ aws cloudformation describe-stacks --stack-name dbuff --region eu-north-1 \
 
 Expected: the same IP as before the migration. The EIP is a separate resource from the instance, so instance replacement preserves it and no DNS or Discord reconfiguration is needed.
 
-- [ ] **Step 4: Watch UserData run to completion**
+- [x] **Step 4: Watch UserData run to completion**
 
 ```bash
 INSTANCE=$(aws cloudformation describe-stack-resources --stack-name dbuff \
@@ -1140,7 +1140,7 @@ The app has already started against an empty database, so `ddl-auto=update` has 
 
 **Files:** none (operational)
 
-- [ ] **Step 1: Restore from the pre-migration dump**
+- [x] **Step 1: Restore from the pre-migration dump**
 
 ```bash
 cd /Users/akozlovskyi/Documents/dbuff/dbuff
@@ -1149,7 +1149,7 @@ cd /Users/akozlovskyi/Documents/dbuff/dbuff
 
 Expected: `Success` and no fatal errors in the output. Benign `pg_restore` warnings about roles or ownership are expected and are why the command tolerates a non-zero exit.
 
-- [ ] **Step 2: Diff exact row counts against the Task 9 Step 0 baseline**
+- [x] **Step 2: Diff exact row counts against the Task 9 Step 0 baseline**
 
 Not `n_live_tup` — that is a statistics estimate that reads zero until autovacuum
 runs and would need a `vacuumdb --analyze-only` before it meant anything. Run the
@@ -1218,7 +1218,7 @@ aws ssm send-command --instance-ids "$INSTANCE" \
   --parameters 'commands=["systemctl start dbuff"]' >/dev/null
 ```
 
-- [ ] **Step 3: Confirm the application is healthy against the restored data**
+- [x] **Step 3: Confirm the application is healthy against the restored data**
 
 ```bash
 IP=$(aws cloudformation describe-stacks --stack-name dbuff --region eu-north-1 \
@@ -1234,7 +1234,7 @@ Expected: `{"status":"UP"}`. A non-200 means the app cannot reach the database; 
 
 **Files:** none (operational)
 
-- [ ] **Step 1: Check the memory budget against the prediction**
+- [x] **Step 1: Check the memory budget against the prediction**
 
 ```bash
 INSTANCE=$(aws cloudformation describe-stack-resources --stack-name dbuff \
@@ -1254,7 +1254,7 @@ Expected: `used` around 1.3-1.5 GB of ~1.9 GB total, and swap `used` at or near 
 
 **Escalation criterion, to be checked again after a week of real traffic:** if swap used exceeds ~200 MB on a sustained basis, or the OOM killer appears in `journalctl -k`, redeploy with `INSTANCE_TYPE=t4g.medium`. That is a parameter change plus a stop/start, about two minutes of downtime, and costs an extra ~$11.70/mo.
 
-- [ ] **Step 2: Prove the backup works end to end**
+- [x] **Step 2: Prove the backup works end to end**
 
 Do not wait for 02:30 UTC to find out whether the timer works.
 
@@ -1265,7 +1265,7 @@ cd /Users/akozlovskyi/Documents/dbuff/dbuff
 
 Expected: `Success` and a `backup complete: dbuff-<stamp>.dump` line (`-Fc` already zlib-compresses, so there is no `.gz`).
 
-- [ ] **Step 3: Confirm the backup landed in S3 with a plausible size**
+- [x] **Step 3: Confirm the backup landed in S3 with a plausible size**
 
 ```bash
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
@@ -1274,7 +1274,7 @@ aws s3 ls "s3://dbuff-deploy-${ACCOUNT}/db-backups/" --region eu-north-1 --human
 
 Expected: the new `dbuff-<stamp>.dump` alongside `dbuff-pre-migration.dump`. It should be about the same size as the pre-migration dump - matching sizes are corroboration that the restore kept everything - and certainly not near-zero — a few kilobytes would mean it dumped an empty database.
 
-- [ ] **Step 4: Confirm the timer is scheduled**
+- [x] **Step 4: Confirm the timer is scheduled**
 
 ```bash
 CMD=$(aws ssm send-command --instance-ids "$INSTANCE" \
@@ -1288,7 +1288,7 @@ aws ssm get-command-invocation --command-id "$CMD" --instance-id "$INSTANCE" \
 
 Expected: a row for `dbuff-backup.timer` with a `NEXT` timestamp at the coming 02:30 UTC.
 
-- [ ] **Step 5: Confirm the database is no longer reachable from the internet**
+- [x] **Step 5: Confirm the database is no longer reachable from the internet**
 
 ```bash
 IP=$(aws cloudformation describe-stacks --stack-name dbuff --region eu-north-1 \
@@ -1305,7 +1305,7 @@ Expected: `not reachable - good`. Postgres binds to `localhost` and no security 
 **Files:**
 - Modify: `CLAUDE.md`
 
-- [ ] **Step 1: Add a lifecycle rule so backups do not accumulate forever**
+- [x] **Step 1: Add a lifecycle rule so backups do not accumulate forever**
 
 The deploy bucket is created by `deploy.sh` with `aws s3 mb`, not by CloudFormation, so the rule is applied with the CLI.
 
@@ -1333,7 +1333,7 @@ aws s3api get-bucket-lifecycle-configuration --bucket "dbuff-deploy-${ACCOUNT}" 
 
 Expected: the rule echoed back. Note this expires `dbuff-pre-migration.dump` after 30 days too — acceptable, since the RDS snapshot is the long-term rollback artifact.
 
-- [ ] **Step 2: Correct the Flyway claim in CLAUDE.md**
+- [x] **Step 2: Correct the Flyway claim in CLAUDE.md**
 
 Replace:
 
@@ -1350,7 +1350,7 @@ with:
   a `pg_dump` as the only source of truth for the live schema.
 ```
 
-- [ ] **Step 3: Document the new topology in CLAUDE.md**
+- [x] **Step 3: Document the new topology in CLAUDE.md**
 
 Replace:
 
@@ -1370,14 +1370,14 @@ with:
   `infrastructure/cloudformation/deploy.sh restore <key>`.
 ```
 
-- [ ] **Step 4: Commit the documentation**
+- [x] **Step 4: Commit the documentation**
 
 ```bash
 git add CLAUDE.md
 git commit -m "docs: correct Flyway claim and document single-instance Postgres topology"
 ```
 
-- [ ] **Step 5: Confirm no RDS resources or second IPv4 remain billable**
+- [x] **Step 5: Confirm no RDS resources or second IPv4 remain billable**
 
 ```bash
 aws rds describe-db-instances --region eu-north-1 \
@@ -1388,7 +1388,7 @@ aws ec2 describe-addresses --region eu-north-1 \
 
 Expected: empty output from the first command, and exactly **one** address from the second, associated with the app instance. A second address, or one with no `InstanceId`, is $3.65/mo of waste — release it.
 
-- [ ] **Step 6: Verify the snapshot survived the RDS deletion**
+- [x] **Step 6: Verify the snapshot survived the RDS deletion**
 
 ```bash
 aws rds describe-db-snapshots --region eu-north-1 \
