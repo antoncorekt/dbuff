@@ -123,7 +123,8 @@ public class PlayersMapper {
   private PlayerDomain getOrCreatePlayer(Long accountId, String personaname) {
     return playerRepo
         .findById(accountId)
-        .orElseGet(() -> playerRepo.save(new PlayerDomain(accountId, personaname)));
+        .orElseGet(
+            () -> playerRepo.save(PlayerDomain.builder().id(accountId).name(personaname).build()));
   }
 
   private PlayerMatchStatisticDomain createPlayerStatistics(
