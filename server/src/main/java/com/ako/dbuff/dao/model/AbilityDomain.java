@@ -4,6 +4,8 @@ import com.ako.dbuff.dao.model.id.AbilityId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,6 +20,13 @@ import lombok.ToString;
  * the same playerId - playerSlot (0-9) is always unique within a match
  */
 @Entity
+@Table(
+    indexes = {
+      @Index(
+          name = "idx_ability_domain_player_match_slot",
+          columnList = "playerId, matchId, playerSlot"),
+      @Index(name = "idx_ability_domain_ability_id", columnList = "abilityId")
+    })
 @IdClass(AbilityId.class)
 @Builder
 @ToString
