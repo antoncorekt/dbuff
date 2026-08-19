@@ -153,6 +153,37 @@ Two independent copies before anything is destroyed: an RDS snapshot (fast rollb
 
 **Files:** none (operational)
 
+- [ ] **Step 0: Grant the running instance permission to write to S3**
+
+The deployed IAM policy allows only `s3:GetObject`/`s3:ListBucket`. The
+`s3:PutObject` grant on `db-backups/*` is part of Task 6, which does not take
+effect until the Task 9 deploy — i.e. after the destructive step. Without this,
+Step 4 below fails with `AccessDenied` and the migration would proceed with no
+dump at all.
+
+Add it as a separate inline policy so CloudFormation, which only reconciles the
+`dbuff-ssm-s3-access` policy it declares, leaves it alone:
+
+```bash
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+aws iam put-role-policy \
+  --role-name dbuff-ec2-role \
+  --policy-name dbuff-migration-backup-write \
+  --policy-document "{
+    \"Version\": \"2012-10-17\",
+    \"Statement\": [{
+      \"Effect\": \"Allow\",
+      \"Action\": \"s3:PutObject\",
+      \"Resource\": \"arn:aws:s3:::dbuff-deploy-${ACCOUNT}/db-backups/*\"
+    }]
+  }"
+```
+
+Expected: no output. IAM changes take a few seconds to propagate. This grant
+becomes redundant once Task 9 deploys the Task 6 policy; remove it afterwards
+with `aws iam delete-role-policy --role-name dbuff-ec2-role --policy-name
+dbuff-migration-backup-write`.
+
 - [ ] **Step 1: Take a manual RDS snapshot**
 
 ```bash
