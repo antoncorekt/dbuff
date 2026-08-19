@@ -32,11 +32,19 @@ Parameters:
     NoEcho: true
     Description: Discord bot token
 
+  GoogleVisionCredentialsB64:
+    Type: String
+    NoEcho: true
+    Description: Base64-encoded Google Vision service-account JSON key
+
   InstanceType:
     Type: String
-    Default: t3.small
-    AllowedValues: [t3.micro, t3.small, t3.medium]
-    Description: EC2 instance type
+    Default: t4g.small
+    AllowedValues: [t4g.small, t4g.medium]
+    Description: >-
+      EC2 instance type (Graviton/arm64 only - the AMI below is arm64).
+      t4g.small (2 GiB) runs the app plus Postgres with ~600 MB headroom.
+      Step up to t4g.medium (4 GiB) only if swap usage is sustained.
 
   AllowedSshCidr:
     Type: String
@@ -221,6 +229,14 @@ Resources:
       Value: !Ref DiscordBotToken
       Description: Discord bot token
 
+  SsmGoogleVisionCredentials:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /dbuff/GOOGLE_VISION_CREDENTIALS_B64
+      Type: String
+      Value: !Ref GoogleVisionCredentialsB64
+      Description: Base64-encoded Google Vision service-account JSON key
+
   # ---------- S3 Bucket ----------
   # The deploy bucket is created by deploy.sh on first upload.
   # We reference it by name in IAM policies and UserData.
@@ -320,7 +336,7 @@ Resources:
     Properties:
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyPairName
-      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64}}'
       SubnetId: !Ref PublicSubnet1
       SecurityGroupIds:
         - !Ref AppSecurityGroup
@@ -328,7 +344,10 @@ Resources:
       BlockDeviceMappings:
         - DeviceName: /dev/xvda
           Ebs:
-            VolumeSize: 20
+            # 40 GB: OS + JAR + Postgres data + 2 GB swapfile + room to grow.
+            # gp3 includes 3000 IOPS / 125 MB-s at any size, matching what the
+            # 20 GB RDS volume provided, so there is no IO regression.
+            VolumeSize: 40
             VolumeType: gp3
             Encrypted: true
       UserData:
@@ -376,11 +395,22 @@ Resources:
           SCRAPPER_API_KEY=$(aws ssm get-parameter --name /dbuff/SCRAPPER_API_KEY --region $REGION --query 'Parameter.Value' --output text)
           OPENAI_API_KEY=$(aws ssm get-parameter --name /dbuff/OPENAI_API_KEY --region $REGION --query 'Parameter.Value' --output text)
           DISCORD_BOT_TOKEN=$(aws ssm get-parameter --name /dbuff/DISCORD_BOT_TOKEN --region $REGION --query 'Parameter.Value' --output text)
+          GOOGLE_VISION_CREDENTIALS_B64=$(aws ssm get-parameter --name /dbuff/GOOGLE_VISION_CREDENTIALS_B64 --region $REGION --query 'Parameter.Value' --output text)
 
           # Prepare directories
           mkdir -p /opt/dbuff /var/log/dbuff
           useradd -r -s /sbin/nologin dbuff || true
           chown dbuff:dbuff /opt/dbuff /var/log/dbuff
+
+          # Write the Google Vision service-account key (skip if not provided)
+          GOOGLE_VISION_CREDENTIALS_PATH=/opt/dbuff/google-vision.json
+          if [ -n "$GOOGLE_VISION_CREDENTIALS_B64" ]; then
+            echo "$GOOGLE_VISION_CREDENTIALS_B64" | base64 -d > "$GOOGLE_VISION_CREDENTIALS_PATH"
+            chown dbuff:dbuff "$GOOGLE_VISION_CREDENTIALS_PATH"
+            chmod 600 "$GOOGLE_VISION_CREDENTIALS_PATH"
+          else
+            GOOGLE_VISION_CREDENTIALS_PATH=""
+          fi
 
           # Download JAR from S3
           aws s3 cp s3://dbuff-deploy-${AWS::AccountId}/server.jar /opt/dbuff/server.jar
@@ -410,6 +440,7 @@ Resources:
           Environment=SCRAPPER_API_KEY=$SCRAPPER_API_KEY
           Environment=OPENAI_API_KEY=$OPENAI_API_KEY
           Environment=DISCORD_BOT_TOKEN=$DISCORD_BOT_TOKEN
+          Environment=GOOGLE_VISION_CREDENTIALS_PATH=$GOOGLE_VISION_CREDENTIALS_PATH
 
           [Install]
           WantedBy=multi-user.target
