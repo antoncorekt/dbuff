@@ -42,6 +42,7 @@ public class AbilityRankingRepository {
    * @param abilityIds Optional set of ability IDs to include (if null, returns top abilities by
    *     pick rate)
    * @param excludedAbilities Optional set of ability IDs to exclude
+   * @param heroIds Optional set of hero IDs to restrict the query to
    * @param limit Maximum number of abilities to return (default 10)
    * @return List of AbilityRankingResponse ordered by pick count descending
    */
@@ -51,12 +52,13 @@ public class AbilityRankingRepository {
       LocalDate endDate,
       Set<Long> abilityIds,
       Set<Long> excludedAbilities,
+      Set<Long> heroIds,
       Integer limit) {
 
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
 
-    // First, get total match count for the player within the date range
-    Long totalMatches = getTotalMatchCount(playerId, startDate, endDate);
+    // First, get total match count for the player within the date range and hero filter
+    Long totalMatches = getTotalMatchCount(playerId, startDate, endDate, heroIds);
     if (totalMatches == null || totalMatches == 0) {
       return List.of();
     }
@@ -112,13 +114,19 @@ public class AbilityRankingRepository {
       predicates.add(cb.not(abilityRoot.get(AbilityDomain_.abilityId).in(excludedAbilities)));
     }
 
+    // Hero filter
+    if (heroIds != null && !heroIds.isEmpty()) {
+      predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.heroId).in(heroIds));
+    }
+
     // Select aggregated values
     query.multiselect(
         abilityRoot.get(AbilityDomain_.abilityId).alias("abilityId"),
         abilityRoot.get(AbilityDomain_.name).alias("abilityName"),
         abilityRoot.get(AbilityDomain_.prettyName).alias("abilityPrettyName"),
         cb.countDistinct(abilityRoot.get(AbilityDomain_.matchId)).alias("pickCount"),
-        cb.sum(statsRoot.get(PlayerMatchStatisticDomain_.win)).alias("winCount"));
+        cb.sum(statsRoot.get(PlayerMatchStatisticDomain_.win)).alias("winCount"),
+        cb.avg(abilityRoot.get(AbilityDomain_.useCount)).alias("avgUseCount"));
 
     query.where(predicates.toArray(new Predicate[0]));
 
@@ -141,8 +149,9 @@ public class AbilityRankingRepository {
         .toList();
   }
 
-  /** Gets the total number of matches for a player within the date range. */
-  private Long getTotalMatchCount(Long playerId, LocalDate startDate, LocalDate endDate) {
+  /** Gets the total number of matches for a player within the date range and hero filter. */
+  private Long getTotalMatchCount(
+      Long playerId, LocalDate startDate, LocalDate endDate, Set<Long> heroIds) {
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
     CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
     Root<PlayerMatchStatisticDomain> statsRoot = countQuery.from(PlayerMatchStatisticDomain.class);
@@ -160,6 +169,12 @@ public class AbilityRankingRepository {
     }
     if (endDate != null) {
       predicates.add(cb.lessThanOrEqualTo(matchRoot.get(MatchDomain_.startLocalDate), endDate));
+    }
+    // Must mirror the main query's hero filter. Filtering only the numerator would
+    // divide hero-specific pick counts by the player's games across ALL heroes and
+    // report pick rates several times too low, with no error.
+    if (heroIds != null && !heroIds.isEmpty()) {
+      predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.heroId).in(heroIds));
     }
 
     countQuery.select(cb.countDistinct(statsRoot.get(PlayerMatchStatisticDomain_.matchId)));
@@ -186,6 +201,7 @@ public class AbilityRankingRepository {
       Tuple tuple, Long totalMatches, Long playerId, String playerName) {
     Long pickCount = tuple.get("pickCount", Long.class);
     Long winCount = tuple.get("winCount", Long.class);
+    Double avgUseCount = tuple.get("avgUseCount", Double.class);
 
     // Calculate pick rate: (pickCount / totalMatches) * 100
     BigDecimal pickRate =
@@ -210,6 +226,10 @@ public class AbilityRankingRepository {
         .pickCount(pickCount)
         .pickRate(pickRate)
         .winRate(winRate)
+        .avgUseCount(
+            avgUseCount != null
+                ? BigDecimal.valueOf(avgUseCount).setScale(2, RoundingMode.HALF_UP)
+                : null)
         .build();
   }
 }

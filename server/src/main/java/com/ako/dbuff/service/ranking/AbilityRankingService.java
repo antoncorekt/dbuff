@@ -78,7 +78,13 @@ public class AbilityRankingService {
 
     List<AbilityRankingResponse> rankings =
         abilityRankingRepository.findAbilityRankingsByPlayer(
-            playerId, startDate, effectiveEndDate, abilityIds, excludedAbilityIds, effectiveLimit);
+            playerId,
+            startDate,
+            effectiveEndDate,
+            abilityIds,
+            excludedAbilityIds,
+            null,
+            effectiveLimit);
 
     log.info("Found {} ability rankings for player {}", rankings.size(), playerId);
 

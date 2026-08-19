@@ -39,4 +39,10 @@ public class AbilityRankingResponse {
 
   /** Win rate when this ability was picked (0-100) */
   private BigDecimal winRate;
+
+  /**
+   * Average number of times the ability was used per game, or null when no game in range recorded a
+   * use count. Unparsed matches leave it unset, so null means "no data", not "never used".
+   */
+  private BigDecimal avgUseCount;
 }
