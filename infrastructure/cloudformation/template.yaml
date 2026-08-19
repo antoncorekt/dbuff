@@ -233,6 +233,11 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:s3:::dbuff-deploy-${AWS::AccountId}'
                   - !Sub 'arn:aws:s3:::dbuff-deploy-${AWS::AccountId}/*'
+              # Nightly pg_dump upload; replaces RDS automated backups.
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub 'arn:aws:s3:::dbuff-deploy-${AWS::AccountId}/db-backups/*'
 
   Ec2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -385,6 +390,69 @@ Resources:
           mkdir -p /opt/dbuff /var/log/dbuff
           useradd -r -s /sbin/nologin dbuff || true
           chown dbuff:dbuff /opt/dbuff /var/log/dbuff
+
+          # ---------- Nightly backup ----------
+          # Replaces RDS automated backups. Retention is an S3 lifecycle rule on
+          # the db-backups/ prefix, not this script's problem.
+          # Quoted heredoc, so the shell does not expand $STAMP/$TMP when writing
+          # the file - but CloudFormation still substitutes $${...} here, which is
+          # how the bucket and region get baked in. Do not use $${braced} shell
+          # variables in this block: Fn::Sub would try to resolve them.
+          cat > /usr/local/bin/dbuff-backup.sh <<'BKEOF'
+          #!/bin/bash
+          set -euo pipefail
+          BUCKET="dbuff-deploy-${AWS::AccountId}"
+          REGION="${AWS::Region}"
+          STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          TMP=$(mktemp /tmp/dbuff-XXXXXX.dump)
+          trap 'rm -f "$TMP"' EXIT
+          # Runs as root, switches to the postgres OS user so peer auth applies
+          # and no password needs to live on disk. -Fc already zlib-compresses,
+          # so there is nothing to gain by piping through gzip. The redirect is
+          # done by this root shell rather than pg_dump's -f, because mktemp made
+          # the file root-owned 0600 and the postgres user could not open it.
+          sudo -u postgres pg_dump -Fc -d dbuff > "$TMP"
+          # Cheap integrity gate: a truncated dump fails to list. Upload only a
+          # dump we know is readable, so S3 never holds a corrupt file that looks
+          # like a valid backup.
+          pg_restore --list "$TMP" > /dev/null
+          aws s3 cp "$TMP" "s3://$BUCKET/db-backups/dbuff-$STAMP.dump" --region "$REGION"
+          echo "backup complete: dbuff-$STAMP.dump ($(du -h "$TMP" | cut -f1))"
+          BKEOF
+          chmod 755 /usr/local/bin/dbuff-backup.sh
+
+          cat > /etc/systemd/system/dbuff-backup.service <<'BKSVC'
+          [Unit]
+          Description=DBuff nightly database backup to S3
+          After=postgresql.service
+          Requires=postgresql.service
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/bin/dbuff-backup.sh
+          StandardOutput=append:/var/log/dbuff/backup.log
+          StandardError=append:/var/log/dbuff/backup.log
+          BKSVC
+
+          cat > /etc/systemd/system/dbuff-backup.timer <<'BKTMR'
+          [Unit]
+          Description=Run the DBuff database backup nightly
+
+          [Timer]
+          # 02:30 UTC, inside the app's configured quiet hours (01:00-09:00)
+          OnCalendar=*-*-* 02:30:00
+          Persistent=true
+
+          [Install]
+          WantedBy=timers.target
+          BKTMR
+
+          systemctl daemon-reload
+          # With no prior run recorded, Persistent=true makes this fire straight
+          # away. That is deliberate: it smoke-tests pg_dump and the s3:PutObject
+          # grant at boot rather than 24h later. The dump is empty until the
+          # restore in the migration runbook.
+          systemctl enable --now dbuff-backup.timer
 
           # Write the Google Vision service-account key (skip if not provided)
           GOOGLE_VISION_CREDENTIALS_PATH=/opt/dbuff/google-vision.json
