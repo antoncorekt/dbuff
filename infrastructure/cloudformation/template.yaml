@@ -367,9 +367,10 @@ Resources:
           # Quoted heredoc: CloudFormation substitutes the password parameter
           # first, and the quoting then stops the shell expanding any $ or
           # backtick in it. A single quote in the password would still break this
-          # SQL - see the DB_PASSWORD note in deploy.sh usage. (The $${...} below
-          # is escaped so Fn::Sub leaves this comment alone rather than
-          # interpolating the secret into it.)
+          # SQL - see the DB_PASSWORD note in deploy.sh usage. Note that this
+          # comment deliberately avoids writing CloudFormation's parameter
+          # reference syntax: Fn::Sub rewrites comments too, so spelling it out
+          # here would interpolate the secret into a comment in the boot log.
           sudo -u postgres psql -v ON_ERROR_STOP=1 <<'SQLEOF'
           SELECT 'CREATE ROLE dbuffuser LOGIN'
             WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'dbuffuser')\gexec
@@ -395,9 +396,12 @@ Resources:
           # Replaces RDS automated backups. Retention is an S3 lifecycle rule on
           # the db-backups/ prefix, not this script's problem.
           # Quoted heredoc, so the shell does not expand $STAMP/$TMP when writing
-          # the file - but CloudFormation still substitutes $${...} here, which is
-          # how the bucket and region get baked in. Do not use $${braced} shell
-          # variables in this block: Fn::Sub would try to resolve them.
+          # the file - but CloudFormation still substitutes its own parameter
+          # references here, which is how the bucket and region get baked in.
+          # Consequence: do not use brace-delimited shell variables in this
+          # block, because Fn::Sub would try to resolve them as template
+          # references and fail the deploy. Bare $NAME is safe; $NAME in braces
+          # is not.
           cat > /usr/local/bin/dbuff-backup.sh <<'BKEOF'
           #!/bin/bash
           set -euo pipefail
