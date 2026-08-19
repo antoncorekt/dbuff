@@ -9,6 +9,7 @@ import com.ako.dbuff.service.instance.DbufInstanceConfigService;
 import com.ako.dbuff.service.match.DotaApiParseRequestService;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
 import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
+import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,7 @@ public class MatchParseCheckJob implements Job {
   @Autowired private DbufInstanceConfigService instanceConfigService;
   @Autowired private MatchParseSchedulerService matchParseSchedulerService;
   @Autowired private DotaApiConfigurationProperties config;
+  @Autowired private QuietHoursGuard quietHoursGuard;
 
   @Override
   public void execute(JobExecutionContext context) throws JobExecutionException {
@@ -38,6 +40,11 @@ public class MatchParseCheckJob implements Job {
     String instanceId = context.getJobDetail().getJobDataMap().getString("instanceId");
     long discordThreadId = context.getJobDetail().getJobDataMap().getLong("discordThreadId");
     long headerMessageId = context.getJobDetail().getJobDataMap().getLong("headerMessageId");
+
+    if (quietHoursGuard.isQuietTime()) {
+      log.debug("Skipping parse check for match {} during quiet hours", matchId);
+      return;
+    }
 
     log.debug("Checking parse status for match {}", matchId);
 
