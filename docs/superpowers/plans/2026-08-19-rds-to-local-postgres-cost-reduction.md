@@ -644,32 +644,46 @@ with:
 
 Insert after the role/database creation block from Task 5 Step 3:
 
+This block goes after the `mkdir -p /opt/dbuff /var/log/dbuff` from Task 5, so
+the log directory already exists and no second `mkdir` is needed here.
+
 ```bash
           # ---------- Nightly backup ----------
-          # The log directory is created again later in this script, but the
-          # backup service writes into it and Persistent=true means the timer can
-          # fire on boot before that later mkdir runs. Create it here; mkdir -p
-          # and the later chown are both idempotent.
-          mkdir -p /var/log/dbuff
+          # Replaces RDS automated backups. Retention is an S3 lifecycle rule on
+          # the db-backups/ prefix, not this script's problem.
           cat > /usr/local/bin/dbuff-backup.sh <<'BKEOF'
           #!/bin/bash
           set -euo pipefail
-          BUCKET="__BUCKET__"
-          REGION="__REGION__"
+          BUCKET="dbuff-deploy-${AWS::AccountId}"
+          REGION="${AWS::Region}"
           STAMP=$(date -u +%Y%m%dT%H%M%SZ)
           TMP=$(mktemp /tmp/dbuff-XXXXXX.dump)
           trap 'rm -f "$TMP"' EXIT
           # Runs as root, switches to the postgres OS user so peer auth applies
-          # and no password needs to live on disk.
-          sudo -u postgres pg_dump -Fc -d dbuff -f "$TMP"
-          gzip -c "$TMP" | aws s3 cp - "s3://$BUCKET/db-backups/dbuff-$STAMP.dump.gz" --region "$REGION"
-          echo "backup complete: dbuff-$STAMP.dump.gz"
+          # and no password needs to live on disk. -Fc already zlib-compresses,
+          # so there is nothing to gain by piping through gzip. The redirect is
+          # done by this root shell rather than pg_dump's -f, because mktemp made
+          # the file root-owned 0600 and the postgres user could not open it.
+          sudo -u postgres pg_dump -Fc -d dbuff > "$TMP"
+          # Cheap integrity gate: a truncated dump fails to list. Upload only a
+          # dump we know is readable, so S3 never holds a corrupt file that looks
+          # like a valid backup.
+          pg_restore --list "$TMP" > /dev/null
+          aws s3 cp "$TMP" "s3://$BUCKET/db-backups/dbuff-$STAMP.dump" --region "$REGION"
+          echo "backup complete: dbuff-$STAMP.dump ($(du -h "$TMP" | cut -f1))"
           BKEOF
-          sed -i "s|__BUCKET__|dbuff-deploy-${AWS::AccountId}|; s|__REGION__|${AWS::Region}|" /usr/local/bin/dbuff-backup.sh
           chmod 755 /usr/local/bin/dbuff-backup.sh
 ```
 
-`mktemp` writes to `/tmp` on the 40 GB root volume; the `trap` removes the uncompressed dump even on failure.
+`mktemp` writes to `/tmp` on the 40 GB root volume; the `trap` removes the dump
+even on failure.
+
+Note the heredoc is quoted, so the shell does not expand `$STAMP`/`$TMP` when the
+file is written — but `Fn::Sub` still substitutes its own references, which is how
+the bucket and region get baked in without the `__PLACEHOLDER__` + `sed` dance.
+The consequence is that **no brace-delimited shell variable may appear anywhere in
+this block**: `Fn::Sub` would try to resolve it as a template reference and fail
+the deploy. Bare `$NAME` is safe; `${NAME}` is not.
 
 - [ ] **Step 3: Add the systemd service and timer**
 
@@ -704,7 +718,21 @@ Insert directly after:
 
           systemctl daemon-reload
           systemctl enable --now dbuff-backup.timer
+          # Run the backup once at boot, to smoke-test pg_dump and the
+          # s3:PutObject grant now rather than discovering a broken backup at
+          # 02:30 the following morning. This explicit trigger is required:
+          # Persistent=true only replays a run the timer *missed*, and on a
+          # first-ever enable systemd stamps the timer as though it had just
+          # run, so nothing fires until the next OnCalendar match. Learned the
+          # hard way - after the first boot of this instance, backup.log did not
+          # exist. Tolerates failure because a fresh instance has an empty
+          # database and a backup must never block the boot.
+          systemctl start dbuff-backup.service || true
 ```
+
+`enable --now` starts the *timer*, not the service — a distinction that cost us
+the boot-time smoke test on the first deploy. `Persistent=true` still earns its
+place: it covers a run missed because the instance was stopped over 02:30.
 
 - [ ] **Step 4: Validate and commit**
 
@@ -1235,7 +1263,7 @@ cd /Users/akozlovskyi/Documents/dbuff/dbuff
 ./infrastructure/cloudformation/deploy.sh backup-now
 ```
 
-Expected: `Success` and a `backup complete: dbuff-<stamp>.dump.gz` line.
+Expected: `Success` and a `backup complete: dbuff-<stamp>.dump` line (`-Fc` already zlib-compresses, so there is no `.gz`).
 
 - [ ] **Step 3: Confirm the backup landed in S3 with a plausible size**
 
@@ -1244,7 +1272,7 @@ ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 aws s3 ls "s3://dbuff-deploy-${ACCOUNT}/db-backups/" --region eu-north-1 --human-readable
 ```
 
-Expected: the new `dbuff-<stamp>.dump.gz` alongside `dbuff-pre-migration.dump`. The gzipped file should be smaller than the pre-migration dump but not near-zero — a few kilobytes would mean it dumped an empty database.
+Expected: the new `dbuff-<stamp>.dump` alongside `dbuff-pre-migration.dump`. It should be about the same size as the pre-migration dump - matching sizes are corroboration that the restore kept everything - and certainly not near-zero — a few kilobytes would mean it dumped an empty database.
 
 - [ ] **Step 4: Confirm the timer is scheduled**
 
