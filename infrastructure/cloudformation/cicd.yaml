@@ -1,0 +1,142 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  CI/CD identity for the dbuff GitHub Actions pipeline: a GitHub OIDC provider
+  and the least-privilege role that the deploy job assumes.
+
+  This is deliberately a SEPARATE stack from `dbuff`. That stack owns the EC2
+  instance which, since the RDS removal, also hosts PostgreSQL - so it must not
+  be updated merely to adjust CI permissions. Keeping the CI identity here means
+  the role can be created, changed, or torn down without ever running
+  update-stack against the stack that holds the database.
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Default: antoncorekt
+    Description: GitHub account or organisation that owns the repository.
+
+  GitHubRepo:
+    Type: String
+    Default: dbuff
+    Description: Repository name.
+
+  DeployBranch:
+    Type: String
+    Default: main
+    Description: >
+      Only workflow runs on this branch may assume the role. A fork or a feature
+      branch cannot assume it even if the workflow file is modified there.
+
+  AppStackName:
+    Type: String
+    Default: dbuff
+    Description: Stack to read the application instance ID from.
+
+  InstanceNameTag:
+    Type: String
+    Default: dbuff-instance
+    Description: >
+      Value of the Name tag on the application instance. SendCommand is
+      restricted to instances carrying it.
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      # AWS no longer validates the thumbprint for GitHub's endpoint, but the
+      # property is still required. Both currently published CA thumbprints are
+      # listed so a rotation does not break role assumption.
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: dbuff-github-deploy
+      Description: Assumed by GitHub Actions to deploy the dbuff application JAR.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOidcProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${DeployBranch}'
+      Policies:
+        - PolicyName: dbuff-app-deploy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Release artifacts only. The nightly db-backups/ prefix is
+              # deliberately excluded: CI has no business touching backups.
+              - Sid: ReleaseObjects
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::dbuff-deploy-${AWS::AccountId}/releases/*'
+                  - !Sub 'arn:aws:s3:::dbuff-deploy-${AWS::AccountId}/server.jar'
+
+              # Needed to list releases for pruning.
+              - Sid: ListReleases
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub 'arn:aws:s3:::dbuff-deploy-${AWS::AccountId}'
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - releases
+                      - releases/*
+
+              # SendCommand authorises the document and the target instance
+              # independently, so these MUST be two statements. A single
+              # statement carrying the tag condition would apply it to the
+              # document too - which has no Name tag - and the call would be
+              # denied.
+              - Sid: SendCommandDocument
+                Effect: Allow
+                Action: ssm:SendCommand
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}::document/AWS-RunShellScript'
+
+              - Sid: SendCommandInstance
+                Effect: Allow
+                Action: ssm:SendCommand
+                Resource: !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*'
+                Condition:
+                  StringEquals:
+                    ssm:resourceTag/Name: !Ref InstanceNameTag
+
+              # Reading a command's result does not support resource scoping.
+              - Sid: ReadCommandResult
+                Effect: Allow
+                Action:
+                  - ssm:GetCommandInvocation
+                  - ssm:ListCommandInvocations
+                Resource: '*'
+
+              # Resolve the instance ID from the application stack, the same way
+              # deploy.sh does.
+              - Sid: ResolveInstanceId
+                Effect: Allow
+                Action: cloudformation:DescribeStackResources
+                Resource: !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AppStackName}/*'
+
+Outputs:
+  DeployRoleArn:
+    Description: Set this as the AWS_DEPLOY_ROLE_ARN GitHub Actions secret.
+    Value: !GetAtt DeployRole.Arn
+
+  OidcProviderArn:
+    Description: ARN of the GitHub Actions OIDC provider.
+    Value: !Ref GitHubOidcProvider

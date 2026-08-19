@@ -1,0 +1,192 @@
+name: CI / CD
+
+# Verify runs on every push. Deploy runs only for main.
+#
+# `pull_request` is deliberately absent: this repo allows direct pushes, so the
+# push trigger already covers every same-repo branch, and GitHub surfaces those
+# runs as checks on any PR opened from one. Adding pull_request would just
+# duplicate every run.
+on:
+  push:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-north-1
+  STACK_NAME: dbuff
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Build, test, check formatting
+    runs-on: ubuntu-latest
+    concurrency:
+      group: verify-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: '21'
+          cache: gradle
+
+      # `build` covers everything in one task: it compiles both modules, runs the
+      # full test suite, and enforces formatting, because spotless sets
+      # enforceCheck = true which wires spotlessCheck into `check`.
+      - name: Gradle build
+        run: ./gradlew build --no-daemon
+
+      - name: Locate the boot JAR
+        id: jar
+        run: |
+          set -euo pipefail
+          # server's plain `jar` task is disabled, so bootJar leaves exactly one
+          # artifact. Resolved by glob so a version bump in gradle.properties
+          # cannot silently break the path.
+          shopt -s nullglob
+          jars=(server/build/libs/server-*.jar)
+          if [ ${#jars[@]} -ne 1 ]; then
+            echo "Expected exactly one boot JAR, found ${#jars[@]}: ${jars[*]:-none}" >&2
+            exit 1
+          fi
+          echo "path=${jars[0]}" >> "$GITHUB_OUTPUT"
+          echo "Found ${jars[0]}"
+
+      # The deploy job consumes this rather than rebuilding, so the bytes that
+      # ship are exactly the bytes that passed the tests.
+      - name: Upload the JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-jar
+          path: ${{ steps.jar.outputs.path }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            server/build/reports/tests/test/
+            server/build/test-results/test/
+          if-no-files-found: ignore
+
+  deploy:
+    name: Deploy to production
+    needs: verify
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC role assumption
+      contents: read
+    # One instance means two deploys would race on `systemctl restart dbuff`.
+    # Queue them, and never cancel one midway through a restart.
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the verified JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: server-jar
+          path: artifact
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve deploy context
+        id: ctx
+        run: |
+          set -euo pipefail
+          bucket="dbuff-deploy-${{ secrets.AWS_ACCOUNT_ID }}"
+
+          jars=(artifact/server-*.jar)
+          jar="${jars[0]}"
+
+          # Same lookup deploy.sh uses, for consistency.
+          instance="$(aws cloudformation describe-stack-resources \
+            --stack-name "$STACK_NAME" \
+            --query "StackResources[?LogicalResourceId=='AppInstance'].PhysicalResourceId" \
+            --output text)"
+          if [ -z "$instance" ] || [ "$instance" = "None" ]; then
+            echo "Could not resolve AppInstance in stack $STACK_NAME" >&2
+            exit 1
+          fi
+
+          # Rollback target. Absent on the first CI deploy.
+          if aws s3 cp "s3://$bucket/releases/current-sha" /tmp/prev-sha >/dev/null 2>&1; then
+            prev="$(tr -d '\n' < /tmp/prev-sha)"
+          else
+            prev=""
+            echo "::warning::No releases/current-sha in S3 - treating this as the first CI deploy. Rollback is unavailable for this run."
+          fi
+
+          {
+            echo "bucket=$bucket"
+            echo "jar=$jar"
+            echo "instance=$instance"
+            echo "prev=$prev"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "instance=$instance  previous=${prev:-none}  jar=$jar"
+
+      - name: Upload the release
+        run: |
+          aws s3 cp "${{ steps.ctx.outputs.jar }}" \
+            "s3://${{ steps.ctx.outputs.bucket }}/releases/${{ github.sha }}.jar"
+
+      # Installs, waits for the SSM command to actually finish, then polls
+      # /actuator/health. Fails the step if the app does not come up.
+      - name: Deploy and verify health
+        run: |
+          ./scripts/deploy-release.sh \
+            "${{ steps.ctx.outputs.bucket }}" \
+            "${{ steps.ctx.outputs.instance }}" \
+            "${{ github.sha }}"
+
+      - name: Record the release
+        run: |
+          set -euo pipefail
+          bucket="${{ steps.ctx.outputs.bucket }}"
+          printf '%s' "${{ github.sha }}" | aws s3 cp - "s3://$bucket/releases/current-sha"
+          # UserData fetches server.jar at first boot, so keep it current: a
+          # future instance rebuild via deploy.sh then comes up on this release
+          # instead of a stale one.
+          aws s3 cp "s3://$bucket/releases/${{ github.sha }}.jar" "s3://$bucket/server.jar"
+
+      - name: Prune old releases
+        run: |
+          set -euo pipefail
+          bucket="${{ steps.ctx.outputs.bucket }}"
+          # Keep the 10 most recent JARs. current-sha is not a .jar, so the
+          # filter leaves it alone.
+          aws s3 ls "s3://$bucket/releases/" \
+            | awk '$4 ~ /\.jar$/ {print $1" "$2" "$4}' \
+            | sort \
+            | head -n -10 \
+            | awk '{print $3}' \
+            | while read -r key; do
+                echo "removing $key"
+                aws s3 rm "s3://$bucket/releases/$key"
+              done
+
+      # Reuses the same script as the forward deploy, so the rollback path is not
+      # separately-written, never-executed code. The job still ends red: the
+      # deployment failed even though production recovered.
+      - name: Roll back
+        if: failure() && steps.ctx.outputs.prev != ''
+        run: |
+          echo "::error::Deploy of ${{ github.sha }} failed. Rolling back to ${{ steps.ctx.outputs.prev }}."
+          ./scripts/deploy-release.sh \
+            "${{ steps.ctx.outputs.bucket }}" \
+            "${{ steps.ctx.outputs.instance }}" \
+            "${{ steps.ctx.outputs.prev }}"
+          echo "::error::Rolled back to ${{ steps.ctx.outputs.prev }}. Note that the database schema is NOT rolled back."
