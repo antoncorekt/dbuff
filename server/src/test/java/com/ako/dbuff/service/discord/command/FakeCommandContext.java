@@ -23,6 +23,8 @@ public class FakeCommandContext implements CommandContext {
   private final String guildId;
   private final boolean insideThread;
   private final String threadName;
+  private final byte[] attachment;
+  private final RuntimeException attachmentFailure;
 
   private final List<String> posts = new ArrayList<>();
   private final List<MessageEmbed> embeds = new ArrayList<>();
@@ -40,6 +42,8 @@ public class FakeCommandContext implements CommandContext {
     this.guildId = builder.guildId;
     this.insideThread = builder.insideThread;
     this.threadName = builder.threadName;
+    this.attachment = builder.attachment;
+    this.attachmentFailure = builder.attachmentFailure;
   }
 
   public static Builder builder() {
@@ -76,6 +80,14 @@ public class FakeCommandContext implements CommandContext {
   @Override
   public Optional<String> getOptionAsUserId(String name) {
     return Optional.ofNullable(options.get(name));
+  }
+
+  @Override
+  public Optional<byte[]> downloadAttachment(String name) {
+    if (attachmentFailure != null) {
+      throw attachmentFailure;
+    }
+    return Optional.ofNullable(attachment);
   }
 
   @Override
@@ -124,6 +136,8 @@ public class FakeCommandContext implements CommandContext {
     private String guildId = "guild-1";
     private boolean insideThread = false;
     private String threadName = null;
+    private byte[] attachment = null;
+    private RuntimeException attachmentFailure = null;
 
     public Builder option(String name, String value) {
       options.put(name, value);
@@ -159,6 +173,18 @@ public class FakeCommandContext implements CommandContext {
     public Builder threadName(String threadName) {
       this.threadName = threadName;
       this.insideThread = true;
+      return this;
+    }
+
+    /** Makes {@code downloadAttachment} return these bytes for any option name. */
+    public Builder attachment(byte[] attachment) {
+      this.attachment = attachment;
+      return this;
+    }
+
+    /** Makes {@code downloadAttachment} throw, as a failed download does. */
+    public Builder attachmentFailure(RuntimeException attachmentFailure) {
+      this.attachmentFailure = attachmentFailure;
       return this;
     }
 

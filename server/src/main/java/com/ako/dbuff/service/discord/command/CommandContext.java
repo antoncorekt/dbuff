@@ -32,6 +32,23 @@ public interface CommandContext {
   /** Discord user snowflake for a user-typed option, or empty when absent. */
   Optional<String> getOptionAsUserId(String name);
 
+  /**
+   * Downloads the bytes of an attachment option.
+   *
+   * <p>Named for what it does rather than as a getter, because it performs network I/O. Call it
+   * <em>after</em> {@link #acknowledge} — spending the three-second interaction budget on an image
+   * download is exactly how a command ends up dropped by Discord.
+   *
+   * <p>Defaults to empty: only the slash surface can carry an attachment, so the text surface has
+   * nothing to return.
+   *
+   * @param name the option name
+   * @return the attachment bytes, or empty when the option is absent
+   */
+  default Optional<byte[]> downloadAttachment(String name) {
+    return Optional.empty();
+  }
+
   /** Snowflake of the user who invoked the command. */
   String getInvokerId();
 

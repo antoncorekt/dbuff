@@ -2,6 +2,8 @@ package com.ako.dbuff.service.discord.command.adapter;
 
 import com.ako.dbuff.service.discord.command.AsyncReply;
 import com.ako.dbuff.service.discord.command.CommandContext;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -49,6 +51,21 @@ public class InteractionCommandContext implements CommandContext {
   public Optional<String> getOptionAsUserId(String name) {
     OptionMapping option = event.getOption(name);
     return option == null ? Optional.empty() : Optional.of(option.getAsUser().getId());
+  }
+
+  @Override
+  public Optional<byte[]> downloadAttachment(String name) {
+    OptionMapping option = event.getOption(name);
+    if (option == null) {
+      return Optional.empty();
+    }
+    Message.Attachment attachment = option.getAsAttachment();
+    try (InputStream stream = attachment.getProxy().download().join()) {
+      return Optional.of(stream.readAllBytes());
+    } catch (IOException | RuntimeException e) {
+      throw new IllegalStateException(
+          "Could not download attachment " + attachment.getFileName(), e);
+    }
   }
 
   @Override
