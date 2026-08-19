@@ -15,9 +15,9 @@ import org.springframework.stereotype.Component;
  * The single source of truth for which commands exist.
  *
  * <p>Both adapters dispatch through this, JDA registration reads its definitions, and help text is
- * generated from it — so help cannot drift from the actual command set. The previous listeners kept
- * a hand-written help embed, which is how {@code MatchSummaryDiscordListener} ended up dead and
- * unnoticed.
+ * generated from it — so help cannot drift from the actual command set. The listeners this replaced
+ * each kept a hand-written help embed, which is how one of them ended up dead and unnoticed:
+ * nothing tied the advertised commands to the implemented ones.
  */
 @Component
 public class CommandRegistry {

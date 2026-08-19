@@ -16,7 +16,7 @@ import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
  *
  * <p>Options come from a map the command built by parsing its argument string, so handlers cannot
  * tell which surface invoked them. Threads are created on the user's own message, matching what the
- * previous {@code PlayerScoutDiscordListener} did.
+ * text listeners this replaced did.
  */
 @RequiredArgsConstructor
 public class MessageCommandContext implements CommandContext {
