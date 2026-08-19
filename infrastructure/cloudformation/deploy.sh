@@ -25,6 +25,13 @@ BUCKET="dbuff-deploy-${ACCOUNT_ID}"
 JAR_PATH="$PROJECT_ROOT/server/build/libs/server-0.0.1-SNAPSHOT.jar"
 TEMPLATE="$SCRIPT_DIR/template.yaml"
 
+# The CI identity lives in its own stack so that changing CI permissions never
+# means running update-stack against the stack that owns the database instance.
+# Not configurable: scripts/sync-github-secrets.sh looks the role ARN up by
+# this exact name.
+CICD_STACK_NAME="dbuff-cicd"
+CICD_TEMPLATE="$SCRIPT_DIR/cicd.yaml"
+
 usage() {
   cat <<EOF
 Usage: $0 <command> [options]
@@ -34,8 +41,13 @@ Commands:
   upload      Upload JAR to S3 (creates bucket if needed via stack)
   deploy      Create or update the CloudFormation stack
   all         build + upload + deploy
+  cicd        Create or update the $CICD_STACK_NAME stack (GitHub OIDC + deploy role)
   backup-now  Trigger an immediate database backup to S3
   restore     Restore a dump from s3://<bucket>/db-backups/<key> (stops the app)
+
+Note: 'build'/'upload'/'deploy' are the manual path, kept for infrastructure
+changes and emergencies. Application releases normally go out through GitHub
+Actions on a push to main - see docs/superpowers/specs/2026-08-19-app-cicd-design.md.
 
 Required environment variables for deploy:
   KEY_PAIR_NAME       EC2 key pair name
@@ -138,6 +150,79 @@ cmd_deploy() {
     --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' --output table
 }
 
+cmd_cicd() {
+  # Org/repo are derived from the 'origin' remote so this stack cannot drift from
+  # the repository it is meant to trust. The template's own defaults are used if
+  # derivation fails.
+  local url path org repo params=()
+  url="$(git -C "$PROJECT_ROOT" remote get-url origin 2>/dev/null || true)"
+  case "$url" in
+    *://*) path="${url#*://}"; path="${path#*/}" ;;   # https://host/owner/repo
+    *:*)   path="${url##*:}" ;;                       # git@host:owner/repo
+    *)     path="" ;;
+  esac
+  path="${path%.git}"
+  org="${path%%/*}"
+  repo="${path##*/}"
+  if [ -n "$path" ] && [ "$org" != "$path" ]; then
+    echo "==> Trusting GitHub repo $org/$repo (branch main) from the origin remote"
+    params+=(ParameterKey=GitHubOrg,ParameterValue="$org")
+    params+=(ParameterKey=GitHubRepo,ParameterValue="$repo")
+  else
+    echo "WARN: could not derive owner/repo from origin ($url); using template defaults"
+  fi
+  params+=(ParameterKey=AppStackName,ParameterValue="$STACK_NAME")
+
+  echo "==> Deploying CloudFormation stack: $CICD_STACK_NAME"
+
+  local action
+  if aws cloudformation describe-stacks --stack-name "$CICD_STACK_NAME" --region "$REGION" >/dev/null 2>&1; then
+    action="update-stack"
+    echo "    Stack exists, updating..."
+  else
+    action="create-stack"
+    echo "    Creating new stack..."
+    # The OIDC provider is account-global, so a provider created by hand or by
+    # another project makes create-stack fail with EntityAlreadyExists. Say so
+    # up front rather than leaving a confusing ROLLBACK_COMPLETE behind.
+    if aws iam list-open-id-connect-providers \
+         --query "OpenIDConnectProviderList[?ends_with(Arn, ':oidc-provider/token.actions.githubusercontent.com')].Arn" \
+         --output text | grep -q .; then
+      echo "ERROR: an OIDC provider for token.actions.githubusercontent.com already exists in" >&2
+      echo "       this account. Import it into the stack, or delete the GitHubOidcProvider" >&2
+      echo "       resource from cicd.yaml and reference the existing ARN instead." >&2
+      return 1
+    fi
+  fi
+
+  # update-stack exits non-zero when there is genuinely nothing to change, which
+  # is a successful outcome here.
+  local out
+  if ! out="$(aws cloudformation $action \
+      --stack-name "$CICD_STACK_NAME" \
+      --template-body "file://$CICD_TEMPLATE" \
+      --region "$REGION" \
+      --parameters "${params[@]}" \
+      --capabilities CAPABILITY_NAMED_IAM 2>&1)"; then
+    if echo "$out" | grep -q 'No updates are to be performed'; then
+      echo "    No changes to apply"
+    else
+      echo "$out" >&2
+      return 1
+    fi
+  else
+    echo "==> Waiting for stack to complete..."
+    aws cloudformation wait "stack-${action%%-stack}-complete" \
+      --stack-name "$CICD_STACK_NAME" --region "$REGION"
+  fi
+
+  echo "==> Stack outputs:"
+  aws cloudformation describe-stacks --stack-name "$CICD_STACK_NAME" --region "$REGION" \
+    --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' --output table
+
+  echo "==> Next: ./scripts/sync-github-secrets.sh push"
+}
+
 cmd_instance_id() {
   aws cloudformation describe-stack-resources --stack-name "$STACK_NAME" \
     --region "$REGION" \
@@ -190,6 +275,7 @@ case "${1:-}" in
   upload)     cmd_upload ;;
   deploy)     cmd_deploy ;;
   all)        cmd_build && cmd_upload && cmd_deploy ;;
+  cicd)       cmd_cicd ;;
   backup-now) cmd_backup_now ;;
   restore)    cmd_restore "$@" ;;
   *)          usage ;;

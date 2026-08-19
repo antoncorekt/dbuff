@@ -86,3 +86,27 @@ Consequences worth knowing before changing anything here:
   there is no longer a managed snapshot to fall back on.
 - **RAM is the binding constraint** (~2 GiB shared between the JVM at `-Xmx512m`,
   Postgres at `shared_buffers=256MB`, and a 2 GiB swapfile as a safety net).
+
+### Deploying
+
+**Application code ships through CI.** A push to `main` runs
+`.github/workflows/ci-cd.yml`: the `verify` job builds and tests, and the
+`deploy` job installs the JAR that those tests passed, then gates on
+`/actuator/health` and rolls back to the previous release if it does not come
+up. Do not deploy application changes by hand — merge to `main` instead. CI
+authenticates via GitHub OIDC (role from `infrastructure/cloudformation/cicd.yaml`,
+a stack separate from `dbuff`), so there is no long-lived AWS key.
+
+**Infrastructure stays manual, deliberately.** The `dbuff` stack owns the EC2
+instance that hosts the database, so CI has no permission to touch it. Apply
+template changes yourself:
+
+```bash
+./infrastructure/cloudformation/deploy.sh deploy   # apply template.yaml
+./infrastructure/cloudformation/deploy.sh cicd     # apply cicd.yaml (CI identity)
+./infrastructure/cloudformation/deploy.sh all      # build + upload + deploy, the pre-CI manual path
+```
+
+`build`/`upload`/`all` remain for emergencies and for bootstrapping a rebuilt
+instance. Note that a stack update replacing the instance destroys the local
+database — take a backup first.
