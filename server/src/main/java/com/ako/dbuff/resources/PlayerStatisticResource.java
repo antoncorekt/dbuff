@@ -5,6 +5,7 @@ import com.ako.dbuff.resources.model.PlayerStatisticResponse;
 import com.ako.dbuff.service.ranking.PlayerStatisticService;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -46,6 +47,7 @@ public class PlayerStatisticResource {
    * @param startDate Optional start date filter (inclusive). If null, includes all history.
    * @param endDate Optional end date filter (inclusive). If null, uses current date.
    * @param heroLimit Number of popular heroes to return. Defaults to 3 if null.
+   * @param heroes Optional set of hero names to restrict the statistics to.
    * @return PlayerStatisticResponse with aggregated statistics
    */
   @GetMapping("/{playerId}/statistic")
@@ -55,17 +57,19 @@ public class PlayerStatisticResource {
           LocalDate startDate,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
           LocalDate endDate,
-      @RequestParam(required = false) Integer heroLimit) {
+      @RequestParam(required = false) Integer heroLimit,
+      @RequestParam(required = false) Set<String> heroes) {
 
     log.info(
-        "GET /api/v1/player/{}/statistic - startDate={}, endDate={}, heroLimit={}",
+        "GET /api/v1/player/{}/statistic - startDate={}, endDate={}, heroLimit={}, heroes={}",
         playerId,
         startDate,
         endDate,
-        heroLimit);
+        heroLimit,
+        heroes);
 
     return playerStatisticService.getPlayerStatistics(
-        playerId, startDate, endDate, heroLimit, null);
+        playerId, startDate, endDate, heroLimit, heroes);
   }
 
   /**

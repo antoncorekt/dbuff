@@ -2,14 +2,11 @@ package com.ako.dbuff.service.ranking;
 
 import com.ako.dbuff.dao.repo.ItemRankingRepository;
 import com.ako.dbuff.resources.model.ItemRankingResponse;
-import com.ako.dbuff.service.constant.ConstantsManagers;
-import com.ako.dbuff.service.constant.data.ItemConstant;
+import com.ako.dbuff.service.constant.ConstantNameResolver;
+import com.ako.dbuff.service.constant.NameResolution;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for calculating item rankings per player. Provides statistics about item usage including
- * pick rate, win rate, and average purchase time.
+ * pick rate, win rate, average purchase time, and average uses per game.
  */
 @Slf4j
 @Service
@@ -27,7 +24,7 @@ public class ItemRankingService {
   private static final int DEFAULT_LIMIT = 10;
 
   private final ItemRankingRepository itemRankingRepository;
-  private final ConstantsManagers constantsManagers;
+  private final ConstantNameResolver nameResolver;
 
   /**
    * Gets item rankings for a specific player.
@@ -35,83 +32,75 @@ public class ItemRankingService {
    * @param playerId The player's account ID
    * @param startDate Optional start date filter (inclusive). If null, includes all history.
    * @param endDate Optional end date filter (inclusive). If null, uses current date.
-   * @param itemDnames Optional set of item dnames to include. If null, returns top items by pick
+   * @param itemNames Optional item names to include. If null or empty, returns top items by pick
    *     count.
-   * @param excludedItemDnames Optional set of item dnames to exclude from results.
+   * @param excludedItemNames Optional item names to exclude from results.
+   * @param heroNames Optional hero names to restrict the query to.
    * @param limit Maximum number of items to return. Defaults to 10 if null.
    * @return List of ItemRankingResponse ordered by pick count descending
+   * @throws UnknownConstantNameException if any supplied name matches no known constant
    */
   @Transactional(readOnly = true)
   public List<ItemRankingResponse> getItemRankings(
       Long playerId,
       LocalDate startDate,
       LocalDate endDate,
-      Set<String> itemDnames,
-      Set<String> excludedItemDnames,
+      Set<String> itemNames,
+      Set<String> excludedItemNames,
+      Set<String> heroNames,
       Integer limit) {
 
-    log.info(
-        "Fetching item rankings for player {} with startDate={}, endDate={}, items={}, excludedItems={}, limit={}",
-        playerId,
-        startDate,
-        endDate,
-        itemDnames,
-        excludedItemDnames,
-        limit);
-
-    // Use current date as default end date if not specified
     LocalDate effectiveEndDate = endDate != null ? endDate : LocalDate.now();
-
-    // Use default limit if not specified
     int effectiveLimit = limit != null && limit > 0 ? limit : DEFAULT_LIMIT;
 
-    // Convert item dnames to IDs using ConstantsManagers
-    Set<Long> itemIds = convertDnamesToIds(itemDnames);
-    Set<Long> excludedItemIds = convertDnamesToIds(excludedItemDnames);
+    Set<Long> itemIds = resolveItemsOrThrow(itemNames);
+    Set<Long> excludedItemIds = resolveItemsOrThrow(excludedItemNames);
+    Set<Long> heroIds = resolveHeroesOrThrow(heroNames);
 
-    log.debug(
-        "Converted item dnames to IDs: items={} -> {}, excludedItems={} -> {}",
-        itemDnames,
+    log.info(
+        "Fetching item rankings for player {}: startDate={}, endDate={}, items={}, excluded={}, heroes={}, limit={}",
+        playerId,
+        startDate,
+        effectiveEndDate,
         itemIds,
-        excludedItemDnames,
-        excludedItemIds);
+        excludedItemIds,
+        heroIds,
+        effectiveLimit);
 
     List<ItemRankingResponse> rankings =
         itemRankingRepository.findItemRankingsByPlayer(
-            playerId, startDate, effectiveEndDate, itemIds, excludedItemIds, null, effectiveLimit);
+            playerId,
+            startDate,
+            effectiveEndDate,
+            itemIds,
+            excludedItemIds,
+            heroIds,
+            effectiveLimit);
 
     log.info("Found {} item rankings for player {}", rankings.size(), playerId);
-
     return rankings;
   }
 
   /**
-   * Converts a set of item dnames to their corresponding IDs using the item constant map.
+   * Resolves item names to IDs, refusing to proceed if any name is unknown.
    *
-   * @param dnames Set of item dnames (e.g., "blink", "black_king_bar")
-   * @return Set of item IDs, or null if input is null or empty
+   * <p>Throwing rather than dropping is deliberate. A null ID set means "no filter" to the
+   * repository, so silently discarding unknown names turns a filtered query into an unfiltered
+   * top-N ranking and answers a different question than the caller asked.
    */
-  private Set<Long> convertDnamesToIds(Set<String> dnames) {
-    if (dnames == null || dnames.isEmpty()) {
-      return null;
+  private Set<Long> resolveItemsOrThrow(Set<String> names) {
+    NameResolution resolution = nameResolver.resolveItems(names);
+    if (resolution.hasUnresolved()) {
+      throw new UnknownConstantNameException("items", resolution.unresolvedNames());
     }
+    return resolution.idsOrNullIfEmpty();
+  }
 
-    Map<String, ItemConstant> itemConstantMap = constantsManagers.getItemConstantMap();
-
-    Set<Long> ids =
-        dnames.stream()
-            .map(
-                dname -> {
-                  ItemConstant itemConstant = itemConstantMap.get(dname);
-                  if (itemConstant == null) {
-                    log.warn("Unknown item dname: {}", dname);
-                    return null;
-                  }
-                  return itemConstant.getId();
-                })
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
-
-    return ids.isEmpty() ? null : ids;
+  private Set<Long> resolveHeroesOrThrow(Set<String> names) {
+    NameResolution resolution = nameResolver.resolveHeroes(names);
+    if (resolution.hasUnresolved()) {
+      throw new UnknownConstantNameException("heroes", resolution.unresolvedNames());
+    }
+    return resolution.idsOrNullIfEmpty();
   }
 }
