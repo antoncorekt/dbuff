@@ -10,7 +10,10 @@ Parameters:
     Type: String
     NoEcho: true
     MinLength: 8
-    Description: Password for the RDS PostgreSQL database
+    Description: >-
+      Password for the dbuffuser role in the PostgreSQL instance running on the
+      app server. Must not contain a single quote - it is interpolated into a
+      SQL literal in UserData.
 
   DotaApiKey:
     Type: String
@@ -307,6 +310,69 @@ Resources:
             -a fetch-config -m ec2 \
             -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
 
+          # ---------- Swap ----------
+          # 2 GiB safety net. RAM budget on t4g.small is ~1.4 GB of 2 GB, so swap
+          # should stay near-empty; sustained usage means resize the instance.
+          dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+          chmod 600 /swapfile
+          mkswap /swapfile
+          swapon /swapfile
+          echo '/swapfile none swap sw 0 0' >> /etc/fstab
+          echo 'vm.swappiness=10' > /etc/sysctl.d/99-dbuff-swap.conf
+          sysctl -p /etc/sysctl.d/99-dbuff-swap.conf
+
+          # ---------- PostgreSQL 16 ----------
+          dnf install -y postgresql16-server postgresql16
+          /usr/bin/postgresql-setup --initdb
+
+          # Tuning for 2 GiB shared with the JVM. Appended rather than edited in
+          # place: in postgresql.conf the last occurrence of a setting wins.
+          cat >> /var/lib/pgsql/data/postgresql.conf <<'PGCONF'
+
+          # --- dbuff tuning ---
+          listen_addresses = 'localhost'
+          max_connections = 30
+          shared_buffers = 256MB
+          effective_cache_size = 768MB
+          maintenance_work_mem = 64MB
+          work_mem = 8MB
+          wal_compression = on
+          checkpoint_completion_target = 0.9
+          # SSD-backed gp3: random reads cost about the same as sequential
+          random_page_cost = 1.1
+          effective_io_concurrency = 200
+          # Trades up to ~200ms of committed transactions on an unclean shutdown
+          # for better write throughput. Set to 'on' if that is unacceptable.
+          synchronous_commit = off
+          log_min_duration_statement = 2000
+          PGCONF
+
+          # The AL2023 default pg_hba uses 'ident' for TCP loopback, which fails
+          # for the 'dbuff' OS user connecting as role 'dbuffuser'. The app uses
+          # jdbc:postgresql://localhost, i.e. a TCP connection, so this must be
+          # password auth or the application cannot start.
+          sed -i -E 's|^(host[[:space:]]+all[[:space:]]+all[[:space:]]+127\.0\.0\.1/32[[:space:]]+).*|\1scram-sha-256|' /var/lib/pgsql/data/pg_hba.conf
+          sed -i -E 's|^(host[[:space:]]+all[[:space:]]+all[[:space:]]+::1/128[[:space:]]+).*|\1scram-sha-256|' /var/lib/pgsql/data/pg_hba.conf
+          grep -E '^host' /var/lib/pgsql/data/pg_hba.conf
+
+          systemctl enable --now postgresql
+
+          # Create the application role and database idempotently, so replacing
+          # the instance against an existing volume does not fail the boot.
+          # Quoted heredoc: CloudFormation substitutes the password parameter
+          # first, and the quoting then stops the shell expanding any $ or
+          # backtick in it. A single quote in the password would still break this
+          # SQL - see the DB_PASSWORD note in deploy.sh usage. (The $${...} below
+          # is escaped so Fn::Sub leaves this comment alone rather than
+          # interpolating the secret into it.)
+          sudo -u postgres psql -v ON_ERROR_STOP=1 <<'SQLEOF'
+          SELECT 'CREATE ROLE dbuffuser LOGIN'
+            WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'dbuffuser')\gexec
+          SELECT 'CREATE DATABASE dbuff OWNER dbuffuser'
+            WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'dbuff')\gexec
+          ALTER ROLE dbuffuser LOGIN PASSWORD '${DbPassword}';
+          SQLEOF
+
           # Fetch secrets from SSM Parameter Store
           REGION=${AWS::Region}
           DOTA_API_KEY=$(aws ssm get-parameter --name /dbuff/DOTA_API_KEY --region $REGION --query 'Parameter.Value' --output text)
@@ -338,13 +404,14 @@ Resources:
           cat > /etc/systemd/system/dbuff.service <<EOF
           [Unit]
           Description=DBuff Application
-          After=network.target
+          After=network.target postgresql.service
+          Requires=postgresql.service
 
           [Service]
           Type=simple
           User=dbuff
           WorkingDirectory=/opt/dbuff
-          ExecStart=/usr/bin/java --enable-preview -Xms256m -Xmx512m -Dspring.datasource.hikari.maximum-pool-size=30 -jar /opt/dbuff/server.jar
+          ExecStart=/usr/bin/java --enable-preview -Xms256m -Xmx512m -jar /opt/dbuff/server.jar
           Restart=on-failure
           RestartSec=10
           StandardOutput=append:/var/log/dbuff/dbuff.log
