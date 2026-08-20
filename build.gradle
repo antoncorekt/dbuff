@@ -69,7 +69,12 @@ subprojects {
     }
     tasks.withType(Test) { task ->
         maxHeapSize '1024m'
-        jvmArgs '-XX:+HeapDumpOnOutOfMemoryError'
+        // Must mirror the compile flag above: classes that actually use a preview feature are
+        // marked in the class file and refuse to load on a JVM without it. Without this, any test
+        // touching such a class dies with UnsupportedClassVersionError — which is why no
+        // @SpringBootTest could load the context. Production passes the same flag; see
+        // infrastructure/cloudformation/template.yaml.
+        jvmArgs '-XX:+HeapDumpOnOutOfMemoryError', '--enable-preview'
         testLogging {
             events 'started', 'failed', 'passed', 'skipped'
             showStackTraces true

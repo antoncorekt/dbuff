@@ -47,4 +47,19 @@ public interface PlayerRepo
    */
   @Query(value = "SELECT * FROM player_domain WHERE name ~* :pattern", nativeQuery = true)
   List<PlayerDomain> findByNameMatchingRegex(@Param("pattern") String pattern);
+
+  /**
+   * Finds the player linked to a Discord user.
+   *
+   * @param discordUserId the Discord user snowflake
+   * @return the linked player, if any
+   */
+  Optional<PlayerDomain> findByDiscordUserId(String discordUserId);
+
+  /**
+   * All players that have a Discord account linked. Used to render "Name — @nick" in autocomplete.
+   *
+   * @return the linked players
+   */
+  List<PlayerDomain> findAllByDiscordUserIdIsNotNull();
 }

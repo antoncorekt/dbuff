@@ -124,8 +124,8 @@ require_gh() {
   command -v gh >/dev/null 2>&1 \
     || die "gh not found. Install with: brew install gh"
 
-  # This repo is on public GitHub. Being logged into an enterprise host such as
-  # an internal GHE host does not grant access here.
+  # This repo is on public GitHub. Being logged into a GitHub Enterprise host
+  # does not grant access here.
   gh auth status --hostname github.com >/dev/null 2>&1 \
     || die "gh is not authenticated to github.com. Run:
          gh auth login --hostname github.com --git-protocol ssh --web

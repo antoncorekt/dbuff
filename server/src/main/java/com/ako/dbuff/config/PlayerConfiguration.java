@@ -32,7 +32,11 @@ public class PlayerConfiguration {
 
     DEFAULT_PLAYERS.forEach(
         (id, name) -> {
-          if (!playerRepo.existsById(id)) {
+          // Looked up by name, not existsById(id): PlayerRepo declares its ID type as Long while
+          // PlayerDomain's @Id is the String name, so existsById(accountId) always answers false.
+          // With the old guard every startup re-saved each player, clearing any column the re-save
+          // did not set — including discordUserId, which would silently unlink everyone on restart.
+          if (playerRepo.findByName(name).isEmpty()) {
             playerRepo.save(PlayerDomain.builder().id(id).name(name).build());
             log.info("Saved player [{}].", name);
           }

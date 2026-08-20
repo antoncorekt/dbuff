@@ -248,7 +248,7 @@ local `.env`, which is what `deploy.sh` reads:
 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `KEY_PAIR_NAME`, `DB_PASSWORD`,
 `DOTA_API_KEY`, `SCRAPPER_API_KEY`, `OPENAI_API_KEY`, `DISCORD_BOT_TOKEN`.
 
-Operationally, `gh` is currently authenticated only to `an internal GHE host`.
+Operationally, `gh` may be authenticated only to a GitHub Enterprise host.
 This repository is on public GitHub — the `github-antoncorekt` remote is an SSH
 alias with `HostName github.com`, owner `antoncorekt/dbuff` — so a second host
 login is needed: `gh auth login --hostname github.com`. `gh` holds both hosts

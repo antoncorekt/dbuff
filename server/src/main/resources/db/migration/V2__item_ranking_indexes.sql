@@ -1,3 +1,15 @@
+-- ============================================================================
+-- NOT EXECUTED. Flyway is not on the classpath, so nothing in db/migration has
+-- ever run against any database. Retained only as documentation of the intended
+-- INCLUDE and partial indexes, which JPA cannot express.
+--
+-- The composite indexes below are now declared via @Index on ItemDomain,
+-- AbilityDomain, PlayerMatchStatisticDomain and MatchDomain, and are created by
+-- Hibernate's ddl-auto=update. The INCLUDE / WHERE variants here are NOT
+-- created; apply them by hand via psql only if profiling shows the plain
+-- composites are insufficient.
+-- ============================================================================
+
 -- =====================================================
 -- PostgreSQL Indexes for Item Ranking API Performance
 -- =====================================================

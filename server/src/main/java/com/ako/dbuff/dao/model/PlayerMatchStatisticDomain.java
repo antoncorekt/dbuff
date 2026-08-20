@@ -4,6 +4,8 @@ import com.ako.dbuff.dao.model.id.PlayerGameStatisticDomainId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,6 +21,12 @@ import lombok.ToString;
  * match would have the same playerId - playerSlot (0-9) is always unique within a match
  */
 @Entity
+@Table(
+    indexes = {
+      @Index(name = "idx_player_match_stat_player_match", columnList = "playerId, matchId"),
+      @Index(name = "idx_player_match_stat_player_hero", columnList = "playerId, heroId"),
+      @Index(name = "idx_player_match_stat_match_id", columnList = "matchId")
+    })
 @IdClass(PlayerGameStatisticDomainId.class)
 @Data
 @Builder

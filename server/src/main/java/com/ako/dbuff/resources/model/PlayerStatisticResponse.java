@@ -36,6 +36,12 @@ public class PlayerStatisticResponse {
   /** N most popular heroes (default 3) */
   private List<HeroStatistic> popularHeroes;
 
+  /**
+   * True when these statistics were restricted to a single hero. Callers should omit the
+   * popularHeroes section in that case — it degenerates to one entry and reads as noise.
+   */
+  @Builder.Default private Boolean heroFiltered = false;
+
   // Observer and Sentry wards
   private BigDecimal avgObsPlaced;
   private BigDecimal avgSenPlaced;

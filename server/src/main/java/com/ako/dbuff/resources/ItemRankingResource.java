@@ -43,6 +43,7 @@ public class ItemRankingResource {
    * @param endDate Optional end date filter (inclusive). If null, uses current date.
    * @param items Optional set of item dnames to include. If null, returns top items by pick count.
    * @param excludedItems Optional set of item dnames to exclude from results.
+   * @param heroes Optional set of hero names to restrict the statistics to.
    * @param limit Maximum number of items to return. Defaults to 10 if null.
    * @return List of ItemRankingResponse ordered by pick count descending
    */
@@ -55,18 +56,20 @@ public class ItemRankingResource {
           LocalDate endDate,
       @RequestParam(required = false) Set<String> items,
       @RequestParam(required = false) Set<String> excludedItems,
+      @RequestParam(required = false) Set<String> heroes,
       @RequestParam(required = false) Integer limit) {
 
     log.info(
-        "GET /api/v1/player/{}/itemRanking - startDate={}, endDate={}, items={}, excludedItems={}, limit={}",
+        "GET /api/v1/player/{}/itemRanking - startDate={}, endDate={}, items={}, excludedItems={}, heroes={}, limit={}",
         playerId,
         startDate,
         endDate,
         items,
         excludedItems,
+        heroes,
         limit);
 
     return itemRankingService.getItemRankings(
-        playerId, startDate, endDate, items, excludedItems, limit);
+        playerId, startDate, endDate, items, excludedItems, heroes, limit);
   }
 }
