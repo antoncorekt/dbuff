@@ -74,24 +74,7 @@ public class StatsEmbedFormatter {
       String playerName, List<ItemRankingResponse> rankings, String periodLabel) {
     EmbedBuilder embed = baseEmbed("🎒 Items — " + playerName, periodLabel);
 
-    List<String> lines = new ArrayList<>();
-    for (ItemRankingResponse item : rankings) {
-      lines.add(
-          "**"
-              + displayName(item.getItemPrettyName(), item.getItemName(), item.getItemId())
-              + "** — "
-              + orZero(item.getPickCount())
-              + " games, "
-              + percent(item.getPickRate())
-              + " picked, "
-              + percent(item.getWinRate())
-              + " won, buy "
-              + duration(item.getAvgPurchaseTime())
-              + ", "
-              + metric(item.getAvgUseCount())
-              + " uses");
-    }
-    addTable(embed, "Top items", lines, "No items in this period.");
+    addTable(embed, "Top items", itemLines(rankings), "No items in this period.");
     return embed.build();
   }
 
@@ -125,33 +108,64 @@ public class StatsEmbedFormatter {
       String playerName, List<AbilityRankingResponse> rankings, String periodLabel) {
     EmbedBuilder embed = baseEmbed("✨ Skills — " + playerName, periodLabel);
 
-    List<String> lines = new ArrayList<>();
-    for (AbilityRankingResponse ability : rankings) {
-      lines.add(
-          "**"
-              + displayName(
-                  ability.getAbilityPrettyName(), ability.getAbilityName(), ability.getAbilityId())
-              + "** — "
-              + orZero(ability.getPickCount())
-              + " games, "
-              + percent(ability.getPickRate())
-              + " picked, "
-              + percent(ability.getWinRate())
-              + " won, "
-              + metric(ability.getAvgUseCount())
-              + " uses");
-    }
-    addTable(embed, "Top skills", lines, "No skills in this period.");
+    addTable(embed, "Top skills", abilityLines(rankings), "No skills in this period.");
     return embed.build();
   }
 
-  /** Statistics for games containing every requested ability. */
-  public MessageEmbed formatAbilityCombo(AbilityComboStatisticResponse combo, String periodLabel) {
+  /**
+   * One hero's report for one player: the overall numbers on that hero, plus the item and skill
+   * tables when they were asked for.
+   *
+   * <p>One embed rather than three, because all of it answers a single question — and because three
+   * embeds per player would push a five-player request past what Discord shows without collapsing.
+   *
+   * @param heroName the hero as the user named it, for the title
+   * @param items the item ranking, or null when the option was not set
+   * @param abilities the skill ranking, or null when the option was not set
+   */
+  public MessageEmbed formatHero(
+      String heroName,
+      PlayerStatisticResponse stats,
+      List<ItemRankingResponse> items,
+      List<AbilityRankingResponse> abilities,
+      String periodLabel) {
+
     EmbedBuilder embed =
         baseEmbed(
-                "✨ Skill combo — " + nameOf(combo.getPlayerName(), combo.getPlayerId()),
+                "🦸 " + heroName + " — " + nameOf(stats.getPlayerName(), stats.getPlayerId()),
                 periodLabel)
-            .addField("Games with all skills", String.valueOf(orZero(combo.getGamesFound())), true)
+            .addField("Matches", String.valueOf(orZero(stats.getTotalMatches())), true)
+            .addField("Record", record(stats), true)
+            .addField("Win rate", percent(stats.getAvgWinRate()), true)
+            .addField("Avg KDA", metric(stats.getAvgKda()), true)
+            .addField("Avg GPM", metric(stats.getAvgGoldPerMin()), true)
+            .addField("Avg XPM", metric(stats.getAvgXpPerMin()), true);
+
+    if (items != null) {
+      addTable(embed, "Top items", itemLines(items), "No items on this hero in this period.");
+    }
+    if (abilities != null) {
+      addTable(
+          embed, "Top skills", abilityLines(abilities), "No skills on this hero in this period.");
+    }
+    return embed.build();
+  }
+
+  /**
+   * Statistics for games containing every requested ability, and every requested item when items
+   * were named too.
+   */
+  public MessageEmbed formatAbilityCombo(AbilityComboStatisticResponse combo, String periodLabel) {
+    boolean withItems = !orEmpty(combo.getItemMembers()).isEmpty();
+    EmbedBuilder embed =
+        baseEmbed(
+                (withItems ? "✨ Skill + item combo — " : "✨ Skill combo — ")
+                    + nameOf(combo.getPlayerName(), combo.getPlayerId()),
+                periodLabel)
+            .addField(
+                withItems ? "Games with all of both" : "Games with all skills",
+                String.valueOf(orZero(combo.getGamesFound())),
+                true)
             .addField("Win rate", percent(combo.getWinRate()), true)
             .addField("Avg KDA", metric(combo.getAvgKda()), true);
 
@@ -166,7 +180,65 @@ public class StatsEmbedFormatter {
               + " uses");
     }
     addTable(embed, "Per skill", lines, "No per-skill data.");
+
+    if (withItems) {
+      List<String> itemLines = new ArrayList<>();
+      for (AbilityComboStatisticResponse.ItemMember member : combo.getItemMembers()) {
+        itemLines.add(
+            "**"
+                + displayName(member.getItemPrettyName(), member.getItemName(), member.getItemId())
+                + "** — buy "
+                + duration(member.getAvgPurchaseTime())
+                + ", "
+                + metric(member.getAvgUseCount())
+                + " uses");
+      }
+      addTable(embed, "Per item", itemLines, "No per-item data.");
+    }
     return embed.build();
+  }
+
+  /** One line per item of a ranking, shared by {@code /stats items} and {@code /hero}. */
+  private List<String> itemLines(List<ItemRankingResponse> rankings) {
+    List<String> lines = new ArrayList<>();
+    for (ItemRankingResponse item : orEmpty(rankings)) {
+      lines.add(
+          "**"
+              + displayName(item.getItemPrettyName(), item.getItemName(), item.getItemId())
+              + "** — "
+              + orZero(item.getPickCount())
+              + " games, "
+              + percent(item.getPickRate())
+              + " picked, "
+              + percent(item.getWinRate())
+              + " won, buy "
+              + duration(item.getAvgPurchaseTime())
+              + ", "
+              + metric(item.getAvgUseCount())
+              + " uses");
+    }
+    return lines;
+  }
+
+  /** One line per ability of a ranking, shared by {@code /stats skills} and {@code /hero}. */
+  private List<String> abilityLines(List<AbilityRankingResponse> rankings) {
+    List<String> lines = new ArrayList<>();
+    for (AbilityRankingResponse ability : orEmpty(rankings)) {
+      lines.add(
+          "**"
+              + displayName(
+                  ability.getAbilityPrettyName(), ability.getAbilityName(), ability.getAbilityId())
+              + "** — "
+              + orZero(ability.getPickCount())
+              + " games, "
+              + percent(ability.getPickRate())
+              + " picked, "
+              + percent(ability.getWinRate())
+              + " won, "
+              + metric(ability.getAvgUseCount())
+              + " uses");
+    }
+    return lines;
   }
 
   private EmbedBuilder baseEmbed(String title, String periodLabel) {

@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.ranking;
 
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,6 +33,42 @@ class StatsPeriodTest {
     assertThat(range.startDate()).isNull();
     assertThat(range.endDate()).isEqualTo(TODAY);
     assertThat(range.fellBack()).isFalse();
+  }
+
+  /** Calendar months, not 30-day multiples: "3 months ago" means the same day three months back. */
+  @Test
+  void monthlyPresets_countBackInCalendarMonths() {
+    assertThat(StatsPeriod.LAST_3_MONTHS.resolve(TODAY, null).startDate())
+        .isEqualTo(LocalDate.of(2026, 5, 19));
+    assertThat(StatsPeriod.LAST_6_MONTHS.resolve(TODAY, null).startDate())
+        .isEqualTo(LocalDate.of(2026, 2, 19));
+    assertThat(StatsPeriod.LAST_12_MONTHS.resolve(TODAY, null).startDate())
+        .isEqualTo(LocalDate.of(2025, 8, 19));
+  }
+
+  @Test
+  void monthlyPresets_endToday_andNeverReportAFallback() {
+    for (StatsPeriod period :
+        List.of(StatsPeriod.LAST_3_MONTHS, StatsPeriod.LAST_6_MONTHS, StatsPeriod.LAST_12_MONTHS)) {
+      StatsPeriod.Range range = period.resolve(TODAY, null);
+
+      assertThat(range.endDate()).as("end of %s", period).isEqualTo(TODAY);
+      assertThat(range.fellBack()).as("fallback flag of %s", period).isFalse();
+    }
+  }
+
+  /** A month subtraction that lands on a shorter month must clamp, not roll over. */
+  @Test
+  void monthlyPresets_clampWhenTheTargetMonthIsShorter() {
+    assertThat(StatsPeriod.LAST_3_MONTHS.resolve(LocalDate.of(2026, 5, 31), null).startDate())
+        .isEqualTo(LocalDate.of(2026, 2, 28));
+  }
+
+  @Test
+  void monthlyPresets_areOfferedAsChoices() {
+    assertThat(StatsPeriod.fromChoiceValue("last_3_months")).isEqualTo(StatsPeriod.LAST_3_MONTHS);
+    assertThat(StatsPeriod.fromChoiceValue("last_6_months")).isEqualTo(StatsPeriod.LAST_6_MONTHS);
+    assertThat(StatsPeriod.fromChoiceValue("last_12_months")).isEqualTo(StatsPeriod.LAST_12_MONTHS);
   }
 
   @Test

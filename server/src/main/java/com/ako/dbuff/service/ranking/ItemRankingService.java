@@ -4,6 +4,8 @@ import com.ako.dbuff.dao.repo.ItemRankingRepository;
 import com.ako.dbuff.resources.model.ItemComboStatisticResponse;
 import com.ako.dbuff.resources.model.ItemRankingResponse;
 import com.ako.dbuff.service.constant.ConstantNameResolver;
+import com.ako.dbuff.service.constant.GameModeResolver;
+import com.ako.dbuff.service.constant.GameModeSelection;
 import com.ako.dbuff.service.constant.NameResolution;
 import java.time.LocalDate;
 import java.util.List;
@@ -26,6 +28,7 @@ public class ItemRankingService {
 
   private final ItemRankingRepository itemRankingRepository;
   private final ConstantNameResolver nameResolver;
+  private final GameModeResolver gameModeResolver;
 
   /**
    * Gets item rankings for a specific player.
@@ -37,6 +40,8 @@ public class ItemRankingService {
    *     count.
    * @param excludedItemNames Optional item names to exclude from results.
    * @param heroNames Optional hero names to restrict the query to.
+   * @param gameModeNames Optional game mode names to restrict the query to. Null or empty includes
+   *     every mode.
    * @param limit Maximum number of items to return. Defaults to 10 if null.
    * @return List of ItemRankingResponse ordered by pick count descending
    * @throws UnknownConstantNameException if any supplied name matches no known constant
@@ -49,6 +54,7 @@ public class ItemRankingService {
       Set<String> itemNames,
       Set<String> excludedItemNames,
       Set<String> heroNames,
+      Set<String> gameModeNames,
       Integer limit) {
 
     LocalDate effectiveEndDate = endDate != null ? endDate : LocalDate.now();
@@ -57,15 +63,17 @@ public class ItemRankingService {
     Set<Long> itemIds = resolveItemsOrThrow(itemNames);
     Set<Long> excludedItemIds = resolveItemsOrThrow(excludedItemNames);
     Set<Long> heroIds = resolveHeroesOrThrow(heroNames);
+    Set<Long> gameModeIds = resolveGameModesOrThrow(gameModeNames);
 
     log.info(
-        "Fetching item rankings for player {}: startDate={}, endDate={}, items={}, excluded={}, heroes={}, limit={}",
+        "Fetching item rankings for player {}: startDate={}, endDate={}, items={}, excluded={}, heroes={}, gameModes={}, limit={}",
         playerId,
         startDate,
         effectiveEndDate,
         itemIds,
         excludedItemIds,
         heroIds,
+        gameModeIds,
         effectiveLimit);
 
     List<ItemRankingResponse> rankings =
@@ -76,6 +84,7 @@ public class ItemRankingService {
             itemIds,
             excludedItemIds,
             heroIds,
+            gameModeIds,
             effectiveLimit);
 
     log.info("Found {} item rankings for player {}", rankings.size(), playerId);
@@ -93,22 +102,25 @@ public class ItemRankingService {
       LocalDate startDate,
       LocalDate endDate,
       Set<String> itemNames,
-      Set<String> heroNames) {
+      Set<String> heroNames,
+      Set<String> gameModeNames) {
 
     Set<Long> itemIds = resolveItemsOrThrow(itemNames);
     Set<Long> heroIds = resolveHeroesOrThrow(heroNames);
+    Set<Long> gameModeIds = resolveGameModesOrThrow(gameModeNames);
     LocalDate effectiveEndDate = endDate != null ? endDate : LocalDate.now();
 
     log.info(
-        "Fetching item combo statistics for player {}: items={}, heroes={}, {} to {}",
+        "Fetching item combo statistics for player {}: items={}, heroes={}, gameModes={}, {} to {}",
         playerId,
         itemIds,
         heroIds,
+        gameModeIds,
         startDate,
         effectiveEndDate);
 
     return itemRankingRepository.findItemComboStatistics(
-        playerId, itemIds, heroIds, startDate, effectiveEndDate);
+        playerId, itemIds, heroIds, gameModeIds, startDate, effectiveEndDate);
   }
 
   /**
@@ -132,5 +144,14 @@ public class ItemRankingService {
       throw new UnknownConstantNameException("heroes", resolution.unresolvedNames());
     }
     return resolution.idsOrNullIfEmpty();
+  }
+
+  /** Resolves game mode names to IDs, refusing to proceed if any is unknown. */
+  private Set<Long> resolveGameModesOrThrow(Set<String> names) {
+    GameModeSelection modes = gameModeResolver.resolve(names);
+    if (modes.hasUnresolved()) {
+      throw new UnknownConstantNameException("game modes", modes.unresolvedNames());
+    }
+    return modes.idsOrNullIfEmpty();
   }
 }

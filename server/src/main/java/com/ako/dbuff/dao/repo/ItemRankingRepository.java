@@ -44,6 +44,7 @@ public class ItemRankingRepository {
    * @param itemIds Optional set of item IDs to include (if null, returns top items by pick rate)
    * @param excludedItems Optional set of item IDs to exclude
    * @param heroIds Optional set of hero IDs to restrict the query to
+   * @param gameModeIds Optional set of game mode IDs to restrict the query to
    * @param limit Maximum number of items to return (default 10)
    * @return List of ItemRankingResponse ordered by pick count descending
    */
@@ -54,12 +55,13 @@ public class ItemRankingRepository {
       Set<Long> itemIds,
       Set<Long> excludedItems,
       Set<Long> heroIds,
+      Set<Long> gameModeIds,
       Integer limit) {
 
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
 
     // First, get total match count for the player within the date range and hero filter
-    Long totalMatches = getTotalMatchCount(playerId, startDate, endDate, heroIds);
+    Long totalMatches = getTotalMatchCount(playerId, startDate, endDate, heroIds, gameModeIds);
     if (totalMatches == null || totalMatches == 0) {
       return List.of();
     }
@@ -121,6 +123,11 @@ public class ItemRankingRepository {
       predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.heroId).in(heroIds));
     }
 
+    // Game mode filter
+    if (gameModeIds != null && !gameModeIds.isEmpty()) {
+      predicates.add(matchRoot.get(MatchDomain_.gameModeId).in(gameModeIds));
+    }
+
     // Select aggregated values
     query.multiselect(
         itemRoot.get(ItemDomain_.itemId).alias("itemId"),
@@ -163,12 +170,18 @@ public class ItemRankingRepository {
    * @param playerId the player's account ID
    * @param itemIds the items that must ALL be present; empty or null yields zero games
    * @param heroIds optional hero restriction
+   * @param gameModeIds optional game mode restriction
    * @param startDate optional inclusive lower bound on match date
    * @param endDate optional inclusive upper bound on match date
    * @return combo statistics, never null; {@code gamesFound} is 0 when nothing matched
    */
   public ItemComboStatisticResponse findItemComboStatistics(
-      Long playerId, Set<Long> itemIds, Set<Long> heroIds, LocalDate startDate, LocalDate endDate) {
+      Long playerId,
+      Set<Long> itemIds,
+      Set<Long> heroIds,
+      Set<Long> gameModeIds,
+      LocalDate startDate,
+      LocalDate endDate) {
 
     String playerName = getPlayerName(playerId);
     ItemComboStatisticResponse empty =
@@ -191,7 +204,7 @@ public class ItemRankingRepository {
     }
 
     Set<Long> comboMatchIds =
-        applyDateAndHeroFilters(playerId, candidateMatchIds, heroIds, startDate, endDate);
+        applyMatchFilters(playerId, candidateMatchIds, heroIds, gameModeIds, startDate, endDate);
     if (comboMatchIds.isEmpty()) {
       return empty;
     }
@@ -294,11 +307,12 @@ public class ItemRankingRepository {
     return new LinkedHashSet<>(entityManager.createQuery(query).getResultList());
   }
 
-  /** Narrows candidate match IDs by match date and hero. */
-  private Set<Long> applyDateAndHeroFilters(
+  /** Narrows candidate match IDs by match date, hero and game mode. */
+  private Set<Long> applyMatchFilters(
       Long playerId,
       Set<Long> candidateMatchIds,
       Set<Long> heroIds,
+      Set<Long> gameModeIds,
       LocalDate startDate,
       LocalDate endDate) {
 
@@ -324,6 +338,9 @@ public class ItemRankingRepository {
     if (heroIds != null && !heroIds.isEmpty()) {
       predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.heroId).in(heroIds));
     }
+    if (gameModeIds != null && !gameModeIds.isEmpty()) {
+      predicates.add(matchRoot.get(MatchDomain_.gameModeId).in(gameModeIds));
+    }
 
     query.select(statsRoot.get(PlayerMatchStatisticDomain_.matchId)).distinct(true);
     query.where(predicates.toArray(new Predicate[0]));
@@ -333,7 +350,11 @@ public class ItemRankingRepository {
 
   /** Gets the total number of matches for a player within the date range and hero filter. */
   private Long getTotalMatchCount(
-      Long playerId, LocalDate startDate, LocalDate endDate, Set<Long> heroIds) {
+      Long playerId,
+      LocalDate startDate,
+      LocalDate endDate,
+      Set<Long> heroIds,
+      Set<Long> gameModeIds) {
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
     CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
     Root<PlayerMatchStatisticDomain> statsRoot = countQuery.from(PlayerMatchStatisticDomain.class);
@@ -354,9 +375,13 @@ public class ItemRankingRepository {
     }
     // Must mirror the main query's hero filter. Filtering only the numerator would
     // divide hero-specific pick counts by the player's games across ALL heroes and
-    // report pick rates several times too low, with no error.
+    // report pick rates several times too low, with no error. The same applies to
+    // the game mode filter.
     if (heroIds != null && !heroIds.isEmpty()) {
       predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.heroId).in(heroIds));
+    }
+    if (gameModeIds != null && !gameModeIds.isEmpty()) {
+      predicates.add(matchRoot.get(MatchDomain_.gameModeId).in(gameModeIds));
     }
 
     countQuery.select(cb.countDistinct(statsRoot.get(PlayerMatchStatisticDomain_.matchId)));

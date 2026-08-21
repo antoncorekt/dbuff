@@ -6,6 +6,8 @@ import com.ako.dbuff.dao.repo.PlayerStatisticSummaryRepo;
 import com.ako.dbuff.resources.model.PlayerStatisticResponse;
 import com.ako.dbuff.resources.model.PlayerStatisticResponse.HeroStatistic;
 import com.ako.dbuff.service.constant.ConstantNameResolver;
+import com.ako.dbuff.service.constant.GameModeResolver;
+import com.ako.dbuff.service.constant.GameModeSelection;
 import com.ako.dbuff.service.constant.NameResolution;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -32,6 +34,7 @@ public class PlayerStatisticService {
   private final PlayerStatisticRepository playerStatisticRepository;
   private final PlayerStatisticSummaryRepo playerStatisticSummaryRepo;
   private final ConstantNameResolver nameResolver;
+  private final GameModeResolver gameModeResolver;
 
   /**
    * Gets player statistics for a specific date range.
@@ -41,8 +44,10 @@ public class PlayerStatisticService {
    * @param endDate Optional end date filter (inclusive). If null, uses current date.
    * @param heroLimit Number of popular heroes to return. Defaults to 3 if null.
    * @param heroNames Optional hero names to restrict the statistics to.
+   * @param gameModeNames Optional game mode names to restrict the statistics to. Null or empty
+   *     includes every mode — the caller's default, if it has one, belongs to the caller.
    * @return PlayerStatisticResponse with aggregated statistics
-   * @throws UnknownConstantNameException if any supplied hero name matches no known hero
+   * @throws UnknownConstantNameException if any supplied hero or game mode name is unknown
    */
   @Transactional(readOnly = true)
   public PlayerStatisticResponse getPlayerStatistics(
@@ -50,15 +55,17 @@ public class PlayerStatisticService {
       LocalDate startDate,
       LocalDate endDate,
       Integer heroLimit,
-      Set<String> heroNames) {
+      Set<String> heroNames,
+      Set<String> gameModeNames) {
 
     log.info(
-        "Fetching player statistics for player {} with startDate={}, endDate={}, heroLimit={}, heroes={}",
+        "Fetching player statistics for player {} with startDate={}, endDate={}, heroLimit={}, heroes={}, gameModes={}",
         playerId,
         startDate,
         endDate,
         heroLimit,
-        heroNames);
+        heroNames,
+        gameModeNames);
 
     // Use current date as default end date if not specified
     LocalDate effectiveEndDate = endDate != null ? endDate : LocalDate.now();
@@ -70,10 +77,16 @@ public class PlayerStatisticService {
     if (heroes.hasUnresolved()) {
       throw new UnknownConstantNameException("heroes", heroes.unresolvedNames());
     }
+    Set<Long> gameModeIds = resolveGameModesOrThrow(gameModeNames);
 
     PlayerStatisticResponse statistics =
         playerStatisticRepository.findPlayerStatistics(
-            playerId, startDate, effectiveEndDate, effectiveHeroLimit, heroes.idsOrNullIfEmpty());
+            playerId,
+            startDate,
+            effectiveEndDate,
+            effectiveHeroLimit,
+            heroes.idsOrNullIfEmpty(),
+            gameModeIds);
 
     log.info(
         "Found statistics for player {} with {} total matches",
@@ -81,6 +94,21 @@ public class PlayerStatisticService {
         statistics.getTotalMatches());
 
     return statistics;
+  }
+
+  /**
+   * Resolves game mode names to IDs, refusing to proceed if any is unknown.
+   *
+   * <p>Throwing rather than dropping, for the same reason the item and hero resolvers do: an empty
+   * ID set means "every mode" to the repository, so a discarded typo would answer a broader
+   * question than the one asked.
+   */
+  private Set<Long> resolveGameModesOrThrow(Set<String> gameModeNames) {
+    GameModeSelection modes = gameModeResolver.resolve(gameModeNames);
+    if (modes.hasUnresolved()) {
+      throw new UnknownConstantNameException("game modes", modes.unresolvedNames());
+    }
+    return modes.idsOrNullIfEmpty();
   }
 
   /**
@@ -119,7 +147,7 @@ public class PlayerStatisticService {
 
     // Calculate statistics
     PlayerStatisticResponse stats =
-        getPlayerStatistics(playerId, startDate, endDate, heroLimit, null);
+        getPlayerStatistics(playerId, startDate, endDate, heroLimit, null, null);
 
     // Convert to domain entity
     PlayerStatisticSummaryDomain summary = convertToSummaryDomain(stats);

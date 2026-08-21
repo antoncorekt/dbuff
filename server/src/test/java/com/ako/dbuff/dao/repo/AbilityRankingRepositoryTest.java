@@ -149,7 +149,7 @@ class AbilityRankingRepositoryTest {
     void shouldReturnAbilitiesOrderedByPickCount() {
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 10);
+              PLAYER_ID, null, null, null, null, null, null, 10);
 
       assertThat(results).hasSize(4);
       assertThat(results.get(0).getAbilityId()).isEqualTo(BLINK_ABILITY_ID); // Blink - 4 picks
@@ -163,7 +163,7 @@ class AbilityRankingRepositoryTest {
     void shouldCalculatePickCountCorrectly() {
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 10);
+              PLAYER_ID, null, null, null, null, null, null, 10);
 
       AbilityRankingResponse blink =
           results.stream()
@@ -185,7 +185,7 @@ class AbilityRankingRepositoryTest {
     void shouldCalculatePickRateCorrectly() {
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 10);
+              PLAYER_ID, null, null, null, null, null, null, 10);
 
       // Total matches = 5
       AbilityRankingResponse blink =
@@ -210,7 +210,7 @@ class AbilityRankingRepositoryTest {
     void shouldCalculateWinRateCorrectly() {
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 10);
+              PLAYER_ID, null, null, null, null, null, null, 10);
 
       // Blink: picked in matches 1,2,3,5 - wins in 1,3,5 = 3/4 = 75%
       AbilityRankingResponse blink =
@@ -242,7 +242,7 @@ class AbilityRankingRepositoryTest {
     void shouldIncludePlayerInfo() {
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 10);
+              PLAYER_ID, null, null, null, null, null, null, 10);
 
       assertThat(results)
           .allSatisfy(
@@ -257,7 +257,7 @@ class AbilityRankingRepositoryTest {
     void shouldIncludeAbilityNames() {
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 10);
+              PLAYER_ID, null, null, null, null, null, null, 10);
 
       AbilityRankingResponse blink =
           results.stream()
@@ -279,7 +279,7 @@ class AbilityRankingRepositoryTest {
       // Only matches from March onwards (matches 3, 4, 5)
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, LocalDate.of(2024, 3, 1), null, null, null, null, 10);
+              PLAYER_ID, LocalDate.of(2024, 3, 1), null, null, null, null, null, 10);
 
       // Blink in matches 3, 5 = 2 picks
       AbilityRankingResponse blink =
@@ -296,7 +296,7 @@ class AbilityRankingRepositoryTest {
       // Only matches until February (matches 1, 2)
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, LocalDate.of(2024, 2, 28), null, null, null, 10);
+              PLAYER_ID, null, LocalDate.of(2024, 2, 28), null, null, null, null, 10);
 
       // Blink in matches 1, 2 = 2 picks
       AbilityRankingResponse blink =
@@ -313,7 +313,14 @@ class AbilityRankingRepositoryTest {
       // Only matches in February and March (matches 2, 3)
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, LocalDate.of(2024, 2, 1), LocalDate.of(2024, 3, 31), null, null, null, 10);
+              PLAYER_ID,
+              LocalDate.of(2024, 2, 1),
+              LocalDate.of(2024, 3, 31),
+              null,
+              null,
+              null,
+              null,
+              10);
 
       // Blink in matches 2, 3 = 2 picks
       AbilityRankingResponse blink =
@@ -343,7 +350,14 @@ class AbilityRankingRepositoryTest {
       // Filter by ability IDs (converted from names in service layer)
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, Set.of(BLINK_ABILITY_ID, HEAL_ABILITY_ID), null, null, 10);
+              PLAYER_ID,
+              null,
+              null,
+              Set.of(BLINK_ABILITY_ID, HEAL_ABILITY_ID),
+              null,
+              null,
+              null,
+              10);
 
       assertThat(results).hasSize(2);
       assertThat(results)
@@ -357,7 +371,7 @@ class AbilityRankingRepositoryTest {
       // Exclude ability ID (converted from name in service layer)
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, null, Set.of(BLINK_ABILITY_ID), null, 10);
+              PLAYER_ID, null, null, null, Set.of(BLINK_ABILITY_ID), null, null, 10);
 
       assertThat(results).hasSize(3);
       assertThat(results)
@@ -375,6 +389,7 @@ class AbilityRankingRepositoryTest {
               null,
               Set.of(BLINK_ABILITY_ID, STUN_ABILITY_ID, HEAL_ABILITY_ID),
               Set.of(STUN_ABILITY_ID),
+              null,
               null,
               10);
 
@@ -394,7 +409,7 @@ class AbilityRankingRepositoryTest {
     void shouldRespectLimit() {
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 2);
+              PLAYER_ID, null, null, null, null, null, null, 2);
 
       assertThat(results).hasSize(2);
       // Should return top 2 by pick count
@@ -407,7 +422,7 @@ class AbilityRankingRepositoryTest {
     void shouldUseDefaultLimit() {
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, null);
+              PLAYER_ID, null, null, null, null, null, null, null);
 
       // We only have 4 abilities, so should return all 4
       assertThat(results).hasSize(4);
@@ -423,7 +438,7 @@ class AbilityRankingRepositoryTest {
     void shouldReturnEmptyForNonExistentPlayer() {
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              999999L, null, null, null, null, null, 10);
+              999999L, null, null, null, null, null, null, 10);
 
       assertThat(results).isEmpty();
     }
@@ -439,6 +454,7 @@ class AbilityRankingRepositoryTest {
               null,
               null,
               null,
+              null,
               10);
 
       assertThat(results).isEmpty();
@@ -449,7 +465,7 @@ class AbilityRankingRepositoryTest {
     void shouldHandleEmptyAbilityFilterSet() {
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, Set.of(), null, null, 10);
+              PLAYER_ID, null, null, Set.of(), null, null, null, 10);
 
       // Empty set should be treated as no filter
       assertThat(results).hasSize(4);
@@ -465,7 +481,7 @@ class AbilityRankingRepositoryTest {
     void shouldRestrictToHero() {
       List<AbilityRankingResponse> invokerOnly =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, Set.of(INVOKER_HERO_ID), 10);
+              PLAYER_ID, null, null, null, null, Set.of(INVOKER_HERO_ID), null, 10);
 
       // Invoker games are 1-3: blink in all three, stun in 1 and 3, heal in 2.
       // "ultimate" is only in match 5 (Anti-Mage) so it must not appear.
@@ -485,7 +501,7 @@ class AbilityRankingRepositoryTest {
       // the 3 Invoker games, reporting 60% instead of 100%.
       List<AbilityRankingResponse> invokerOnly =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, Set.of(INVOKER_HERO_ID), 10);
+              PLAYER_ID, null, null, null, null, Set.of(INVOKER_HERO_ID), null, 10);
 
       assertThat(find(invokerOnly, BLINK_ABILITY_ID).getPickRate())
           .isEqualByComparingTo(new BigDecimal("100.00"));
@@ -498,7 +514,7 @@ class AbilityRankingRepositoryTest {
     void heroFilterMatchingNoGamesReturnsEmpty() {
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, Set.of(999L), 10);
+              PLAYER_ID, null, null, null, null, Set.of(999L), null, 10);
 
       assertThat(results).isEmpty();
     }
@@ -508,7 +524,7 @@ class AbilityRankingRepositoryTest {
     void emptyHeroFilterSetIsNoFilter() {
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, Set.of(), 10);
+              PLAYER_ID, null, null, null, null, Set.of(), null, 10);
 
       assertThat(results).hasSize(4);
     }
@@ -523,7 +539,7 @@ class AbilityRankingRepositoryTest {
     void shouldAverageUseCount() {
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, Set.of(BLINK_ABILITY_ID), null, null, 10);
+              PLAYER_ID, null, null, Set.of(BLINK_ABILITY_ID), null, null, null, 10);
 
       // Blink use counts: 10, 20, 30, 40 -> 25.00
       assertThat(results).hasSize(1);
@@ -536,7 +552,7 @@ class AbilityRankingRepositoryTest {
       // Heal rows have useCount = null: "no data", not "never used".
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, Set.of(HEAL_ABILITY_ID), null, null, 10);
+              PLAYER_ID, null, null, Set.of(HEAL_ABILITY_ID), null, null, null, 10);
 
       assertThat(results).hasSize(1);
       assertThat(results.get(0).getAvgUseCount()).isNull();
@@ -547,7 +563,14 @@ class AbilityRankingRepositoryTest {
     void averageUseCountRespectsHeroFilter() {
       List<AbilityRankingResponse> results =
           abilityRankingRepository.findAbilityRankingsByPlayer(
-              PLAYER_ID, null, null, Set.of(BLINK_ABILITY_ID), null, Set.of(INVOKER_HERO_ID), 10);
+              PLAYER_ID,
+              null,
+              null,
+              Set.of(BLINK_ABILITY_ID),
+              null,
+              Set.of(INVOKER_HERO_ID),
+              null,
+              10);
 
       // Invoker games only: use counts 10, 20, 30 -> 20.00
       assertThat(results).hasSize(1);

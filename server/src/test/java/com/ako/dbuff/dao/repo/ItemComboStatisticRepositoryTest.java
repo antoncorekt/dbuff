@@ -101,7 +101,7 @@ class ItemComboStatisticRepositoryTest {
   void requiresAllItemsInTheSameGame() {
     ItemComboStatisticResponse result =
         itemRankingRepository.findItemComboStatistics(
-            PLAYER_ID, Set.of(BLINK, BKB), null, null, null);
+            PLAYER_ID, Set.of(BLINK, BKB), null, null, null, null);
 
     // Matches 1, 2 and 4 have both items. Matches 3 and 5 have only Blink.
     assertThat(result.getGamesFound()).isEqualTo(3L);
@@ -111,7 +111,7 @@ class ItemComboStatisticRepositoryTest {
   void gamesHoldingOnlySomeOfTheItemsAreExcluded() {
     ItemComboStatisticResponse result =
         itemRankingRepository.findItemComboStatistics(
-            PLAYER_ID, Set.of(BLINK, BKB), null, null, null);
+            PLAYER_ID, Set.of(BLINK, BKB), null, null, null, null);
 
     assertThat(result.getMatchIds()).containsExactlyInAnyOrder(1L, 2L, 4L);
   }
@@ -144,7 +144,7 @@ class ItemComboStatisticRepositoryTest {
   void winRateIsComputedOverComboGamesOnly() {
     ItemComboStatisticResponse result =
         itemRankingRepository.findItemComboStatistics(
-            PLAYER_ID, Set.of(BLINK, BKB), null, null, null);
+            PLAYER_ID, Set.of(BLINK, BKB), null, null, null, null);
 
     // Matches 1 and 4 won, match 2 lost -> 2/3 = 66.67%
     assertThat(result.getWinRate()).isEqualByComparingTo(BigDecimal.valueOf(66.67).setScale(2));
@@ -154,7 +154,7 @@ class ItemComboStatisticRepositoryTest {
   void heroFilterNarrowsComboGames() {
     ItemComboStatisticResponse result =
         itemRankingRepository.findItemComboStatistics(
-            PLAYER_ID, Set.of(BLINK, BKB), Set.of(INVOKER), null, null);
+            PLAYER_ID, Set.of(BLINK, BKB), Set.of(INVOKER), null, null, null);
 
     // Only matches 1 and 2 are Invoker games with both items.
     assertThat(result.getGamesFound()).isEqualTo(2L);
@@ -165,7 +165,7 @@ class ItemComboStatisticRepositoryTest {
   void perItemAveragesCoverOnlyComboGames() {
     ItemComboStatisticResponse result =
         itemRankingRepository.findItemComboStatistics(
-            PLAYER_ID, Set.of(BLINK, BKB), Set.of(INVOKER), null, null);
+            PLAYER_ID, Set.of(BLINK, BKB), Set.of(INVOKER), null, null, null);
 
     ItemComboStatisticResponse.Member blink =
         result.getMembers().stream()
@@ -183,7 +183,8 @@ class ItemComboStatisticRepositoryTest {
   @Test
   void singleItemDegeneratesToGamesWithThatItem() {
     ItemComboStatisticResponse result =
-        itemRankingRepository.findItemComboStatistics(PLAYER_ID, Set.of(BKB), null, null, null);
+        itemRankingRepository.findItemComboStatistics(
+            PLAYER_ID, Set.of(BKB), null, null, null, null);
 
     assertThat(result.getGamesFound()).isEqualTo(3L);
   }
@@ -192,7 +193,7 @@ class ItemComboStatisticRepositoryTest {
   void noComboGames_returnsZeroNotNull() {
     ItemComboStatisticResponse result =
         itemRankingRepository.findItemComboStatistics(
-            PLAYER_ID, Set.of(BLINK, BKB, 999L), null, null, null);
+            PLAYER_ID, Set.of(BLINK, BKB, 999L), null, null, null, null);
 
     assertThat(result.getGamesFound()).isZero();
     assertThat(result.getWinRate()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -203,7 +204,7 @@ class ItemComboStatisticRepositoryTest {
   void dateRangeExcludesOlderComboGames() {
     ItemComboStatisticResponse result =
         itemRankingRepository.findItemComboStatistics(
-            PLAYER_ID, Set.of(BLINK, BKB), null, LocalDate.of(2026, 8, 15), null);
+            PLAYER_ID, Set.of(BLINK, BKB), null, null, LocalDate.of(2026, 8, 15), null);
 
     assertThat(result.getGamesFound()).isZero();
   }

@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.interactions.commands.Command;
@@ -16,8 +17,8 @@ import org.springframework.stereotype.Component;
 /**
  * Offers the players tracked by the channel's instance — the focus group.
  *
- * <p>Serves {@code /stats} across every subcommand. List-valued, because {@code /stats} fans out
- * over several players.
+ * <p>Serves {@code /stats} and {@code /hero} across every subcommand. List-valued, because both fan
+ * out over several players.
  */
 @Slf4j
 @Component
@@ -34,6 +35,11 @@ public class TrackedPlayerAutocomplete implements AutocompleteProvider {
   @Override
   public String getCommandName() {
     return "stats";
+  }
+
+  @Override
+  public Set<String> getCommandNames() {
+    return Set.of("stats", "hero");
   }
 
   @Override

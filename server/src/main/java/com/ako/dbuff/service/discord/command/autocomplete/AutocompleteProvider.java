@@ -2,6 +2,7 @@ package com.ako.dbuff.service.discord.command.autocomplete;
 
 import com.ako.dbuff.service.discord.command.CommandContext;
 import java.util.List;
+import java.util.Set;
 import net.dv8tion.jda.api.interactions.commands.Command;
 
 /**
@@ -18,6 +19,19 @@ public interface AutocompleteProvider {
 
   /** The command this provider belongs to, e.g. {@code stats}. */
   String getCommandName();
+
+  /**
+   * Every command this provider serves, for options that mean the same thing on more than one.
+   *
+   * <p>{@code hero:} and {@code player:} are identical questions on {@code /stats} and {@code
+   * /hero}, and the adapter keys providers by command name — so without this a second command would
+   * silently get a dead picker rather than a compile error.
+   *
+   * @return the command names; defaults to just {@link #getCommandName()}
+   */
+  default Set<String> getCommandNames() {
+    return Set.of(getCommandName());
+  }
 
   /**
    * The subcommand this provider is restricted to, or null to serve the option across every

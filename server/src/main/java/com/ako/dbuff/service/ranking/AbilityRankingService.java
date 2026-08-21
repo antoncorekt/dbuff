@@ -4,6 +4,8 @@ import com.ako.dbuff.dao.repo.AbilityRankingRepository;
 import com.ako.dbuff.resources.model.AbilityComboStatisticResponse;
 import com.ako.dbuff.resources.model.AbilityRankingResponse;
 import com.ako.dbuff.service.constant.ConstantNameResolver;
+import com.ako.dbuff.service.constant.GameModeResolver;
+import com.ako.dbuff.service.constant.GameModeSelection;
 import com.ako.dbuff.service.constant.NameResolution;
 import java.time.LocalDate;
 import java.util.List;
@@ -26,6 +28,7 @@ public class AbilityRankingService {
 
   private final AbilityRankingRepository abilityRankingRepository;
   private final ConstantNameResolver nameResolver;
+  private final GameModeResolver gameModeResolver;
 
   /**
    * Gets ability rankings for a specific player.
@@ -37,6 +40,8 @@ public class AbilityRankingService {
    *     by pick count.
    * @param excludedAbilityNames Optional ability names to exclude from results.
    * @param heroNames Optional hero names to restrict the query to.
+   * @param gameModeNames Optional game mode names to restrict the query to. Null or empty includes
+   *     every mode.
    * @param limit Maximum number of abilities to return. Defaults to 10 if null.
    * @return List of AbilityRankingResponse ordered by pick count descending
    * @throws UnknownConstantNameException if any supplied name matches no known constant
@@ -49,6 +54,7 @@ public class AbilityRankingService {
       Set<String> abilityNames,
       Set<String> excludedAbilityNames,
       Set<String> heroNames,
+      Set<String> gameModeNames,
       Integer limit) {
 
     LocalDate effectiveEndDate = endDate != null ? endDate : LocalDate.now();
@@ -57,15 +63,17 @@ public class AbilityRankingService {
     Set<Long> abilityIds = resolveAbilitiesOrThrow(abilityNames);
     Set<Long> excludedAbilityIds = resolveAbilitiesOrThrow(excludedAbilityNames);
     Set<Long> heroIds = resolveHeroesOrThrow(heroNames);
+    Set<Long> gameModeIds = resolveGameModesOrThrow(gameModeNames);
 
     log.info(
-        "Fetching ability rankings for player {}: startDate={}, endDate={}, abilities={}, excluded={}, heroes={}, limit={}",
+        "Fetching ability rankings for player {}: startDate={}, endDate={}, abilities={}, excluded={}, heroes={}, gameModes={}, limit={}",
         playerId,
         startDate,
         effectiveEndDate,
         abilityIds,
         excludedAbilityIds,
         heroIds,
+        gameModeIds,
         effectiveLimit);
 
     List<AbilityRankingResponse> rankings =
@@ -76,6 +84,7 @@ public class AbilityRankingService {
             abilityIds,
             excludedAbilityIds,
             heroIds,
+            gameModeIds,
             effectiveLimit);
 
     log.info("Found {} ability rankings for player {}", rankings.size(), playerId);
@@ -83,8 +92,11 @@ public class AbilityRankingService {
   }
 
   /**
-   * Gets statistics over the games in which the player used every one of the named abilities.
+   * Gets statistics over the games in which the player used every one of the named abilities, and —
+   * when items are named too — also held every one of those items in the same game.
    *
+   * @param itemNames items that must all be present alongside the abilities; null or empty applies
+   *     no item restriction
    * @throws UnknownConstantNameException if any supplied name matches no known constant
    */
   @Transactional(readOnly = true)
@@ -93,22 +105,28 @@ public class AbilityRankingService {
       LocalDate startDate,
       LocalDate endDate,
       Set<String> abilityNames,
-      Set<String> heroNames) {
+      Set<String> itemNames,
+      Set<String> heroNames,
+      Set<String> gameModeNames) {
 
     Set<Long> abilityIds = resolveAbilitiesOrThrow(abilityNames);
+    Set<Long> itemIds = resolveItemsOrThrow(itemNames);
     Set<Long> heroIds = resolveHeroesOrThrow(heroNames);
+    Set<Long> gameModeIds = resolveGameModesOrThrow(gameModeNames);
     LocalDate effectiveEndDate = endDate != null ? endDate : LocalDate.now();
 
     log.info(
-        "Fetching ability combo statistics for player {}: abilities={}, heroes={}, {} to {}",
+        "Fetching ability combo statistics for player {}: abilities={}, items={}, heroes={}, gameModes={}, {} to {}",
         playerId,
         abilityIds,
+        itemIds,
         heroIds,
+        gameModeIds,
         startDate,
         effectiveEndDate);
 
     return abilityRankingRepository.findAbilityComboStatistics(
-        playerId, abilityIds, heroIds, startDate, effectiveEndDate);
+        playerId, abilityIds, itemIds, heroIds, gameModeIds, startDate, effectiveEndDate);
   }
 
   /**
@@ -132,5 +150,22 @@ public class AbilityRankingService {
       throw new UnknownConstantNameException("heroes", resolution.unresolvedNames());
     }
     return resolution.idsOrNullIfEmpty();
+  }
+
+  private Set<Long> resolveItemsOrThrow(Set<String> names) {
+    NameResolution resolution = nameResolver.resolveItems(names);
+    if (resolution.hasUnresolved()) {
+      throw new UnknownConstantNameException("items", resolution.unresolvedNames());
+    }
+    return resolution.idsOrNullIfEmpty();
+  }
+
+  /** Resolves game mode names to IDs, refusing to proceed if any is unknown. */
+  private Set<Long> resolveGameModesOrThrow(Set<String> names) {
+    GameModeSelection modes = gameModeResolver.resolve(names);
+    if (modes.hasUnresolved()) {
+      throw new UnknownConstantNameException("game modes", modes.unresolvedNames());
+    }
+    return modes.idsOrNullIfEmpty();
   }
 }

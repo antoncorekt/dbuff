@@ -154,7 +154,7 @@ class ItemRankingRepositoryTest {
     void shouldReturnItemsOrderedByPickCount() {
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 10);
+              PLAYER_ID, null, null, null, null, null, null, 10);
 
       assertThat(results).hasSize(3);
       assertThat(results.get(0).getItemId()).isEqualTo(BLINK_ITEM_ID); // Blink - 4 picks
@@ -167,7 +167,7 @@ class ItemRankingRepositoryTest {
     void shouldExcludeNeutralItems() {
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 10);
+              PLAYER_ID, null, null, null, null, null, null, 10);
 
       assertThat(results)
           .extracting(ItemRankingResponse::getItemId)
@@ -179,7 +179,7 @@ class ItemRankingRepositoryTest {
     void shouldCalculatePickCountCorrectly() {
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 10);
+              PLAYER_ID, null, null, null, null, null, null, 10);
 
       ItemRankingResponse blink =
           results.stream()
@@ -198,7 +198,7 @@ class ItemRankingRepositoryTest {
     void shouldCalculatePickRateCorrectly() {
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 10);
+              PLAYER_ID, null, null, null, null, null, null, 10);
 
       // Total matches = 5
       ItemRankingResponse blink =
@@ -220,7 +220,7 @@ class ItemRankingRepositoryTest {
     void shouldCalculateWinRateCorrectly() {
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 10);
+              PLAYER_ID, null, null, null, null, null, null, 10);
 
       // Blink: picked in matches 1,2,3,5 - wins in 1,3,5 = 3/4 = 75%
       ItemRankingResponse blink =
@@ -241,7 +241,7 @@ class ItemRankingRepositoryTest {
     void shouldCalculateAvgPurchaseTimeCorrectly() {
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 10);
+              PLAYER_ID, null, null, null, null, null, null, 10);
 
       // Blink: (600 + 720 + 540 + 660) / 4 = 630
       ItemRankingResponse blink =
@@ -265,7 +265,7 @@ class ItemRankingRepositoryTest {
     void shouldIncludePlayerInfo() {
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 10);
+              PLAYER_ID, null, null, null, null, null, null, 10);
 
       assertThat(results)
           .allSatisfy(
@@ -286,7 +286,7 @@ class ItemRankingRepositoryTest {
       // Only matches from March onwards (matches 3, 4, 5)
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, LocalDate.of(2024, 3, 1), null, null, null, null, 10);
+              PLAYER_ID, LocalDate.of(2024, 3, 1), null, null, null, null, null, 10);
 
       // Blink in matches 3, 5 = 2 picks
       ItemRankingResponse blink =
@@ -303,7 +303,7 @@ class ItemRankingRepositoryTest {
       // Only matches until February (matches 1, 2)
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, LocalDate.of(2024, 2, 28), null, null, null, 10);
+              PLAYER_ID, null, LocalDate.of(2024, 2, 28), null, null, null, null, 10);
 
       // Blink in matches 1, 2 = 2 picks
       ItemRankingResponse blink =
@@ -320,7 +320,14 @@ class ItemRankingRepositoryTest {
       // Only matches in February and March (matches 2, 3)
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, LocalDate.of(2024, 2, 1), LocalDate.of(2024, 3, 31), null, null, null, 10);
+              PLAYER_ID,
+              LocalDate.of(2024, 2, 1),
+              LocalDate.of(2024, 3, 31),
+              null,
+              null,
+              null,
+              null,
+              10);
 
       // Blink in matches 2, 3 = 2 picks
       ItemRankingResponse blink =
@@ -347,7 +354,7 @@ class ItemRankingRepositoryTest {
       // Filter by item IDs (converted from dnames "blink" and "boots" in service layer)
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, Set.of(BLINK_ITEM_ID, BOOTS_ITEM_ID), null, null, 10);
+              PLAYER_ID, null, null, Set.of(BLINK_ITEM_ID, BOOTS_ITEM_ID), null, null, null, 10);
 
       assertThat(results).hasSize(2);
       assertThat(results)
@@ -361,7 +368,7 @@ class ItemRankingRepositoryTest {
       // Exclude item ID (converted from dname "blink" in service layer)
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, Set.of(BLINK_ITEM_ID), null, 10);
+              PLAYER_ID, null, null, null, Set.of(BLINK_ITEM_ID), null, null, 10);
 
       assertThat(results).hasSize(2);
       assertThat(results).extracting(ItemRankingResponse::getItemId).doesNotContain(BLINK_ITEM_ID);
@@ -377,6 +384,7 @@ class ItemRankingRepositoryTest {
               null,
               Set.of(BLINK_ITEM_ID, BKB_ITEM_ID, BOOTS_ITEM_ID),
               Set.of(BKB_ITEM_ID),
+              null,
               null,
               10);
 
@@ -396,7 +404,7 @@ class ItemRankingRepositoryTest {
     void shouldRespectLimit() {
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, 2);
+              PLAYER_ID, null, null, null, null, null, null, 2);
 
       assertThat(results).hasSize(2);
       // Should return top 2 by pick count
@@ -409,7 +417,7 @@ class ItemRankingRepositoryTest {
     void shouldUseDefaultLimit() {
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, null, null);
+              PLAYER_ID, null, null, null, null, null, null, null);
 
       // We only have 3 non-neutral items, so should return all 3
       assertThat(results).hasSize(3);
@@ -424,7 +432,8 @@ class ItemRankingRepositoryTest {
     @DisplayName("Should return empty list for non-existent player")
     void shouldReturnEmptyForNonExistentPlayer() {
       List<ItemRankingResponse> results =
-          itemRankingRepository.findItemRankingsByPlayer(999999L, null, null, null, null, null, 10);
+          itemRankingRepository.findItemRankingsByPlayer(
+              999999L, null, null, null, null, null, null, 10);
 
       assertThat(results).isEmpty();
     }
@@ -440,6 +449,7 @@ class ItemRankingRepositoryTest {
               null,
               null,
               null,
+              null,
               10);
 
       assertThat(results).isEmpty();
@@ -450,7 +460,7 @@ class ItemRankingRepositoryTest {
     void shouldHandleEmptyItemFilterSet() {
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, Set.of(), null, null, 10);
+              PLAYER_ID, null, null, Set.of(), null, null, null, 10);
 
       // Empty set should be treated as no filter
       assertThat(results).hasSize(3);
@@ -466,7 +476,7 @@ class ItemRankingRepositoryTest {
     void shouldRestrictToHero() {
       List<ItemRankingResponse> invokerOnly =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, Set.of(INVOKER_HERO_ID), 10);
+              PLAYER_ID, null, null, null, null, Set.of(INVOKER_HERO_ID), null, 10);
 
       // Invoker games are 1-3. Blink appears in all three, BKB in 1 and 3.
       // Boots appears only in match 2 among Invoker games.
@@ -489,7 +499,7 @@ class ItemRankingRepositoryTest {
       // the 3 Invoker games, reporting 60% instead of 100%.
       List<ItemRankingResponse> invokerOnly =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, Set.of(INVOKER_HERO_ID), 10);
+              PLAYER_ID, null, null, null, null, Set.of(INVOKER_HERO_ID), null, 10);
 
       assertThat(find(invokerOnly, BLINK_ITEM_ID).getPickRate())
           .isEqualByComparingTo(new BigDecimal("100.00"));
@@ -504,7 +514,7 @@ class ItemRankingRepositoryTest {
     void winRateReflectsFilteredGames() {
       List<ItemRankingResponse> antimageOnly =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, Set.of(ANTIMAGE_HERO_ID), 10);
+              PLAYER_ID, null, null, null, null, Set.of(ANTIMAGE_HERO_ID), null, 10);
 
       // Anti-Mage games are 4 (loss) and 5 (win). Blink only in match 5 -> 100%.
       assertThat(find(antimageOnly, BLINK_ITEM_ID).getWinRate())
@@ -520,7 +530,7 @@ class ItemRankingRepositoryTest {
     void heroFilterMatchingNoGamesReturnsEmpty() {
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, Set.of(999L), 10);
+              PLAYER_ID, null, null, null, null, Set.of(999L), null, 10);
 
       assertThat(results).isEmpty();
     }
@@ -530,7 +540,7 @@ class ItemRankingRepositoryTest {
     void emptyHeroFilterSetIsNoFilter() {
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, null, null, Set.of(), 10);
+              PLAYER_ID, null, null, null, null, Set.of(), null, 10);
 
       assertThat(results).hasSize(3);
     }
@@ -541,7 +551,14 @@ class ItemRankingRepositoryTest {
       // Invoker games from February onwards: matches 2 and 3.
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, LocalDate.of(2024, 2, 1), null, null, null, Set.of(INVOKER_HERO_ID), 10);
+              PLAYER_ID,
+              LocalDate.of(2024, 2, 1),
+              null,
+              null,
+              null,
+              Set.of(INVOKER_HERO_ID),
+              null,
+              10);
 
       assertThat(find(results, BLINK_ITEM_ID).getPickCount()).isEqualTo(2L);
       // 2 of 2 games in range -> 100%
@@ -559,7 +576,7 @@ class ItemRankingRepositoryTest {
     void shouldAverageUseCount() {
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, Set.of(BLINK_ITEM_ID), null, null, 10);
+              PLAYER_ID, null, null, Set.of(BLINK_ITEM_ID), null, null, null, 10);
 
       // Blink use counts: 3, 2, 4, 1 -> 2.50
       assertThat(results).hasSize(1);
@@ -572,7 +589,7 @@ class ItemRankingRepositoryTest {
       // Boots rows have useCount = null: "no data", not "never used".
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, Set.of(BOOTS_ITEM_ID), null, null, 10);
+              PLAYER_ID, null, null, Set.of(BOOTS_ITEM_ID), null, null, null, 10);
 
       assertThat(results).hasSize(1);
       assertThat(results.get(0).getAvgUseCount()).isNull();
@@ -583,7 +600,14 @@ class ItemRankingRepositoryTest {
     void averageUseCountRespectsHeroFilter() {
       List<ItemRankingResponse> results =
           itemRankingRepository.findItemRankingsByPlayer(
-              PLAYER_ID, null, null, Set.of(BLINK_ITEM_ID), null, Set.of(INVOKER_HERO_ID), 10);
+              PLAYER_ID,
+              null,
+              null,
+              Set.of(BLINK_ITEM_ID),
+              null,
+              Set.of(INVOKER_HERO_ID),
+              null,
+              10);
 
       // Invoker games only: use counts 3, 2, 4 -> 3.00
       assertThat(results).hasSize(1);

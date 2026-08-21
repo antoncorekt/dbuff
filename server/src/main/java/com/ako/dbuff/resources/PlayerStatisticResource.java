@@ -48,6 +48,8 @@ public class PlayerStatisticResource {
    * @param endDate Optional end date filter (inclusive). If null, uses current date.
    * @param heroLimit Number of popular heroes to return. Defaults to 3 if null.
    * @param heroes Optional set of hero names to restrict the statistics to.
+   * @param gameModes Optional set of game mode names to restrict the statistics to. If null,
+   *     includes every mode.
    * @return PlayerStatisticResponse with aggregated statistics
    */
   @GetMapping("/{playerId}/statistic")
@@ -58,18 +60,20 @@ public class PlayerStatisticResource {
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
           LocalDate endDate,
       @RequestParam(required = false) Integer heroLimit,
-      @RequestParam(required = false) Set<String> heroes) {
+      @RequestParam(required = false) Set<String> heroes,
+      @RequestParam(required = false) Set<String> gameModes) {
 
     log.info(
-        "GET /api/v1/player/{}/statistic - startDate={}, endDate={}, heroLimit={}, heroes={}",
+        "GET /api/v1/player/{}/statistic - startDate={}, endDate={}, heroLimit={}, heroes={}, gameModes={}",
         playerId,
         startDate,
         endDate,
         heroLimit,
-        heroes);
+        heroes,
+        gameModes);
 
     return playerStatisticService.getPlayerStatistics(
-        playerId, startDate, endDate, heroLimit, heroes);
+        playerId, startDate, endDate, heroLimit, heroes, gameModes);
   }
 
   /**

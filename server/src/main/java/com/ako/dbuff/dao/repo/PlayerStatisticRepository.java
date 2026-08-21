@@ -40,10 +40,16 @@ public class PlayerStatisticRepository {
    * @param endDate Optional end date filter (inclusive)
    * @param heroLimit Number of popular heroes to return (default 3)
    * @param heroIds Optional set of hero IDs to restrict the query to
+   * @param gameModeIds Optional set of game mode IDs to restrict the query to
    * @return PlayerStatisticResponse with aggregated statistics
    */
   public PlayerStatisticResponse findPlayerStatistics(
-      Long playerId, LocalDate startDate, LocalDate endDate, Integer heroLimit, Set<Long> heroIds) {
+      Long playerId,
+      LocalDate startDate,
+      LocalDate endDate,
+      Integer heroLimit,
+      Set<Long> heroIds,
+      Set<Long> gameModeIds) {
 
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
     boolean heroFiltered = heroIds != null && !heroIds.isEmpty();
@@ -52,7 +58,7 @@ public class PlayerStatisticRepository {
     String playerName = getPlayerName(playerId);
 
     // Get total match count
-    Long totalMatches = getTotalMatchCount(playerId, startDate, endDate, heroIds);
+    Long totalMatches = getTotalMatchCount(playerId, startDate, endDate, heroIds, gameModeIds);
     if (totalMatches == null || totalMatches == 0) {
       return PlayerStatisticResponse.builder()
           .playerId(playerId)
@@ -67,10 +73,11 @@ public class PlayerStatisticRepository {
 
     // Get popular heroes
     List<HeroStatistic> popularHeroes =
-        getPopularHeroes(playerId, startDate, endDate, heroLimit != null ? heroLimit : 3, heroIds);
+        getPopularHeroes(
+            playerId, startDate, endDate, heroLimit != null ? heroLimit : 3, heroIds, gameModeIds);
 
     // Get aggregated statistics
-    Tuple stats = getAggregatedStats(playerId, startDate, endDate, heroIds);
+    Tuple stats = getAggregatedStats(playerId, startDate, endDate, heroIds, gameModeIds);
 
     return buildResponse(
         playerId, playerName, startDate, endDate, totalMatches, popularHeroes, stats, heroFiltered);
@@ -91,14 +98,19 @@ public class PlayerStatisticRepository {
 
   /** Gets the total number of matches for a player within the date range. */
   private Long getTotalMatchCount(
-      Long playerId, LocalDate startDate, LocalDate endDate, Set<Long> heroIds) {
+      Long playerId,
+      LocalDate startDate,
+      LocalDate endDate,
+      Set<Long> heroIds,
+      Set<Long> gameModeIds) {
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
     CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
     Root<PlayerMatchStatisticDomain> statsRoot = countQuery.from(PlayerMatchStatisticDomain.class);
     Root<MatchDomain> matchRoot = countQuery.from(MatchDomain.class);
 
     List<Predicate> predicates =
-        buildDatePredicates(cb, statsRoot, matchRoot, playerId, startDate, endDate, heroIds);
+        buildMatchPredicates(
+            cb, statsRoot, matchRoot, playerId, startDate, endDate, heroIds, gameModeIds);
 
     countQuery.select(cb.countDistinct(statsRoot.get(PlayerMatchStatisticDomain_.matchId)));
     countQuery.where(predicates.toArray(new Predicate[0]));
@@ -108,14 +120,20 @@ public class PlayerStatisticRepository {
 
   /** Gets the N most popular heroes for a player. */
   private List<HeroStatistic> getPopularHeroes(
-      Long playerId, LocalDate startDate, LocalDate endDate, int limit, Set<Long> heroIds) {
+      Long playerId,
+      LocalDate startDate,
+      LocalDate endDate,
+      int limit,
+      Set<Long> heroIds,
+      Set<Long> gameModeIds) {
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
     CriteriaQuery<Tuple> query = cb.createTupleQuery();
     Root<PlayerMatchStatisticDomain> statsRoot = query.from(PlayerMatchStatisticDomain.class);
     Root<MatchDomain> matchRoot = query.from(MatchDomain.class);
 
     List<Predicate> predicates =
-        buildDatePredicates(cb, statsRoot, matchRoot, playerId, startDate, endDate, heroIds);
+        buildMatchPredicates(
+            cb, statsRoot, matchRoot, playerId, startDate, endDate, heroIds, gameModeIds);
 
     query.multiselect(
         statsRoot.get(PlayerMatchStatisticDomain_.heroId).alias("heroId"),
@@ -158,14 +176,19 @@ public class PlayerStatisticRepository {
 
   /** Gets all aggregated statistics for a player. */
   private Tuple getAggregatedStats(
-      Long playerId, LocalDate startDate, LocalDate endDate, Set<Long> heroIds) {
+      Long playerId,
+      LocalDate startDate,
+      LocalDate endDate,
+      Set<Long> heroIds,
+      Set<Long> gameModeIds) {
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
     CriteriaQuery<Tuple> query = cb.createTupleQuery();
     Root<PlayerMatchStatisticDomain> statsRoot = query.from(PlayerMatchStatisticDomain.class);
     Root<MatchDomain> matchRoot = query.from(MatchDomain.class);
 
     List<Predicate> predicates =
-        buildDatePredicates(cb, statsRoot, matchRoot, playerId, startDate, endDate, heroIds);
+        buildMatchPredicates(
+            cb, statsRoot, matchRoot, playerId, startDate, endDate, heroIds, gameModeIds);
 
     query.multiselect(
         // Observer and Sentry wards
@@ -208,21 +231,22 @@ public class PlayerStatisticRepository {
 
   /**
    * Builds the predicates shared by every statistics query: player, match join, date range, and the
-   * optional hero filter.
+   * optional hero and game mode filters.
    *
-   * <p>All three query methods route through here, so the hero filter is applied to the
-   * aggregation, the total-match count, and the popular-heroes query from one place. Applying it to
-   * only some of them would produce internally inconsistent statistics — for instance a match count
-   * that disagrees with the win/loss sum.
+   * <p>All three query methods route through here, so each filter is applied to the aggregation,
+   * the total-match count, and the popular-heroes query from one place. Applying one to only some
+   * of them would produce internally inconsistent statistics — for instance a match count that
+   * disagrees with the win/loss sum.
    */
-  private List<Predicate> buildDatePredicates(
+  private List<Predicate> buildMatchPredicates(
       CriteriaBuilder cb,
       Root<PlayerMatchStatisticDomain> statsRoot,
       Root<MatchDomain> matchRoot,
       Long playerId,
       LocalDate startDate,
       LocalDate endDate,
-      Set<Long> heroIds) {
+      Set<Long> heroIds,
+      Set<Long> gameModeIds) {
 
     List<Predicate> predicates = new ArrayList<>();
     predicates.add(cb.equal(statsRoot.get(PlayerMatchStatisticDomain_.playerId), playerId));
@@ -239,6 +263,9 @@ public class PlayerStatisticRepository {
     }
     if (heroIds != null && !heroIds.isEmpty()) {
       predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.heroId).in(heroIds));
+    }
+    if (gameModeIds != null && !gameModeIds.isEmpty()) {
+      predicates.add(matchRoot.get(MatchDomain_.gameModeId).in(gameModeIds));
     }
 
     return predicates;

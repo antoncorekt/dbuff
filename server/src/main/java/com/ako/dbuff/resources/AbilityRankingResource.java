@@ -44,6 +44,8 @@ public class AbilityRankingResource {
    *     pick count.
    * @param excludedAbilities Optional set of ability names to exclude from results.
    * @param heroes Optional set of hero names to restrict the statistics to.
+   * @param gameModes Optional set of game mode names to restrict the statistics to. If null,
+   *     includes every mode.
    * @param limit Maximum number of abilities to return. Defaults to 10 if null.
    * @return List of AbilityRankingResponse ordered by pick count descending
    */
@@ -57,19 +59,21 @@ public class AbilityRankingResource {
       @RequestParam(required = false) Set<String> abilities,
       @RequestParam(required = false) Set<String> excludedAbilities,
       @RequestParam(required = false) Set<String> heroes,
+      @RequestParam(required = false) Set<String> gameModes,
       @RequestParam(required = false) Integer limit) {
 
     log.info(
-        "GET /api/v1/player/{}/abilityRanking - startDate={}, endDate={}, abilities={}, excludedAbilities={}, heroes={}, limit={}",
+        "GET /api/v1/player/{}/abilityRanking - startDate={}, endDate={}, abilities={}, excludedAbilities={}, heroes={}, gameModes={}, limit={}",
         playerId,
         startDate,
         endDate,
         abilities,
         excludedAbilities,
         heroes,
+        gameModes,
         limit);
 
     return abilityRankingService.getAbilityRankings(
-        playerId, startDate, endDate, abilities, excludedAbilities, heroes, limit);
+        playerId, startDate, endDate, abilities, excludedAbilities, heroes, gameModes, limit);
   }
 }

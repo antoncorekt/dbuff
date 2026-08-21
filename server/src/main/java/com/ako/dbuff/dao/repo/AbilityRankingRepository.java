@@ -2,6 +2,8 @@ package com.ako.dbuff.dao.repo;
 
 import com.ako.dbuff.dao.model.AbilityDomain;
 import com.ako.dbuff.dao.model.AbilityDomain_;
+import com.ako.dbuff.dao.model.ItemDomain;
+import com.ako.dbuff.dao.model.ItemDomain_;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.MatchDomain_;
 import com.ako.dbuff.dao.model.PlayerDomain;
@@ -45,6 +47,7 @@ public class AbilityRankingRepository {
    *     pick rate)
    * @param excludedAbilities Optional set of ability IDs to exclude
    * @param heroIds Optional set of hero IDs to restrict the query to
+   * @param gameModeIds Optional set of game mode IDs to restrict the query to
    * @param limit Maximum number of abilities to return (default 10)
    * @return List of AbilityRankingResponse ordered by pick count descending
    */
@@ -55,12 +58,13 @@ public class AbilityRankingRepository {
       Set<Long> abilityIds,
       Set<Long> excludedAbilities,
       Set<Long> heroIds,
+      Set<Long> gameModeIds,
       Integer limit) {
 
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
 
     // First, get total match count for the player within the date range and hero filter
-    Long totalMatches = getTotalMatchCount(playerId, startDate, endDate, heroIds);
+    Long totalMatches = getTotalMatchCount(playerId, startDate, endDate, heroIds, gameModeIds);
     if (totalMatches == null || totalMatches == 0) {
       return List.of();
     }
@@ -121,6 +125,11 @@ public class AbilityRankingRepository {
       predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.heroId).in(heroIds));
     }
 
+    // Game mode filter
+    if (gameModeIds != null && !gameModeIds.isEmpty()) {
+      predicates.add(matchRoot.get(MatchDomain_.gameModeId).in(gameModeIds));
+    }
+
     // Select aggregated values
     query.multiselect(
         abilityRoot.get(AbilityDomain_.abilityId).alias("abilityId"),
@@ -152,16 +161,23 @@ public class AbilityRankingRepository {
   }
 
   /**
-   * Finds statistics over the games in which the player used EVERY one of {@code abilityIds}.
+   * Finds statistics over the games in which the player used EVERY one of {@code abilityIds} and,
+   * if any are given, also held every one of {@code itemIds}.
    *
    * <p>Two-step by design: step one asks {@code ability_domain} alone which matches contain the
-   * full set, step two aggregates the player's statistics over those matches with the date and hero
-   * filters applied. Doing it in one query would need a correlated having-clause across three cross
-   * joins, which is harder to read and less portable.
+   * full set, step two aggregates the player's statistics over those matches with the date, hero
+   * and game mode filters applied. Doing it in one query would need a correlated having-clause
+   * across three cross joins, which is harder to read and less portable.
+   *
+   * <p>The item conjunction is an intersection of that first step with the same question asked of
+   * {@code item_domain}, so "these skills and these items in one game" stays a conjunction rather
+   * than degrading into "these skills, and separately these items".
    *
    * @param playerId the player's account ID
    * @param abilityIds the abilities that must ALL be present; empty or null yields zero games
+   * @param itemIds items that must ALL also be present; empty or null applies no item restriction
    * @param heroIds optional hero restriction
+   * @param gameModeIds optional game mode restriction
    * @param startDate optional inclusive lower bound on match date
    * @param endDate optional inclusive upper bound on match date
    * @return combo statistics, never null; {@code gamesFound} is 0 when nothing matched
@@ -169,7 +185,9 @@ public class AbilityRankingRepository {
   public AbilityComboStatisticResponse findAbilityComboStatistics(
       Long playerId,
       Set<Long> abilityIds,
+      Set<Long> itemIds,
       Set<Long> heroIds,
+      Set<Long> gameModeIds,
       LocalDate startDate,
       LocalDate endDate) {
 
@@ -182,6 +200,7 @@ public class AbilityRankingRepository {
             .matchIds(Set.of())
             .winRate(BigDecimal.ZERO)
             .members(List.of())
+            .itemMembers(List.of())
             .build();
 
     if (abilityIds == null || abilityIds.isEmpty()) {
@@ -193,8 +212,16 @@ public class AbilityRankingRepository {
       return empty;
     }
 
+    boolean itemFiltered = itemIds != null && !itemIds.isEmpty();
+    if (itemFiltered) {
+      candidateMatchIds.retainAll(findMatchesContainingAllItems(playerId, itemIds));
+      if (candidateMatchIds.isEmpty()) {
+        return empty;
+      }
+    }
+
     Set<Long> comboMatchIds =
-        applyDateAndHeroFilters(playerId, candidateMatchIds, heroIds, startDate, endDate);
+        applyMatchFilters(playerId, candidateMatchIds, heroIds, gameModeIds, startDate, endDate);
     if (comboMatchIds.isEmpty()) {
       return empty;
     }
@@ -264,7 +291,84 @@ public class AbilityRankingRepository {
         .avgKda(
             avgKda != null ? BigDecimal.valueOf(avgKda).setScale(2, RoundingMode.HALF_UP) : null)
         .members(members)
+        .itemMembers(itemFiltered ? itemMembers(playerId, itemIds, comboMatchIds) : List.of())
         .build();
+  }
+
+  /**
+   * Per-item averages over the combo games, for a request that named items as well as skills.
+   *
+   * <p>Averaged over the games that satisfied <em>both</em> conjunctions, not over every game the
+   * item appears in — the question asked was about the combination.
+   */
+  private List<AbilityComboStatisticResponse.ItemMember> itemMembers(
+      Long playerId, Set<Long> itemIds, Set<Long> comboMatchIds) {
+
+    CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+    CriteriaQuery<Tuple> memberQuery = cb.createTupleQuery();
+    Root<ItemDomain> itemRoot = memberQuery.from(ItemDomain.class);
+
+    memberQuery.multiselect(
+        itemRoot.get(ItemDomain_.itemId).alias("itemId"),
+        itemRoot.get(ItemDomain_.itemName).alias("itemName"),
+        itemRoot.get(ItemDomain_.itemPrettyName).alias("itemPrettyName"),
+        cb.avg(itemRoot.get(ItemDomain_.itemPurchaseTime)).alias("avgPurchaseTime"),
+        cb.avg(itemRoot.get(ItemDomain_.useCount)).alias("avgUseCount"));
+    memberQuery.where(
+        cb.equal(itemRoot.get(ItemDomain_.playerId), playerId),
+        cb.equal(itemRoot.get(ItemDomain_.isNeutral), false),
+        itemRoot.get(ItemDomain_.itemId).in(itemIds),
+        itemRoot.get(ItemDomain_.matchId).in(comboMatchIds));
+    memberQuery.groupBy(
+        itemRoot.get(ItemDomain_.itemId),
+        itemRoot.get(ItemDomain_.itemName),
+        itemRoot.get(ItemDomain_.itemPrettyName));
+
+    return entityManager.createQuery(memberQuery).getResultList().stream()
+        .map(
+            tuple -> {
+              Double avgPurchase = tuple.get("avgPurchaseTime", Double.class);
+              Double avgUse = tuple.get("avgUseCount", Double.class);
+              return AbilityComboStatisticResponse.ItemMember.builder()
+                  .itemId(tuple.get("itemId", Long.class))
+                  .itemName(tuple.get("itemName", String.class))
+                  .itemPrettyName(tuple.get("itemPrettyName", String.class))
+                  .avgPurchaseTime(
+                      avgPurchase != null
+                          ? BigDecimal.valueOf(avgPurchase).setScale(2, RoundingMode.HALF_UP)
+                          : null)
+                  .avgUseCount(
+                      avgUse != null
+                          ? BigDecimal.valueOf(avgUse).setScale(2, RoundingMode.HALF_UP)
+                          : null)
+                  .build();
+            })
+        .toList();
+  }
+
+  /**
+   * Match IDs where the player held every one of {@code itemIds}.
+   *
+   * <p>The sibling of {@code ItemRankingRepository}'s query of the same name, kept here so the
+   * skill-plus-item conjunction does not need a repository-to-repository dependency. {@code
+   * countDistinct} rather than {@code count} is essential: a game with two rows for the same item
+   * would otherwise satisfy a two-item request.
+   */
+  private Set<Long> findMatchesContainingAllItems(Long playerId, Set<Long> itemIds) {
+    CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+    CriteriaQuery<Long> query = cb.createQuery(Long.class);
+    Root<ItemDomain> itemRoot = query.from(ItemDomain.class);
+
+    query.select(itemRoot.get(ItemDomain_.matchId));
+    query.where(
+        cb.equal(itemRoot.get(ItemDomain_.playerId), playerId),
+        cb.equal(itemRoot.get(ItemDomain_.isNeutral), false),
+        itemRoot.get(ItemDomain_.itemId).in(itemIds));
+    query.groupBy(itemRoot.get(ItemDomain_.matchId));
+    query.having(
+        cb.equal(cb.countDistinct(itemRoot.get(ItemDomain_.itemId)), Long.valueOf(itemIds.size())));
+
+    return new LinkedHashSet<>(entityManager.createQuery(query).getResultList());
   }
 
   /**
@@ -291,11 +395,12 @@ public class AbilityRankingRepository {
     return new LinkedHashSet<>(entityManager.createQuery(query).getResultList());
   }
 
-  /** Narrows candidate match IDs by match date and hero. */
-  private Set<Long> applyDateAndHeroFilters(
+  /** Narrows candidate match IDs by match date, hero and game mode. */
+  private Set<Long> applyMatchFilters(
       Long playerId,
       Set<Long> candidateMatchIds,
       Set<Long> heroIds,
+      Set<Long> gameModeIds,
       LocalDate startDate,
       LocalDate endDate) {
 
@@ -321,6 +426,9 @@ public class AbilityRankingRepository {
     if (heroIds != null && !heroIds.isEmpty()) {
       predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.heroId).in(heroIds));
     }
+    if (gameModeIds != null && !gameModeIds.isEmpty()) {
+      predicates.add(matchRoot.get(MatchDomain_.gameModeId).in(gameModeIds));
+    }
 
     query.select(statsRoot.get(PlayerMatchStatisticDomain_.matchId)).distinct(true);
     query.where(predicates.toArray(new Predicate[0]));
@@ -330,7 +438,11 @@ public class AbilityRankingRepository {
 
   /** Gets the total number of matches for a player within the date range and hero filter. */
   private Long getTotalMatchCount(
-      Long playerId, LocalDate startDate, LocalDate endDate, Set<Long> heroIds) {
+      Long playerId,
+      LocalDate startDate,
+      LocalDate endDate,
+      Set<Long> heroIds,
+      Set<Long> gameModeIds) {
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
     CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
     Root<PlayerMatchStatisticDomain> statsRoot = countQuery.from(PlayerMatchStatisticDomain.class);
@@ -351,9 +463,13 @@ public class AbilityRankingRepository {
     }
     // Must mirror the main query's hero filter. Filtering only the numerator would
     // divide hero-specific pick counts by the player's games across ALL heroes and
-    // report pick rates several times too low, with no error.
+    // report pick rates several times too low, with no error. The same applies to
+    // the game mode filter.
     if (heroIds != null && !heroIds.isEmpty()) {
       predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.heroId).in(heroIds));
+    }
+    if (gameModeIds != null && !gameModeIds.isEmpty()) {
+      predicates.add(matchRoot.get(MatchDomain_.gameModeId).in(gameModeIds));
     }
 
     countQuery.select(cb.countDistinct(statsRoot.get(PlayerMatchStatisticDomain_.matchId)));

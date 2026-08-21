@@ -4,11 +4,10 @@ import com.ako.dbuff.service.discord.command.CommandContext;
 import com.ako.dbuff.service.discord.command.CommandRegistry;
 import com.ako.dbuff.service.discord.command.DbuffCommand;
 import com.ako.dbuff.service.discord.command.autocomplete.AutocompleteProvider;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
@@ -34,17 +33,16 @@ public class SlashCommandAdapter extends ListenerAdapter {
 
   public SlashCommandAdapter(CommandRegistry registry, List<AutocompleteProvider> providers) {
     this.registry = registry;
-    this.providersByKey =
-        providers.stream()
-            .collect(
-                Collectors.toMap(
-                    provider ->
-                        providerKey(
-                            provider.getCommandName(),
-                            provider.getSubcommandName(),
-                            provider.getOptionName()),
-                    Function.identity(),
-                    (first, second) -> first));
+    this.providersByKey = new LinkedHashMap<>();
+    for (AutocompleteProvider provider : providers) {
+      for (String commandName : provider.getCommandNames()) {
+        // First registration wins, matching the previous merge behaviour: a duplicate key is a
+        // wiring mistake, and silently swapping which provider serves a picker would be worse.
+        providersByKey.putIfAbsent(
+            providerKey(commandName, provider.getSubcommandName(), provider.getOptionName()),
+            provider);
+      }
+    }
   }
 
   @Override

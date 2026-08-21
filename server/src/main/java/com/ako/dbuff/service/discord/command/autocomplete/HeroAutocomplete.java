@@ -6,6 +6,7 @@ import com.ako.dbuff.service.discord.command.CommandContext;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.interactions.commands.Command;
@@ -32,6 +33,12 @@ public class HeroAutocomplete implements AutocompleteProvider {
   @Override
   public String getCommandName() {
     return "stats";
+  }
+
+  /** {@code /hero hero:} asks the same question, from the same dictionary. */
+  @Override
+  public Set<String> getCommandNames() {
+    return Set.of("stats", "hero");
   }
 
   @Override

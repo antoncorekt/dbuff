@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.discord.command.autocomplete;
 
 import com.ako.dbuff.service.constant.ConstantsManagers;
+import com.ako.dbuff.service.constant.GameModeResolver;
 import com.ako.dbuff.service.constant.data.MatchTypeConstant;
 import com.ako.dbuff.service.discord.command.CommandContext;
 import java.util.LinkedHashMap;
@@ -50,26 +51,8 @@ public class GameModeAutocomplete implements AutocompleteProvider {
         constantsManagers.getMatchTypeConstantMap().entrySet()) {
       MatchTypeConstant mode = entry.getValue();
       String id = mode.getId() != null ? mode.getId() : entry.getKey();
-      candidates.put(prettyName(mode.getName(), id), id);
+      candidates.put(GameModeResolver.prettyName(mode.getName(), id), id);
     }
     return candidates;
-  }
-
-  /** Turns {@code game_mode_all_pick} into {@code All Pick}, falling back to the raw ID. */
-  private String prettyName(String rawName, String id) {
-    if (rawName == null || rawName.isBlank()) {
-      return "Mode " + id;
-    }
-    String stripped = rawName.replace("game_mode_", "").replace('_', ' ').trim();
-    if (stripped.isEmpty()) {
-      return "Mode " + id;
-    }
-    StringBuilder pretty = new StringBuilder(stripped.length());
-    boolean capitalize = true;
-    for (char c : stripped.toCharArray()) {
-      pretty.append(capitalize ? Character.toUpperCase(c) : c);
-      capitalize = c == ' ';
-    }
-    return pretty.toString();
   }
 }

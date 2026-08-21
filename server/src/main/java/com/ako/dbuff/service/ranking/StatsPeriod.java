@@ -11,6 +11,9 @@ import java.time.LocalDate;
 public enum StatsPeriod {
   LAST_7_DAYS("Last 7 days"),
   LAST_30_DAYS("Last 30 days"),
+  LAST_3_MONTHS("Last 3 months"),
+  LAST_6_MONTHS("Last 6 months"),
+  LAST_12_MONTHS("Last 12 months"),
   CURRENT_PATCH("Current patch"),
   ALL_TIME("All time");
 
@@ -53,6 +56,9 @@ public enum StatsPeriod {
     return switch (this) {
       case LAST_7_DAYS -> new Range(today.minusDays(7), today, false);
       case LAST_30_DAYS -> new Range(today.minusDays(DEFAULT_DAYS), today, false);
+      case LAST_3_MONTHS -> new Range(today.minusMonths(3), today, false);
+      case LAST_6_MONTHS -> new Range(today.minusMonths(6), today, false);
+      case LAST_12_MONTHS -> new Range(today.minusMonths(12), today, false);
       case ALL_TIME -> new Range(null, today, false);
       case CURRENT_PATCH ->
           patchStartDate != null

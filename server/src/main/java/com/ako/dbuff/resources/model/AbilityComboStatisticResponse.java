@@ -32,6 +32,15 @@ public class AbilityComboStatisticResponse {
 
   private List<Member> members;
 
+  /**
+   * Per-item figures over the same games, when the request also named items. Empty when it did not.
+   *
+   * <p>Separate from {@link #members} rather than a shared "member" shape because an item has a
+   * purchase time and an ability does not, and flattening the two would mean rendering {@code —}
+   * for a column that can never apply.
+   */
+  private List<ItemMember> itemMembers;
+
   @Data
   @Builder
   @AllArgsConstructor
@@ -42,6 +51,23 @@ public class AbilityComboStatisticResponse {
     private String abilityPrettyName;
 
     /** Average uses per game across the combo games, or null when no use data was recorded. */
+    private BigDecimal avgUseCount;
+  }
+
+  /** One item of a skill-plus-item request, averaged over the games satisfying both. */
+  @Data
+  @Builder
+  @AllArgsConstructor
+  @NoArgsConstructor
+  public static class ItemMember {
+    private Long itemId;
+    private String itemName;
+    private String itemPrettyName;
+
+    /** Average purchase time in seconds, or null when none was recorded. */
+    private BigDecimal avgPurchaseTime;
+
+    /** Average uses per game, or null when no use data was recorded. */
     private BigDecimal avgUseCount;
   }
 }

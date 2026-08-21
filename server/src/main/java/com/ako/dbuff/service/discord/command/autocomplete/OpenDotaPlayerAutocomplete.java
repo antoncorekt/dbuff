@@ -16,7 +16,14 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 /**
- * Searches all of OpenDota for a player to add to the focus group, for {@code /dbuff players add}.
+ * Searches all of OpenDota for a player to start tracking, for {@code /dbuff register} and {@code
+ * /dbuff add}.
+ *
+ * <p>Registered for {@code /dbuff} generally rather than for one subcommand, because both of those
+ * name players the channel does not track yet. {@code remove} and {@code link} have their own
+ * providers and still win, since the adapter prefers a subcommand-specific provider over a general
+ * one — searching all of OpenDota for a player to remove would offer millions of accounts that
+ * cannot be removed.
  *
  * <p>The only autocomplete provider that makes a network call, which drives two decisions:
  *
@@ -61,11 +68,6 @@ public class OpenDotaPlayerAutocomplete implements AutocompleteProvider {
   @Override
   public String getCommandName() {
     return "dbuff";
-  }
-
-  @Override
-  public String getSubcommandName() {
-    return "add";
   }
 
   @Override

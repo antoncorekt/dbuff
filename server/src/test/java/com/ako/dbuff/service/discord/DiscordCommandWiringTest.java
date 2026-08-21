@@ -4,8 +4,10 @@ import com.ako.dbuff.service.constant.ConstantPrecacheStarter;
 import com.ako.dbuff.service.discord.command.CommandRegistry;
 import com.ako.dbuff.service.discord.command.adapter.SlashCommandAdapter;
 import com.ako.dbuff.service.discord.command.adapter.TextCommandAdapter;
+import com.ako.dbuff.service.discord.command.autocomplete.AutocompleteProvider;
 import java.util.List;
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import org.junit.jupiter.api.Test;
@@ -41,6 +43,7 @@ class DiscordCommandWiringTest {
   @MockBean private ConstantPrecacheStarter constantPrecacheStarter;
 
   @Autowired private CommandRegistry registry;
+  @Autowired private List<AutocompleteProvider> providers;
   @Autowired private SlashCommandAdapter slashCommandAdapter;
   @Autowired private TextCommandAdapter textCommandAdapter;
   @Autowired private ScoreboardButtonListener scoreboardButtonListener;
@@ -56,7 +59,48 @@ class DiscordCommandWiringTest {
   void everyExpectedCommandIsRegistered() {
     assertThat(registry.getDefinitions())
         .extracting(SlashCommandData::getName)
-        .contains("stats", "scout", "match", "dbuff");
+        .contains("stats", "scout", "match", "dbuff", "hero");
+  }
+
+  /**
+   * An option marked autocomplete with no provider registered for its command shows the user an
+   * empty picker and no explanation — the exact failure mode that adding a second command using the
+   * same option names introduces.
+   */
+  @Test
+  void everyAutocompleteOptionHasAProvider() {
+    for (SlashCommandData definition : registry.getDefinitions()) {
+      assertAutocompleteOptionsAreServed(definition.getName(), null, definition.getOptions());
+      for (SubcommandData subcommand : definition.getSubcommands()) {
+        assertAutocompleteOptionsAreServed(
+            definition.getName(), subcommand.getName(), subcommand.getOptions());
+      }
+    }
+  }
+
+  private void assertAutocompleteOptionsAreServed(
+      String command, String subcommand, List<OptionData> options) {
+
+    for (OptionData option : options) {
+      if (!option.isAutoComplete()) {
+        continue;
+      }
+      assertThat(providerExists(command, subcommand, option.getName()))
+          .as(
+              "autocomplete provider for /%s%s %s:",
+              command, subcommand == null ? "" : " " + subcommand, option.getName())
+          .isTrue();
+    }
+  }
+
+  private boolean providerExists(String command, String subcommand, String option) {
+    return providers.stream()
+        .anyMatch(
+            provider ->
+                provider.getCommandNames().stream().anyMatch(command::equalsIgnoreCase)
+                    && provider.getOptionName().equalsIgnoreCase(option)
+                    && (provider.getSubcommandName() == null
+                        || provider.getSubcommandName().equalsIgnoreCase(subcommand)));
   }
 
   /** Discord refuses a registration payload containing two commands with the same name. */

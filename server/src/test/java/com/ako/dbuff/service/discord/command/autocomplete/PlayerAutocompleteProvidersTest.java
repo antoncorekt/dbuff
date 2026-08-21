@@ -209,14 +209,18 @@ class PlayerAutocompleteProvidersTest {
         .isEmpty();
   }
 
+  /**
+   * General to {@code /dbuff} rather than one subcommand: {@code register} and {@code add} both
+   * name untracked players. {@code remove} and {@code link} override it by being more specific.
+   */
   @Test
-  void openDota_isRegisteredForTheAddSubcommandOnly() {
+  void openDota_servesDbuffPlayerOptionsWithoutTheirOwnProvider() {
     OpenDotaPlayerAutocomplete provider =
         new OpenDotaPlayerAutocomplete(Mockito.mock(SearchApi.class), RateLimiter.create(100.0));
 
     assertThat(provider.getCommandName()).isEqualTo("dbuff");
     assertThat(provider.getOptionName()).isEqualTo("player");
-    assertThat(provider.getSubcommandName()).isEqualTo("add");
+    assertThat(provider.getSubcommandName()).isNull();
   }
 
   private static SearchResponse searchResult(Long accountId, String personaname) {

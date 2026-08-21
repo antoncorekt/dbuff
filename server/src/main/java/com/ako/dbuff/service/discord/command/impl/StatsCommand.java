@@ -3,24 +3,17 @@ package com.ako.dbuff.service.discord.command.impl;
 import com.ako.dbuff.resources.model.AbilityComboStatisticResponse;
 import com.ako.dbuff.resources.model.ItemComboStatisticResponse;
 import com.ako.dbuff.resources.model.PlayerStatisticResponse;
-import com.ako.dbuff.service.constant.ConstantNameResolver;
-import com.ako.dbuff.service.constant.CurrentPatchDateResolver;
-import com.ako.dbuff.service.constant.NameResolution;
 import com.ako.dbuff.service.discord.command.AsyncReply;
 import com.ako.dbuff.service.discord.command.CommandContext;
 import com.ako.dbuff.service.discord.command.DbuffCommand;
 import com.ako.dbuff.service.discord.command.PlayerReferenceResolver;
 import com.ako.dbuff.service.discord.command.StatsEmbedFormatter;
-import com.ako.dbuff.service.instance.DbufInstanceConfigService;
+import com.ako.dbuff.service.discord.command.StatsOptions;
+import com.ako.dbuff.service.discord.command.StatsRequestResolver;
+import com.ako.dbuff.service.discord.command.StatsRequestResolver.StatsRequest;
 import com.ako.dbuff.service.ranking.AbilityRankingService;
 import com.ako.dbuff.service.ranking.ItemRankingService;
 import com.ako.dbuff.service.ranking.PlayerStatisticService;
-import com.ako.dbuff.service.ranking.StatsPeriod;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
@@ -36,36 +29,25 @@ import org.springframework.stereotype.Component;
 /**
  * {@code /stats} — player statistics.
  *
- * <p>All four subcommands share one validation sequence, and the order of it is the contract:
- * everything that can fail cheaply is checked <em>before</em> {@link CommandContext#acknowledge},
- * because acknowledging creates a thread and Discord will not let an ephemeral message carry one. A
- * typo therefore gets a private correction, not a thread full of an error.
+ * <p>All four subcommands share {@link StatsRequestResolver}'s validation sequence, which runs
+ * before anything is acknowledged. See that class for why the order matters.
  *
  * <p>{@code items} and {@code skills} each have two modes. With the option absent they answer "what
  * does this player buy / cast most", a ranking grouped by item. With it present they answer "how
  * does this player do when they get all of these in one game", which is a conjunction the ranking
  * query cannot express. Both are useful and they are not the same question.
+ *
+ * <p>{@code skills} additionally accepts {@code items}, which intersects the two conjunctions:
+ * games where the player used all of those skills <em>and</em> held all of those items. That is a
+ * third question again — a skill build's win rate can depend entirely on whether the item that
+ * enables it was bought.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class StatsCommand implements DbuffCommand {
 
-  /**
-   * Cap on players per invocation. Each one is a separate aggregation over the match history, and a
-   * request naming the whole server would sit in the thread for minutes.
-   */
-  static final int MAX_PLAYERS = 5;
-
-  /** Discord will not render more than this usefully, and the tables get unreadable first. */
-  static final int MAX_LIMIT = 25;
-
-  static final int DEFAULT_LIMIT = 10;
-
-  private final DbufInstanceConfigService instanceConfigService;
-  private final PlayerReferenceResolver playerResolver;
-  private final ConstantNameResolver nameResolver;
-  private final CurrentPatchDateResolver patchDateResolver;
+  private final StatsRequestResolver requestResolver;
   private final PlayerStatisticService playerStatisticService;
   private final ItemRankingService itemRankingService;
   private final AbilityRankingService abilityRankingService;
@@ -81,56 +63,50 @@ public class StatsCommand implements DbuffCommand {
     return Commands.slash("stats", "Player statistics")
         .addSubcommands(
             new SubcommandData("overall", "Win/loss, KDA and farm for a player")
-                .addOptions(playerOption(), heroOption(), periodOption()),
+                .addOptions(
+                    StatsOptions.player(),
+                    StatsOptions.hero(),
+                    StatsOptions.period(),
+                    StatsOptions.gameMode()),
             new SubcommandData("heroes", "Most played heroes for a player")
-                .addOptions(playerOption(), periodOption(), limitOption()),
+                .addOptions(
+                    StatsOptions.player(),
+                    StatsOptions.period(),
+                    StatsOptions.gameMode(),
+                    StatsOptions.limit()),
             new SubcommandData("items", "Item statistics, or stats for a set of items in one game")
                 .addOptions(
-                    playerOption(),
+                    StatsOptions.player(),
                     new OptionData(
                         OptionType.STRING,
                         "items",
                         "Items that must all appear in the same game",
                         false,
                         true),
-                    heroOption(),
-                    periodOption(),
-                    limitOption()),
+                    StatsOptions.hero(),
+                    StatsOptions.period(),
+                    StatsOptions.gameMode(),
+                    StatsOptions.limit()),
             new SubcommandData(
                     "skills", "Skill statistics, or stats for a set of skills in one game")
                 .addOptions(
-                    playerOption(),
+                    StatsOptions.player(),
                     new OptionData(
                         OptionType.STRING,
                         "skills",
                         "Skills that must all appear in the same game",
                         false,
                         true),
-                    heroOption(),
-                    periodOption(),
-                    limitOption()));
-  }
-
-  private OptionData playerOption() {
-    return new OptionData(
-        OptionType.STRING, "player", "Player, @mention or comma-separated list", true, true);
-  }
-
-  private OptionData heroOption() {
-    return new OptionData(OptionType.STRING, "hero", "Restrict to one hero", false, true);
-  }
-
-  private OptionData limitOption() {
-    return new OptionData(OptionType.INTEGER, "limit", "How many rows (max 25)", false);
-  }
-
-  /** Static choices, so no autocomplete round trip is needed for four fixed values. */
-  private OptionData periodOption() {
-    OptionData option = new OptionData(OptionType.STRING, "period", "Time range", false);
-    for (StatsPeriod period : StatsPeriod.values()) {
-      option.addChoice(period.getDisplayName(), period.getChoiceValue());
-    }
-    return option;
+                    new OptionData(
+                        OptionType.STRING,
+                        "items",
+                        "Items that must appear in the same game as those skills",
+                        false,
+                        true),
+                    StatsOptions.hero(),
+                    StatsOptions.period(),
+                    StatsOptions.gameMode(),
+                    StatsOptions.limit()));
   }
 
   @Override
@@ -144,10 +120,11 @@ public class StatsCommand implements DbuffCommand {
   }
 
   private void overall(CommandContext context) {
-    prepare(context)
+    requestResolver
+        .prepare(context)
         .ifPresent(
             request -> {
-              AsyncReply reply = acknowledge(context, request, "stats");
+              AsyncReply reply = acknowledge(context, request, "📊", "Overall stats");
               perPlayer(
                   request,
                   reply,
@@ -158,17 +135,19 @@ public class StatsCommand implements DbuffCommand {
                               request.startDate(),
                               request.endDate(),
                               null,
-                              request.heroNames()),
-                          request.label()));
+                              request.heroNames(),
+                              request.gameModeNames()),
+                          request.footer()));
             });
   }
 
   private void heroes(CommandContext context) {
-    prepare(context)
+    requestResolver
+        .prepare(context)
         .ifPresent(
             request -> {
-              int limit = resolveLimit(context);
-              AsyncReply reply = acknowledge(context, request, "stats heroes");
+              int limit = requestResolver.resolveLimit(context);
+              AsyncReply reply = acknowledge(context, request, "🦸", "Most played heroes");
               perPlayer(
                   request,
                   reply,
@@ -179,26 +158,30 @@ public class StatsCommand implements DbuffCommand {
                             request.startDate(),
                             request.endDate(),
                             limit,
-                            request.heroNames());
-                    return formatter.formatHeroes(stats, request.label());
+                            request.heroNames(),
+                            request.gameModeNames());
+                    return formatter.formatHeroes(stats, request.footer());
                   });
             });
   }
 
   private void items(CommandContext context) {
-    prepare(context)
+    requestResolver
+        .prepare(context)
         .ifPresent(
             request -> {
               // After prepare, so an unregistered channel is reported as such rather than as a
               // typo, but still before acknowledge, so a typo never creates a thread.
-              Set<String> itemNames = optionAsSet(context, "items");
-              if (reportUnknown(
-                  context, nameResolver.resolveItems(itemNames), "item", itemNames, true)) {
+              Set<String> itemNames = requestResolver.optionAsSet(context, "items");
+              if (requestResolver.reportUnknownItems(context, itemNames)) {
                 return;
               }
 
-              int limit = resolveLimit(context);
-              AsyncReply reply = acknowledge(context, request, "stats items");
+              int limit = requestResolver.resolveLimit(context);
+              String title =
+                  itemNames.isEmpty() ? "Item stats" : "Item combo (" + join(itemNames) + ")";
+              AsyncReply reply = acknowledge(context, request, "🎒", title);
+
               perPlayer(
                   request,
                   reply,
@@ -213,8 +196,9 @@ public class StatsCommand implements DbuffCommand {
                               null,
                               null,
                               request.heroNames(),
+                              request.gameModeNames(),
                               limit),
-                          request.label());
+                          request.footer());
                     }
                     ItemComboStatisticResponse combo =
                         itemRankingService.getItemComboStatistics(
@@ -222,33 +206,45 @@ public class StatsCommand implements DbuffCommand {
                             request.startDate(),
                             request.endDate(),
                             itemNames,
-                            request.heroNames());
+                            request.heroNames(),
+                            request.gameModeNames());
                     if (combo.getGamesFound() == null || combo.getGamesFound() == 0L) {
                       reply.post(
                           "🔍 **"
                               + player.name()
                               + "** has no games with all of: "
-                              + String.join(", ", itemNames)
+                              + join(itemNames)
                               + ".");
                       return null;
                     }
-                    return formatter.formatItemCombo(combo, request.label());
+                    return formatter.formatItemCombo(combo, request.footer());
                   });
             });
   }
 
   private void skills(CommandContext context) {
-    prepare(context)
+    requestResolver
+        .prepare(context)
         .ifPresent(
             request -> {
-              Set<String> skillNames = optionAsSet(context, "skills");
-              if (reportUnknown(
-                  context, nameResolver.resolveAbilities(skillNames), "skill", skillNames, false)) {
+              Set<String> skillNames = requestResolver.optionAsSet(context, "skills");
+              Set<String> itemNames = requestResolver.optionAsSet(context, "items");
+              if (requestResolver.reportUnknownSkills(context, skillNames)
+                  || requestResolver.reportUnknownItems(context, itemNames)) {
+                return;
+              }
+              // Items alone cannot narrow a skill ranking — the conjunction needs a skill to be a
+              // conjunction with. Saying so beats answering the unfiltered top-N question instead.
+              if (skillNames.isEmpty() && !itemNames.isEmpty()) {
+                context.replyEphemeral(
+                    "❌ Name at least one skill to combine those items with, or use `/stats items`.");
                 return;
               }
 
-              int limit = resolveLimit(context);
-              AsyncReply reply = acknowledge(context, request, "stats skills");
+              int limit = requestResolver.resolveLimit(context);
+              AsyncReply reply =
+                  acknowledge(context, request, "✨", skillsTitle(skillNames, itemNames));
+
               perPlayer(
                   request,
                   reply,
@@ -263,8 +259,9 @@ public class StatsCommand implements DbuffCommand {
                               null,
                               null,
                               request.heroNames(),
+                              request.gameModeNames(),
                               limit),
-                          request.label());
+                          request.footer());
                     }
                     AbilityComboStatisticResponse combo =
                         abilityRankingService.getAbilityComboStatistics(
@@ -272,103 +269,46 @@ public class StatsCommand implements DbuffCommand {
                             request.startDate(),
                             request.endDate(),
                             skillNames,
-                            request.heroNames());
+                            itemNames,
+                            request.heroNames(),
+                            request.gameModeNames());
                     if (combo.getGamesFound() == null || combo.getGamesFound() == 0L) {
                       reply.post(
                           "🔍 **"
                               + player.name()
                               + "** has no games with all of: "
-                              + String.join(", ", skillNames)
+                              + join(skillNames)
+                              + (itemNames.isEmpty() ? "" : " + " + join(itemNames))
                               + ".");
                       return null;
                     }
-                    return formatter.formatAbilityCombo(combo, request.label());
+                    return formatter.formatAbilityCombo(combo, request.footer());
                   });
             });
   }
 
-  /**
-   * A validated request. Exists so the four subcommands share one validation sequence instead of
-   * four drifting copies.
-   *
-   * @param players the resolved players, in the order asked for
-   * @param heroNames the hero filter, empty for none
-   * @param startDate inclusive lower bound, null for all time
-   * @param endDate inclusive upper bound
-   * @param label period text for the embed footer, which says so when the range fell back
-   */
-  private record Request(
-      List<PlayerReferenceResolver.ResolvedPlayer> players,
-      Set<String> heroNames,
-      LocalDate startDate,
-      LocalDate endDate,
-      String label) {}
-
-  /**
-   * Validates everything cheap, replying ephemerally and returning empty on the first problem.
-   *
-   * @return the validated request, or empty when the user has already been told what was wrong
-   */
-  private Optional<Request> prepare(CommandContext context) {
-    String channelId = context.getParentChannelId();
-
-    if (instanceConfigService.getByDiscordChannelId(channelId).isEmpty()) {
-      context.replyEphemeral(
-          "ℹ️ This channel is not tracking any players yet. Use `/dbuff register` first.");
-      return Optional.empty();
+  private String skillsTitle(Set<String> skillNames, Set<String> itemNames) {
+    if (skillNames.isEmpty()) {
+      return "Skill stats";
     }
-
-    List<String> references = context.getOptionAsList("player");
-    if (references.isEmpty()) {
-      context.replyEphemeral("❌ Name at least one player.");
-      return Optional.empty();
+    if (itemNames.isEmpty()) {
+      return "Skill combo (" + join(skillNames) + ")";
     }
-
-    PlayerReferenceResolver.Resolution resolution = playerResolver.resolve(channelId, references);
-    if (resolution.hasUnresolved()) {
-      context.replyEphemeral(unresolvedPlayerMessage(context, resolution));
-      return Optional.empty();
-    }
-    if (resolution.isEmpty()) {
-      context.replyEphemeral("❌ Name at least one player.");
-      return Optional.empty();
-    }
-    if (resolution.players().size() > MAX_PLAYERS) {
-      context.replyEphemeral(
-          "❌ At most "
-              + MAX_PLAYERS
-              + " players per command; you named "
-              + resolution.players().size()
-              + ". Each one is a separate pass over the match history.");
-      return Optional.empty();
-    }
-
-    Set<String> heroNames = optionAsSet(context, "hero");
-    if (reportUnknown(context, nameResolver.resolveHeroes(heroNames), "hero", heroNames, null)) {
-      return Optional.empty();
-    }
-
-    StatsPeriod period = StatsPeriod.fromChoiceValue(context.getOption("period"));
-    StatsPeriod.Range range =
-        period.resolve(LocalDate.now(), patchDateResolver.getCurrentPatchStartDate().orElse(null));
-
-    return Optional.of(
-        new Request(
-            resolution.players(),
-            heroNames,
-            range.startDate(),
-            range.endDate(),
-            label(period, range)));
+    return "Skill + item combo (" + join(skillNames) + " + " + join(itemNames) + ")";
   }
 
-  private AsyncReply acknowledge(CommandContext context, Request request, String threadPrefix) {
-    String names =
-        String.join(
-            ", ",
-            request.players().stream().map(PlayerReferenceResolver.ResolvedPlayer::name).toList());
+  /**
+   * Acknowledges with a summary that names the question asked.
+   *
+   * <p>"Fetching statistics for 4 player(s)" was the same message for all four subcommands, so a
+   * thread gave no clue which one produced it — and the threads outlive the invocation that made
+   * them.
+   */
+  private AsyncReply acknowledge(
+      CommandContext context, StatsRequest request, String emoji, String title) {
     return context.acknowledge(
-        "📊 Fetching statistics for " + request.players().size() + " player(s)…",
-        threadPrefix + ": " + names);
+        emoji + " " + title + " — " + request.playerNames() + " · " + request.footer() + "…",
+        title + ": " + request.playerNames());
   }
 
   /**
@@ -381,7 +321,7 @@ public class StatsCommand implements DbuffCommand {
    * @param work returns the embed to post, or null when it has already posted its own message
    */
   private void perPlayer(
-      Request request,
+      StatsRequest request,
       AsyncReply reply,
       Function<PlayerReferenceResolver.ResolvedPlayer, MessageEmbed> work) {
 
@@ -399,83 +339,7 @@ public class StatsCommand implements DbuffCommand {
     }
   }
 
-  /** Clamps rather than rejects: a user asking for 100 rows wants "as many as you can". */
-  private int resolveLimit(CommandContext context) {
-    int requested = context.getOptionAsInt("limit", DEFAULT_LIMIT);
-    if (requested < 1) {
-      return DEFAULT_LIMIT;
-    }
-    return Math.min(requested, MAX_LIMIT);
-  }
-
-  private Set<String> optionAsSet(CommandContext context, String name) {
-    return new LinkedHashSet<>(context.getOptionAsList(name));
-  }
-
-  /**
-   * Reports unknown constant names ephemerally, with a "did you mean" for each.
-   *
-   * @param suggestItems true for items, false for abilities, null for heroes — selects which
-   *     suggestion source to consult
-   * @return true when something was unknown and the user has been told
-   */
-  private boolean reportUnknown(
-      CommandContext context,
-      NameResolution resolution,
-      String kind,
-      Set<String> requested,
-      Boolean suggestItems) {
-
-    if (!resolution.hasUnresolved()) {
-      return false;
-    }
-    List<String> parts = new ArrayList<>();
-    for (String unknown : resolution.unresolvedNames()) {
-      Optional<String> suggestion =
-          suggestItems == null
-              ? nameResolver.suggestHero(unknown)
-              : suggestItems
-                  ? nameResolver.suggestItem(unknown)
-                  : nameResolver.suggestAbility(unknown);
-      parts.add(
-          "`" + unknown + "`" + suggestion.map(s -> " (did you mean `" + s + "`?)").orElse(""));
-    }
-    context.replyEphemeral("❌ Unknown " + kind + ": " + String.join(", ", parts));
-    log.debug(
-        "Unknown {} names in /stats: {} of {}", kind, resolution.unresolvedNames(), requested);
-    return true;
-  }
-
-  private String unresolvedPlayerMessage(
-      CommandContext context, PlayerReferenceResolver.Resolution resolution) {
-    List<String> parts =
-        resolution.unresolved().stream()
-            .map(
-                unknown ->
-                    "`"
-                        + unknown
-                        + "`"
-                        + playerResolver
-                            .suggest(context.getParentChannelId(), unknown)
-                            .map(suggestion -> " (did you mean `" + suggestion + "`?)")
-                            .orElse(""))
-            .toList();
-    return "❌ Could not find: " + String.join(", ", parts);
-  }
-
-  /**
-   * Footer text for the period.
-   *
-   * <p>Says so when {@code CURRENT_PATCH} could not find a patch date and degraded to 30 days.
-   * Labelling that result "Current patch" would present an answer to a question the user did not
-   * ask, and they would have no way to tell.
-   */
-  private String label(StatsPeriod period, StatsPeriod.Range range) {
-    if (!range.fellBack()) {
-      return period.getDisplayName();
-    }
-    return period.getDisplayName()
-        + " unavailable — showing "
-        + StatsPeriod.LAST_30_DAYS.getDisplayName().toLowerCase();
+  private String join(Set<String> names) {
+    return String.join(", ", names);
   }
 }
