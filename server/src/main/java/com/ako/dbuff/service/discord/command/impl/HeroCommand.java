@@ -166,7 +166,14 @@ public class HeroCommand implements DbuffCommand {
       CommandContext context, StatsRequest request, String heroDisplayName) {
     String title = heroDisplayName + " stats";
     return context.acknowledge(
-        "🦸 " + title + " — " + request.playerNames() + " · " + request.footer() + "…",
+        "🦸 "
+            + title
+            + " — "
+            + request.playerNames()
+            + " · "
+            + request.footer()
+            + request.omissionNotice()
+            + "…",
         title + ": " + request.playerNames());
   }
 

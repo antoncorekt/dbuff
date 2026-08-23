@@ -37,6 +37,11 @@ import org.springframework.stereotype.Component;
  * does this player do when they get all of these in one game", which is a conjunction the ranking
  * query cannot express. Both are useful and they are not the same question.
  *
+ * <p>{@code heroes} takes {@code hero:} for the same reason: unfiltered it ranks the heroes played,
+ * and filtered it collapses to that hero's own record. Unlike {@code overall}, the table is kept
+ * when filtered — there it degenerates to the hero already named in the request, but here the table
+ * <em>is</em> the answer.
+ *
  * <p>{@code skills} additionally accepts {@code items}, which intersects the two conjunctions:
  * games where the player used all of those skills <em>and</em> held all of those items. That is a
  * third question again — a skill build's win rate can depend entirely on whether the item that
@@ -68,9 +73,10 @@ public class StatsCommand implements DbuffCommand {
                     StatsOptions.hero(),
                     StatsOptions.period(),
                     StatsOptions.gameMode()),
-            new SubcommandData("heroes", "Most played heroes for a player")
+            new SubcommandData("heroes", "Most played heroes, or your record on one of them")
                 .addOptions(
                     StatsOptions.player(),
+                    StatsOptions.hero(),
                     StatsOptions.period(),
                     StatsOptions.gameMode(),
                     StatsOptions.limit()),
@@ -307,7 +313,15 @@ public class StatsCommand implements DbuffCommand {
   private AsyncReply acknowledge(
       CommandContext context, StatsRequest request, String emoji, String title) {
     return context.acknowledge(
-        emoji + " " + title + " — " + request.playerNames() + " · " + request.footer() + "…",
+        emoji
+            + " "
+            + title
+            + " — "
+            + request.playerNames()
+            + " · "
+            + request.footer()
+            + request.omissionNotice()
+            + "…",
         title + ": " + request.playerNames());
   }
 

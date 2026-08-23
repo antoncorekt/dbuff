@@ -168,4 +168,61 @@ class PlayerReferenceResolverTest {
   void suggest_unrelatedInput_isEmpty() {
     assertThat(resolver.suggest(CHANNEL, "zzzzzzzzzzzz")).isEmpty();
   }
+
+  // ------------------------------------------------------------------ focusGroup
+
+  @Test
+  void focusGroup_returnsEveryTrackedPlayer() {
+    assertThat(resolver.focusGroup(CHANNEL))
+        .extracting(PlayerReferenceResolver.ResolvedPlayer::accountId)
+        .containsExactlyInAnyOrder(201613150L, 204429164L);
+  }
+
+  /**
+   * The config stores players in a {@code Set}, whose order is a hash order. Sorting makes a bare
+   * command deterministic — otherwise the embeds arrive in a different sequence each time, and a
+   * group trimmed to the player cap would drop a different player on every invocation.
+   */
+  @Test
+  void focusGroup_isSortedByNameSoTrimmingIsDeterministic() {
+    Mockito.when(instanceConfigService.getByDiscordChannelId(CHANNEL))
+        .thenReturn(
+            Optional.of(
+                DbufInstanceConfigResponse.builder()
+                    .players(
+                        Set.of(
+                            PlayerInfo.builder().id(3L).name("charlie").build(),
+                            PlayerInfo.builder().id(1L).name("Alice").build(),
+                            PlayerInfo.builder().id(2L).name("Bob").build()))
+                    .build()));
+
+    assertThat(resolver.focusGroup(CHANNEL))
+        .extracting(PlayerReferenceResolver.ResolvedPlayer::name)
+        .containsExactly("Alice", "Bob", "charlie");
+  }
+
+  @Test
+  void focusGroup_unregisteredChannel_isEmpty() {
+    Mockito.when(instanceConfigService.getByDiscordChannelId(CHANNEL)).thenReturn(Optional.empty());
+
+    assertThat(resolver.focusGroup(CHANNEL)).isEmpty();
+  }
+
+  /** A tracked entry with no account ID cannot be queried, so it must not reach the caller. */
+  @Test
+  void focusGroup_skipsPlayersWithNoAccountId() {
+    Mockito.when(instanceConfigService.getByDiscordChannelId(CHANNEL))
+        .thenReturn(
+            Optional.of(
+                DbufInstanceConfigResponse.builder()
+                    .players(
+                        Set.of(
+                            PlayerInfo.builder().id(null).name("Ghost").build(),
+                            PlayerInfo.builder().id(1L).name("Alice").build()))
+                    .build()));
+
+    assertThat(resolver.focusGroup(CHANNEL))
+        .extracting(PlayerReferenceResolver.ResolvedPlayer::name)
+        .containsExactly("Alice");
+  }
 }

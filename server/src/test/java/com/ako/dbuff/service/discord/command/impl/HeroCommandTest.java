@@ -145,12 +145,12 @@ class HeroCommandTest {
   // ---------------------------------------------------------------- definition
 
   @Test
-  void definitionHasNoSubcommandsAndRequiresHeroAndPlayer() {
+  void definitionHasNoSubcommandsAndRequiresOnlyTheHero() {
     assertThat(command.getDefinition().getSubcommands()).isEmpty();
     assertThat(command.getDefinition().getOptions())
         .filteredOn(option -> option.isRequired())
         .extracting(option -> option.getName())
-        .containsExactlyInAnyOrder("hero", "player");
+        .containsExactly("hero");
   }
 
   @Test
@@ -468,5 +468,37 @@ class HeroCommandTest {
     command.execute(null, request().option("items", "false").build());
 
     Mockito.verifyNoInteractions(itemRankingService);
+  }
+
+  // ------------------------------------------------------- defaulting the player
+
+  @Test
+  void noPlayerNamed_reportsOnTheWholeFocusGroup() {
+    invokerIsKnown();
+    Mockito.when(playerResolver.focusGroup(Mockito.anyString()))
+        .thenReturn(
+            List.of(
+                new PlayerReferenceResolver.ResolvedPlayer(TIGRESS, "Tigress"),
+                new PlayerReferenceResolver.ResolvedPlayer(PASTUKH, "Пастух лолей")));
+
+    FakeCommandContext context = FakeCommandContext.builder().option("hero", "Invoker").build();
+    command.execute(null, context);
+
+    assertThat(context.getEphemeralReplies()).isEmpty();
+    assertThat(context.getEmbeds()).hasSize(2);
+    Mockito.verify(playerResolver, Mockito.never()).resolve(Mockito.anyString(), Mockito.anyList());
+  }
+
+  @Test
+  void noPlayerNamedAndNothingTracked_saysToAddPlayersRatherThanToRegister() {
+    invokerIsKnown();
+    Mockito.when(playerResolver.focusGroup(Mockito.anyString())).thenReturn(List.of());
+
+    FakeCommandContext context = FakeCommandContext.builder().option("hero", "Invoker").build();
+    command.execute(null, context);
+
+    assertThat(context.getEphemeralReplies().get(0)).contains("/dbuff add");
+    assertThat(context.getAcknowledgeSummary()).isNull();
+    Mockito.verifyNoInteractions(playerStatisticService);
   }
 }

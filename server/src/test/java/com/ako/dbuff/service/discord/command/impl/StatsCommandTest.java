@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -187,13 +188,16 @@ class StatsCommandTest {
   }
 
   @Test
-  void noPlayerNamed_repliesEphemerally() {
+  void noPlayerNamedAndNothingTracked_saysToAddPlayersRatherThanToRegister() {
+    Mockito.when(playerResolver.focusGroup(Mockito.anyString())).thenReturn(List.of());
     FakeCommandContext context = FakeCommandContext.builder().build();
 
     command.execute("overall", context);
 
     assertThat(context.getEphemeralReplies()).hasSize(1);
+    assertThat(context.getEphemeralReplies().get(0)).contains("/dbuff add");
     assertThat(context.getAcknowledgeSummary()).isNull();
+    Mockito.verifyNoInteractions(playerStatisticService);
   }
 
   @Test
@@ -438,6 +442,102 @@ class StatsCommandTest {
   }
 
   // -------------------------------------------------------------------- heroes
+
+  @Test
+  void heroes_offersAnOptionalHeroFilter() {
+    OptionData hero =
+        command.getDefinition().getSubcommands().stream()
+            .filter(subcommand -> subcommand.getName().equals("heroes"))
+            .findFirst()
+            .orElseThrow()
+            .getOptions()
+            .stream()
+            .filter(option -> option.getName().equals("hero"))
+            .findFirst()
+            .orElseThrow();
+
+    assertThat(hero.isRequired()).isFalse();
+    assertThat(hero.isAutoComplete()).isTrue();
+  }
+
+  @Test
+  void heroes_heroFilter_isForwardedSoTheTableCollapsesToThatHero() {
+    Mockito.when(nameResolver.resolveHeroes(Set.of("Invoker")))
+        .thenReturn(new NameResolution(Set.of(74L), Set.of()));
+
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "Tigress").option("hero", "Invoker").build();
+    command.execute("heroes", context);
+
+    Mockito.verify(playerStatisticService)
+        .getPlayerStatistics(
+            Mockito.eq(TIGRESS),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.eq(StatsRequestResolver.DEFAULT_LIMIT),
+            Mockito.eq(Set.of("Invoker")),
+            Mockito.anySet());
+    assertThat(context.getEphemeralReplies()).isEmpty();
+  }
+
+  /**
+   * Unlike {@code /stats overall}, which drops the hero list once filtered, here the table is the
+   * answer — omitting it would leave an embed with nothing but a match count.
+   */
+  @Test
+  void heroes_heroFiltered_stillRendersTheTable() {
+    Mockito.when(
+            playerStatisticService.getPlayerStatistics(
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any()))
+        .thenReturn(
+            PlayerStatisticResponse.builder()
+                .playerId(TIGRESS)
+                .playerName("Tigress")
+                .totalMatches(12L)
+                .heroFiltered(true)
+                .popularHeroes(
+                    List.of(
+                        PlayerStatisticResponse.HeroStatistic.builder()
+                            .heroId(74L)
+                            .heroPrettyName("Invoker")
+                            .pickCount(12L)
+                            .winRate(BigDecimal.valueOf(66.67))
+                            .build()))
+                .build());
+    Mockito.when(nameResolver.resolveHeroes(Set.of("Invoker")))
+        .thenReturn(new NameResolution(Set.of(74L), Set.of()));
+
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "Tigress").option("hero", "Invoker").build();
+    command.execute("heroes", context);
+
+    assertThat(context.getEmbeds().get(0).getFields())
+        .anySatisfy(
+            field -> {
+              assertThat(field.getName()).isEqualTo("Most played");
+              assertThat(field.getValue()).contains("Invoker").contains("66.67%");
+            });
+  }
+
+  @Test
+  void heroes_unknownHero_isRejectedBeforeAcknowledging() {
+    Mockito.when(nameResolver.resolveHeroes(Set.of("Invokr")))
+        .thenReturn(new NameResolution(Set.of(), Set.of("Invokr")));
+    Mockito.when(nameResolver.suggestHero("Invokr")).thenReturn(Optional.of("Invoker"));
+
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "Tigress").option("hero", "Invokr").build();
+    command.execute("heroes", context);
+
+    assertThat(context.getEphemeralReplies().get(0)).contains("Invokr").contains("Invoker");
+    assertThat(context.getAcknowledgeSummary()).isNull();
+    Mockito.verifyNoInteractions(playerStatisticService);
+  }
 
   @Test
   void heroes_limitAboveTwentyFiveIsClampedNotRejected() {
@@ -988,5 +1088,68 @@ class StatsCommandTest {
                 .members(List.of())
                 .itemMembers(List.of())
                 .build());
+  }
+
+  // ------------------------------------------------------- defaulting the player
+
+  @Test
+  void noPlayerNamed_answersForTheWholeFocusGroup() {
+    tracks("Tigress", "Пастух лолей");
+    FakeCommandContext context = FakeCommandContext.builder().build();
+
+    command.execute("overall", context);
+
+    assertThat(context.getEphemeralReplies()).isEmpty();
+    assertThat(context.getEmbeds()).hasSize(2);
+    assertThat(context.getAcknowledgeSummary()).contains("Tigress", "Пастух лолей");
+    // The reference resolver is for parsing what a user typed; nothing was typed.
+    Mockito.verify(playerResolver, Mockito.never()).resolve(Mockito.anyString(), Mockito.anyList());
+  }
+
+  @Test
+  void namedPlayerStillWinsOverTheGroupDefault() {
+    tracks("Tigress", "Пастух лолей", "Someone Else");
+    FakeCommandContext context = context();
+
+    command.execute("overall", context);
+
+    assertThat(context.getEmbeds()).hasSize(1);
+    Mockito.verify(playerResolver).resolve(Mockito.anyString(), Mockito.anyList());
+    Mockito.verify(playerResolver, Mockito.never()).focusGroup(Mockito.anyString());
+  }
+
+  /**
+   * A group larger than the cap is trimmed rather than refused, so a bare command still answers —
+   * but it must say so, since five of eight players reads exactly like all of them.
+   */
+  @Test
+  void groupLargerThanTheCap_isTrimmedAndSaysSo() {
+    tracks("A", "B", "C", "D", "E", "F", "G", "H");
+    FakeCommandContext context = FakeCommandContext.builder().build();
+
+    command.execute("overall", context);
+
+    assertThat(context.getEmbeds()).hasSize(StatsRequestResolver.MAX_PLAYERS);
+    assertThat(context.getAcknowledgeSummary())
+        .contains("showing " + StatsRequestResolver.MAX_PLAYERS + " of 8 tracked");
+  }
+
+  @Test
+  void groupWithinTheCap_saysNothingAboutTrimming() {
+    tracks("Tigress", "Пастух лолей");
+    FakeCommandContext context = FakeCommandContext.builder().build();
+
+    command.execute("overall", context);
+
+    assertThat(context.getAcknowledgeSummary()).doesNotContain("tracked");
+  }
+
+  /** Stubs the channel's focus group, in the order the resolver would return it. */
+  private void tracks(String... names) {
+    List<PlayerReferenceResolver.ResolvedPlayer> group = new ArrayList<>();
+    for (int i = 0; i < names.length; i++) {
+      group.add(new PlayerReferenceResolver.ResolvedPlayer((long) (1000 + i), names[i]));
+    }
+    Mockito.when(playerResolver.focusGroup(Mockito.anyString())).thenReturn(group);
   }
 }

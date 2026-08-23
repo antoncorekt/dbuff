@@ -16,9 +16,17 @@ public final class StatsOptions {
 
   private StatsOptions() {}
 
+  /**
+   * The player filter. Optional: an omitted {@code player:} means every player the channel tracks,
+   * which is the question most often asked of a shared channel.
+   */
   public static OptionData player() {
     return new OptionData(
-        OptionType.STRING, "player", "Player, @mention or comma-separated list", true, true);
+        OptionType.STRING,
+        "player",
+        "Player, @mention or list; defaults to everyone tracked here",
+        false,
+        true);
   }
 
   public static OptionData hero() {

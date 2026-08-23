@@ -62,6 +62,8 @@ public class StatsRequestResolver {
    * @param endDate inclusive upper bound
    * @param periodLabel period text, which says so when the range fell back
    * @param gameModeLabel mode text, e.g. {@code Ability Draft}
+   * @param omittedPlayers how many tracked players the {@value #MAX_PLAYERS} cap left out when the
+   *     request defaulted to the whole focus group; zero otherwise
    */
   public record StatsRequest(
       List<PlayerReferenceResolver.ResolvedPlayer> players,
@@ -70,7 +72,8 @@ public class StatsRequestResolver {
       LocalDate startDate,
       LocalDate endDate,
       String periodLabel,
-      String gameModeLabel) {
+      String gameModeLabel,
+      int omittedPlayers) {
 
     /** Footer text: the period and the mode, which together scope every number in the embed. */
     public String footer() {
@@ -81,6 +84,23 @@ public class StatsRequestResolver {
     public String playerNames() {
       return String.join(
           ", ", players.stream().map(PlayerReferenceResolver.ResolvedPlayer::name).toList());
+    }
+
+    /**
+     * Text stating that the group was trimmed, or empty when it was not.
+     *
+     * <p>Said out loud rather than trimmed quietly: an answer covering five of eight tracked
+     * players reads exactly like an answer covering everyone, and the reader has no way to tell.
+     */
+    public String omissionNotice() {
+      if (omittedPlayers <= 0) {
+        return "";
+      }
+      return " (showing "
+          + players.size()
+          + " of "
+          + (players.size() + omittedPlayers)
+          + " tracked — name players to pick others)";
     }
   }
 
@@ -99,29 +119,53 @@ public class StatsRequestResolver {
       return Optional.empty();
     }
 
+    List<PlayerReferenceResolver.ResolvedPlayer> players;
+    int omittedPlayers = 0;
+
     List<String> references = context.getOptionAsList("player");
     if (references.isEmpty()) {
-      context.replyEphemeral("❌ Name at least one player.");
-      return Optional.empty();
-    }
-
-    PlayerReferenceResolver.Resolution resolution = playerResolver.resolve(channelId, references);
-    if (resolution.hasUnresolved()) {
-      context.replyEphemeral(unresolvedPlayerMessage(context, resolution));
-      return Optional.empty();
-    }
-    if (resolution.isEmpty()) {
-      context.replyEphemeral("❌ Name at least one player.");
-      return Optional.empty();
-    }
-    if (resolution.players().size() > MAX_PLAYERS) {
-      context.replyEphemeral(
-          "❌ At most "
-              + MAX_PLAYERS
-              + " players per command; you named "
-              + resolution.players().size()
-              + ". Each one is a separate pass over the match history.");
-      return Optional.empty();
+      // No player named: answer for the channel's whole focus group, which is the question a
+      // shared channel usually means.
+      List<PlayerReferenceResolver.ResolvedPlayer> group = playerResolver.focusGroup(channelId);
+      if (group.isEmpty()) {
+        // Registered but empty, so /dbuff register is the wrong advice here.
+        context.replyEphemeral(
+            "ℹ️ This channel tracks no players yet. Use `/dbuff add` first, or name a player.");
+        return Optional.empty();
+      }
+      // Trimmed rather than refused: a bare command should still answer something, and the cap is
+      // there because each player is another pass over the match history.
+      players = group.size() > MAX_PLAYERS ? group.subList(0, MAX_PLAYERS) : group;
+      omittedPlayers = group.size() - players.size();
+      if (omittedPlayers > 0) {
+        log.info(
+            "Channel {} tracks {} players; trimming to {} for a request that named none",
+            channelId,
+            group.size(),
+            MAX_PLAYERS);
+      }
+    } else {
+      PlayerReferenceResolver.Resolution resolution = playerResolver.resolve(channelId, references);
+      if (resolution.hasUnresolved()) {
+        context.replyEphemeral(unresolvedPlayerMessage(context, resolution));
+        return Optional.empty();
+      }
+      if (resolution.isEmpty()) {
+        context.replyEphemeral("❌ Name at least one player, or omit the option for everyone.");
+        return Optional.empty();
+      }
+      // Explicitly named players are rejected rather than trimmed: the user chose these, so
+      // answering for a subset would drop one of their choices without saying which.
+      if (resolution.players().size() > MAX_PLAYERS) {
+        context.replyEphemeral(
+            "❌ At most "
+                + MAX_PLAYERS
+                + " players per command; you named "
+                + resolution.players().size()
+                + ". Each one is a separate pass over the match history.");
+        return Optional.empty();
+      }
+      players = resolution.players();
     }
 
     Set<String> heroNames = optionAsSet(context, "hero");
@@ -141,13 +185,14 @@ public class StatsRequestResolver {
 
     return Optional.of(
         new StatsRequest(
-            resolution.players(),
+            players,
             heroNames,
             modes.canonicalNames(),
             range.startDate(),
             range.endDate(),
             periodLabel(period, range),
-            modes.label()));
+            modes.label(),
+            omittedPlayers));
   }
 
   /** Clamps rather than rejects: a user asking for 100 rows wants "as many as you can". */

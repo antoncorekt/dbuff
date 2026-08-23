@@ -6,6 +6,7 @@ import com.ako.dbuff.resources.model.DbufInstanceConfigResponse;
 import com.ako.dbuff.resources.model.PlayerInfo;
 import com.ako.dbuff.service.instance.DbufInstanceConfigService;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -94,6 +95,26 @@ public class PlayerReferenceResolver {
       }
     }
     return new Resolution(resolved, unresolved);
+  }
+
+  /**
+   * The whole focus group of {@code channelId}, for a request that named no player.
+   *
+   * <p>Sorted by name rather than left in the config's {@code Set} order, which is a hash order and
+   * therefore arbitrary. Without this the embeds would arrive in a different sequence on every
+   * invocation, and a request trimmed to the player cap would drop a different player each time.
+   *
+   * @param channelId the parent text channel, used to find the instance
+   * @return the tracked players with a known account ID, by name; empty when nothing is tracked
+   */
+  public List<ResolvedPlayer> focusGroup(String channelId) {
+    return focusGroupByName(channelId).values().stream()
+        .filter(player -> player.getId() != null)
+        .map(player -> new ResolvedPlayer(player.getId(), player.getName()))
+        .sorted(
+            Comparator.comparing(
+                ResolvedPlayer::name, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+        .toList();
   }
 
   /**
