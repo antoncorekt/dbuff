@@ -6,6 +6,7 @@ import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.model.PlayerDomain_;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain_;
+import com.ako.dbuff.resources.model.MatchReference;
 import com.ako.dbuff.resources.model.PlayerStatisticResponse;
 import com.ako.dbuff.resources.model.PlayerStatisticResponse.HeroStatistic;
 import jakarta.persistence.EntityManager;
@@ -81,6 +82,63 @@ public class PlayerStatisticRepository {
 
     return buildResponse(
         playerId, playerName, startDate, endDate, totalMatches, popularHeroes, stats, heroFiltered);
+  }
+
+  /**
+   * Finds the matches a statistics query covered, newest first, for tracing numbers back to games.
+   *
+   * <p>Shares {@link #buildMatchPredicates} with the aggregations, which is the point: a trace
+   * built from a different predicate set would list matches the numbers did not come from, and be
+   * worse than no trace at all.
+   *
+   * @param playerId the player's account ID
+   * @param startDate optional inclusive lower bound
+   * @param endDate optional inclusive upper bound
+   * @param heroIds optional hero restriction
+   * @param gameModeIds optional game mode restriction
+   * @param restrictToMatchIds when non-empty, only these matches — used by the combo queries, which
+   *     already know which games satisfied their conjunction
+   * @param limit maximum matches to return
+   * @return match IDs with their dates, most recent first
+   */
+  public List<MatchReference> findPlayerMatches(
+      Long playerId,
+      LocalDate startDate,
+      LocalDate endDate,
+      Set<Long> heroIds,
+      Set<Long> gameModeIds,
+      Set<Long> restrictToMatchIds,
+      int limit) {
+
+    CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+    CriteriaQuery<Tuple> query = cb.createTupleQuery();
+    Root<PlayerMatchStatisticDomain> statsRoot = query.from(PlayerMatchStatisticDomain.class);
+    Root<MatchDomain> matchRoot = query.from(MatchDomain.class);
+
+    List<Predicate> predicates =
+        buildMatchPredicates(
+            cb, statsRoot, matchRoot, playerId, startDate, endDate, heroIds, gameModeIds);
+    if (restrictToMatchIds != null && !restrictToMatchIds.isEmpty()) {
+      predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.matchId).in(restrictToMatchIds));
+    }
+
+    query.multiselect(
+        matchRoot.get(MatchDomain_.id).alias("matchId"),
+        matchRoot.get(MatchDomain_.startLocalDate).alias("startDate"));
+    query.where(predicates.toArray(new Predicate[0]));
+    query.distinct(true);
+    // Nulls last so a match with no recorded date does not head the list; the secondary sort on ID
+    // keeps the order stable when several matches share a day.
+    query.orderBy(
+        cb.desc(matchRoot.get(MatchDomain_.startLocalDate)),
+        cb.desc(matchRoot.get(MatchDomain_.id)));
+
+    return entityManager.createQuery(query).setMaxResults(limit).getResultList().stream()
+        .map(
+            tuple ->
+                new MatchReference(
+                    tuple.get("matchId", Long.class), tuple.get("startDate", LocalDate.class)))
+        .toList();
   }
 
   /** Gets the player name by player ID. */

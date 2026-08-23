@@ -6,6 +6,7 @@ import com.ako.dbuff.resources.model.PlayerStatisticResponse;
 import com.ako.dbuff.service.discord.command.AsyncReply;
 import com.ako.dbuff.service.discord.command.CommandContext;
 import com.ako.dbuff.service.discord.command.DbuffCommand;
+import com.ako.dbuff.service.discord.command.MatchTraceReporter;
 import com.ako.dbuff.service.discord.command.PlayerReferenceResolver;
 import com.ako.dbuff.service.discord.command.StatsEmbedFormatter;
 import com.ako.dbuff.service.discord.command.StatsOptions;
@@ -45,6 +46,7 @@ import org.springframework.stereotype.Component;
 public class HeroCommand implements DbuffCommand {
 
   private final StatsRequestResolver requestResolver;
+  private final MatchTraceReporter traceReporter;
   private final PlayerStatisticService playerStatisticService;
   private final ItemRankingService itemRankingService;
   private final AbilityRankingService abilityRankingService;
@@ -65,7 +67,8 @@ public class HeroCommand implements DbuffCommand {
             new OptionData(OptionType.BOOLEAN, "skills", "Also list the top skills on this hero"),
             StatsOptions.period(),
             StatsOptions.gameMode(),
-            StatsOptions.limit());
+            StatsOptions.limit(),
+            StatsOptions.traceMatches());
   }
 
   @Override
@@ -84,6 +87,7 @@ public class HeroCommand implements DbuffCommand {
             request -> {
               boolean withItems = isEnabled(context, "items");
               boolean withSkills = isEnabled(context, "skills");
+              boolean trace = requestResolver.isEnabled(context, "trace_matches");
               int limit = requestResolver.resolveLimit(context);
               // From the request, not the raw option: prepare() has validated these against the
               // hero dictionary, so the title cannot name a hero the queries did not use.
@@ -93,6 +97,11 @@ public class HeroCommand implements DbuffCommand {
               for (PlayerReferenceResolver.ResolvedPlayer player : request.players()) {
                 try {
                   reply.postEmbed(report(request, player, heroes, withItems, withSkills, limit));
+                  if (trace) {
+                    // Null scope: the hero and mode filters on the request already describe exactly
+                    // the games these numbers came from.
+                    traceReporter.post(reply, request, player, null);
+                  }
                 } catch (RuntimeException e) {
                   log.warn("Hero statistics failed for player {}", player.accountId(), e);
                   reply.fail(
@@ -177,19 +186,7 @@ public class HeroCommand implements DbuffCommand {
         title + ": " + request.playerNames());
   }
 
-  /**
-   * Reads a boolean option.
-   *
-   * <p>{@link CommandContext} has no boolean accessor because nothing needed one before, and the
-   * text surface delivers every option as a string regardless — so accept what Discord's picker
-   * submits ({@code true}) as well as what someone types by hand.
-   */
   private boolean isEnabled(CommandContext context, String name) {
-    String raw = context.getOption(name);
-    if (raw == null || raw.isBlank()) {
-      return false;
-    }
-    String value = raw.trim();
-    return value.equalsIgnoreCase("true") || value.equalsIgnoreCase("yes") || value.equals("1");
+    return requestResolver.isEnabled(context, name);
   }
 }

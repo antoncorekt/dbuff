@@ -210,6 +210,26 @@ public class StatsRequestResolver {
   }
 
   /**
+   * Reads a boolean option.
+   *
+   * <p>{@link CommandContext} has no boolean accessor because nothing needed one before, and the
+   * text surface delivers every option as a string regardless — so accept what Discord's picker
+   * submits ({@code true}) as well as what someone types by hand.
+   *
+   * @param context the in-flight command
+   * @param name the option name
+   * @return true when the option is set to an affirmative value
+   */
+  public boolean isEnabled(CommandContext context, String name) {
+    String raw = context.getOption(name);
+    if (raw == null || raw.isBlank()) {
+      return false;
+    }
+    String value = raw.trim();
+    return value.equalsIgnoreCase("true") || value.equalsIgnoreCase("yes") || value.equals("1");
+  }
+
+  /**
    * Reports unknown item names ephemerally, with a "did you mean" for each.
    *
    * @return true when something was unknown and the user has been told

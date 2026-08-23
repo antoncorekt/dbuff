@@ -3,11 +3,13 @@ package com.ako.dbuff.dao.repo;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
+import com.ako.dbuff.resources.model.MatchReference;
 import com.ako.dbuff.resources.model.PlayerStatisticResponse;
 import com.ako.dbuff.resources.model.PlayerStatisticResponse.HeroStatistic;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -734,6 +736,68 @@ class PlayerStatisticRepositoryTest {
 
       assertThat(result.getTotalMatches()).isZero();
       assertThat(result.getPopularHeroes()).isEmpty();
+    }
+  }
+
+  @Nested
+  @DisplayName("Match Trace Tests")
+  class MatchTraceTests {
+
+    @Test
+    @DisplayName("Should list every match with its date, most recent first")
+    void listsMatchesNewestFirst() {
+      List<MatchReference> matches =
+          playerStatisticRepository.findPlayerMatches(PLAYER_ID, null, null, null, null, null, 50);
+
+      assertThat(matches).hasSize(5);
+      assertThat(matches).extracting(MatchReference::matchId).containsExactly(5L, 4L, 3L, 2L, 1L);
+      assertThat(matches.get(0).startDate()).isEqualTo(LocalDate.of(2024, 5, 25));
+    }
+
+    /**
+     * The trace exists to explain a number, so it must be built from the same filters that produced
+     * it — a list of games the aggregate did not cover would be worse than no list.
+     */
+    @Test
+    @DisplayName("Should apply the same date and hero filters as the aggregations")
+    void appliesTheSameFiltersAsTheStatistics() {
+      List<MatchReference> antiMage =
+          playerStatisticRepository.findPlayerMatches(
+              PLAYER_ID, null, null, Set.of(ANTI_MAGE_ID), null, null, 50);
+      assertThat(antiMage).extracting(MatchReference::matchId).containsExactly(2L, 1L);
+
+      List<MatchReference> fromMarch =
+          playerStatisticRepository.findPlayerMatches(
+              PLAYER_ID, LocalDate.of(2024, 3, 1), null, null, null, null, 50);
+      assertThat(fromMarch).extracting(MatchReference::matchId).containsExactly(5L, 4L, 3L);
+    }
+
+    @Test
+    @DisplayName("Should restrict to an explicit match set when given one")
+    void restrictsToTheGivenMatchIds() {
+      List<MatchReference> matches =
+          playerStatisticRepository.findPlayerMatches(
+              PLAYER_ID, null, null, null, null, Set.of(2L, 4L), 50);
+
+      assertThat(matches).extracting(MatchReference::matchId).containsExactly(4L, 2L);
+    }
+
+    @Test
+    @DisplayName("Should respect the limit, keeping the most recent")
+    void respectsTheLimit() {
+      List<MatchReference> matches =
+          playerStatisticRepository.findPlayerMatches(PLAYER_ID, null, null, null, null, null, 2);
+
+      assertThat(matches).extracting(MatchReference::matchId).containsExactly(5L, 4L);
+    }
+
+    @Test
+    @DisplayName("Should return nothing for a player with no matches")
+    void unknownPlayerHasNoMatches() {
+      assertThat(
+              playerStatisticRepository.findPlayerMatches(
+                  999999L, null, null, null, null, null, 50))
+          .isEmpty();
     }
   }
 }

@@ -3,6 +3,7 @@ package com.ako.dbuff.service.ranking;
 import com.ako.dbuff.dao.model.PlayerStatisticSummaryDomain;
 import com.ako.dbuff.dao.repo.PlayerStatisticRepository;
 import com.ako.dbuff.dao.repo.PlayerStatisticSummaryRepo;
+import com.ako.dbuff.resources.model.MatchReference;
 import com.ako.dbuff.resources.model.PlayerStatisticResponse;
 import com.ako.dbuff.resources.model.PlayerStatisticResponse.HeroStatistic;
 import com.ako.dbuff.service.constant.ConstantNameResolver;
@@ -94,6 +95,49 @@ public class PlayerStatisticService {
         statistics.getTotalMatches());
 
     return statistics;
+  }
+
+  /**
+   * Lists the matches a statistics query covered, newest first.
+   *
+   * <p>Takes the same filters as {@link #getPlayerStatistics} so the list and the numbers describe
+   * the same games — the whole value of a trace is that correspondence.
+   *
+   * @param playerId The player's account ID
+   * @param startDate Optional start date filter (inclusive)
+   * @param endDate Optional end date filter (inclusive). If null, uses current date.
+   * @param heroNames Optional hero names to restrict to
+   * @param gameModeNames Optional game mode names to restrict to
+   * @param restrictToMatchIds when non-empty, only these matches
+   * @param limit maximum matches to return
+   * @return match IDs with dates, most recent first
+   * @throws UnknownConstantNameException if any supplied hero or game mode name is unknown
+   */
+  @Transactional(readOnly = true)
+  public List<MatchReference> getPlayerMatches(
+      Long playerId,
+      LocalDate startDate,
+      LocalDate endDate,
+      Set<String> heroNames,
+      Set<String> gameModeNames,
+      Set<Long> restrictToMatchIds,
+      int limit) {
+
+    LocalDate effectiveEndDate = endDate != null ? endDate : LocalDate.now();
+
+    NameResolution heroes = nameResolver.resolveHeroes(heroNames);
+    if (heroes.hasUnresolved()) {
+      throw new UnknownConstantNameException("heroes", heroes.unresolvedNames());
+    }
+
+    return playerStatisticRepository.findPlayerMatches(
+        playerId,
+        startDate,
+        effectiveEndDate,
+        heroes.idsOrNullIfEmpty(),
+        resolveGameModesOrThrow(gameModeNames),
+        restrictToMatchIds,
+        limit);
   }
 
   /**

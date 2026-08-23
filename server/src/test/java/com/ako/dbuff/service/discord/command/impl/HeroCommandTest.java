@@ -3,6 +3,7 @@ package com.ako.dbuff.service.discord.command.impl;
 import com.ako.dbuff.resources.model.AbilityRankingResponse;
 import com.ako.dbuff.resources.model.DbufInstanceConfigResponse;
 import com.ako.dbuff.resources.model.ItemRankingResponse;
+import com.ako.dbuff.resources.model.MatchReference;
 import com.ako.dbuff.resources.model.PlayerStatisticResponse;
 import com.ako.dbuff.service.constant.ConstantNameResolver;
 import com.ako.dbuff.service.constant.CurrentPatchDateResolver;
@@ -10,6 +11,7 @@ import com.ako.dbuff.service.constant.GameModeResolver;
 import com.ako.dbuff.service.constant.GameModeSelection;
 import com.ako.dbuff.service.constant.NameResolution;
 import com.ako.dbuff.service.discord.command.FakeCommandContext;
+import com.ako.dbuff.service.discord.command.MatchTraceReporter;
 import com.ako.dbuff.service.discord.command.PlayerReferenceResolver;
 import com.ako.dbuff.service.discord.command.StatsEmbedFormatter;
 import com.ako.dbuff.service.discord.command.StatsRequestResolver;
@@ -67,6 +69,9 @@ class HeroCommandTest {
                 nameResolver,
                 gameModeResolver,
                 patchDateResolver),
+            // The real reporter over the mocked service, so the trace message these tests assert
+            // on is the one users see.
+            new MatchTraceReporter(playerStatisticService),
             playerStatisticService,
             itemRankingService,
             abilityRankingService,
@@ -500,5 +505,83 @@ class HeroCommandTest {
     assertThat(context.getEphemeralReplies().get(0)).contains("/dbuff add");
     assertThat(context.getAcknowledgeSummary()).isNull();
     Mockito.verifyNoInteractions(playerStatisticService);
+  }
+
+  // ------------------------------------------------------------- trace_matches
+
+  @Test
+  void traceMatches_listsTheHeroesGamesAsASeparateMessage() {
+    invokerIsKnown();
+    Mockito.when(
+            playerStatisticService.getPlayerMatches(
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.anyInt()))
+        .thenReturn(List.of(new MatchReference(8795480597L, LocalDate.of(2026, 8, 10))));
+
+    FakeCommandContext context = request().option("trace_matches", "true").build();
+    command.execute(null, context);
+
+    assertThat(context.getEmbeds()).hasSize(1);
+    assertThat(context.getPosts()).hasSize(1);
+    assertThat(context.getPosts().get(0)).contains("8795480597 - 2026-08-10");
+  }
+
+  /** The trace must inherit the hero filter, or it would list games on other heroes. */
+  @Test
+  void traceMatches_inheritsTheHeroAndGameModeFilters() {
+    invokerIsKnown();
+    Mockito.when(
+            playerStatisticService.getPlayerMatches(
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.anyInt()))
+        .thenReturn(List.of());
+
+    command.execute(null, request().option("trace_matches", "true").build());
+
+    Mockito.verify(playerStatisticService)
+        .getPlayerMatches(
+            Mockito.eq(TIGRESS),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.eq(Set.of("Invoker")),
+            Mockito.eq(Set.of("game_mode_ability_draft")),
+            Mockito.isNull(),
+            Mockito.anyInt());
+  }
+
+  @Test
+  void traceMatchesOff_postsNothingExtra() {
+    invokerIsKnown();
+
+    FakeCommandContext context = request().build();
+    command.execute(null, context);
+
+    assertThat(context.getPosts()).isEmpty();
+    Mockito.verify(playerStatisticService, Mockito.never())
+        .getPlayerMatches(
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.anyInt());
+  }
+
+  @Test
+  void definitionOffersTheTraceOption() {
+    assertThat(command.getDefinition().getOptions())
+        .extracting(option -> option.getName())
+        .contains("trace_matches");
   }
 }

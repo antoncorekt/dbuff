@@ -58,4 +58,18 @@ public final class StatsOptions {
         false,
         true);
   }
+
+  /**
+   * Asks for the match IDs behind the numbers, posted as a separate message per player.
+   *
+   * <p>Off by default: it is another query per player, and most of the time the aggregate is the
+   * answer. When a figure looks wrong, though, the only way to check it is to see which games it
+   * came from.
+   */
+  public static OptionData traceMatches() {
+    return new OptionData(
+        OptionType.BOOLEAN,
+        "trace_matches",
+        "Also list the match IDs and dates behind the numbers");
+  }
 }

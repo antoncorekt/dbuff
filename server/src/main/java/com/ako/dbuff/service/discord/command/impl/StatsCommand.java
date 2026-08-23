@@ -6,6 +6,7 @@ import com.ako.dbuff.resources.model.PlayerStatisticResponse;
 import com.ako.dbuff.service.discord.command.AsyncReply;
 import com.ako.dbuff.service.discord.command.CommandContext;
 import com.ako.dbuff.service.discord.command.DbuffCommand;
+import com.ako.dbuff.service.discord.command.MatchTraceReporter;
 import com.ako.dbuff.service.discord.command.PlayerReferenceResolver;
 import com.ako.dbuff.service.discord.command.StatsEmbedFormatter;
 import com.ako.dbuff.service.discord.command.StatsOptions;
@@ -53,6 +54,7 @@ import org.springframework.stereotype.Component;
 public class StatsCommand implements DbuffCommand {
 
   private final StatsRequestResolver requestResolver;
+  private final MatchTraceReporter traceReporter;
   private final PlayerStatisticService playerStatisticService;
   private final ItemRankingService itemRankingService;
   private final AbilityRankingService abilityRankingService;
@@ -72,14 +74,16 @@ public class StatsCommand implements DbuffCommand {
                     StatsOptions.player(),
                     StatsOptions.hero(),
                     StatsOptions.period(),
-                    StatsOptions.gameMode()),
+                    StatsOptions.gameMode(),
+                    StatsOptions.traceMatches()),
             new SubcommandData("heroes", "Most played heroes, or your record on one of them")
                 .addOptions(
                     StatsOptions.player(),
                     StatsOptions.hero(),
                     StatsOptions.period(),
                     StatsOptions.gameMode(),
-                    StatsOptions.limit()),
+                    StatsOptions.limit(),
+                    StatsOptions.traceMatches()),
             new SubcommandData("items", "Item statistics, or stats for a set of items in one game")
                 .addOptions(
                     StatsOptions.player(),
@@ -92,7 +96,8 @@ public class StatsCommand implements DbuffCommand {
                     StatsOptions.hero(),
                     StatsOptions.period(),
                     StatsOptions.gameMode(),
-                    StatsOptions.limit()),
+                    StatsOptions.limit(),
+                    StatsOptions.traceMatches()),
             new SubcommandData(
                     "skills", "Skill statistics, or stats for a set of skills in one game")
                 .addOptions(
@@ -112,7 +117,8 @@ public class StatsCommand implements DbuffCommand {
                     StatsOptions.hero(),
                     StatsOptions.period(),
                     StatsOptions.gameMode(),
-                    StatsOptions.limit()));
+                    StatsOptions.limit(),
+                    StatsOptions.traceMatches()));
   }
 
   @Override
@@ -130,20 +136,23 @@ public class StatsCommand implements DbuffCommand {
         .prepare(context)
         .ifPresent(
             request -> {
+              boolean trace = requestResolver.isEnabled(context, "trace_matches");
               AsyncReply reply = acknowledge(context, request, "📊", "Overall stats");
               perPlayer(
                   request,
                   reply,
+                  trace,
                   player ->
-                      formatter.formatOverall(
-                          playerStatisticService.getPlayerStatistics(
-                              player.accountId(),
-                              request.startDate(),
-                              request.endDate(),
-                              null,
-                              request.heroNames(),
-                              request.gameModeNames()),
-                          request.footer()));
+                      PlayerAnswer.of(
+                          formatter.formatOverall(
+                              playerStatisticService.getPlayerStatistics(
+                                  player.accountId(),
+                                  request.startDate(),
+                                  request.endDate(),
+                                  null,
+                                  request.heroNames(),
+                                  request.gameModeNames()),
+                              request.footer())));
             });
   }
 
@@ -153,10 +162,12 @@ public class StatsCommand implements DbuffCommand {
         .ifPresent(
             request -> {
               int limit = requestResolver.resolveLimit(context);
+              boolean trace = requestResolver.isEnabled(context, "trace_matches");
               AsyncReply reply = acknowledge(context, request, "🦸", "Most played heroes");
               perPlayer(
                   request,
                   reply,
+                  trace,
                   player -> {
                     PlayerStatisticResponse stats =
                         playerStatisticService.getPlayerStatistics(
@@ -166,7 +177,7 @@ public class StatsCommand implements DbuffCommand {
                             limit,
                             request.heroNames(),
                             request.gameModeNames());
-                    return formatter.formatHeroes(stats, request.footer());
+                    return PlayerAnswer.of(formatter.formatHeroes(stats, request.footer()));
                   });
             });
   }
@@ -184,6 +195,7 @@ public class StatsCommand implements DbuffCommand {
               }
 
               int limit = requestResolver.resolveLimit(context);
+              boolean trace = requestResolver.isEnabled(context, "trace_matches");
               String title =
                   itemNames.isEmpty() ? "Item stats" : "Item combo (" + join(itemNames) + ")";
               AsyncReply reply = acknowledge(context, request, "🎒", title);
@@ -191,20 +203,22 @@ public class StatsCommand implements DbuffCommand {
               perPlayer(
                   request,
                   reply,
+                  trace,
                   player -> {
                     if (itemNames.isEmpty()) {
-                      return formatter.formatItemRanking(
-                          player.name(),
-                          itemRankingService.getItemRankings(
-                              player.accountId(),
-                              request.startDate(),
-                              request.endDate(),
-                              null,
-                              null,
-                              request.heroNames(),
-                              request.gameModeNames(),
-                              limit),
-                          request.footer());
+                      return PlayerAnswer.of(
+                          formatter.formatItemRanking(
+                              player.name(),
+                              itemRankingService.getItemRankings(
+                                  player.accountId(),
+                                  request.startDate(),
+                                  request.endDate(),
+                                  null,
+                                  null,
+                                  request.heroNames(),
+                                  request.gameModeNames(),
+                                  limit),
+                              request.footer()));
                     }
                     ItemComboStatisticResponse combo =
                         itemRankingService.getItemComboStatistics(
@@ -221,9 +235,12 @@ public class StatsCommand implements DbuffCommand {
                               + "** has no games with all of: "
                               + join(itemNames)
                               + ".");
-                      return null;
+                      return PlayerAnswer.none();
                     }
-                    return formatter.formatItemCombo(combo, request.footer());
+                    // The combo query already knows which games satisfied the conjunction, so the
+                    // trace lists exactly those rather than re-deriving a wider set.
+                    return PlayerAnswer.over(
+                        formatter.formatItemCombo(combo, request.footer()), combo.getMatchIds());
                   });
             });
   }
@@ -248,26 +265,29 @@ public class StatsCommand implements DbuffCommand {
               }
 
               int limit = requestResolver.resolveLimit(context);
+              boolean trace = requestResolver.isEnabled(context, "trace_matches");
               AsyncReply reply =
                   acknowledge(context, request, "✨", skillsTitle(skillNames, itemNames));
 
               perPlayer(
                   request,
                   reply,
+                  trace,
                   player -> {
                     if (skillNames.isEmpty()) {
-                      return formatter.formatAbilityRanking(
-                          player.name(),
-                          abilityRankingService.getAbilityRankings(
-                              player.accountId(),
-                              request.startDate(),
-                              request.endDate(),
-                              null,
-                              null,
-                              request.heroNames(),
-                              request.gameModeNames(),
-                              limit),
-                          request.footer());
+                      return PlayerAnswer.of(
+                          formatter.formatAbilityRanking(
+                              player.name(),
+                              abilityRankingService.getAbilityRankings(
+                                  player.accountId(),
+                                  request.startDate(),
+                                  request.endDate(),
+                                  null,
+                                  null,
+                                  request.heroNames(),
+                                  request.gameModeNames(),
+                                  limit),
+                              request.footer()));
                     }
                     AbilityComboStatisticResponse combo =
                         abilityRankingService.getAbilityComboStatistics(
@@ -286,9 +306,10 @@ public class StatsCommand implements DbuffCommand {
                               + join(skillNames)
                               + (itemNames.isEmpty() ? "" : " + " + join(itemNames))
                               + ".");
-                      return null;
+                      return PlayerAnswer.none();
                     }
-                    return formatter.formatAbilityCombo(combo, request.footer());
+                    return PlayerAnswer.over(
+                        formatter.formatAbilityCombo(combo, request.footer()), combo.getMatchIds());
                   });
             });
   }
@@ -326,24 +347,55 @@ public class StatsCommand implements DbuffCommand {
   }
 
   /**
+   * What one player's work produced.
+   *
+   * @param embed the embed to post, or null when the work already posted its own message
+   * @param traceMatchIds the matches this answer covered, when the query knows them — the combo
+   *     queries do. Null means "the whole filtered selection", which the trace then re-derives from
+   *     the request's own filters.
+   */
+  private record PlayerAnswer(MessageEmbed embed, Set<Long> traceMatchIds) {
+
+    static PlayerAnswer of(MessageEmbed embed) {
+      return new PlayerAnswer(embed, null);
+    }
+
+    static PlayerAnswer over(MessageEmbed embed, Set<Long> matchIds) {
+      return new PlayerAnswer(embed, matchIds);
+    }
+
+    /** Nothing to post: the work reported its own outcome, so there is nothing to trace either. */
+    static PlayerAnswer none() {
+      return new PlayerAnswer(null, Set.of());
+    }
+  }
+
+  /**
    * Runs {@code work} for each player, posting each embed as it completes.
    *
    * <p>Posting per player rather than collecting first means a slow five-player request shows its
    * first answer immediately, and one player's failure costs only that player's result — the rest
    * still arrive.
    *
-   * @param work returns the embed to post, or null when it has already posted its own message
+   * @param traceMatches whether to follow each embed with that player's match list
+   * @param work returns the embed to post and the matches it covered
    */
   private void perPlayer(
       StatsRequest request,
       AsyncReply reply,
-      Function<PlayerReferenceResolver.ResolvedPlayer, MessageEmbed> work) {
+      boolean traceMatches,
+      Function<PlayerReferenceResolver.ResolvedPlayer, PlayerAnswer> work) {
 
     for (PlayerReferenceResolver.ResolvedPlayer player : request.players()) {
       try {
-        MessageEmbed embed = work.apply(player);
-        if (embed != null) {
-          reply.postEmbed(embed);
+        PlayerAnswer answer = work.apply(player);
+        if (answer.embed() != null) {
+          reply.postEmbed(answer.embed());
+        }
+        // After the embed, so the thread reads answer-then-evidence. Skipped when the work posted
+        // its own message instead of an embed — there is no answer to trace.
+        if (traceMatches && answer.embed() != null) {
+          traceReporter.post(reply, request, player, answer.traceMatchIds());
         }
       } catch (RuntimeException e) {
         log.warn("Statistics failed for player {}", player.accountId(), e);

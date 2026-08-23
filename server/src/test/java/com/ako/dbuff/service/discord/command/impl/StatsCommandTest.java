@@ -5,6 +5,7 @@ import com.ako.dbuff.resources.model.AbilityRankingResponse;
 import com.ako.dbuff.resources.model.DbufInstanceConfigResponse;
 import com.ako.dbuff.resources.model.ItemComboStatisticResponse;
 import com.ako.dbuff.resources.model.ItemRankingResponse;
+import com.ako.dbuff.resources.model.MatchReference;
 import com.ako.dbuff.resources.model.PlayerStatisticResponse;
 import com.ako.dbuff.service.constant.ConstantNameResolver;
 import com.ako.dbuff.service.constant.CurrentPatchDateResolver;
@@ -12,6 +13,7 @@ import com.ako.dbuff.service.constant.GameModeResolver;
 import com.ako.dbuff.service.constant.GameModeSelection;
 import com.ako.dbuff.service.constant.NameResolution;
 import com.ako.dbuff.service.discord.command.FakeCommandContext;
+import com.ako.dbuff.service.discord.command.MatchTraceReporter;
 import com.ako.dbuff.service.discord.command.PlayerReferenceResolver;
 import com.ako.dbuff.service.discord.command.StatsEmbedFormatter;
 import com.ako.dbuff.service.discord.command.StatsRequestResolver;
@@ -75,6 +77,9 @@ class StatsCommandTest {
                 nameResolver,
                 gameModeResolver,
                 patchDateResolver),
+            // The real reporter over the mocked service, so the trace message these tests assert
+            // on is the one users see.
+            new MatchTraceReporter(playerStatisticService),
             playerStatisticService,
             itemRankingService,
             abilityRankingService,
@@ -1151,5 +1156,192 @@ class StatsCommandTest {
       group.add(new PlayerReferenceResolver.ResolvedPlayer((long) (1000 + i), names[i]));
     }
     Mockito.when(playerResolver.focusGroup(Mockito.anyString())).thenReturn(group);
+  }
+
+  // ------------------------------------------------------------- trace_matches
+
+  @Test
+  void traceMatchesOffByDefault_soNoExtraQueryAndNoExtraMessage() {
+    command.execute("overall", context());
+
+    Mockito.verify(playerStatisticService, Mockito.never())
+        .getPlayerMatches(
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.anyInt());
+    assertThat(context().getPosts()).isEmpty();
+  }
+
+  @Test
+  void traceMatches_postsTheMatchListAsASeparateMessageAfterTheEmbed() {
+    tracesTo(
+        new MatchReference(8795480597L, LocalDate.of(2026, 8, 10)),
+        new MatchReference(8795480598L, LocalDate.of(2026, 8, 9)));
+
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .option("player", "Tigress")
+            .option("trace_matches", "true")
+            .build();
+    command.execute("overall", context);
+
+    assertThat(context.getEmbeds()).hasSize(1);
+    assertThat(context.getPosts()).hasSize(1);
+    assertThat(context.getPosts().get(0))
+        .contains("8795480597 - 2026-08-10")
+        .contains("8795480598 - 2026-08-09");
+  }
+
+  @Test
+  void traceMatches_worksOnEverySubcommand() {
+    tracesTo(new MatchReference(8795480597L, LocalDate.of(2026, 8, 10)));
+
+    for (String subcommand : List.of("overall", "heroes", "items", "skills")) {
+      FakeCommandContext context =
+          FakeCommandContext.builder()
+              .option("player", "Tigress")
+              .option("trace_matches", "true")
+              .build();
+      command.execute(subcommand, context);
+
+      assertThat(context.getPosts())
+          .as("trace for /stats %s", subcommand)
+          .anySatisfy(post -> assertThat(post).contains("8795480597"));
+    }
+  }
+
+  @Test
+  void traceMatches_onePerPlayer() {
+    tracesTo(new MatchReference(8795480597L, LocalDate.of(2026, 8, 10)));
+    resolvesTo(
+        new PlayerReferenceResolver.ResolvedPlayer(TIGRESS, "Tigress"),
+        new PlayerReferenceResolver.ResolvedPlayer(PASTUKH, "Пастух лолей"));
+
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .option("player", "Tigress,Пастух лолей")
+            .option("trace_matches", "true")
+            .build();
+    command.execute("overall", context);
+
+    assertThat(context.getPosts()).hasSize(2);
+    assertThat(context.getPosts().get(0)).contains("Tigress");
+    assertThat(context.getPosts().get(1)).contains("Пастух лолей");
+  }
+
+  /**
+   * The combo query already knows which games satisfied the conjunction, so the trace must list
+   * those rather than every game matching the looser date and mode filters.
+   */
+  @Test
+  void traceMatches_forACombo_usesTheCombosOwnMatchSet() {
+    Mockito.when(nameResolver.resolveItems(Set.of("Blink Dagger")))
+        .thenReturn(new NameResolution(Set.of(1L), Set.of()));
+    Mockito.when(
+            itemRankingService.getItemComboStatistics(
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any()))
+        .thenReturn(
+            ItemComboStatisticResponse.builder()
+                .playerId(TIGRESS)
+                .playerName("Tigress")
+                .gamesFound(2L)
+                .matchIds(Set.of(111L, 222L))
+                .winRate(BigDecimal.valueOf(50.00))
+                .members(List.of())
+                .build());
+    tracesTo(new MatchReference(111L, LocalDate.of(2026, 8, 10)));
+
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .option("player", "Tigress")
+            .option("items", "Blink Dagger")
+            .option("trace_matches", "true")
+            .build();
+    command.execute("items", context);
+
+    Mockito.verify(playerStatisticService)
+        .getPlayerMatches(
+            Mockito.eq(TIGRESS),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.eq(Set.of(111L, 222L)),
+            Mockito.anyInt());
+  }
+
+  /** With no games there is no answer to trace, so the "no games" note should stand alone. */
+  @Test
+  void traceMatches_comboWithNoGames_postsNoTrace() {
+    Mockito.when(nameResolver.resolveItems(Set.of("Blink Dagger")))
+        .thenReturn(new NameResolution(Set.of(1L), Set.of()));
+    Mockito.when(
+            itemRankingService.getItemComboStatistics(
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any()))
+        .thenReturn(
+            ItemComboStatisticResponse.builder()
+                .playerId(TIGRESS)
+                .playerName("Tigress")
+                .gamesFound(0L)
+                .winRate(BigDecimal.ZERO)
+                .members(List.of())
+                .build());
+
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .option("player", "Tigress")
+            .option("items", "Blink Dagger")
+            .option("trace_matches", "true")
+            .build();
+    command.execute("items", context);
+
+    assertThat(context.getPosts()).hasSize(1);
+    assertThat(context.getPosts().get(0)).contains("no games");
+    Mockito.verify(playerStatisticService, Mockito.never())
+        .getPlayerMatches(
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.anyInt());
+  }
+
+  @Test
+  void everySubcommandOffersTheTraceOption() {
+    assertThat(command.getDefinition().getSubcommands())
+        .allSatisfy(
+            subcommand ->
+                assertThat(subcommand.getOptions())
+                    .as("options of /stats %s", subcommand.getName())
+                    .anySatisfy(option -> assertThat(option.getName()).isEqualTo("trace_matches")));
+  }
+
+  private void tracesTo(MatchReference... matches) {
+    Mockito.when(
+            playerStatisticService.getPlayerMatches(
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.anyInt()))
+        .thenReturn(List.of(matches));
   }
 }
