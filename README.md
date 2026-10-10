@@ -77,6 +77,11 @@ This starts PostgreSQL on `localhost:5432` with:
 
 The server starts on `http://localhost:8080`
 
+## Add the bot to your Discord server
+
+Group admins: see [docs/ONBOARDING.md](docs/ONBOARDING.md). The bot logs its invite URL at startup
+(`Invite URL: ...`).
+
 ## API Endpoints
 
 | Endpoint | Description |
@@ -156,14 +161,17 @@ docker-compose down -v
 
 ## AWS Deployment
 
-Deploy DBuff to a single EC2 instance with RDS PostgreSQL. Estimated cost: ~$28/mo.
+Deploy DBuff to a single EC2 instance that also hosts PostgreSQL 16 on localhost.
 
 ```
-Internet → EC2 t3.small (:8080) → RDS PostgreSQL (private subnet)
+Internet → EC2 t4g.small (:8080) → PostgreSQL 16 (same instance)
                    ↓
            SSM Parameter Store (API keys)
-           S3 bucket (JAR artifact)
+           S3 bucket (JAR artifact, nightly pg_dump backups)
 ```
+
+Application changes ship through CI on every push to `main`; see `CLAUDE.md` for the deploy
+and backup details.
 
 ### Prerequisites
 
@@ -206,7 +214,7 @@ DB_PASSWORD=YourStrongPassword123
 ./infrastructure/cloudformation/deploy.sh all
 ```
 
-This builds the JAR, uploads it to S3, and creates the full CloudFormation stack (VPC, EC2, RDS, security groups, etc.). Takes ~15 minutes on first run (mostly RDS creation).
+This builds the JAR, uploads it to S3, and creates the full CloudFormation stack (VPC, EC2, security groups, etc.).
 
 **4. Verify:**
 
@@ -264,9 +272,8 @@ cat /var/log/user-data.log
 ### Tearing Down
 
 ```bash
-# Disable deletion protection on RDS first (via AWS Console or CLI)
-aws rds modify-db-instance --db-instance-identifier dbuff-postgres \
-  --no-deletion-protection --apply-immediately
+# Take a backup first: the database lives on the instance and is destroyed with it
+./infrastructure/cloudformation/deploy.sh backup-now
 
 # Delete the stack
 aws cloudformation delete-stack --stack-name dbuff

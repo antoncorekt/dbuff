@@ -47,12 +47,14 @@ class DiscordCommandWiringTest {
   @Autowired private SlashCommandAdapter slashCommandAdapter;
   @Autowired private TextCommandAdapter textCommandAdapter;
   @Autowired private ScoreboardButtonListener scoreboardButtonListener;
+  @Autowired private GuildLifecycleListener guildLifecycleListener;
 
   @Test
-  void allThreeListenersAreAvailableForRegistration() {
+  void allFourListenersAreAvailableForRegistration() {
     assertThat(slashCommandAdapter).isNotNull();
     assertThat(textCommandAdapter).isNotNull();
     assertThat(scoreboardButtonListener).isNotNull();
+    assertThat(guildLifecycleListener).isNotNull();
   }
 
   @Test

@@ -22,6 +22,7 @@ public class FakeCommandContext implements CommandContext {
   private final String parentChannelId;
   private final String guildId;
   private final boolean insideThread;
+  private final boolean canManageChannel;
   private final String threadName;
   private final byte[] attachment;
   private final RuntimeException attachmentFailure;
@@ -41,6 +42,7 @@ public class FakeCommandContext implements CommandContext {
     this.parentChannelId = builder.parentChannelId;
     this.guildId = builder.guildId;
     this.insideThread = builder.insideThread;
+    this.canManageChannel = builder.canManageChannel;
     this.threadName = builder.threadName;
     this.attachment = builder.attachment;
     this.attachmentFailure = builder.attachmentFailure;
@@ -96,6 +98,11 @@ public class FakeCommandContext implements CommandContext {
   }
 
   @Override
+  public boolean invokerCanManageChannel() {
+    return canManageChannel;
+  }
+
+  @Override
   public Optional<String> getThreadName() {
     return Optional.ofNullable(threadName);
   }
@@ -135,6 +142,7 @@ public class FakeCommandContext implements CommandContext {
     private String parentChannelId = "channel-1";
     private String guildId = "guild-1";
     private boolean insideThread = false;
+    private boolean canManageChannel = true;
     private String threadName = null;
     private byte[] attachment = null;
     private RuntimeException attachmentFailure = null;
@@ -166,6 +174,12 @@ public class FakeCommandContext implements CommandContext {
 
     public Builder insideThread(boolean insideThread) {
       this.insideThread = insideThread;
+      return this;
+    }
+
+    /** Defaults to true so existing tests act as a channel manager; set false to test gating. */
+    public Builder canManageChannel(boolean canManageChannel) {
+      this.canManageChannel = canManageChannel;
       return this;
     }
 

@@ -29,6 +29,14 @@ public interface DbufInstanceConfigRepository
   List<DbufInstanceConfigDomain> findByActiveTrue();
 
   /**
+   * Find the active instance configurations registered from a Discord guild.
+   *
+   * @param discordGuildId the Discord guild ID
+   * @return list of active configurations
+   */
+  List<DbufInstanceConfigDomain> findByDiscordGuildIdAndActiveTrue(String discordGuildId);
+
+  /**
    * Find all instance configurations that track a specific player.
    *
    * @param playerId the player ID to search for

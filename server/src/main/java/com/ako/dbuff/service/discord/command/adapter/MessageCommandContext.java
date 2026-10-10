@@ -91,6 +91,13 @@ public class MessageCommandContext implements CommandContext {
   }
 
   @Override
+  public boolean invokerCanManageChannel() {
+    return sourceMessage.isFromGuild()
+        && DiscordPermissions.canManageChannel(
+            sourceMessage.getMember(), sourceMessage.getChannel());
+  }
+
+  @Override
   public boolean isInsideThread() {
     return sourceMessage.getChannel() instanceof ThreadChannel;
   }

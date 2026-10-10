@@ -6,6 +6,7 @@ import com.ako.dbuff.resources.model.DbufInstanceConfigResponse;
 import com.ako.dbuff.resources.model.PlayerInfo;
 import com.ako.dbuff.resources.model.RegisterInstanceRequest;
 import com.ako.dbuff.resources.model.UpdateInstanceRequest;
+import com.ako.dbuff.service.discord.ChannelReadinessService;
 import com.ako.dbuff.service.discord.command.CommandRegistry;
 import com.ako.dbuff.service.discord.command.FakeCommandContext;
 import com.ako.dbuff.service.discord.command.PlayerReferenceResolver;
@@ -16,6 +17,8 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -28,6 +31,7 @@ class DbuffConfigCommandTest {
   private DbufInstanceConfigService instanceConfigService;
   private PlayerReferenceResolver playerResolver;
   private PlayerRepo playerRepo;
+  private ChannelReadinessService channelReadiness;
   private DbuffConfigCommand command;
 
   @BeforeEach
@@ -35,6 +39,7 @@ class DbuffConfigCommandTest {
     instanceConfigService = Mockito.mock(DbufInstanceConfigService.class);
     playerResolver = Mockito.mock(PlayerReferenceResolver.class);
     playerRepo = Mockito.mock(PlayerRepo.class);
+    channelReadiness = Mockito.mock(ChannelReadinessService.class);
     CommandRegistry registry = Mockito.mock(CommandRegistry.class);
 
     Mockito.when(instanceConfigService.getByDiscordChannelId(Mockito.anyString()))
@@ -45,7 +50,11 @@ class DbuffConfigCommandTest {
         .thenReturn(new PlayerReferenceResolver.Resolution(List.of(), List.of()));
     Mockito.when(playerRepo.findByAccountIds(Mockito.anyCollection())).thenReturn(List.of());
 
-    command = new DbuffConfigCommand(instanceConfigService, playerResolver, playerRepo, registry);
+    Mockito.when(channelReadiness.findProblems(Mockito.anyString())).thenReturn(List.of());
+
+    command =
+        new DbuffConfigCommand(
+            instanceConfigService, playerResolver, playerRepo, channelReadiness, registry);
   }
 
   private static DbufInstanceConfigResponse instance() {
@@ -125,6 +134,71 @@ class DbuffConfigCommandTest {
     assertThat(context.getEphemeralReplies()).hasSize(1);
     assertThat(context.getAcknowledgeSummary()).isNull();
     Mockito.verify(instanceConfigService, Mockito.never()).register(Mockito.any());
+  }
+
+  @Test
+  void register_channelNotReady_listsTheProblemsBeforeAnyWork() {
+    Mockito.when(channelReadiness.findProblems("channel-1"))
+        .thenReturn(
+            List.of("The bot is missing permissions in this channel: Create Public Threads"));
+    FakeCommandContext context = FakeCommandContext.builder().option("player", "204429164").build();
+
+    command.execute("register", context);
+
+    assertThat(context.getEphemeralReplies().get(0)).contains("Create Public Threads");
+    assertThat(context.getAcknowledgeSummary()).isNull();
+    Mockito.verify(instanceConfigService, Mockito.never()).register(Mockito.any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"register", "add", "remove", "link", "modes", "deactivate"})
+  void configChanges_withoutManagePermission_areRefusedPrivately(String subcommand) {
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .canManageChannel(false)
+            .option("player", "204429164")
+            .option("mode", "all")
+            .build();
+
+    command.execute(subcommand, context);
+
+    assertThat(context.getEphemeralReplies()).hasSize(1);
+    assertThat(context.getEphemeralReplies().get(0)).contains("Manage Channel");
+    assertThat(context.getAcknowledgeSummary()).isNull();
+    Mockito.verifyNoInteractions(playerRepo);
+    Mockito.verify(instanceConfigService, Mockito.never()).register(Mockito.any());
+    Mockito.verify(instanceConfigService, Mockito.never()).update(Mockito.any(), Mockito.any());
+    Mockito.verify(instanceConfigService, Mockito.never()).deactivate(Mockito.any());
+  }
+
+  @Test
+  void nullSubcommand_fallsBackToHelpEvenWithoutManagePermission() {
+    FakeCommandContext context = FakeCommandContext.builder().canManageChannel(false).build();
+
+    command.execute(null, context);
+
+    assertThat(context.getEphemeralReplies()).isEmpty();
+    assertThat(context.getAcknowledgeSummary()).isNotNull();
+  }
+
+  @Test
+  void status_withoutManagePermission_stillWorks() {
+    FakeCommandContext context = FakeCommandContext.builder().canManageChannel(false).build();
+
+    command.execute("status", context);
+
+    assertThat(context.getAcknowledgeSummary()).isNotNull();
+    assertThat(context.getEmbeds()).hasSize(1);
+  }
+
+  @Test
+  void status_surfacesReadinessProblemsAsWarnings() {
+    Mockito.when(channelReadiness.findProblems("channel-1")).thenReturn(List.of("cannot post"));
+    FakeCommandContext context = FakeCommandContext.builder().build();
+
+    command.execute("status", context);
+
+    assertThat(context.getPosts()).containsExactly("⚠️ cannot post");
   }
 
   @Test

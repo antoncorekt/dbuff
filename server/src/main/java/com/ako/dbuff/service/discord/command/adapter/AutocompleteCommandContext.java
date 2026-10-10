@@ -76,6 +76,11 @@ public class AutocompleteCommandContext implements CommandContext {
   }
 
   @Override
+  public boolean invokerCanManageChannel() {
+    return DiscordPermissions.canManageChannel(event.getMember(), event.getChannel());
+  }
+
+  @Override
   public boolean isInsideThread() {
     return false;
   }

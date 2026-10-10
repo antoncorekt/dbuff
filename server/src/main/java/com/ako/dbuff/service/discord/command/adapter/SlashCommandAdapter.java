@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
-import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
@@ -19,20 +18,23 @@ import org.springframework.stereotype.Component;
 
 /**
  * Routes slash-command interactions and autocomplete requests to {@link DbuffCommand} handlers, and
- * registers the command definitions with every guild the bot is in on startup.
- *
- * <p>Guild-scoped registration rather than global: it propagates immediately instead of taking up
- * to an hour, which matters when iterating.
+ * registers the command definitions with every guild the bot is in on startup. Servers joined later
+ * are handled by {@link com.ako.dbuff.service.discord.GuildLifecycleListener}.
  */
 @Slf4j
 @Component
 public class SlashCommandAdapter extends ListenerAdapter {
 
   private final CommandRegistry registry;
+  private final GuildCommandRegistrar guildCommandRegistrar;
   private final Map<String, AutocompleteProvider> providersByKey;
 
-  public SlashCommandAdapter(CommandRegistry registry, List<AutocompleteProvider> providers) {
+  public SlashCommandAdapter(
+      CommandRegistry registry,
+      GuildCommandRegistrar guildCommandRegistrar,
+      List<AutocompleteProvider> providers) {
     this.registry = registry;
+    this.guildCommandRegistrar = guildCommandRegistrar;
     this.providersByKey = new LinkedHashMap<>();
     for (AutocompleteProvider provider : providers) {
       for (String commandName : provider.getCommandNames()) {
@@ -47,23 +49,7 @@ public class SlashCommandAdapter extends ListenerAdapter {
 
   @Override
   public void onReady(ReadyEvent event) {
-    for (Guild guild : event.getJDA().getGuilds()) {
-      guild
-          .updateCommands()
-          .addCommands(registry.getDefinitions())
-          .queue(
-              success ->
-                  log.info(
-                      "Registered {} slash commands with guild {}",
-                      registry.getDefinitions().size(),
-                      guild.getId()),
-              error ->
-                  log.error(
-                      "Failed to register slash commands with guild {}: {}",
-                      guild.getId(),
-                      error.getMessage(),
-                      error));
-    }
+    event.getJDA().getGuilds().forEach(guildCommandRegistrar::register);
   }
 
   @Override
