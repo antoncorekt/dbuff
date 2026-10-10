@@ -84,6 +84,14 @@ public class DbufInstanceConfigDomain {
   @Column(name = "updated_at")
   private LocalDateTime updatedAt;
 
+  /**
+   * When tracking began (or last widened to new players). Matches that ended before it are imported
+   * quietly for statistics instead of being reported. Null on instances that predate the field,
+   * which keeps reporting everything, as they always did.
+   */
+  @Column(name = "tracking_since")
+  private LocalDateTime trackingSince;
+
   /** Whether this instance is active */
   @Column(name = "active")
   @Builder.Default

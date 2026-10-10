@@ -126,6 +126,46 @@ class DbuffConfigCommandTest {
   }
 
   @Test
+  void register_acceptsSteam64AndProfileLinks() {
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .option("player", "76561198164694892,https://www.dotabuff.com/players/279195408")
+            .build();
+    Mockito.when(instanceConfigService.register(Mockito.any())).thenReturn(instance());
+
+    command.execute("register", context);
+
+    ArgumentCaptor<RegisterInstanceRequest> captor =
+        ArgumentCaptor.forClass(RegisterInstanceRequest.class);
+    Mockito.verify(instanceConfigService).register(captor.capture());
+    assertThat(captor.getValue().getPlayerIds()).containsExactly(204429164L, 279195408L);
+  }
+
+  @Test
+  void register_oneUnreadablePlayerAmongValidOnes_rejectsAndNamesIt() {
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("player", "204429164,Termit").build();
+
+    command.execute("register", context);
+
+    assertThat(context.getEphemeralReplies()).hasSize(1);
+    assertThat(context.getEphemeralReplies().get(0)).contains("`Termit`").contains("Steam64");
+    Mockito.verify(instanceConfigService, Mockito.never()).register(Mockito.any());
+  }
+
+  @Test
+  void register_embedExplainsTheNextSteps() {
+    FakeCommandContext context = FakeCommandContext.builder().option("player", "204429164").build();
+    Mockito.when(instanceConfigService.register(Mockito.any())).thenReturn(instance());
+
+    command.execute("register", context);
+
+    assertThat(context.getEmbeds()).hasSize(1);
+    assertThat(context.getEmbeds().get(0).getFields())
+        .anyMatch(field -> "Next steps".equals(field.getName()));
+  }
+
+  @Test
   void register_nonNumericPlayer_isRejectedBeforeAnyWork() {
     FakeCommandContext context = FakeCommandContext.builder().option("player", "Termit").build();
 

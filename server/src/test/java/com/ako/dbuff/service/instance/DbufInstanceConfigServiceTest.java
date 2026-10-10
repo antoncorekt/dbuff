@@ -26,22 +26,26 @@ class DbufInstanceConfigServiceTest {
 
   private DbufInstanceConfigRepository repository;
   private InstanceSchedulerService scheduler;
+  private PlayerRepo playerRepo;
+  private PlayersApi playersApi;
   private DbufInstanceConfigService service;
 
   @BeforeEach
   void setUp() {
     repository = Mockito.mock(DbufInstanceConfigRepository.class);
     scheduler = Mockito.mock(InstanceSchedulerService.class);
-    PlayerRepo playerRepo = Mockito.mock(PlayerRepo.class);
-    Mockito.when(playerRepo.findAll())
+    playerRepo = Mockito.mock(PlayerRepo.class);
+    playersApi = Mockito.mock(PlayersApi.class);
+    Mockito.when(playerRepo.findByAccountIds(List.of(PLAYER_ID)))
         .thenReturn(List.of(PlayerDomain.builder().id(PLAYER_ID).name("Tigress").build()));
+    Mockito.when(playerRepo.save(Mockito.any())).thenAnswer(call -> call.getArgument(0));
     Mockito.when(repository.save(Mockito.any())).thenAnswer(call -> call.getArgument(0));
 
     service =
         new DbufInstanceConfigService(
             repository,
             playerRepo,
-            Mockito.mock(PlayersApi.class),
+            playersApi,
             Mockito.mock(ConstantsManagers.class),
             new ObjectMapper(),
             scheduler);
@@ -113,5 +117,130 @@ class DbufInstanceConfigServiceTest {
     assertThat(second.getActive()).isFalse();
     Mockito.verify(scheduler).unscheduleJobsForInstance("instance-1");
     Mockito.verify(scheduler).unscheduleJobsForInstance("instance-2");
+  }
+
+  private void stubApiProfile(long accountId, String persona) {
+    var response = new com.ako.dbuff.dotapi.model.PlayersResponse();
+    if (persona != null) {
+      var profile = new com.ako.dbuff.dotapi.model.PlayersResponseProfile();
+      profile.setPersonaname(persona);
+      response.setProfile(profile);
+    }
+    try {
+      Mockito.when(playersApi.getPlayersByAccountId(accountId)).thenReturn(response);
+    } catch (com.ako.dbuff.dotapi.invoker.ApiException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  private RegisterInstanceRequest requestFor(long accountId) {
+    return RegisterInstanceRequest.builder()
+        .playerIds(Set.of(accountId))
+        .discordChannelId("channel-2")
+        .build();
+  }
+
+  @Test
+  void register_sameNameDifferentAccount_isStoredSeparatelyNotRepointed() {
+    PlayerDomain other = PlayerDomain.builder().id(111L).name("Pudge").build();
+    stubApiProfile(222L, "Pudge");
+    Mockito.when(playerRepo.findByName("Pudge")).thenReturn(Optional.of(other));
+
+    var response = service.register(requestFor(222L));
+
+    assertThat(other.getId()).isEqualTo(111L);
+    assertThat(response.getPlayers())
+        .extracting(info -> info.getName() + ":" + info.getId())
+        .containsExactly("Pudge (222):222");
+  }
+
+  @Test
+  void register_sameNameWithNoAccountYet_adoptsTheAccount() {
+    PlayerDomain legacy = PlayerDomain.builder().id(null).name("Pudge").build();
+    stubApiProfile(222L, "Pudge");
+    Mockito.when(playerRepo.findByName("Pudge")).thenReturn(Optional.of(legacy));
+
+    service.register(requestFor(222L));
+
+    assertThat(legacy.getId()).isEqualTo(222L);
+  }
+
+  @Test
+  void register_accountWithoutPersona_getsAPlaceholderName() {
+    stubApiProfile(333L, null);
+    Mockito.when(playerRepo.findByName(Mockito.anyString())).thenReturn(Optional.empty());
+
+    var response = service.register(requestFor(333L));
+
+    assertThat(response.getPlayers())
+        .extracting(info -> info.getName())
+        .containsExactly("Player_333");
+  }
+
+  @Test
+  void register_startsTrackingNow() {
+    var before = java.time.LocalDateTime.now();
+    var captor = org.mockito.ArgumentCaptor.forClass(DbufInstanceConfigDomain.class);
+
+    service.register(request());
+
+    Mockito.verify(repository).save(captor.capture());
+    assertThat(captor.getValue().getTrackingSince()).isAfterOrEqualTo(before);
+  }
+
+  @Test
+  void update_addingAnAlreadyTrackedPlayer_leavesTheCutoffAlone() {
+    DbufInstanceConfigDomain instance = existing(true);
+    instance.getPlayers().add(PlayerDomain.builder().id(PLAYER_ID).name("Tigress").build());
+    Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(instance));
+
+    service.update(
+        "instance-1", UpdateInstanceRequest.builder().addPlayerIds(Set.of(PLAYER_ID)).build());
+
+    assertThat(instance.getTrackingSince()).isNull();
+  }
+
+  @Test
+  void update_reactivating_restartsTheBackfillWindow() {
+    DbufInstanceConfigDomain instance = existing(false);
+    Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(instance));
+
+    service.update("instance-1", UpdateInstanceRequest.builder().active(true).build());
+
+    assertThat(instance.getTrackingSince()).isNotNull();
+  }
+
+  @Test
+  void update_addingANewPlayer_restartsTheBackfillWindow() {
+    DbufInstanceConfigDomain instance = existing(true);
+    stubApiProfile(555L, "Newcomer");
+    Mockito.when(playerRepo.findByName("Newcomer")).thenReturn(Optional.empty());
+    Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(instance));
+
+    service.update(
+        "instance-1", UpdateInstanceRequest.builder().addPlayerIds(Set.of(555L)).build());
+
+    assertThat(instance.getTrackingSince()).isNotNull();
+  }
+
+  @Test
+  void update_addingAPlayerNotYetTracked_restartsTheBackfillWindow() {
+    DbufInstanceConfigDomain instance = existing(true);
+    Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(instance));
+
+    service.update(
+        "instance-1", UpdateInstanceRequest.builder().addPlayerIds(Set.of(PLAYER_ID)).build());
+
+    assertThat(instance.getTrackingSince()).isNotNull();
+  }
+
+  @Test
+  void update_notAddingAPlayer_leavesTrackingSinceAlone() {
+    DbufInstanceConfigDomain instance = existing(true);
+    Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(instance));
+
+    service.update("instance-1", UpdateInstanceRequest.builder().name("Squad").build());
+
+    assertThat(instance.getTrackingSince()).isNull();
   }
 }

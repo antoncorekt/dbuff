@@ -5,12 +5,15 @@ import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.service.instance.DbufInstanceConfigService;
+import com.ako.dbuff.service.match.DotaApiLastMatchesService.RecentMatch;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
 import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -130,22 +133,18 @@ public class LastMatchesProcessorService {
     Set<Long> playerIds = config.getPlayerIds();
     Set<Long> gameModeIds = config.getGameModeIds();
 
-    Set<Long> matchesToFetch =
+    Map<Long, RecentMatch> recentMatches =
         playerIds.stream()
             .map(dotaApiLastMatchesService::fetchLastMatches)
             .flatMap(Collection::stream)
-            .collect(Collectors.toSet());
+            .collect(
+                Collectors.toMap(RecentMatch::id, Function.identity(), (first, other) -> first));
+    Set<Long> matchesToFetch = recentMatches.keySet();
 
     log.info("Matches to fetch: {}", matchesToFetch);
 
     List<MatchDomain> matchDomains =
-        matchesToFetch.stream()
-            .map(
-                id ->
-                    matchRepo
-                        .findById(id)
-                        .orElseGet(() -> matchRepo.save(MatchDomain.builder().id(id).build())))
-            .toList();
+        recentMatches.values().stream().map(this::findOrCreateMatch).toList();
 
     // Filter by game mode IDs if specified (skip filtering if "all" game modes is set)
     List<MatchDomain> filteredMatches = matchDomains;
@@ -162,12 +161,24 @@ public class LastMatchesProcessorService {
       log.info("Processing all game modes (no filtering)");
     }
 
-    // For new matches: request parsing, send partial report, schedule Quartz parse-check jobs
-    List<MatchDomain> newMatches =
+    List<MatchDomain> unseenMatches =
         filteredMatches.stream()
             .filter(m -> m.getEndProcess() == null)
             .filter(m -> !Boolean.TRUE.equals(m.getParseRequested()))
             .toList();
+
+    // History from before tracking began is imported for statistics but never reported: a fresh
+    // registration would otherwise open a thread for each of ~20 matches per player.
+    LocalDateTime trackingSince = config.getTrackingSince();
+    Map<Boolean, List<MatchDomain>> split =
+        unseenMatches.stream()
+            .collect(
+                Collectors.partitioningBy(
+                    m ->
+                        trackingSince != null
+                            && recentMatches.get(m.getId()).endedBefore(trackingSince)));
+    // For new matches: request parsing, send partial report, schedule Quartz parse-check jobs
+    List<MatchDomain> newMatches = split.get(false);
 
     for (MatchDomain match : newMatches) {
       parseRequestService.submitParseRequest(match.getId());
@@ -190,7 +201,49 @@ public class LastMatchesProcessorService {
           "Submitted parse requests and scheduled wait jobs for {} new matches", newMatches.size());
     }
 
+    // After the live path: the import is rate-limited and slow, and must not delay a report.
+    importQuietly(split.get(true), config);
+
     return matchesToFetch;
+  }
+
+  /**
+   * Looks the match up, creating it with the game mode OpenDota reported. Recording the mode at
+   * creation is what lets the instance's mode filter apply before the match has been fetched.
+   */
+  private MatchDomain findOrCreateMatch(RecentMatch recent) {
+    MatchDomain match =
+        matchRepo
+            .findById(recent.id())
+            .orElseGet(
+                () ->
+                    matchRepo.save(
+                        MatchDomain.builder()
+                            .id(recent.id())
+                            .gameModeId(recent.gameMode())
+                            .build()));
+    if (match.getGameModeId() == null && recent.gameMode() != null) {
+      match.setGameModeId(recent.gameMode());
+      matchRepo.save(match);
+    }
+    return match;
+  }
+
+  private void importQuietly(List<MatchDomain> history, DbufInstanceConfigDomain config) {
+    if (history.isEmpty()) {
+      return;
+    }
+    log.info(
+        "Importing {} past matches without reporting for instance {}",
+        history.size(),
+        config.getId());
+    try {
+      int imported = matchProcessorService.process(history).join().size();
+      matchReportOrchestrator.sendBackfillNotice(config, imported);
+    } catch (Exception e) {
+      // Statistics history is best effort; it must not stop live matches from being reported.
+      log.error("Quiet import failed for instance {}: {}", config.getId(), e.getMessage(), e);
+    }
   }
 
   // ==================== Legacy methods for backward compatibility ====================

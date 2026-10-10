@@ -103,6 +103,7 @@ public class DbufInstanceConfigService {
     domain.setGameModeIds(gameModeIds);
     domain.setExtraConfig(serializeExtraConfig(request.getExtraConfig()));
     domain.setUpdatedAt(now);
+    domain.setTrackingSince(now);
     domain.setActive(true);
 
     DbufInstanceConfigDomain saved = repository.save(domain);
@@ -135,9 +136,15 @@ public class DbufInstanceConfigService {
 
     // Update players
     if (request.getAddPlayerIds() != null && !request.getAddPlayerIds().isEmpty()) {
+      boolean added = false;
       for (Long playerId : request.getAddPlayerIds()) {
         PlayerDomain player = getOrCreatePlayer(playerId);
-        domain.getPlayers().add(player);
+        added |= domain.getPlayers().add(player);
+      }
+      // A new player arrives with ~20 recent matches that are history, not news. Re-adding someone
+      // already tracked must not move the cutoff, or it would swallow real recent matches.
+      if (added) {
+        domain.setTrackingSince(LocalDateTime.now());
       }
     }
     if (request.getRemovePlayerIds() != null && !request.getRemovePlayerIds().isEmpty()) {
@@ -173,6 +180,10 @@ public class DbufInstanceConfigService {
     boolean wasActive = Boolean.TRUE.equals(domain.getActive());
     if (request.getActive() != null) {
       domain.setActive(request.getActive());
+      if (!wasActive && request.getActive()) {
+        // Matches played while it was off are history, as on a fresh registration.
+        domain.setTrackingSince(LocalDateTime.now());
+      }
     }
 
     domain.setUpdatedAt(LocalDateTime.now());
@@ -307,45 +318,45 @@ public class DbufInstanceConfigService {
   /**
    * Gets or creates a PlayerDomain entity for the given player ID. Fetches player info from
    * OpenDota API if not found locally.
+   *
+   * <p>Players are keyed by display name, so two accounts can share one. An existing row for a
+   * <em>different</em> account is never repointed — that would silently move another group's
+   * tracked player onto this account — so the newcomer is stored as {@code "name (accountId)"}.
    */
   private PlayerDomain getOrCreatePlayer(Long playerId) {
-    // First try to find by ID
-    Optional<PlayerDomain> existingPlayer =
-        playerRepo.findAll().stream().filter(p -> playerId.equals(p.getId())).findFirst();
-
-    if (existingPlayer.isPresent()) {
-      return existingPlayer.get();
+    List<PlayerDomain> known = playerRepo.findByAccountIds(List.of(playerId));
+    if (!known.isEmpty()) {
+      return known.get(0);
     }
 
-    // Fetch from OpenDota API
+    PlayersResponse playerResp;
     try {
-      PlayersResponse playerResp = playersApi.getPlayersByAccountId(playerId);
-      String playerName =
-          playerResp.getProfile() != null
-              ? playerResp.getProfile().getPersonaname()
-              : "Player_" + playerId;
-
-      log.info("Fetched player from API: id={}, name={}", playerId, playerName);
-
-      // Check if player with this name exists
-      Optional<PlayerDomain> byName = playerRepo.findByName(playerName);
-      if (byName.isPresent()) {
-        // Update the ID if needed
-        PlayerDomain player = byName.get();
-        if (player.getId() == null || !player.getId().equals(playerId)) {
-          player.setId(playerId);
-          return playerRepo.save(player);
-        }
-        return player;
-      }
-
-      // Create new player
-      PlayerDomain newPlayer = PlayerDomain.builder().id(playerId).name(playerName).build();
-      return playerRepo.save(newPlayer);
-
+      playerResp = playersApi.getPlayersByAccountId(playerId);
     } catch (ApiException e) {
       throw new RuntimeException("Can't find information about player_id " + playerId, e);
     }
+
+    String persona =
+        playerResp.getProfile() != null ? playerResp.getProfile().getPersonaname() : null;
+    String playerName = persona == null || persona.isBlank() ? "Player_" + playerId : persona;
+    log.info("Fetched player from API: id={}, name={}", playerId, playerName);
+
+    Optional<PlayerDomain> sameName = playerRepo.findByName(playerName);
+    if (sameName.isPresent()) {
+      PlayerDomain existing = sameName.get();
+      if (existing.getId() == null) {
+        existing.setId(playerId);
+        return playerRepo.save(existing);
+      }
+      playerName = playerName + " (" + playerId + ")";
+      log.info(
+          "Name already used by account {}, storing account {} as '{}'",
+          existing.getId(),
+          playerId,
+          playerName);
+    }
+
+    return playerRepo.save(PlayerDomain.builder().id(playerId).name(playerName).build());
   }
 
   /**

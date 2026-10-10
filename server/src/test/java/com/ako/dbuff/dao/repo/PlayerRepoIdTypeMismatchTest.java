@@ -15,10 +15,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code @Id} is the String {@code name}. So {@code existsById} is handed an OpenDota account ID
  * and compares it against a name column.
  *
- * <p>This matters because {@code PlayerConfiguration.setUpPlayers()} guards its seeding with {@code
- * existsById}. As these tests show, that guard never fires, so every startup re-saves every seeded
- * player — which silently clears any column the re-save does not set, including {@code
- * discordUserId}.
+ * <p>This matters because any caller that guards a save with {@code existsById(accountId)} is never
+ * told the player exists. As these tests show, that guard never fires, so a re-save would silently
+ * clear any column it does not set, including {@code discordUserId}.
  */
 @DataJpaTest
 @ActiveProfiles("test")
@@ -34,8 +33,8 @@ class PlayerRepoIdTypeMismatchTest {
     playerRepo.save(
         PlayerDomain.builder().id(ACCOUNT_ID).name(PLAYER_NAME).discordUserId("d-1").build());
 
-    // Does not throw — it quietly answers the wrong question, which is why the
-    // PlayerConfiguration seeding guard is ineffective rather than loudly broken.
+    // Does not throw — it quietly answers the wrong question, which is why an existsById guard is
+    // ineffective rather than loudly broken.
     assertThat(playerRepo.existsById(ACCOUNT_ID)).isFalse();
     assertThat(playerRepo.findByName(PLAYER_NAME)).isPresent();
   }
