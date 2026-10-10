@@ -189,7 +189,7 @@ class DbufInstanceConfigServiceTest {
   }
 
   @Test
-  void update_addingAnAlreadyTrackedPlayer_leavesTheCutoffAlone() {
+  void update_addingAnAlreadyTrackedPlayer_changesNoCutoff() {
     DbufInstanceConfigDomain instance = existing(true);
     instance.getPlayers().add(PlayerDomain.builder().id(PLAYER_ID).name("Tigress").build());
     Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(instance));
@@ -198,20 +198,11 @@ class DbufInstanceConfigServiceTest {
         "instance-1", UpdateInstanceRequest.builder().addPlayerIds(Set.of(PLAYER_ID)).build());
 
     assertThat(instance.getTrackingSince()).isNull();
+    assertThat(instance.getPlayerTrackingSince()).isEmpty();
   }
 
   @Test
-  void update_reactivating_restartsTheBackfillWindow() {
-    DbufInstanceConfigDomain instance = existing(false);
-    Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(instance));
-
-    service.update("instance-1", UpdateInstanceRequest.builder().active(true).build());
-
-    assertThat(instance.getTrackingSince()).isNotNull();
-  }
-
-  @Test
-  void update_addingANewPlayer_restartsTheBackfillWindow() {
+  void update_addingANewPlayer_setsOnlyThatPlayersCutoff() {
     DbufInstanceConfigDomain instance = existing(true);
     stubApiProfile(555L, "Newcomer");
     Mockito.when(playerRepo.findByName("Newcomer")).thenReturn(Optional.empty());
@@ -220,18 +211,35 @@ class DbufInstanceConfigServiceTest {
     service.update(
         "instance-1", UpdateInstanceRequest.builder().addPlayerIds(Set.of(555L)).build());
 
-    assertThat(instance.getTrackingSince()).isNotNull();
+    assertThat(instance.getTrackingSince()).isNull();
+    assertThat(instance.getPlayerTrackingSince()).containsOnlyKeys(555L);
+    assertThat(instance.trackingSinceFor(555L)).isNotNull();
+    assertThat(instance.trackingSinceFor(PLAYER_ID)).isNull();
   }
 
   @Test
-  void update_addingAPlayerNotYetTracked_restartsTheBackfillWindow() {
+  void update_removingAPlayer_dropsTheirCutoff() {
     DbufInstanceConfigDomain instance = existing(true);
+    instance.getPlayers().add(PlayerDomain.builder().id(PLAYER_ID).name("Tigress").build());
+    instance.getPlayerTrackingSince().put(PLAYER_ID, java.time.LocalDateTime.now());
     Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(instance));
 
     service.update(
-        "instance-1", UpdateInstanceRequest.builder().addPlayerIds(Set.of(PLAYER_ID)).build());
+        "instance-1", UpdateInstanceRequest.builder().removePlayerIds(Set.of(PLAYER_ID)).build());
+
+    assertThat(instance.getPlayerTrackingSince()).isEmpty();
+  }
+
+  @Test
+  void update_reactivating_restartsTheWindowForEveryone() {
+    DbufInstanceConfigDomain instance = existing(false);
+    instance.getPlayerTrackingSince().put(PLAYER_ID, java.time.LocalDateTime.now().minusDays(3));
+    Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(instance));
+
+    service.update("instance-1", UpdateInstanceRequest.builder().active(true).build());
 
     assertThat(instance.getTrackingSince()).isNotNull();
+    assertThat(instance.getPlayerTrackingSince()).isEmpty();
   }
 
   @Test

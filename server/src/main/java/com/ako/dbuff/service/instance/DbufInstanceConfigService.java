@@ -104,6 +104,7 @@ public class DbufInstanceConfigService {
     domain.setExtraConfig(serializeExtraConfig(request.getExtraConfig()));
     domain.setUpdatedAt(now);
     domain.setTrackingSince(now);
+    domain.getPlayerTrackingSince().clear();
     domain.setActive(true);
 
     DbufInstanceConfigDomain saved = repository.save(domain);
@@ -136,19 +137,20 @@ public class DbufInstanceConfigService {
 
     // Update players
     if (request.getAddPlayerIds() != null && !request.getAddPlayerIds().isEmpty()) {
-      boolean added = false;
+      LocalDateTime now = LocalDateTime.now();
       for (Long playerId : request.getAddPlayerIds()) {
         PlayerDomain player = getOrCreatePlayer(playerId);
-        added |= domain.getPlayers().add(player);
-      }
-      // A new player arrives with ~20 recent matches that are history, not news. Re-adding someone
-      // already tracked must not move the cutoff, or it would swallow real recent matches.
-      if (added) {
-        domain.setTrackingSince(LocalDateTime.now());
+        // A new player arrives with ~20 recent matches that are history, not news. Only their
+        // cutoff moves; re-adding someone already tracked changes nothing, and the players
+        // already tracked keep reporting theirs.
+        if (domain.getPlayers().add(player)) {
+          domain.getPlayerTrackingSince().put(player.getId(), now);
+        }
       }
     }
     if (request.getRemovePlayerIds() != null && !request.getRemovePlayerIds().isEmpty()) {
       domain.getPlayers().removeIf(player -> request.getRemovePlayerIds().contains(player.getId()));
+      domain.getPlayerTrackingSince().keySet().removeAll(request.getRemovePlayerIds());
     }
 
     // Update game modes (convert names to IDs)
@@ -183,6 +185,7 @@ public class DbufInstanceConfigService {
       if (!wasActive && request.getActive()) {
         // Matches played while it was off are history, as on a fresh registration.
         domain.setTrackingSince(LocalDateTime.now());
+        domain.getPlayerTrackingSince().clear();
       }
     }
 

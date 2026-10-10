@@ -11,6 +11,7 @@ import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -78,6 +79,73 @@ class LastMatchesProcessorServiceTest {
             .trackingSince(trackingSince)
             .build();
     Mockito.when(instanceConfigService.getDomainById("instance-1")).thenReturn(Optional.of(config));
+  }
+
+  private static final long NEWCOMER = 279195408L;
+
+  /** Tracks PLAYER since {@code TRACKING_SINCE} and NEWCOMER since {@code newcomerSince}. */
+  private void instanceWithNewcomer(LocalDateTime newcomerSince) {
+    DbufInstanceConfigDomain config =
+        DbufInstanceConfigDomain.builder()
+            .id("instance-1")
+            .discordChannelId("channel-1")
+            .active(true)
+            .players(
+                Set.of(
+                    PlayerDomain.builder().id(PLAYER).name("Tigress").build(),
+                    PlayerDomain.builder().id(NEWCOMER).name("Newcomer").build()))
+            .gameModeIds(Set.of())
+            .trackingSince(TRACKING_SINCE)
+            .playerTrackingSince(Map.of(NEWCOMER, newcomerSince))
+            .build();
+    Mockito.when(instanceConfigService.getDomainById("instance-1")).thenReturn(Optional.of(config));
+  }
+
+  private RecentMatch match(long id, LocalDateTime start) {
+    return new RecentMatch(id, epoch(start), 1800L, ABILITY_DRAFT);
+  }
+
+  @Test
+  void addingAPlayerLater_doesNotSwallowAnExistingPlayersRecentMatch() {
+    LocalDateTime newcomerSince = TRACKING_SINCE.plusDays(2);
+    instanceWithNewcomer(newcomerSince);
+    // Ended after the instance's cutoff but before the newcomer was added.
+    Mockito.when(lastMatches.fetchLastMatches(PLAYER))
+        .thenReturn(List.of(match(10, newcomerSince.minusHours(3))));
+    Mockito.when(lastMatches.fetchLastMatches(NEWCOMER)).thenReturn(List.of());
+
+    service.processLastMatchesForInstance("instance-1");
+
+    Mockito.verify(parseRequests).submitParseRequest(10L);
+    Mockito.verify(matchProcessor, Mockito.never()).process(Mockito.anyList());
+  }
+
+  @Test
+  void addingAPlayerLater_importsOnlyTheNewPlayersHistoryQuietly() {
+    LocalDateTime newcomerSince = TRACKING_SINCE.plusDays(2);
+    instanceWithNewcomer(newcomerSince);
+    Mockito.when(lastMatches.fetchLastMatches(PLAYER)).thenReturn(List.of());
+    Mockito.when(lastMatches.fetchLastMatches(NEWCOMER))
+        .thenReturn(List.of(match(11, newcomerSince.minusDays(1))));
+
+    service.processLastMatchesForInstance("instance-1");
+
+    Mockito.verify(matchProcessor).process(Mockito.argThat(list -> list.size() == 1));
+    Mockito.verify(parseRequests, Mockito.never()).submitParseRequest(Mockito.anyLong());
+  }
+
+  @Test
+  void aMatchBothPlayersHave_isLiveIfItIsNewsToEither() {
+    LocalDateTime newcomerSince = TRACKING_SINCE.plusDays(2);
+    instanceWithNewcomer(newcomerSince);
+    RecentMatch shared = match(12, newcomerSince.minusHours(3));
+    Mockito.when(lastMatches.fetchLastMatches(PLAYER)).thenReturn(List.of(shared));
+    Mockito.when(lastMatches.fetchLastMatches(NEWCOMER)).thenReturn(List.of(shared));
+
+    service.processLastMatchesForInstance("instance-1");
+
+    Mockito.verify(parseRequests).submitParseRequest(12L);
+    Mockito.verify(matchProcessor, Mockito.never()).process(Mockito.anyList());
   }
 
   private void recent(long id, LocalDateTime start, long mode) {

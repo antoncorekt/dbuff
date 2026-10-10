@@ -11,9 +11,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.MapKeyColumn;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -92,10 +95,35 @@ public class DbufInstanceConfigDomain {
   @Column(name = "tracking_since")
   private LocalDateTime trackingSince;
 
+  /**
+   * Per-player cutoffs for players added after registration, keyed by account ID. A player added
+   * later brings recent matches that are history, but the players already tracked must keep
+   * reporting theirs, so the instance-wide {@link #trackingSince} cannot be moved for them.
+   */
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(
+      name = "dbuf_instance_player_tracking_since",
+      joinColumns = @JoinColumn(name = "instance_id"))
+  @MapKeyColumn(name = "player_id")
+  @Column(name = "tracking_since")
+  @Builder.Default
+  private Map<Long, LocalDateTime> playerTrackingSince = new HashMap<>();
+
   /** Whether this instance is active */
   @Column(name = "active")
   @Builder.Default
   private Boolean active = true;
+
+  /**
+   * The moment before which this player's matches are history.
+   *
+   * @return the player's own cutoff, else the instance's; null when neither exists, meaning
+   *     everything is reported
+   */
+  public LocalDateTime trackingSinceFor(Long playerId) {
+    LocalDateTime own = playerTrackingSince == null ? null : playerTrackingSince.get(playerId);
+    return own != null ? own : trackingSince;
+  }
 
   /**
    * Helper method to get player IDs from the players set.
