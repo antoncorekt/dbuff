@@ -7,6 +7,7 @@ import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.service.replay.file.ReplayFile;
 import com.ako.dbuff.service.replay.file.ReplayFileProvider;
+import com.ako.dbuff.service.replay.map.MapLayouts;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +36,7 @@ public class ReplayRunService {
   private final List<ReplayExtractor> extractors;
   private final ReplayProcessingProperties properties;
   private final Semaphore parseSemaphore;
+  private final MapLayouts mapLayouts;
 
   public ReplayRunService(
       ReplayParseRunRepo runRepo,
@@ -45,7 +47,8 @@ public class ReplayRunService {
       ReplayRosterVerifier rosterVerifier,
       List<ReplayExtractor> extractors,
       ReplayProcessingProperties properties,
-      @Qualifier("replayParseSemaphore") Semaphore parseSemaphore) {
+      @Qualifier("replayParseSemaphore") Semaphore parseSemaphore,
+      MapLayouts mapLayouts) {
     this.runRepo = runRepo;
     this.playerStatRepo = playerStatRepo;
     this.eligibility = eligibility;
@@ -55,6 +58,7 @@ public class ReplayRunService {
     this.extractors = extractors;
     this.properties = properties;
     this.parseSemaphore = parseSemaphore;
+    this.mapLayouts = mapLayouts;
   }
 
   /**
@@ -116,11 +120,26 @@ public class ReplayRunService {
       run.setReplayBytes(file.compressedBytes());
       run.setClockStartTick(facts.clockStartTick());
       run.setClarityVersion(parser.version());
+      recordMapVersion(run, facts);
       run.setParseMillis((System.nanoTime() - started) / 1_000_000);
       if (failed.isEmpty()) {
         return finish(run, ReplayStatus.DONE, null);
       }
       return fail(run, ReplayStatus.PARTIAL, "Failed extractors: " + String.join(", ", failed));
+    }
+  }
+
+  private void recordMapVersion(ReplayParseRunDomain run, ReplayFacts facts) {
+    if (facts.map() == null) {
+      return;
+    }
+    run.setMapVersion(facts.map().version());
+    if (mapLayouts.forVersion(run.getMapVersion()).isEmpty()) {
+      log.warn(
+          "Match {} was played on map layout {}, the frozen one is {}; map analyses will skip it",
+          run.getMatchId(),
+          run.getMapVersion(),
+          mapLayouts.frozenVersion());
     }
   }
 

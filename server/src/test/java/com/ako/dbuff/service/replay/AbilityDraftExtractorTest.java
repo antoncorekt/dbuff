@@ -102,7 +102,12 @@ class AbilityDraftExtractorTest {
   }
 
   private ReplayFacts facts(DraftFacts draft) {
-    return new ReplayFacts(17136, 596.5, players, draft);
+    return ReplayFacts.builder()
+        .clockStartTick(17136)
+        .gameStartTime(596.5)
+        .players(players)
+        .draft(draft)
+        .build();
   }
 
   /** Pool entry i is ability 100+i; the first 40 are picked, alternating Radiant and Dire. */

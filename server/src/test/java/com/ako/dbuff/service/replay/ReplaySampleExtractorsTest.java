@@ -68,7 +68,8 @@ class ReplaySampleExtractorsTest {
 
   @Test
   void bothExtractors_storeNothingForAReplayWithoutSamples() {
-    ReplayFacts none = new ReplayFacts(100, 1.0, players);
+    ReplayFacts none =
+        ReplayFacts.builder().clockStartTick(100).gameStartTime(1.0).players(players).build();
 
     trackExtractor.extract(none, MATCH);
     minuteExtractor.extract(none, MATCH);
@@ -112,7 +113,12 @@ class ReplaySampleExtractorsTest {
                     new int[] {0, 1, 2},
                     new int[] {0, 1, 1})),
             List.of(minute(0, 5, 3, 900), minute(10, 5, 1, 0)));
-    return new ReplayFacts(100, 1.0, players, null, samples);
+    return ReplayFacts.builder()
+        .clockStartTick(100)
+        .gameStartTime(1.0)
+        .players(players)
+        .samples(samples)
+        .build();
   }
 
   private static SampleFacts.MinuteSnapshot minute(

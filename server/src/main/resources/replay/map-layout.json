@@ -1,0 +1,456 @@
+{
+  "buildings" : [ {
+    "name" : "dota_goodguys_tower3_bot",
+    "team" : 2,
+    "x" : -3952,
+    "y" : -6112
+  }, {
+    "name" : "dota_goodguys_tower3_mid",
+    "team" : 2,
+    "x" : -4640,
+    "y" : -4144
+  }, {
+    "name" : "dota_goodguys_tower3_top",
+    "team" : 2,
+    "x" : -6592,
+    "y" : -3408
+  }, {
+    "name" : "dota_goodguys_tower2_bot",
+    "team" : 2,
+    "x" : -360,
+    "y" : -6256
+  }, {
+    "name" : "dota_goodguys_tower1_bot",
+    "team" : 2,
+    "x" : 4859,
+    "y" : -6379
+  }, {
+    "name" : "dota_goodguys_tower2_mid",
+    "team" : 2,
+    "x" : -3190,
+    "y" : -2926
+  }, {
+    "name" : "dota_goodguys_tower2_top",
+    "team" : 2,
+    "x" : -6501,
+    "y" : -872
+  }, {
+    "name" : "dota_goodguys_tower1_top",
+    "team" : 2,
+    "x" : -6336,
+    "y" : 1856
+  }, {
+    "name" : "dota_goodguys_tower4_top",
+    "team" : 2,
+    "x" : -5712,
+    "y" : -4864
+  }, {
+    "name" : "dota_badguys_tower4_top",
+    "team" : 3,
+    "x" : 4944,
+    "y" : 4776
+  }, {
+    "name" : "dota_badguys_tower2_top",
+    "team" : 3,
+    "x" : -128,
+    "y" : 6016
+  }, {
+    "name" : "dota_badguys_tower1_top",
+    "team" : 3,
+    "x" : -5274,
+    "y" : 6036
+  }, {
+    "name" : "dota_badguys_tower2_mid",
+    "team" : 3,
+    "x" : 2496,
+    "y" : 2112
+  }, {
+    "name" : "dota_badguys_tower1_mid",
+    "team" : 3,
+    "x" : 524,
+    "y" : 652
+  }, {
+    "name" : "dota_badguys_tower2_bot",
+    "team" : 3,
+    "x" : 6400,
+    "y" : 384
+  }, {
+    "name" : "dota_badguys_tower3_bot",
+    "team" : 3,
+    "x" : 6336,
+    "y" : 3032
+  }, {
+    "name" : "dota_badguys_tower3_top",
+    "team" : 3,
+    "x" : 3552,
+    "y" : 5776
+  }, {
+    "name" : "dota_badguys_tower3_mid",
+    "team" : 3,
+    "x" : 4272,
+    "y" : 3759
+  }, {
+    "name" : "dota_badguys_tower4_bot",
+    "team" : 3,
+    "x" : 5280,
+    "y" : 4432
+  }, {
+    "name" : "dota_goodguys_tower4_bot",
+    "team" : 2,
+    "x" : -5392,
+    "y" : -5192
+  }, {
+    "name" : "dota_goodguys_tower1_mid",
+    "team" : 2,
+    "x" : -1544,
+    "y" : -1408
+  }, {
+    "name" : "dota_badguys_tower1_bot",
+    "team" : 3,
+    "x" : 6269,
+    "y" : -2240
+  }, {
+    "name" : "good_rax_melee_mid",
+    "team" : 2,
+    "x" : -4672,
+    "y" : -4552
+  }, {
+    "name" : "good_rax_range_mid",
+    "team" : 2,
+    "x" : -5060,
+    "y" : -4199
+  }, {
+    "name" : "good_rax_melee_bot",
+    "team" : 2,
+    "x" : -4280,
+    "y" : -6360
+  }, {
+    "name" : "good_rax_range_bot",
+    "team" : 2,
+    "x" : -4279,
+    "y" : -5853
+  }, {
+    "name" : "good_rax_melee_top",
+    "team" : 2,
+    "x" : -6336,
+    "y" : -3758
+  }, {
+    "name" : "good_rax_range_top",
+    "team" : 2,
+    "x" : -6844,
+    "y" : -3759
+  }, {
+    "name" : "bad_rax_melee_bot",
+    "team" : 3,
+    "x" : 6592,
+    "y" : 3392
+  }, {
+    "name" : "bad_rax_range_bot",
+    "team" : 3,
+    "x" : 6064,
+    "y" : 3376
+  }, {
+    "name" : "bad_rax_range_mid",
+    "team" : 3,
+    "x" : 4336,
+    "y" : 4183
+  }, {
+    "name" : "bad_rax_melee_mid",
+    "team" : 3,
+    "x" : 4702,
+    "y" : 3824
+  }, {
+    "name" : "bad_rax_melee_top",
+    "team" : 3,
+    "x" : 3898,
+    "y" : 5496
+  }, {
+    "name" : "bad_rax_range_top",
+    "team" : 3,
+    "x" : 3894,
+    "y" : 6025
+  }, {
+    "name" : "dota_badguys_fort",
+    "team" : 3,
+    "x" : 5528,
+    "y" : 5000
+  }, {
+    "name" : "dota_goodguys_fort",
+    "team" : 2,
+    "x" : -5920,
+    "y" : -5352
+  }, {
+    "name" : "npc_dota_watch_tower_bottom",
+    "team" : 2,
+    "x" : -4096,
+    "y" : -448
+  }, {
+    "name" : "npc_dota_watch_tower_top",
+    "team" : 3,
+    "x" : 3392,
+    "y" : -448
+  }, {
+    "name" : "28346_npc_dota_lotus_pool_dire",
+    "team" : 4,
+    "x" : -7548,
+    "y" : 4209
+  }, {
+    "name" : "28347_npc_dota_lotus_pool_radiant",
+    "team" : 4,
+    "x" : 7503,
+    "y" : -4404
+  } ],
+  "camps" : [ {
+    "name" : "neutralcamp_evil_6",
+    "type" : 1,
+    "minX" : -1216,
+    "minY" : 4520,
+    "maxX" : -316,
+    "maxY" : 5304,
+    "originX" : -848,
+    "originY" : 4952
+  }, {
+    "name" : "neutralcamp_evil_9",
+    "type" : 1,
+    "minX" : 3008,
+    "minY" : -1536,
+    "maxX" : 3776,
+    "maxY" : -896,
+    "originX" : 3360,
+    "originY" : -1248
+  }, {
+    "name" : "neutralcamp_good_1",
+    "type" : 0,
+    "minX" : 3647,
+    "minY" : -5438,
+    "maxX" : 4443,
+    "maxY" : -4648,
+    "originX" : 3954,
+    "originY" : -4800
+  }, {
+    "name" : "neutralcamp_evil_7",
+    "type" : 2,
+    "minX" : 7617,
+    "minY" : -409,
+    "maxX" : 8257,
+    "maxY" : 295,
+    "originX" : 7937,
+    "originY" : -89
+  }, {
+    "name" : "neutralcamp_evil_1",
+    "type" : 2,
+    "minX" : -5212,
+    "minY" : 3584,
+    "maxX" : -4496,
+    "maxY" : 4398,
+    "originX" : -4854,
+    "originY" : 3991
+  }, {
+    "name" : "neutralcamp_good_2",
+    "type" : 2,
+    "minX" : 4379,
+    "minY" : -4313,
+    "maxX" : 5122,
+    "maxY" : -3495,
+    "originX" : 4751,
+    "originY" : -3904
+  }, {
+    "name" : "neutralcamp_good_5",
+    "type" : 2,
+    "minX" : -2036,
+    "minY" : -3881,
+    "maxX" : -988,
+    "maxY" : -3034,
+    "originX" : -986,
+    "originY" : -3715
+  }, {
+    "name" : "neutralcamp_good_4",
+    "type" : 1,
+    "minX" : -251,
+    "minY" : -5532,
+    "maxX" : 636,
+    "maxY" : -4776,
+    "originX" : 128,
+    "originY" : -5216
+  }, {
+    "name" : "neutralcamp_good_8",
+    "type" : 3,
+    "minX" : -5349,
+    "minY" : -592,
+    "maxX" : -4245,
+    "maxY" : 385,
+    "originX" : -4891,
+    "originY" : -128
+  }, {
+    "name" : "neutralcamp_evil_8",
+    "type" : 3,
+    "minX" : 3528,
+    "minY" : -402,
+    "maxX" : 4670,
+    "maxY" : 528,
+    "originX" : 4256,
+    "originY" : 96
+  }, {
+    "name" : "neutralcamp_good_9",
+    "type" : 1,
+    "minX" : -2304,
+    "minY" : -5088,
+    "maxX" : -1619,
+    "maxY" : -4393,
+    "originX" : -1920,
+    "originY" : -4800
+  }, {
+    "name" : "neutralcamp_evil_4",
+    "type" : 1,
+    "minX" : 783,
+    "minY" : 3772,
+    "maxX" : 1521,
+    "maxY" : 4420,
+    "originX" : 1088,
+    "originY" : 4096
+  }, {
+    "name" : "neutralcamp_good_7",
+    "type" : 1,
+    "minX" : -4368,
+    "minY" : 535,
+    "maxX" : -3696,
+    "maxY" : 1255,
+    "originX" : -4032,
+    "originY" : 895
+  }, {
+    "name" : "neutralcamp_good_11",
+    "type" : 1,
+    "minX" : -1068,
+    "minY" : -8019,
+    "maxX" : -469,
+    "maxY" : -7350,
+    "originX" : -96,
+    "originY" : -7648
+  }, {
+    "name" : "neutralcamp_evil_14",
+    "type" : 1,
+    "minX" : -40,
+    "minY" : 7358,
+    "maxX" : 655,
+    "maxY" : 8062,
+    "originX" : 143,
+    "originY" : 7710
+  }, {
+    "name" : "neutralcamp_evil_5",
+    "type" : 2,
+    "minX" : 637,
+    "minY" : 2142,
+    "maxX" : 1539,
+    "maxY" : 2931,
+    "originX" : 1024,
+    "originY" : 2562
+  }, {
+    "name" : "neutralcamp_evil_13",
+    "type" : 0,
+    "minX" : 8192,
+    "minY" : 896,
+    "maxX" : 8704,
+    "maxY" : 1536,
+    "originX" : 8384,
+    "originY" : 1216
+  }, {
+    "name" : "neutralcamp_good_13",
+    "type" : 2,
+    "minX" : -8645,
+    "minY" : -815,
+    "maxX" : -7877,
+    "maxY" : -47,
+    "originX" : -8261,
+    "originY" : -512
+  }, {
+    "name" : "neutralcamp_evil_11",
+    "type" : 0,
+    "minX" : -3319,
+    "minY" : 7060,
+    "maxX" : -2609,
+    "maxY" : 7764,
+    "originX" : -2964,
+    "originY" : 7412
+  }, {
+    "name" : "neutralcamp_evil_15",
+    "type" : 1,
+    "minX" : -2923,
+    "minY" : 3543,
+    "maxX" : -2213,
+    "maxY" : 4171,
+    "originX" : -2568,
+    "originY" : 3895
+  }, {
+    "name" : "neutralcamp_good_14",
+    "type" : 0,
+    "minX" : 2344,
+    "minY" : -8714,
+    "maxX" : 2999,
+    "maxY" : -8027,
+    "originX" : 3248,
+    "originY" : -8784
+  }, {
+    "name" : "neutralcamp_good_15",
+    "type" : 1,
+    "minX" : 1458,
+    "minY" : -4448,
+    "maxX" : 2206,
+    "maxY" : -3618,
+    "originX" : 2290,
+    "originY" : -4386
+  }, {
+    "name" : "neutralcamp_evil_2",
+    "type" : 0,
+    "minX" : -4260,
+    "minY" : 4550,
+    "maxX" : -3620,
+    "maxY" : 5341,
+    "originX" : -3940,
+    "originY" : 4946
+  }, {
+    "name" : "neutralcamp_good_16",
+    "type" : 0,
+    "minX" : -8357,
+    "minY" : -2173,
+    "maxX" : -7608,
+    "maxY" : -1392,
+    "originX" : -7992,
+    "originY" : -1770
+  }, {
+    "name" : "neutralcamp_evil_12",
+    "type" : 1,
+    "minX" : 1629,
+    "minY" : 7524,
+    "maxX" : 2531,
+    "maxY" : 8268,
+    "originX" : 2080,
+    "originY" : 7896
+  }, {
+    "name" : "neutralcamp_good_12",
+    "type" : 1,
+    "minX" : -2855,
+    "minY" : -8767,
+    "maxX" : -2103,
+    "maxY" : -8031,
+    "originX" : -2019,
+    "originY" : -8712
+  }, {
+    "name" : "neutralcamp_good_20",
+    "type" : 1,
+    "minX" : 4072,
+    "minY" : -8634,
+    "maxX" : 4727,
+    "maxY" : -7947,
+    "originX" : 4976,
+    "originY" : -8704
+  }, {
+    "name" : "neutralcamp_evil_20",
+    "type" : 1,
+    "minX" : -4595,
+    "minY" : 7904,
+    "maxX" : -3885,
+    "maxY" : 8608,
+    "originX" : -4240,
+    "originY" : 8256
+  } ]
+}

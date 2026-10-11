@@ -25,16 +25,23 @@ class ReplayPlayerExtractorTest {
     MatchDomain match = new MatchDomain();
     match.setId(5L);
     ReplayFacts first =
-        new ReplayFacts(
-            100,
-            1.0,
-            List.of(
-                new ReplayPlayerFact(0, 2, 76561197960265728L + 7, "Sniper"),
-                new ReplayPlayerFact(10, 3, 0L, "Sven")));
+        ReplayFacts.builder()
+            .clockStartTick(100)
+            .gameStartTime(1.0)
+            .players(
+                List.of(
+                    new ReplayPlayerFact(0, 2, 76561197960265728L + 7, "Sniper"),
+                    new ReplayPlayerFact(10, 3, 0L, "Sven")))
+            .build();
 
     extractor.extract(first, match);
     extractor.extract(
-        new ReplayFacts(100, 1.0, List.of(new ReplayPlayerFact(10, 3, 0L, "Axe"))), match);
+        ReplayFacts.builder()
+            .clockStartTick(100)
+            .gameStartTime(1.0)
+            .players(List.of(new ReplayPlayerFact(10, 3, 0L, "Axe")))
+            .build(),
+        match);
 
     List<ReplayPlayerDomain> stored = repo.findAll();
     assertThat(stored).hasSize(1);
@@ -50,7 +57,11 @@ class ReplayPlayerExtractorTest {
     MatchDomain two = new MatchDomain();
     two.setId(2L);
     ReplayFacts facts =
-        new ReplayFacts(100, 1.0, List.of(new ReplayPlayerFact(0, 2, 0L, "Sniper")));
+        ReplayFacts.builder()
+            .clockStartTick(100)
+            .gameStartTime(1.0)
+            .players(List.of(new ReplayPlayerFact(0, 2, 0L, "Sniper")))
+            .build();
     extractor.extract(facts, one);
     extractor.extract(facts, two);
 

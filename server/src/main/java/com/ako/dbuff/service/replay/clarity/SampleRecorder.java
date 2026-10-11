@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.SampleFacts;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import skadistats.clarity.model.Entity;
@@ -22,8 +23,6 @@ final class SampleRecorder {
   private static final int PRE_GAME_TICKS = 2700;
   private static final int MINUTE_TICKS = 1800;
   private static final int MINUTE_OFFSET_TICKS = 900;
-  private static final int CELL_SIZE = 128;
-  private static final int CELL_ORIGIN = 128;
   private static final int PLAYERS_PER_TEAM = 5;
 
   private final Entities entities;
@@ -123,7 +122,10 @@ final class SampleRecorder {
     if (source == null) {
       return MinuteStat.MISSING;
     }
-    String path = stat.source().arrayPrefix() + String.format("%04d.", position) + stat.property();
+    String path =
+        stat.source().arrayPrefix()
+            + String.format(Locale.ROOT, "%04d.", position)
+            + stat.property();
     return source.hasProperty(path) && source.getProperty(path) instanceof Number n
         ? n.longValue()
         : MinuteStat.MISSING;
@@ -168,8 +170,8 @@ final class SampleRecorder {
         flags = Arrays.copyOf(flags, capacity);
       }
       if (hero != null) {
-        x[size] = world(hero, "CBodyComponent.m_cellX", "CBodyComponent.m_vecX");
-        y[size] = world(hero, "CBodyComponent.m_cellY", "CBodyComponent.m_vecY");
+        x[size] = Positions.x(hero);
+        y[size] = Positions.y(hero);
         hp[size] = percent(hero, "m_iHealth", "m_iMaxHealth");
         mana[size] = percent(hero, "m_flMana", "m_flMaxMana");
         level[size] = (int) number(hero, "m_iCurrentLevel");
@@ -187,10 +189,6 @@ final class SampleRecorder {
           Arrays.copyOf(mana, size),
           Arrays.copyOf(level, size),
           Arrays.copyOf(flags, size));
-    }
-
-    private static int world(Entity hero, String cell, String offset) {
-      return (int) ((number(hero, cell) - CELL_ORIGIN) * CELL_SIZE + number(hero, offset));
     }
 
     private static int percent(Entity hero, String value, String max) {

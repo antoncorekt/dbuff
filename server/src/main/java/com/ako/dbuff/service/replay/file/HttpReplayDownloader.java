@@ -14,6 +14,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -41,7 +42,11 @@ public class HttpReplayDownloader implements ReplayDownloader {
   public Path download(ReplaySource source, Path targetDir) {
     String url =
         String.format(
-            properties.getUrlTemplate(), source.cluster(), source.matchId(), source.salt());
+            Locale.ROOT,
+            properties.getUrlTemplate(),
+            source.cluster(),
+            source.matchId(),
+            source.salt());
     HttpRequest request =
         HttpRequest.newBuilder(URI.create(url))
             .timeout(Duration.ofSeconds(properties.getReadTimeoutSeconds()))

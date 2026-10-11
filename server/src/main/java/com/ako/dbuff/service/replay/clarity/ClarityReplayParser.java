@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.service.replay.DraftFacts;
 import com.ako.dbuff.service.replay.DraftPick;
 import com.ako.dbuff.service.replay.DraftPoolEntry;
+import com.ako.dbuff.service.replay.MapFacts;
 import com.ako.dbuff.service.replay.ReplayException;
 import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.ReplayParser;
@@ -12,6 +13,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.BooleanSupplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -28,6 +30,8 @@ import skadistats.clarity.processor.gameevents.OnCombatLogEntry;
 import skadistats.clarity.processor.reader.OnTickStart;
 import skadistats.clarity.processor.runner.Context;
 import skadistats.clarity.processor.runner.SimpleRunner;
+import skadistats.clarity.processor.stringtables.StringTables;
+import skadistats.clarity.processor.stringtables.UsesStringTable;
 import skadistats.clarity.source.MappedFileSource;
 
 /**
@@ -92,6 +96,7 @@ public class ClarityReplayParser implements ReplayParser {
   }
 
   @UsesEntities
+  @UsesStringTable("EntityNames")
   public static class Collector {
     private static final int PRE_GAME = 4;
     private static final int GAME_IN_PROGRESS = 5;
@@ -112,11 +117,13 @@ public class ClarityReplayParser implements ReplayParser {
     private static final String START_TIME = "m_pGameRules.m_flGameStartTime";
 
     @Insert Entities entities;
+    @Insert StringTables stringTables;
 
     private final BooleanSupplier cancelled;
     ReplayFacts facts;
     private SampleRecorder recorder;
     private final CombatLogRecorder combatLog = new CombatLogRecorder();
+    private MapFacts map;
     private final List<DraftPick> picks = new ArrayList<>();
     private final BitSet picked = new BitSet();
     private long ticksSeen;
@@ -159,9 +166,14 @@ public class ClarityReplayParser implements ReplayParser {
       } else if (state == GAME_IN_PROGRESS && facts == null) {
         Number startTime = rules.getProperty(START_TIME);
         facts =
-            new ReplayFacts(
-                ctx.getTick(), startTime.doubleValue(), readPlayers(), readDraft(rules));
+            ReplayFacts.builder()
+                .clockStartTick(ctx.getTick())
+                .gameStartTime(startTime.doubleValue())
+                .players(readPlayers())
+                .draft(readDraft(rules))
+                .build();
         recorder().gameStarted(ctx.getTick());
+        map = MapReader.read(entities, stringTables.forName("EntityNames"), rules);
       }
     }
 
@@ -174,13 +186,15 @@ public class ClarityReplayParser implements ReplayParser {
 
     /** The facts with the samples of the whole game, once the replay has been read to its end. */
     ReplayFacts result() {
-      return new ReplayFacts(
-          facts.clockStartTick(),
-          facts.gameStartTime(),
-          facts.players(),
-          facts.draft(),
-          recorder().result(facts.clockStartTick()),
-          combatLog.result(facts.gameStartTime()));
+      return ReplayFacts.builder()
+          .clockStartTick(facts.clockStartTick())
+          .gameStartTime(facts.gameStartTime())
+          .players(facts.players())
+          .draft(facts.draft())
+          .samples(recorder().result(facts.clockStartTick()))
+          .combatLog(combatLog.result(facts.gameStartTime()))
+          .map(map)
+          .build();
     }
 
     /** A pick is the moment an entry's player id changes from "nobody" to a player. */
@@ -203,7 +217,7 @@ public class ClarityReplayParser implements ReplayParser {
     private DraftFacts readDraft(Entity rules) {
       List<DraftPoolEntry> pool = new ArrayList<>();
       for (int index = 0; ; index++) {
-        String prefix = DRAFT + String.format("%04d", index) + ".";
+        String prefix = DRAFT + String.format(Locale.ROOT, "%04d", index) + ".";
         Number ability = number(rules, prefix + "m_nAbilityID");
         Number player = number(rules, prefix + "m_unPlayerID");
         Number slot = number(rules, prefix + "m_unAbilityPlayerSlot");
