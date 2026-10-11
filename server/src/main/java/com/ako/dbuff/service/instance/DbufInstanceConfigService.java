@@ -65,9 +65,11 @@ public class DbufInstanceConfigService {
   public DbufInstanceConfigResponse register(RegisterInstanceRequest request) {
     validateRegistrationRequest(request);
 
-    // Check if Discord channel already has an instance
-    if (request.getDiscordChannelId() != null
-        && repository.existsByDiscordChannelId(request.getDiscordChannelId())) {
+    Optional<DbufInstanceConfigDomain> existing =
+        request.getDiscordChannelId() == null
+            ? Optional.empty()
+            : repository.findByDiscordChannelId(request.getDiscordChannelId());
+    if (existing.isPresent() && Boolean.TRUE.equals(existing.get().getActive())) {
       throw new IllegalStateException(
           "Discord channel "
               + request.getDiscordChannelId()
@@ -89,22 +91,24 @@ public class DbufInstanceConfigService {
     Set<Long> gameModeIds = validateAndConvertGameModes(request.getGameModes());
 
     LocalDateTime now = LocalDateTime.now();
-    DbufInstanceConfigDomain domain =
-        DbufInstanceConfigDomain.builder()
-            .discordChannelId(request.getDiscordChannelId())
-            .discordGuildId(request.getDiscordGuildId())
-            .name(request.getName())
-            .players(players)
-            .gameModeIds(gameModeIds)
-            .extraConfig(serializeExtraConfig(request.getExtraConfig()))
-            .createdAt(now)
-            .updatedAt(now)
-            .active(true)
-            .build();
+    // A deactivated channel is brought back rather than rejected, so deactivate -> register works.
+    DbufInstanceConfigDomain domain = existing.orElseGet(DbufInstanceConfigDomain::new);
+    if (existing.isEmpty()) {
+      domain.setCreatedAt(now);
+    }
+    domain.setDiscordChannelId(request.getDiscordChannelId());
+    domain.setDiscordGuildId(request.getDiscordGuildId());
+    domain.setName(request.getName());
+    domain.setPlayers(players);
+    domain.setGameModeIds(gameModeIds);
+    domain.setExtraConfig(serializeExtraConfig(request.getExtraConfig()));
+    domain.setUpdatedAt(now);
+    domain.setActive(true);
 
     DbufInstanceConfigDomain saved = repository.save(domain);
     log.info(
-        "Registered new instance configuration: id={}, players={}, gameModeIds={}",
+        "{} instance configuration: id={}, players={}, gameModeIds={}",
+        existing.isPresent() ? "Reactivated" : "Registered new",
         saved.getId(),
         saved.getPlayerIds(),
         saved.getGameModeIds());
@@ -166,6 +170,7 @@ public class DbufInstanceConfigService {
     }
 
     // Update active status if provided
+    boolean wasActive = Boolean.TRUE.equals(domain.getActive());
     if (request.getActive() != null) {
       domain.setActive(request.getActive());
     }
@@ -177,6 +182,13 @@ public class DbufInstanceConfigService {
         saved.getId(),
         saved.getPlayerIds(),
         saved.getGameModeIds());
+
+    boolean isActive = Boolean.TRUE.equals(saved.getActive());
+    if (!wasActive && isActive) {
+      instanceSchedulerService.scheduleJobsForInstance(saved.getId());
+    } else if (wasActive && !isActive) {
+      instanceSchedulerService.unscheduleJobsForInstance(saved.getId());
+    }
 
     return toResponse(saved);
   }
@@ -263,6 +275,21 @@ public class DbufInstanceConfigService {
               instanceSchedulerService.unscheduleJobsForInstance(instanceId);
               log.info("Deactivated instance configuration: id={}", instanceId);
             });
+  }
+
+  /**
+   * Deactivates every active instance registered from a guild, used when the bot is removed from
+   * it: the channels are unreachable, so their jobs would only fail on every run.
+   *
+   * @param guildId the Discord guild ID
+   * @return how many instances were deactivated
+   */
+  @Transactional
+  public int deactivateAllForGuild(String guildId) {
+    List<DbufInstanceConfigDomain> instances =
+        repository.findByDiscordGuildIdAndActiveTrue(guildId);
+    instances.forEach(instance -> deactivate(instance.getId()));
+    return instances.size();
   }
 
   /**

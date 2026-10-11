@@ -6,6 +6,7 @@ import com.ako.dbuff.resources.model.DbufInstanceConfigResponse;
 import com.ako.dbuff.resources.model.PlayerInfo;
 import com.ako.dbuff.resources.model.RegisterInstanceRequest;
 import com.ako.dbuff.resources.model.UpdateInstanceRequest;
+import com.ako.dbuff.service.discord.ChannelReadinessService;
 import com.ako.dbuff.service.discord.command.AsyncReply;
 import com.ako.dbuff.service.discord.command.CommandContext;
 import com.ako.dbuff.service.discord.command.CommandRegistry;
@@ -42,19 +43,26 @@ public class DbuffConfigCommand implements DbuffCommand {
 
   private static final int EMBED_COLOR = 0x00AE86;
 
+  /** Subcommands that change configuration; the rest only read it. */
+  private static final Set<String> MANAGE_ONLY =
+      Set.of("register", "add", "remove", "link", "modes", "deactivate");
+
   private final DbufInstanceConfigService instanceConfigService;
   private final PlayerReferenceResolver playerResolver;
   private final PlayerRepo playerRepo;
+  private final ChannelReadinessService channelReadiness;
   private final CommandRegistry registry;
 
   public DbuffConfigCommand(
       DbufInstanceConfigService instanceConfigService,
       PlayerReferenceResolver playerResolver,
       PlayerRepo playerRepo,
+      ChannelReadinessService channelReadiness,
       @Lazy CommandRegistry registry) {
     this.instanceConfigService = instanceConfigService;
     this.playerResolver = playerResolver;
     this.playerRepo = playerRepo;
+    this.channelReadiness = channelReadiness;
     // Lazy because the registry collects every DbuffCommand, including this one.
     this.registry = registry;
   }
@@ -150,7 +158,14 @@ public class DbuffConfigCommand implements DbuffCommand {
 
   @Override
   public void execute(String subcommand, CommandContext context) {
-    switch (subcommand == null ? "help" : subcommand) {
+    String resolved = subcommand == null ? "help" : subcommand;
+    if (MANAGE_ONLY.contains(resolved) && !context.invokerCanManageChannel()) {
+      context.replyEphemeral(
+          "❌ Changing tracking needs the **Manage Channel** permission on this channel"
+              + " (or Manage Server).");
+      return;
+    }
+    switch (resolved) {
       case "register" -> register(context);
       case "status" -> status(context);
       case "add" -> addPlayer(context);
@@ -175,6 +190,15 @@ public class DbuffConfigCommand implements DbuffCommand {
           "❌ Could not read a player from `"
               + String.join(", ", playerRefs)
               + "`. Pick one from the autocomplete list, which submits the account ID.");
+      return;
+    }
+
+    List<String> problems = channelReadiness.findProblems(context.getParentChannelId());
+    if (!problems.isEmpty()) {
+      context.replyEphemeral(
+          "❌ This channel is not ready for reports:\n- "
+              + String.join("\n- ", problems)
+              + "\nFix that, then run `/dbuff register` again.");
       return;
     }
 
@@ -209,6 +233,9 @@ public class DbuffConfigCommand implements DbuffCommand {
     }
     AsyncReply reply = context.acknowledge("📊 Fetching configuration…", "dbuff: status");
     reply.postEmbed(configEmbed("📊 Instance Configuration", config.get()));
+    channelReadiness
+        .findProblems(context.getParentChannelId())
+        .forEach(problem -> reply.post("⚠️ " + problem));
   }
 
   private void addPlayer(CommandContext context) {
