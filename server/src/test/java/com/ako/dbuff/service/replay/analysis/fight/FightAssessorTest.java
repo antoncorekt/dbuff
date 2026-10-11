@@ -103,6 +103,46 @@ class FightAssessorTest {
     assertThat(parts.get(0).absenceReason()).isNull();
   }
 
+  @Test
+  void assess_ranksHeroesTakingPartByHowFarForwardTheyStand() {
+    Map<Integer, FightAssessor.Trace> traces = traces();
+    traces.put(0, ranged(0, 150));
+    traces.put(1, ranged(600, 600));
+    traces.put(2, ranged(-600, 150));
+    traces.put(5, ranged(3000, 150));
+    for (int away : List.of(3, 4, 6, 7, 8, 9)) {
+      traces.put(away, trace(9000, 9000, 10, 1));
+    }
+    var fight = fight(Set.of(0, 1, 2, 5), List.of(), 1000, 1000);
+
+    var parts = new HashMap<Integer, FightAssessor.PlayerPart>();
+    assessor
+        .assess(fight, traces, Map.of(), Map.of())
+        .parts()
+        .forEach(p -> parts.put(p.player(), p));
+
+    assertThat(parts.get(1).frontlineRank()).isEqualTo(1);
+    assertThat(parts.get(1).frontlineDelta()).isEqualTo(-2);
+    assertThat(parts.get(1).attackRange()).isEqualTo(600);
+    assertThat(parts.get(2).frontlineRank()).isEqualTo(3);
+    assertThat(parts.get(5).frontlineRank()).as("alone on his side").isNull();
+    assertThat(parts.get(7).frontlineRank()).as("not in the fight").isNull();
+  }
+
+  private static FightAssessor.Trace ranged(int x, int range) {
+    int[] ranges = new int[40];
+    java.util.Arrays.fill(ranges, range);
+    FightAssessor.Trace base = trace(x, 0, 10, 1);
+    return new FightAssessor.Trace(
+        base.startSeconds(),
+        base.stepSeconds(),
+        base.x(),
+        base.y(),
+        base.level(),
+        base.flags(),
+        ranges);
+  }
+
   private static HeroStateTimeline timeline(HeroStateTimeline.Change... changes) {
     HeroStateTimeline timeline = new HeroStateTimeline();
     for (HeroStateTimeline.Change c : changes) {

@@ -151,6 +151,7 @@ final class SampleRecorder {
     private int[] hp = new int[256];
     private int[] mana = new int[256];
     private int[] manaPoints = new int[256];
+    private int[] attackRange = new int[256];
     private int[] level = new int[256];
     private int[] flags = new int[256];
     private int size;
@@ -174,6 +175,7 @@ final class SampleRecorder {
         hp = Arrays.copyOf(hp, capacity);
         mana = Arrays.copyOf(mana, capacity);
         manaPoints = Arrays.copyOf(manaPoints, capacity);
+        attackRange = Arrays.copyOf(attackRange, capacity);
         level = Arrays.copyOf(level, capacity);
         flags = Arrays.copyOf(flags, capacity);
       }
@@ -183,6 +185,7 @@ final class SampleRecorder {
         hp[size] = percent(hero, "m_iHealth", "m_iMaxHealth");
         mana[size] = percent(hero, "m_flMana", "m_flMaxMana");
         manaPoints[size] = (int) Math.round(number(hero, "m_flMana"));
+        attackRange[size] = (int) number(hero, "m_iAttackRange");
         level[size] = (int) number(hero, "m_iCurrentLevel");
         flags[size] = number(hero, "m_lifeState") == 0 ? 1 : 0;
       }
@@ -197,6 +200,7 @@ final class SampleRecorder {
           Arrays.copyOf(hp, size),
           Arrays.copyOf(mana, size),
           Arrays.copyOf(manaPoints, size),
+          Arrays.copyOf(attackRange, size),
           Arrays.copyOf(level, size),
           Arrays.copyOf(flags, size));
     }

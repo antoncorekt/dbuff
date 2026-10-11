@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
   FightAnalyzer.class,
   CombatLogReader.class,
   HeroStateTimelines.class,
+  PlayerTraces.class,
   MapLayouts.class,
   ReplayProcessingProperties.class,
   ReplayAnalysisProperties.class,

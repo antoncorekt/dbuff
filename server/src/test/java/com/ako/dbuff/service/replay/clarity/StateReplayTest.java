@@ -88,6 +88,15 @@ class StateReplayTest {
         .isGreaterThan(300);
   }
 
+  @Test
+  void attackRangeIsSampledInWorldUnits() {
+    int[] ranges = facts.samples().series().get(SNIPER).attackRange();
+
+    assertThat(Arrays.stream(ranges).filter(r -> r > 0))
+        .isNotEmpty()
+        .allMatch(r -> r >= 100 && r <= 1500);
+  }
+
   private long cooldowns(String name) {
     return changes(StateChangeKind.COOLDOWN).stream()
         .filter(c -> c.name().equals(name) && c.gameSecond() > 0)

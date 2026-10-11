@@ -16,6 +16,7 @@ import com.ako.dbuff.service.replay.CombatLogCodec;
 import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
+import com.ako.dbuff.service.replay.analysis.fight.PlayerTraces;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import com.ako.dbuff.service.replay.map.MapLayouts;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
   DeathAnalyzer.class,
   CombatLogReader.class,
   HeroStateTimelines.class,
+  PlayerTraces.class,
   MapLayouts.class,
   ReplayProcessingProperties.class,
   ReplayAnalysisProperties.class,

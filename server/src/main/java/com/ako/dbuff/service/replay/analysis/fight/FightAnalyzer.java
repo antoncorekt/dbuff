@@ -5,13 +5,11 @@ import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.PlayerActivitySegmentDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
-import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
-import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatHeroes;
 import com.ako.dbuff.service.replay.CombatLogReader;
@@ -43,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class FightAnalyzer implements ReplayAnalyzer {
-  private final ReplayPlayerTrackRepo trackRepo;
+  private final PlayerTraces playerTraces;
   private final ReplayPlayerRepo playerRepo;
   private final ReplayParseRunRepo runRepo;
   private final PlayerActivitySegmentRepo segmentRepo;
@@ -62,7 +60,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 2;
+    return 3;
   }
 
   @Override
@@ -81,7 +79,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
       log.info("Match {} has no combat log or heroes to find fights in", matchId);
       return;
     }
-    Map<Integer, FightAssessor.Trace> traces = traces(matchId);
+    Map<Integer, FightAssessor.Trace> traces = playerTraces.load(matchId);
     Map<Integer, List<ActivitySegment>> activities = activities(matchId);
     Map<Integer, HeroStateTimeline> states = timelines.load(matchId);
     MapLayout layout = layout(matchId);
@@ -103,25 +101,6 @@ public class FightAnalyzer implements ReplayAnalyzer {
   public void deleteByMatchId(long matchId) {
     fightRepo.deleteByMatchId(matchId);
     fightPlayerRepo.deleteByMatchId(matchId);
-  }
-
-  private Map<Integer, FightAssessor.Trace> traces(long matchId) {
-    Map<Integer, FightAssessor.Trace> traces = new HashMap<>();
-    for (ReplayPlayerTrackDomain t : trackRepo.findByMatchId(matchId)) {
-      if (t.getSampleCount() == null || t.getSampleCount() == 0 || t.getX().length == 0) {
-        continue;
-      }
-      traces.put(
-          PlayerSlots.index(t.getPlayerSlot()),
-          new FightAssessor.Trace(
-              t.getStartSeconds(),
-              t.getStepSeconds(),
-              t.getX(),
-              t.getY(),
-              t.getLevel(),
-              t.getFlags()));
-    }
-    return traces;
   }
 
   private Map<Integer, List<ActivitySegment>> activities(long matchId) {
@@ -196,6 +175,9 @@ public class FightAnalyzer implements ReplayAnalyzer {
                     .activityAtStart(p.activityAtStart())
                     .absenceReason(p.absenceReason() == null ? null : p.absenceReason().name())
                     .teleportCooldownLeft(p.teleportCooldownLeft())
+                    .attackRange(p.attackRange())
+                    .frontlineRank(p.frontlineRank())
+                    .frontlineDelta(p.frontlineDelta())
                     .analysisVersion(version())
                     .build())
         .toList();

@@ -51,5 +51,17 @@ public class FightPlayerDomain {
   /** Seconds until the quickest teleport he held was ready; null when he held none. */
   private Integer teleportCooldownLeft;
 
+  /** Attack range at the start of the fight; null when the track has none. */
+  private Integer attackRange;
+
+  /** 1 is the hero of those taking part who stood closest to the enemy; null for the others. */
+  private Integer frontlineRank;
+
+  /**
+   * Rank minus the rank his attack range suggests (short range in front); negative means he stood
+   * further forward than his range suggests. Null when ranges are unknown.
+   */
+  private Integer frontlineDelta;
+
   private Integer analysisVersion;
 }

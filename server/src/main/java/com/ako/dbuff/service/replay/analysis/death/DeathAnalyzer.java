@@ -4,12 +4,10 @@ import com.ako.dbuff.dao.model.DeathAnalysisDomain;
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
-import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
-import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.CombatHeroes;
@@ -19,6 +17,7 @@ import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.fight.FightAssessor;
+import com.ako.dbuff.service.replay.analysis.fight.PlayerTraces;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import com.ako.dbuff.service.replay.map.MapLayout;
@@ -41,7 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class DeathAnalyzer implements ReplayAnalyzer {
-  private final ReplayPlayerTrackRepo trackRepo;
+  private final PlayerTraces playerTraces;
   private final ReplayPlayerRepo playerRepo;
   private final ReplayParseRunRepo runRepo;
   private final HeroStateTimelines timelines;
@@ -78,7 +77,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
       log.info("Match {} has no combat log or heroes to explain deaths for", matchId);
       return;
     }
-    Map<Integer, FightAssessor.Trace> traces = traces(matchId);
+    Map<Integer, FightAssessor.Trace> traces = playerTraces.load(matchId);
     Map<Integer, HeroStateTimeline> states = timelines.load(matchId);
     List<FightDomain> fights = fightRepo.findByMatchId(matchId);
     MapLayout layout = layout(matchId);
@@ -115,25 +114,6 @@ public class DeathAnalyzer implements ReplayAnalyzer {
   @Transactional
   public void deleteByMatchId(long matchId) {
     deathRepo.deleteByMatchId(matchId);
-  }
-
-  private Map<Integer, FightAssessor.Trace> traces(long matchId) {
-    Map<Integer, FightAssessor.Trace> traces = new HashMap<>();
-    for (ReplayPlayerTrackDomain t : trackRepo.findByMatchId(matchId)) {
-      if (t.getSampleCount() == null || t.getSampleCount() == 0 || t.getX().length == 0) {
-        continue;
-      }
-      traces.put(
-          PlayerSlots.index(t.getPlayerSlot()),
-          new FightAssessor.Trace(
-              t.getStartSeconds(),
-              t.getStepSeconds(),
-              t.getX(),
-              t.getY(),
-              t.getLevel(),
-              t.getFlags()));
-    }
-    return traces;
   }
 
   private MapLayout layout(long matchId) {

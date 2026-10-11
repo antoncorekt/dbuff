@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,7 +38,27 @@ public final class FightAssessor {
 
   /** One player's samples; level 0 means no data, flag bit 0 means alive. */
   public record Trace(
-      int startSeconds, int stepSeconds, int[] x, int[] y, int[] level, int[] flags) {
+      int startSeconds,
+      int stepSeconds,
+      int[] x,
+      int[] y,
+      int[] level,
+      int[] flags,
+      int[] attackRange) {
+
+    /** A trace of a track that has no attack range. */
+    public Trace(int startSeconds, int stepSeconds, int[] x, int[] y, int[] level, int[] flags) {
+      this(startSeconds, stepSeconds, x, y, level, flags, null);
+    }
+
+    /** Null when the track has no attack range or the hero did not exist at the time. */
+    public Integer attackRangeAt(double second) {
+      if (attackRange == null || attackRange.length != x.length) {
+        return null;
+      }
+      int i = indexAt(second);
+      return level[i] == 0 || attackRange[i] <= 0 ? null : attackRange[i];
+    }
 
     public int indexAt(double second) {
       int i = (int) Math.round((second - startSeconds) / stepSeconds);
@@ -57,7 +78,27 @@ public final class FightAssessor {
       Integer distanceToCenter,
       String activityAtStart,
       AbsenceReason absenceReason,
-      Integer teleportCooldownLeft) {}
+      Integer teleportCooldownLeft,
+      Integer attackRange,
+      Integer frontlineRank,
+      Integer frontlineDelta) {
+
+    PlayerPart inLine(FrontlineRanker.Position position) {
+      return new PlayerPart(
+          player,
+          presence,
+          damageDealt,
+          damageTaken,
+          deaths,
+          distanceToCenter,
+          activityAtStart,
+          absenceReason,
+          teleportCooldownLeft,
+          attackRange,
+          position.rank(),
+          position.delta());
+    }
+  }
 
   /**
    * @param centerX null when no participant had a position
@@ -109,6 +150,7 @@ public final class FightAssessor {
               states.get(player),
               center));
     }
+    parts = withFrontline(fight, traces, parts);
     return new Assessment(
         center == null ? null : center[0],
         center == null ? null : center[1],
@@ -120,6 +162,32 @@ public final class FightAssessor {
         radiantDamage,
         direDamage,
         parts);
+  }
+
+  /** Ranks the heroes who took part by how far forward they stood when the fight began. */
+  private List<PlayerPart> withFrontline(
+      FightDetector.Detected fight, Map<Integer, Trace> traces, List<PlayerPart> parts) {
+    Map<Integer, int[]> positions = new HashMap<>();
+    Map<Integer, Integer> ranges = new HashMap<>();
+    for (PlayerPart part : parts) {
+      Trace trace = traces.get(part.player());
+      boolean tookPart =
+          part.presence() == Presence.ACTIVE || part.presence() == Presence.PRESENT_PASSIVE;
+      if (!tookPart || trace == null) {
+        continue;
+      }
+      int i = trace.indexAt(fight.start());
+      if (trace.level()[i] > 0) {
+        positions.put(part.player(), new int[] {trace.x()[i], trace.y()[i]});
+        if (part.attackRange() != null) {
+          ranges.put(part.player(), part.attackRange());
+        }
+      }
+    }
+    Map<Integer, FrontlineRanker.Position> ranked = new FrontlineRanker().rank(positions, ranges);
+    return parts.stream()
+        .map(p -> ranked.containsKey(p.player()) ? p.inLine(ranked.get(p.player())) : p)
+        .toList();
   }
 
   private static int[] center(
@@ -196,7 +264,10 @@ public final class FightAssessor {
         distance,
         activity,
         couldHaveTeleported ? absenceReason(cooldownLeft) : null,
-        cooldownLeft);
+        cooldownLeft,
+        trace == null ? null : trace.attackRangeAt(fight.start()),
+        null,
+        null);
   }
 
   private static AbsenceReason absenceReason(Integer cooldownLeft) {

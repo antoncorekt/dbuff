@@ -18,6 +18,7 @@ public record SampleFacts(
    * all zeros, so a level of 0 means "no data".
    *
    * @param mana the mana points, as against {@code manaPercent}
+   * @param attackRange the hero's attack range in world units, bonuses included
    * @param flags bit 0 is set while the hero is alive
    */
   public record PlayerSeries(
@@ -27,6 +28,7 @@ public record SampleFacts(
       int[] hpPercent,
       int[] manaPercent,
       int[] mana,
+      int[] attackRange,
       int[] level,
       int[] flags) {}
 
