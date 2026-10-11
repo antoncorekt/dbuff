@@ -20,23 +20,34 @@ class ReplayTempCleanerTest {
   @Test
   void sweep_removesLeftoversWhenNoParseIsRunning() throws IOException {
     properties.setTempDir(dir);
-    Files.writeString(dir.resolve("1-a.replay"), "x");
-    Files.writeString(dir.resolve("1-b.dem"), "x");
+    old("1-a.replay");
+    old("1-b.dem");
+    Files.writeString(dir.resolve("2-fresh.replay"), "x");
 
     new ReplayTempCleaner(properties, semaphore).sweep();
 
-    assertThat(dir).isEmptyDirectory();
+    assertThat(dir).isDirectoryContaining("glob:**/2-fresh.replay");
+    assertThat(dir.toFile().list()).containsExactly("2-fresh.replay");
   }
 
   @Test
   void sweep_leavesFilesAloneWhileAParseHoldsThePermit() throws IOException, InterruptedException {
     properties.setTempDir(dir);
-    Files.writeString(dir.resolve("1-b.dem"), "x");
+    old("1-b.dem");
     semaphore.acquire();
 
     new ReplayTempCleaner(properties, semaphore).sweep();
 
     assertThat(dir.resolve("1-b.dem")).exists();
+  }
+
+  private void old(String name) throws IOException {
+    Path file = dir.resolve(name);
+    Files.writeString(file, "x");
+    Files.setLastModifiedTime(
+        file,
+        java.nio.file.attribute.FileTime.from(
+            java.time.Instant.now().minus(java.time.Duration.ofDays(1))));
   }
 
   @Test

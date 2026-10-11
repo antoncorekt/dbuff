@@ -14,6 +14,8 @@ import lombok.Builder;
  * @param samples per-player state over time, null when the replay was not read past the draft
  * @param combatLog the hero-relevant combat-log entries, null when none were read
  * @param map the buildings and jungle camps of the map the game was played on
+ * @param cutShort true when the replay ended with an error after the game had started, so the facts
+ *     cover only the part that was read
  */
 @Builder
 public record ReplayFacts(
@@ -23,7 +25,8 @@ public record ReplayFacts(
     DraftFacts draft,
     SampleFacts samples,
     CombatLogFacts combatLog,
-    MapFacts map) {
+    MapFacts map,
+    boolean cutShort) {
   /** The players by their replay id; a player listed twice keeps the first entry. */
   public Map<Integer, ReplayPlayerFact> playersById() {
     return players.stream()

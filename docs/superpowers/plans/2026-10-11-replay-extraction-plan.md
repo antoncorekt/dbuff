@@ -568,6 +568,8 @@ Our detector keeps that rule as the baseline and adds layers; store the detector
 Calibrate thresholds in S10 on 20 replays: precision/recall against OpenDota deaths-based fights, plus a manual
 review of 10 engagements that the baseline missed.
 
+> **Implemented (first version):** `FightDetector`, `FightAssessor` and `FightAnalyzer` in `service/replay/analysis/fight/`, rules version 1. Hostile events are hero-to-hero damage between the teams and hero deaths from the stored combat log. Damage only counts as fight activity inside a burst (at least 400 hero damage within 5 s around it), because without that, lane harassment chains into one fight lasting minutes; deaths always count. Events closer than 10 s form a fight: three or more deaths is a TEAMFIGHT, one or two a SKIRMISH, none an ENGAGEMENT (at least 600 damage and two heroes from each side). Checked on match 9038725154: each of OpenDota's 16 teamfights is covered by one of our TEAMFIGHTs with at least as many deaths (two overlapping OpenDota windows at 2011-2081 become one of ours; one late fight at 2259-2303 is ours only). Not yet: the spatial split of simultaneous fights, tags (Roshan, tower, high ground), the OpenDota fight link, TP / cooldown / mana / front-line reasons. Players get ACTIVE, PRESENT_PASSIVE or an ABSENT_* reason taken from the activity classifier.
+
 ### 7.2 Per-fight tables (L1+L2)
 - `FightDomain`: `matchId, fightIndex, detector, type (TEAMFIGHT|SKIRMISH|ENGAGEMENT), startSec, endSec,
   firstDeathSec, centerX, centerY, region, tags, radiantDeaths, direDeaths, radiantParticipants, direParticipants,

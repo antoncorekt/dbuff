@@ -63,6 +63,7 @@ public class ClarityReplayParser implements ReplayParser {
       }
       if (!hasCause(e, GameOver.class)) {
         log.warn("Replay of the game was cut short, keeping what was read: {}", e.getMessage());
+        collector.cutShort = true;
       }
     }
     if (collector.facts == null) {
@@ -121,6 +122,7 @@ public class ClarityReplayParser implements ReplayParser {
 
     private final BooleanSupplier cancelled;
     ReplayFacts facts;
+    boolean cutShort;
     private SampleRecorder recorder;
     private final CombatLogRecorder combatLog = new CombatLogRecorder();
     private MapFacts map;
@@ -194,6 +196,7 @@ public class ClarityReplayParser implements ReplayParser {
           .samples(recorder().result(facts.clockStartTick()))
           .combatLog(combatLog.result(facts.gameStartTime()))
           .map(map)
+          .cutShort(cutShort)
           .build();
     }
 

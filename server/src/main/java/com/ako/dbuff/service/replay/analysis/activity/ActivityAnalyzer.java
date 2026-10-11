@@ -9,15 +9,14 @@ import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
+import com.ako.dbuff.service.replay.CombatHeroes;
 import com.ako.dbuff.service.replay.CombatLogReader;
-import com.ako.dbuff.service.replay.HeroNames;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.map.MapLayout;
 import com.ako.dbuff.service.replay.map.MapLayouts;
 import com.ako.dbuff.service.replay.map.Zone;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,11 +24,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Stores what each hero was doing through the game, from the stored tracks and combat log. */
 @Slf4j
+@Order(10)
 @Component
 @RequiredArgsConstructor
 public class ActivityAnalyzer implements ReplayAnalyzer {
@@ -73,7 +74,7 @@ public class ActivityAnalyzer implements ReplayAnalyzer {
       log.info("Match {} has no stored combat log, no activity stored", matchId);
       return;
     }
-    Set<String> heroNames = heroNames(events);
+    Set<String> heroNames = CombatHeroes.names(events);
     Map<Long, ReplayPlayerDomain> players =
         playerRepo.findByMatchId(matchId).stream()
             .collect(
@@ -83,8 +84,11 @@ public class ActivityAnalyzer implements ReplayAnalyzer {
                     (first, second) -> first));
     ActivitySegmenter segmenter = new ActivitySegmenter(analysis.activityTuning());
     for (ReplayPlayerTrackDomain track : trackRepo.findByMatchId(matchId)) {
+      if (track.getSampleCount() == null || track.getSampleCount() == 0) {
+        continue;
+      }
       ReplayPlayerDomain player = players.get(track.getPlayerSlot());
-      String hero = player == null ? null : heroName(player, heroNames);
+      String hero = player == null ? null : CombatHeroes.nameOf(player, heroNames);
       if (hero == null) {
         log.info("No combat-log hero for slot {} of match {}", track.getPlayerSlot(), matchId);
         continue;
@@ -108,26 +112,6 @@ public class ActivityAnalyzer implements ReplayAnalyzer {
             .map(ReplayParseRunDomain::getMapVersion)
             .orElse(null);
     return mapLayouts.forVersion(version).orElse(null);
-  }
-
-  private static Set<String> heroNames(List<CombatEvent> events) {
-    Set<String> names = new HashSet<>();
-    for (CombatEvent e : events) {
-      if ((e.flags() & CombatEvent.ATTACKER_HERO) != 0) {
-        names.add(e.attacker());
-      }
-      if ((e.flags() & CombatEvent.TARGET_HERO) != 0) {
-        names.add(e.target());
-      }
-    }
-    return names;
-  }
-
-  private static String heroName(ReplayPlayerDomain player, Set<String> heroNames) {
-    return heroNames.stream()
-        .filter(name -> HeroNames.matches(player.getHeroEntityName(), name))
-        .findFirst()
-        .orElse(null);
   }
 
   private static ActivitySegmenter.Track toTrack(
