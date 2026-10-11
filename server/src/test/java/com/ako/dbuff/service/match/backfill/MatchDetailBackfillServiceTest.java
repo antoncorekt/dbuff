@@ -108,6 +108,20 @@ class MatchDetailBackfillServiceTest {
     verify(matchRepo, never()).updateDetailState(any(), any(), any(), any(), any(), any());
   }
 
+  @Test
+  void backfillBatch_stopsTheRunOnARejectedKeyWithoutMarkingAnyMatch() throws Exception {
+    MatchDomain first = MatchDomain.builder().id(1L).build();
+    MatchDomain second = MatchDomain.builder().id(2L).build();
+    pending(first, second);
+    when(api.fetchOnce(1L)).thenThrow(new ApiException(403, "Forbidden"));
+
+    service.backfillBatch();
+
+    assertThat(first.getDetailsAttemptedAt()).isNull();
+    verify(api, never()).fetchOnce(2L);
+    verify(matchRepo, never()).updateDetailState(any(), any(), any(), any(), any(), any());
+  }
+
   private void pending(MatchDomain... matches) {
     when(matchRepo.findMatchesWithoutDetails(any(), any(), any())).thenReturn(List.of(matches));
   }

@@ -24,14 +24,14 @@ class MatchRepoBackfillQueryTest {
   @Autowired private EntityManager entityManager;
 
   @Test
-  void findMatchesWithoutDetails_returnsProcessedUnmappedMatchesNewestFirst() {
+  void findMatchesWithoutDetails_returnsProcessedUnmappedMatchesNewestFirstEvenAfterAnApiFailure() {
     save(1L, 1_100L, NOW, null, null, null);
     save(2L, 1_300L, NOW, null, null, false);
     save(3L, 1_200L, NOW, NOW, null, null);
     save(4L, 1_400L, null, null, null, null);
     save(5L, 1_500L, NOW, null, null, true);
 
-    assertThat(ids(PageRequest.of(0, 10))).containsExactly(2L, 1L);
+    assertThat(ids(PageRequest.of(0, 10))).containsExactly(5L, 2L, 1L);
   }
 
   @Test

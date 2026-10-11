@@ -20,16 +20,16 @@ public interface MatchRepo extends JpaRepository<MatchDomain, Long> {
   List<MatchDomain> findAllByEndProcessIsNull();
 
   /**
-   * Matches whose detail rows are missing. A match tried before is retried only once {@code
-   * retryBefore} has passed and only while it started after {@code recentAfter}, so matches
-   * OpenDota never parsed do not stay in the queue forever.
+   * Matches whose detail rows are missing, including ones whose first fetch failed, since that
+   * failure may have been temporary. A match tried before is retried only once {@code retryBefore}
+   * has passed and only while it started after {@code recentAfter}, so matches OpenDota never
+   * parsed do not stay in the queue forever.
    */
   @Query(
       """
       select m from MatchDomain m
       where m.detailsMappedAt is null
         and m.endProcess is not null
-        and (m.dotaApiFailed is null or m.dotaApiFailed = false)
         and (m.detailsAttemptedAt is null
              or (m.detailsAttemptedAt < :retryBefore and m.startTime > :recentAfter))
       order by m.startTime desc

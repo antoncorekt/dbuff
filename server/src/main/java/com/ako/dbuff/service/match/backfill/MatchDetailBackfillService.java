@@ -16,14 +16,16 @@ import org.springframework.stereotype.Service;
 
 /**
  * Fills the OpenDota detail tables for matches stored before they existed. It does not retry within
- * a run: a problem with one match is recorded as an attempt and skipped, and only a rate limit or
- * an outage ends the run, so the job never holds a thread through one.
+ * a run: a problem with one match is recorded as an attempt and skipped, and only a rate limit, an
+ * outage or a rejected API key ends the run, so the job never holds a thread through one.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class MatchDetailBackfillService {
 
+  private static final int UNAUTHORIZED = 401;
+  private static final int FORBIDDEN = 403;
   private static final int TOO_MANY_REQUESTS = 429;
   private static final int SERVER_ERROR = 500;
 
@@ -52,6 +54,14 @@ public class MatchDetailBackfillService {
       try {
         response = dotaApiMatchDetailsService.fetchOnce(match.getId());
       } catch (ApiException e) {
+        if (isRejectedKey(e)) {
+          log.error(
+              "OpenDota rejected the request for match {} ({}), backfill stopped without"
+                  + " marking any match",
+              match.getId(),
+              e.getCode());
+          break;
+        }
         if (isRateLimitOrOutage(e)) {
           log.warn("Backfill stopped at match {}: {}", match.getId(), e.getMessage());
           break;
@@ -76,6 +86,11 @@ public class MatchDetailBackfillService {
       log.info("Match detail backfill: {} of {} matches stored", stored, pending.size());
     }
     return stored;
+  }
+
+  /** A bad or revoked key fails every request alike, so no match is to blame. */
+  private static boolean isRejectedKey(ApiException e) {
+    return e.getCode() == UNAUTHORIZED || e.getCode() == FORBIDDEN;
   }
 
   private static boolean isRateLimitOrOutage(ApiException e) {
