@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.analysis;
 import com.ako.dbuff.service.replay.analysis.activity.ActivityTuning;
 import com.ako.dbuff.service.replay.analysis.death.DeathAssessor;
 import com.ako.dbuff.service.replay.analysis.fight.FightDetector;
+import com.ako.dbuff.service.replay.analysis.spike.SpikeDetector;
 import com.ako.dbuff.service.replay.analysis.team.TeamStateSegmenter;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -77,6 +78,29 @@ public class ReplayAnalysisProperties {
 
   /** The mid game ends at this game minute; the late game follows. */
   private int phaseMidEndMinutes = 25;
+
+  /** A swing is at least this much net worth. */
+  private int spikeMinGold = 1500;
+
+  /** A swing is at least this share of both teams' net worth together, in percent. */
+  private int spikeMinPercent = 3;
+
+  /** A swing takes up to this many minutes to start; it goes on while it keeps moving. */
+  private int spikeMaxMinutes = 3;
+
+  /** A lead of this size on both sides of a swing makes it a change of direction. */
+  private int spikeFlipGold = 1000;
+
+  /** A source must make up this share of a swing to be named as its cause, in percent. */
+  private int spikeMinSharePercent = 10;
+
+  public SpikeDetector.Tuning spikeTuning() {
+    return new SpikeDetector.Tuning(
+        Math.max(1, spikeMinGold),
+        Math.max(1, spikeMinPercent) / 100.0,
+        Math.max(1, spikeMaxMinutes),
+        spikeFlipGold);
+  }
 
   public TeamStateSegmenter.Tuning teamStateTuning() {
     return new TeamStateSegmenter.Tuning(

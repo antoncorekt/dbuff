@@ -433,6 +433,8 @@ end of the game, so they must be captured while the draft runs) and store the he
 OpenDota hero constants minus nothing (the pool is the whole roster; store bans/picks and the pick timestamps).
 Spike S9 verifies this on an All Pick replay before any AP work.
 
+> **Spike S9 result (2026-10-12, All Pick matches 9040892342 and 9040889566):** the replay holds no pick stream. Recording starts after the draft; the only draft state on the game rules entity is one snapshot at the first tick (`m_vecNewBannedHeroes`, 17 entries) and `m_flHeroPickStateTransitionTime`. There is no pick order or timing to capture, and OpenDota's `picks_bans` already carry the bans, so no All Pick extractor is built.
+
 ### 5.2 Tables (L1)
 - `AbilityDraftPickDomain` (40 rows): `matchId, pickOrder (1..40), playerSlot, replayPlayerId, team,
   teamPickIndex (1..20), pickTick, secondsIntoDraft, secondsSincePrevPick, abilityId (OpenDota id), abilityName,
