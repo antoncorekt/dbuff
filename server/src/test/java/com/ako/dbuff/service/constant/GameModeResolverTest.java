@@ -50,6 +50,34 @@ class GameModeResolverTest {
   }
 
   @Test
+  void channelDefault_isUsedWhenNoModeIsTyped() {
+    GameModeSelection selection =
+        resolver.resolveOrDefault(Set.of(), Set.of("game_mode_all_draft"));
+
+    assertThat(selection.ids()).containsExactly(ALL_DRAFT_ID);
+  }
+
+  @Test
+  void typedMode_beatsTheChannelDefault() {
+    GameModeSelection selection =
+        resolver.resolveOrDefault(Set.of("ability_draft"), Set.of("game_mode_all_draft"));
+
+    assertThat(selection.ids()).containsExactly(ABILITY_DRAFT_ID);
+  }
+
+  @Test
+  void channelDefaultAll_meansEveryMode() {
+    assertThat(resolver.resolveOrDefault(Set.of(), Set.of("all")).isAllModes()).isTrue();
+  }
+
+  @Test
+  void noChannelDefault_stillFallsBackToAbilityDraft() {
+    assertThat(resolver.resolveOrDefault(Set.of(), Set.of()).ids())
+        .containsExactly(ABILITY_DRAFT_ID);
+    assertThat(resolver.resolveOrDefault(null, null).ids()).containsExactly(ABILITY_DRAFT_ID);
+  }
+
+  @Test
   void nullTokens_defaultToAbilityDraft() {
     assertThat(resolver.resolveOrDefault(null).ids()).containsExactly(ABILITY_DRAFT_ID);
   }

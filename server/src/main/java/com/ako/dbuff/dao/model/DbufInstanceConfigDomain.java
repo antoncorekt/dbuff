@@ -3,6 +3,7 @@ package com.ako.dbuff.dao.model;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -109,10 +110,20 @@ public class DbufInstanceConfigDomain {
   @Builder.Default
   private Map<Long, LocalDateTime> playerTrackingSince = new HashMap<>();
 
+  /**
+   * Per-channel choices; null on rows that never set any. Read via {@link #effectiveSettings()}.
+   */
+  @Embedded private InstanceSettings settings;
+
   /** Whether this instance is active */
   @Column(name = "active")
   @Builder.Default
   private Boolean active = true;
+
+  /** The settings with null-for-unset resolved, never null. */
+  public InstanceSettings effectiveSettings() {
+    return settings == null ? new InstanceSettings() : settings;
+  }
 
   /**
    * The moment before which this player's matches are history.

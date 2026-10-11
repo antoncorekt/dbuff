@@ -2,6 +2,7 @@ package com.ako.dbuff.service.scheduler.jobs;
 
 import com.ako.dbuff.config.DotaApiConfig.DotaApiConfigurationProperties;
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
+import com.ako.dbuff.dao.model.InstanceSettings;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.service.details.MatchParserHandler;
@@ -41,7 +42,14 @@ public class MatchParseCheckJob implements Job {
     long discordThreadId = context.getJobDetail().getJobDataMap().getLong("discordThreadId");
     long headerMessageId = context.getJobDetail().getJobDataMap().getLong("headerMessageId");
 
-    if (quietHoursGuard.isQuietTime()) {
+    InstanceSettings settings =
+        instanceId == null
+            ? new InstanceSettings()
+            : instanceConfigService
+                .getDomainById(instanceId)
+                .map(DbufInstanceConfigDomain::effectiveSettings)
+                .orElseGet(InstanceSettings::new);
+    if (quietHoursGuard.isQuietTime(settings)) {
       log.debug("Skipping parse check for match {} during quiet hours", matchId);
       return;
     }

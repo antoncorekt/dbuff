@@ -2,6 +2,7 @@ package com.ako.dbuff.service.match.report.analyzer.item;
 
 import com.ako.dbuff.dao.model.ItemDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
+import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.service.match.report.MatchReportContext;
 import com.ako.dbuff.service.match.report.analyzer.FullDataAvailable;
 import com.ako.dbuff.service.match.report.analyzer.Report;
@@ -44,5 +45,10 @@ public class ItemReporterAnalyzer implements ReportAnalyzer, FullDataAvailable {
   @Override
   public int getOrder() {
     return 4;
+  }
+
+  @Override
+  public ReportDetail getMinimumDetail() {
+    return ReportDetail.STANDARD;
   }
 }

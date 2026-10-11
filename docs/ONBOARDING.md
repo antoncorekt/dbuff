@@ -50,6 +50,20 @@ later works the same way for that player's recent games.
   `game_mode:all` for everything.
 - `/match` reruns or retries a report. `/dbuff help` lists every command.
 
+## Channel settings
+
+`/dbuff settings` shows the current settings to anyone; changing them needs Manage Channel.
+Add options to change them. Anything you leave
+alone keeps its value, and `default` resets a setting.
+
+| Option | What it does |
+|--------|--------------|
+| `detail:` | How much each report includes: `minimal` (the Dotabuff link, plus the AI summary if it is on), `standard` (plus items and abilities) or `full` (everything). |
+| `ai_summary:` | Post the AI match summary or not. |
+| `quiet_hours:` | Pause match checks, e.g. `01:00-09:00`, `off`, or `default` for the server's window. Games are picked up when it ends. |
+| `timezone:` | The timezone quiet hours use, e.g. `Europe/Kyiv`. Pick from the list. |
+| `game_mode:` | The game mode `/stats` and `/hero` use when you do not name one. Registering with a `mode:` sets this too. |
+
 ## Stopping and restarting
 
 `/dbuff deactivate` stops tracking in the channel. `/dbuff register` brings it back. Removing the

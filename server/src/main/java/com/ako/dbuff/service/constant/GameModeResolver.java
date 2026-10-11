@@ -75,6 +75,23 @@ public class GameModeResolver {
   }
 
   /**
+   * Resolves game mode tokens for a channel, falling back to that channel's own default and only
+   * then to {@link #ABILITY_DRAFT}.
+   *
+   * @param tokens what the user typed; null or empty when they named no mode
+   * @param channelDefault the channel's configured default tokens; null or empty when it has none
+   * @return the resolved selection
+   */
+  public GameModeSelection resolveOrDefault(Set<String> tokens, Set<String> channelDefault) {
+    if ((tokens == null || tokens.isEmpty())
+        && channelDefault != null
+        && !channelDefault.isEmpty()) {
+      return resolve(channelDefault);
+    }
+    return resolveOrDefault(tokens);
+  }
+
+  /**
    * Resolves game mode tokens, treating "none given" as "every mode".
    *
    * <p>Deliberately different from {@link #resolveOrDefault}: the services must not invent a mode

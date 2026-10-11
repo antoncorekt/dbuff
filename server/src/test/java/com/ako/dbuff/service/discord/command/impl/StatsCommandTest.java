@@ -92,7 +92,8 @@ class StatsCommandTest {
     Mockito.when(nameResolver.resolveItems(Mockito.anySet())).thenReturn(NameResolution.empty());
     Mockito.when(nameResolver.resolveAbilities(Mockito.anySet()))
         .thenReturn(NameResolution.empty());
-    Mockito.when(gameModeResolver.resolveOrDefault(Mockito.anySet())).thenReturn(ABILITY_DRAFT);
+    Mockito.when(gameModeResolver.resolveOrDefault(Mockito.anySet(), Mockito.anySet()))
+        .thenReturn(ABILITY_DRAFT);
     Mockito.when(patchDateResolver.getCurrentPatchStartDate())
         .thenReturn(Optional.of(LocalDate.of(2026, 8, 1)));
     Mockito.when(
@@ -975,10 +976,29 @@ class StatsCommandTest {
   // ----------------------------------------------------------------- game mode
 
   @Test
+  void theChannelsOwnDefaultMode_isHandedToTheResolverWhenNoModeIsTyped() {
+    Mockito.when(instanceConfigService.getByDiscordChannelId(Mockito.anyString()))
+        .thenReturn(
+            Optional.of(
+                DbufInstanceConfigResponse.builder()
+                    .id("instance-1")
+                    .settings(
+                        com.ako.dbuff.resources.model.InstanceSettingsResponse.builder()
+                            .defaultGameModes(Set.of("game_mode_all_draft"))
+                            .build())
+                    .build()));
+
+    command.execute("overall", context());
+
+    Mockito.verify(gameModeResolver)
+        .resolveOrDefault(Mockito.eq(Set.of()), Mockito.eq(Set.of("game_mode_all_draft")));
+  }
+
+  @Test
   void gameModeDefaultsToAbilityDraftWhenTheOptionIsAbsent() {
     command.execute("overall", context());
 
-    Mockito.verify(gameModeResolver).resolveOrDefault(Set.of());
+    Mockito.verify(gameModeResolver).resolveOrDefault(Mockito.eq(Set.of()), Mockito.anySet());
     ArgumentCaptor<Set<String>> modes = ArgumentCaptor.forClass(Set.class);
     Mockito.verify(playerStatisticService)
         .getPlayerStatistics(
@@ -994,7 +1014,9 @@ class StatsCommandTest {
 
   @Test
   void gameModeAcceptsAList() {
-    Mockito.when(gameModeResolver.resolveOrDefault(Set.of("ability_draft", "all_pick")))
+    Mockito.when(
+            gameModeResolver.resolveOrDefault(
+                Mockito.eq(Set.of("ability_draft", "all_pick")), Mockito.anySet()))
         .thenReturn(
             new GameModeSelection(
                 Set.of("game_mode_ability_draft", "game_mode_all_draft"),
@@ -1026,7 +1048,7 @@ class StatsCommandTest {
 
   @Test
   void gameModeAll_passesNoFilterSoEveryModeCounts() {
-    Mockito.when(gameModeResolver.resolveOrDefault(Set.of("all")))
+    Mockito.when(gameModeResolver.resolveOrDefault(Mockito.eq(Set.of("all")), Mockito.anySet()))
         .thenReturn(GameModeSelection.allModes());
 
     FakeCommandContext context =
@@ -1046,7 +1068,8 @@ class StatsCommandTest {
 
   @Test
   void unknownGameMode_isReportedWithASuggestionBeforeAcknowledging() {
-    Mockito.when(gameModeResolver.resolveOrDefault(Set.of("abilty_draft")))
+    Mockito.when(
+            gameModeResolver.resolveOrDefault(Mockito.eq(Set.of("abilty_draft")), Mockito.anySet()))
         .thenReturn(new GameModeSelection(Set.of(), Set.of(), Set.of("abilty_draft"), "All modes"));
     Mockito.when(gameModeResolver.suggest("abilty_draft")).thenReturn(Optional.of("Ability Draft"));
 

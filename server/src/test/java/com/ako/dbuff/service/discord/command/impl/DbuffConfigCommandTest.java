@@ -63,6 +63,9 @@ class DbuffConfigCommandTest {
         .active(true)
         .players(Set.of(PlayerInfo.builder().id(TIGRESS_ID).name("Tigress").build()))
         .gameModes(Set.of())
+        .settings(
+            com.ako.dbuff.resources.model.InstanceSettingsResponse.from(
+                new com.ako.dbuff.dao.model.InstanceSettings()))
         .build();
   }
 
@@ -71,7 +74,15 @@ class DbuffConfigCommandTest {
     assertThat(command.getDefinition().getSubcommands())
         .extracting(subcommand -> subcommand.getName())
         .containsExactlyInAnyOrder(
-            "register", "status", "add", "remove", "link", "modes", "deactivate", "help");
+            "register",
+            "status",
+            "add",
+            "remove",
+            "link",
+            "modes",
+            "settings",
+            "deactivate",
+            "help");
   }
 
   @Test
@@ -219,6 +230,137 @@ class DbuffConfigCommandTest {
 
     assertThat(context.getEphemeralReplies()).isEmpty();
     assertThat(context.getAcknowledgeSummary()).isNotNull();
+  }
+
+  @Test
+  void settings_changesAreForwardedToTheService() {
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .option("ai_summary", "false")
+            .option("detail", "minimal")
+            .option("quiet_hours", "22:00-07:00")
+            .option("timezone", "Europe/Kyiv")
+            .option("game_mode", "ability_draft,all_pick")
+            .build();
+
+    command.execute("settings", context);
+
+    ArgumentCaptor<UpdateInstanceRequest> captor =
+        ArgumentCaptor.forClass(UpdateInstanceRequest.class);
+    Mockito.verify(instanceConfigService).update(Mockito.eq("instance-1"), captor.capture());
+    UpdateInstanceRequest request = captor.getValue();
+    assertThat(request.getAiSummaryEnabled()).isFalse();
+    assertThat(request.getReportDetail()).isEqualTo("minimal");
+    assertThat(request.getQuietHours()).isEqualTo("22:00-07:00");
+    assertThat(request.getTimezone()).isEqualTo("Europe/Kyiv");
+    assertThat(request.getDefaultGameModes()).containsExactly("ability_draft", "all_pick");
+    assertThat(context.getEmbeds()).hasSize(1);
+  }
+
+  @Test
+  void settings_rejectedValue_isShownPrivatelyBeforeAnyThread() {
+    Mockito.when(instanceConfigService.update(Mockito.anyString(), Mockito.any()))
+        .thenThrow(new IllegalArgumentException("Unknown timezone `Mars/Base`."));
+    FakeCommandContext context =
+        FakeCommandContext.builder().option("timezone", "Mars/Base").build();
+
+    command.execute("settings", context);
+
+    assertThat(context.getEphemeralReplies()).containsExactly("❌ Unknown timezone `Mars/Base`.");
+    assertThat(context.getAcknowledgeSummary()).isNull();
+  }
+
+  @Test
+  void settings_withNoOptions_showsTheCurrentSettingsWithoutChangingAnything() {
+    FakeCommandContext context = FakeCommandContext.builder().build();
+
+    command.execute("settings", context);
+
+    Mockito.verify(instanceConfigService, Mockito.never())
+        .update(Mockito.anyString(), Mockito.any());
+    assertThat(context.getEmbeds()).hasSize(1);
+    assertThat(context.getEmbeds().get(0).getDescription()).contains("Report detail");
+  }
+
+  @Test
+  void settings_changeWithoutManagePermission_isRefused() {
+    FakeCommandContext context =
+        FakeCommandContext.builder().canManageChannel(false).option("detail", "full").build();
+
+    command.execute("settings", context);
+
+    assertThat(context.getEphemeralReplies().get(0)).contains("Manage Channel");
+    Mockito.verify(instanceConfigService, Mockito.never())
+        .update(Mockito.anyString(), Mockito.any());
+  }
+
+  @Test
+  void settings_viewingWithoutManagePermission_isAllowed() {
+    FakeCommandContext context = FakeCommandContext.builder().canManageChannel(false).build();
+
+    command.execute("settings", context);
+
+    assertThat(context.getEmbeds()).hasSize(1);
+    assertThat(context.getEphemeralReplies()).isEmpty();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"true", "ON", "yes", "1"})
+  void settings_aiSummary_acceptsEveryWayOfSayingYes(String raw) {
+    FakeCommandContext context = FakeCommandContext.builder().option("ai_summary", raw).build();
+
+    command.execute("settings", context);
+
+    ArgumentCaptor<UpdateInstanceRequest> captor =
+        ArgumentCaptor.forClass(UpdateInstanceRequest.class);
+    Mockito.verify(instanceConfigService).update(Mockito.anyString(), captor.capture());
+    assertThat(captor.getValue().getAiSummaryEnabled()).isTrue();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"false", "OFF", "no", "0"})
+  void settings_aiSummary_acceptsEveryWayOfSayingNo(String raw) {
+    FakeCommandContext context = FakeCommandContext.builder().option("ai_summary", raw).build();
+
+    command.execute("settings", context);
+
+    ArgumentCaptor<UpdateInstanceRequest> captor =
+        ArgumentCaptor.forClass(UpdateInstanceRequest.class);
+    Mockito.verify(instanceConfigService).update(Mockito.anyString(), captor.capture());
+    assertThat(captor.getValue().getAiSummaryEnabled()).isFalse();
+  }
+
+  @Test
+  void settings_aiSummary_unreadableWord_isRejectedNotTreatedAsFalse() {
+    FakeCommandContext context = FakeCommandContext.builder().option("ai_summary", "maybe").build();
+
+    command.execute("settings", context);
+
+    assertThat(context.getEphemeralReplies().get(0)).contains("`maybe`");
+    Mockito.verify(instanceConfigService, Mockito.never())
+        .update(Mockito.anyString(), Mockito.any());
+    assertThat(context.getAcknowledgeSummary()).isNull();
+  }
+
+  @Test
+  void settings_unregisteredChannel_pointsAtRegister() {
+    Mockito.when(instanceConfigService.getByDiscordChannelId(Mockito.anyString()))
+        .thenReturn(Optional.empty());
+    FakeCommandContext context = FakeCommandContext.builder().option("detail", "full").build();
+
+    command.execute("settings", context);
+
+    assertThat(context.getEphemeralReplies().get(0)).contains("/dbuff register");
+  }
+
+  @Test
+  void status_includesTheSettings() {
+    FakeCommandContext context = FakeCommandContext.builder().build();
+
+    command.execute("status", context);
+
+    assertThat(context.getEmbeds().get(0).getFields())
+        .anyMatch(field -> "Settings".equals(field.getName()));
   }
 
   @Test

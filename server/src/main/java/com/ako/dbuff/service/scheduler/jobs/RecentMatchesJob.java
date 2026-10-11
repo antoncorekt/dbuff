@@ -1,5 +1,8 @@
 package com.ako.dbuff.service.scheduler.jobs;
 
+import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
+import com.ako.dbuff.dao.model.InstanceSettings;
+import com.ako.dbuff.service.instance.DbufInstanceConfigService;
 import com.ako.dbuff.service.match.LastMatchesProcessorService;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import lombok.extern.slf4j.Slf4j;
@@ -21,11 +24,17 @@ public class RecentMatchesJob implements Job {
 
   @Autowired private LastMatchesProcessorService lastMatchesProcessorService;
   @Autowired private QuietHoursGuard quietHoursGuard;
+  @Autowired private DbufInstanceConfigService instanceConfigService;
 
   @Override
   public void execute(JobExecutionContext context) throws JobExecutionException {
     String instanceId = context.getJobDetail().getJobDataMap().getString("instanceId");
-    if (quietHoursGuard.isQuietTime()) {
+    InstanceSettings settings =
+        instanceConfigService
+            .getDomainById(instanceId)
+            .map(DbufInstanceConfigDomain::effectiveSettings)
+            .orElseGet(InstanceSettings::new);
+    if (quietHoursGuard.isQuietTime(settings)) {
       log.info("Skipping recent matches for instance {} during quiet hours", instanceId);
       return;
     }

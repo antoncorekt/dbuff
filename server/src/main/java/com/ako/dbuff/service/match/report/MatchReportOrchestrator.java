@@ -2,6 +2,7 @@ package com.ako.dbuff.service.match.report;
 
 import com.ako.dbuff.dao.model.AbilityDomain;
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
+import com.ako.dbuff.dao.model.InstanceSettings;
 import com.ako.dbuff.dao.model.ItemDomain;
 import com.ako.dbuff.dao.model.KillLogDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.entities.Message;
@@ -57,7 +59,7 @@ public class MatchReportOrchestrator {
     }
 
     List<ReportAnalyzer> sortedAnalyzers =
-        analyzers.stream().sorted(Comparator.comparingInt(ReportAnalyzer::getOrder)).toList();
+        enabledAnalyzers(config).sorted(Comparator.comparingInt(ReportAnalyzer::getOrder)).toList();
 
     Set<Long> focusPlayerIds = config.getPlayerIds();
 
@@ -104,7 +106,7 @@ public class MatchReportOrchestrator {
     MatchReportContext context = buildContext(match, config, focusPlayerIds);
 
     List<ReportAnalyzer> partialAnalyzers =
-        analyzers.stream()
+        enabledAnalyzers(config)
             .filter(a -> a instanceof PartialDataAvailable)
             .filter(a -> ((PartialDataAvailable) a).isApplicable(context))
             .sorted(Comparator.comparingInt(ReportAnalyzer::getOrder))
@@ -153,7 +155,7 @@ public class MatchReportOrchestrator {
     }
 
     List<ReportAnalyzer> fullAnalyzers =
-        analyzers.stream()
+        enabledAnalyzers(config)
             .filter(a -> a instanceof FullDataAvailable)
             .filter(a -> ((FullDataAvailable) a).isApplicable(context))
             .sorted(Comparator.comparingInt(ReportAnalyzer::getOrder))
@@ -180,6 +182,12 @@ public class MatchReportOrchestrator {
     }
 
     log.info("Full report sent for match {} in thread {}", match.getId(), threadId);
+  }
+
+  /** The analyzers this channel's settings allow. */
+  private Stream<ReportAnalyzer> enabledAnalyzers(DbufInstanceConfigDomain config) {
+    InstanceSettings settings = config.effectiveSettings();
+    return analyzers.stream().filter(analyzer -> analyzer.isEnabledFor(settings));
   }
 
   public List<Report> analyzeMatch(MatchDomain match, DbufInstanceConfigDomain config) {

@@ -1,8 +1,9 @@
 package com.ako.dbuff.service.scheduler;
 
 import com.ako.dbuff.config.QuietHoursProperties;
+import com.ako.dbuff.dao.model.InstanceSettings;
+import java.time.Instant;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -19,25 +20,39 @@ public class QuietHoursGuard {
   private final QuietHoursProperties properties;
 
   /**
-   * @return {@code true} if the server's current local time is within the quiet-hours window
+   * Whether jobs for a channel should be skipped now, honouring that channel's own settings.
+   *
+   * <p>A channel with no quiet-hours choice follows the server-wide window; one that turned them
+   * off never skips; one with its own window is judged by its own clock, in its own timezone.
    */
-  public boolean isQuietTime() {
-    return isQuietTime(LocalTime.now(ZoneId.systemDefault()));
+  public boolean isQuietTime(InstanceSettings settings) {
+    return isQuietTime(settings, Instant.now());
+  }
+
+  boolean isQuietTime(InstanceSettings settings, Instant moment) {
+    Boolean own = settings.getQuietHoursEnabled();
+    if (Boolean.FALSE.equals(own)) {
+      return false;
+    }
+    LocalTime now = LocalTime.ofInstant(moment, settings.zone());
+    if (own == null) {
+      return properties.isEnabled() && inWindow(now, properties.getStart(), properties.getEnd());
+    }
+    return inWindow(now, settings.getQuietStart(), settings.getQuietEnd());
   }
 
   /**
-   * Tests a specific time against the window. Handles windows that wrap past midnight (e.g. 23:00
-   * to 07:00). The window is {@code [start, end)}.
+   * Tests a specific time against the server-wide window. Handles windows that wrap past midnight
+   * (e.g. 23:00 to 07:00). The window is {@code [start, end)}.
    *
    * @param now the local time to test
-   * @return {@code true} if {@code now} is within the window
+   * @return {@code true} if {@code now} is within the quiet-hours window
    */
   boolean isQuietTime(LocalTime now) {
-    if (!properties.isEnabled()) {
-      return false;
-    }
-    LocalTime start = properties.getStart();
-    LocalTime end = properties.getEnd();
+    return properties.isEnabled() && inWindow(now, properties.getStart(), properties.getEnd());
+  }
+
+  private static boolean inWindow(LocalTime now, LocalTime start, LocalTime end) {
     if (start == null || end == null || start.equals(end)) {
       return false;
     }

@@ -81,7 +81,8 @@ class HeroCommandTest {
         .thenReturn(Optional.of(DbufInstanceConfigResponse.builder().id("instance-1").build()));
     resolvesTo(new PlayerReferenceResolver.ResolvedPlayer(TIGRESS, "Tigress"));
     Mockito.when(nameResolver.resolveHeroes(Mockito.anySet())).thenReturn(NameResolution.empty());
-    Mockito.when(gameModeResolver.resolveOrDefault(Mockito.anySet())).thenReturn(ABILITY_DRAFT);
+    Mockito.when(gameModeResolver.resolveOrDefault(Mockito.anySet(), Mockito.anySet()))
+        .thenReturn(ABILITY_DRAFT);
     Mockito.when(patchDateResolver.getCurrentPatchStartDate())
         .thenReturn(Optional.of(LocalDate.of(2026, 8, 1)));
     Mockito.when(
@@ -386,7 +387,7 @@ class HeroCommandTest {
   @Test
   void gameModeOption_overridesTheAbilityDraftDefault() {
     invokerIsKnown();
-    Mockito.when(gameModeResolver.resolveOrDefault(Set.of("all")))
+    Mockito.when(gameModeResolver.resolveOrDefault(Mockito.eq(Set.of("all")), Mockito.anySet()))
         .thenReturn(GameModeSelection.allModes());
 
     FakeCommandContext context = request().option("game_mode", "all").build();
