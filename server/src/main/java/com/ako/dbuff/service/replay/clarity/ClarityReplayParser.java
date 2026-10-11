@@ -126,6 +126,7 @@ public class ClarityReplayParser implements ReplayParser {
     private SampleRecorder recorder;
     private final CombatLogRecorder combatLog = new CombatLogRecorder();
     private MapFacts map;
+    private StateRecorder stateRecorder;
     private final List<DraftPick> picks = new ArrayList<>();
     private final BitSet picked = new BitSet();
     private long ticksSeen;
@@ -179,9 +180,16 @@ public class ClarityReplayParser implements ReplayParser {
       }
     }
 
+    private StateRecorder stateRecorder() {
+      recorder();
+      return stateRecorder;
+    }
+
     private SampleRecorder recorder() {
       if (recorder == null) {
         recorder = new SampleRecorder(entities);
+        stateRecorder = new StateRecorder(entities, stringTables);
+        recorder.observe(stateRecorder);
       }
       return recorder;
     }
@@ -196,6 +204,7 @@ public class ClarityReplayParser implements ReplayParser {
           .samples(recorder().result(facts.clockStartTick()))
           .combatLog(combatLog.result(facts.gameStartTime()))
           .map(map)
+          .stateChanges(stateRecorder().result(facts.clockStartTick()))
           .cutShort(cutShort)
           .build();
     }
