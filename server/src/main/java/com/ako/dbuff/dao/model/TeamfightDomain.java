@@ -13,10 +13,7 @@ import lombok.*;
 public class TeamfightDomain {
   @Id
   @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "teamfight_seq")
-  @SequenceGenerator(
-      name = "teamfight_seq",
-      sequenceName = "teamfight_seq",
-      allocationSize = 50)
+  @SequenceGenerator(name = "teamfight_seq", sequenceName = "teamfight_seq", allocationSize = 50)
   private Long id;
 
   private Long matchId;

@@ -29,8 +29,7 @@ public class ObjectiveEventMapper implements MatchDetailMapper {
               .eventTime(MatchPayload.asLong(event.get("time")))
               .eventType(MatchPayload.asString(event.get("type")))
               .unit(MatchPayload.asString(event.get("unit")))
-              .objectiveKey(
-                  event.get("key") == null ? null : String.valueOf(event.get("key")))
+              .objectiveKey(event.get("key") == null ? null : String.valueOf(event.get("key")))
               .playerSlot(MatchPayload.asLong(event.get("player_slot")))
               .victimPlayerSlot(MatchPayload.asLong(event.get("victim_player_slot")))
               .team(MatchPayload.asLong(event.get("team")))

@@ -23,7 +23,9 @@ public class AbilityUpgradeDomain {
   private Long matchId;
   private Long playerSlot;
   private Long playerId;
+
   /** 1-based order of the ability point. */
   private Integer upgradeIndex;
+
   private Long abilityId;
 }

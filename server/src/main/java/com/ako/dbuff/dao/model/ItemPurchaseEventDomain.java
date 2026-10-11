@@ -23,11 +23,15 @@ public class ItemPurchaseEventDomain {
   private Long matchId;
   private Long playerSlot;
   private Long playerId;
+
   /** Order of the purchase within the player log. */
   private Integer purchaseIndex;
+
   /** Game time in seconds; negative before the horn. */
   private Long purchaseTime;
+
   /** Internal item name without the item_ prefix. */
   private String itemKey;
+
   private Long charges;
 }

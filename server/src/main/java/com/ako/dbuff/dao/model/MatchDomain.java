@@ -50,13 +50,18 @@ public class MatchDomain {
 
   /** OpenDota od_data.has_parsed at fetch time; false means replay-derived fields are missing. */
   private Boolean hasParsed;
+
   /** Valve replay server cluster; with replaySalt it forms the replay download URL. */
   private Long replayCluster;
+
   private Long replaySalt;
+
   /** When complete OpenDota detail rows were stored; null until the match is parsed there. */
   private LocalDateTime detailsMappedAt;
+
   /** Last time the detail rows were tried, successful or not; paces the backfill retries. */
   private LocalDateTime detailsAttemptedAt;
+
   private Boolean parseRequested;
   private LocalDateTime parseRequestedAt;
 

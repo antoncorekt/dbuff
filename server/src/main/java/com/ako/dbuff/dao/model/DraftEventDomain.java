@@ -20,11 +20,15 @@ public class DraftEventDomain {
   private Long id;
 
   private Long matchId;
+
   /** Position in the draft sequence, from OpenDota picks_bans.order. */
   private Integer draftOrder;
+
   /** True for a pick, false for a ban. */
   private Boolean pick;
+
   private Long heroId;
+
   /** 0 = Radiant, 1 = Dire. */
   private Integer team;
 }

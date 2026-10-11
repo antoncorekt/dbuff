@@ -37,8 +37,7 @@ public class MatchDetailBackfillScheduler {
         log.info("Match detail backfill is disabled");
         return;
       }
-      JobDetail job =
-          JobBuilder.newJob(MatchDetailBackfillJob.class).withIdentity(JOB_KEY).build();
+      JobDetail job = JobBuilder.newJob(MatchDetailBackfillJob.class).withIdentity(JOB_KEY).build();
       Trigger trigger =
           TriggerBuilder.newTrigger()
               .forJob(JOB_KEY)

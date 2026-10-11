@@ -8,19 +8,19 @@ import com.ako.dbuff.dao.model.DraftEventDomain;
 import com.ako.dbuff.dao.model.HeroTargetStatDomain;
 import com.ako.dbuff.dao.model.ItemPurchaseEventDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
-import com.ako.dbuff.dao.model.TargetStatKind;
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
+import com.ako.dbuff.dao.model.TargetStatKind;
 import com.ako.dbuff.dao.model.TeamTimelineDomain;
 import com.ako.dbuff.dao.repo.AbilityUpgradeRepo;
 import com.ako.dbuff.dao.repo.DeathEventRepo;
-import com.ako.dbuff.dao.repo.HeroTargetStatRepo;
-import com.ako.dbuff.dao.repo.ObjectiveEventRepo;
-import com.ako.dbuff.dao.repo.TeamfightPlayerRepo;
-import com.ako.dbuff.dao.repo.TeamfightRepo;
 import com.ako.dbuff.dao.repo.DraftEventRepo;
+import com.ako.dbuff.dao.repo.HeroTargetStatRepo;
 import com.ako.dbuff.dao.repo.ItemPurchaseEventRepo;
+import com.ako.dbuff.dao.repo.ObjectiveEventRepo;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
 import com.ako.dbuff.dao.repo.TeamTimelineRepo;
+import com.ako.dbuff.dao.repo.TeamfightPlayerRepo;
+import com.ako.dbuff.dao.repo.TeamfightRepo;
 import com.ako.dbuff.dotapi.invoker.JSON;
 import com.ako.dbuff.dotapi.model.MatchResponse;
 import com.ako.dbuff.dotapi.model.MatchResponsePicksBansInner;
@@ -82,36 +82,28 @@ class MatchDetailMappersTest {
             AbilityUpgradeDomain::getAbilityId,
             AbilityUpgradeDomain::getPlayerId)
         .containsExactlyInAnyOrder(
-            tuple(1, 5001L, -1L),
-            tuple(2, 5002L, -1L),
-            tuple(3, 5001L, -1L));
+            tuple(1, 5001L, -1L), tuple(2, 5002L, -1L), tuple(3, 5001L, -1L));
 
     assertThat(timelineRepo.findAll())
         .extracting(
             PlayerTimelineDomain::getGameMinute,
             PlayerTimelineDomain::getGold,
             PlayerTimelineDomain::getDenies)
-        .containsExactlyInAnyOrder(
-            tuple(0, 0L, null),
-            tuple(1, 120L, null));
+        .containsExactlyInAnyOrder(tuple(0, 0L, null), tuple(1, 120L, null));
 
     assertThat(teamTimelineRepo.findAll())
         .extracting(
             TeamTimelineDomain::getGameMinute,
             TeamTimelineDomain::getRadiantGoldAdv,
             TeamTimelineDomain::getRadiantXpAdv)
-        .containsExactlyInAnyOrder(
-            tuple(0, 0L, 0L),
-            tuple(1, -350L, null));
+        .containsExactlyInAnyOrder(tuple(0, 0L, 0L), tuple(1, -350L, null));
 
     assertThat(purchaseRepo.findAll())
         .extracting(
             ItemPurchaseEventDomain::getPurchaseIndex,
             ItemPurchaseEventDomain::getItemKey,
             ItemPurchaseEventDomain::getPurchaseTime)
-        .containsExactlyInAnyOrder(
-            tuple(0, "tango", -80L),
-            tuple(1, "tango", -80L));
+        .containsExactlyInAnyOrder(tuple(0, "tango", -80L), tuple(1, "tango", -80L));
   }
 
   @Test

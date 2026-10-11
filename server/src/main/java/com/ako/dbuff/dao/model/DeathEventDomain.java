@@ -22,13 +22,18 @@ public class DeathEventDomain {
   private Long matchId;
   private Long playerSlot;
   private Long playerId;
+
   /** Order of the death within the player log. */
   private Integer deathIndex;
+
   private Long deathTime;
+
   /** Internal name of the hero that got the kill. */
   private String killerHeroName;
+
   private Long goldLost;
   private Long goldFed;
+
   /** Seconds spent dead before respawn. */
   private Long timeDead;
 }

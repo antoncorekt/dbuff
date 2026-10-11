@@ -58,8 +58,7 @@ public class TeamfightMapper implements MatchDetailMapper {
       int fightIndex,
       Map<String, Object> fight,
       List<MatchResponsePlayersInner> players) {
-    List<?> entries =
-        fight.get("players") instanceof List<?> list ? list : List.of();
+    List<?> entries = fight.get("players") instanceof List<?> list ? list : List.of();
     if (players == null || entries.size() != players.size()) {
       log.warn(
           "Match {} fight {} lists {} players against {} in the match, skipping player rows",

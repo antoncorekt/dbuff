@@ -25,12 +25,16 @@ public class HeroTargetStatDomain {
   private Long matchId;
   private Long playerSlot;
   private Long playerId;
+
   @Enumerated(EnumType.STRING)
   private TargetStatKind statKind;
+
   /** Ability or item key; "null" means plain attacks. */
   private String inflictor;
+
   /** Internal hero name of the target. */
   private String targetHeroName;
+
   /** Damage points, or number of casts for ABILITY_USE. */
   private Long amount;
 }

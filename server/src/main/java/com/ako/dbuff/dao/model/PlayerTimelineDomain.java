@@ -27,8 +27,10 @@ public class PlayerTimelineDomain {
   private Long xp;
   private Long lastHits;
   private Long denies;
+
   /** Series below are absent from older parser versions and stay null then. */
   private Long networth;
+
   private Long heroDamage;
   private Long towerDamage;
   private Long heroHealing;

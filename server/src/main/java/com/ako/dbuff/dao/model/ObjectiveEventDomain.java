@@ -20,17 +20,23 @@ public class ObjectiveEventDomain {
   private Long id;
 
   private Long matchId;
+
   /** Order of the event within the match. */
   private Integer objectiveIndex;
+
   private Long eventTime;
   private String eventType;
   private String unit;
+
   /** Building name, or event specific key. */
   private String objectiveKey;
+
   private Long playerSlot;
   private Long victimPlayerSlot;
+
   /** 2 = Radiant, 3 = Dire where OpenDota provides it. */
   private Long team;
+
   private Long eventValue;
   private Long killer;
 }
