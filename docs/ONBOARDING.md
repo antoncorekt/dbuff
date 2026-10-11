@@ -24,8 +24,14 @@ tracking. `/dbuff status` and `/dbuff help` work for everyone.
 If the channel is not ready, `register` tells you exactly what is missing — usually a channel
 permission the bot lacks. Fix it and run the command again.
 
-**Finding a player:** type a name in the `player:` box and pick a result. If you only have an ID,
-the number in a player's OpenDota or Dotabuff profile URL is their account ID.
+**Finding a player:** type a name in the `player:` box and pick a result. You can also paste an
+account ID, a Steam64 ID, or a profile link from OpenDota, Dotabuff or Stratz. Steam vanity links
+(`steamcommunity.com/id/...`) cannot be used; paste the numeric profile link instead.
+
+**Your history is imported quietly.** Registering does not post a thread for every old game. The
+bot imports each player's recent matches so `/stats` has data from day one, says so in one
+message, and starts reporting with the first game that ends after registration. Adding a player
+later works the same way for that player's recent games.
 
 ## 3. Add the rest of the group
 

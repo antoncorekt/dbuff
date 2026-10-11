@@ -72,6 +72,21 @@ public class MatchReportOrchestrator {
     }
   }
 
+  /**
+   * Tells the channel that history was imported without per-match reports, so the silence after
+   * registration is explained rather than mistaken for a failure.
+   */
+  public void sendBackfillNotice(DbufInstanceConfigDomain config, int imported) {
+    if (config.getDiscordChannelId() == null || imported == 0) {
+      return;
+    }
+    discordMessageService.sendChannelMessage(
+        config.getDiscordChannelId(),
+        "📥 Imported "
+            + imported
+            + " past matches for `/stats`. Live reports start with your next game.");
+  }
+
   public record PartialReportResult(long threadId, long headerMessageId) {}
 
   /**

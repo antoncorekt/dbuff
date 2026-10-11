@@ -3,14 +3,20 @@ package com.ako.dbuff.service.scheduler.jobs;
 import com.ako.dbuff.service.match.LastMatchesProcessorService;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import lombok.extern.slf4j.Slf4j;
+import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+/**
+ * Never overlaps itself for one instance: a first-run import can outlast the 5-minute trigger, and
+ * a second run would otherwise import the same matches again.
+ */
 @Slf4j
 @Component
+@DisallowConcurrentExecution
 public class RecentMatchesJob implements Job {
 
   @Autowired private LastMatchesProcessorService lastMatchesProcessorService;

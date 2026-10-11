@@ -105,7 +105,15 @@ public class CommandRegistry {
    * @return the rendered help embed
    */
   public MessageEmbed buildHelpEmbed() {
-    StringBuilder description = new StringBuilder();
+    StringBuilder description =
+        new StringBuilder(
+            """
+            **Getting started**
+            1. `/dbuff register` in the channel where reports should go
+            2. `/dbuff add` for the rest of the group
+            3. `/stats` once you have played a few games
+
+            """);
 
     for (DbuffCommand command : commands) {
       SlashCommandData definition = command.getDefinition();

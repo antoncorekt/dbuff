@@ -11,6 +11,7 @@ import com.ako.dbuff.service.discord.command.AsyncReply;
 import com.ako.dbuff.service.discord.command.CommandContext;
 import com.ako.dbuff.service.discord.command.CommandRegistry;
 import com.ako.dbuff.service.discord.command.DbuffCommand;
+import com.ako.dbuff.service.discord.command.PlayerIdParser;
 import com.ako.dbuff.service.discord.command.PlayerReferenceResolver;
 import com.ako.dbuff.service.instance.DbufInstanceConfigService;
 import java.util.HashMap;
@@ -184,14 +185,12 @@ public class DbuffConfigCommand implements DbuffCommand {
       return;
     }
 
-    Set<Long> playerIds = numericIdsOrEmpty(playerRefs);
-    if (playerIds.isEmpty()) {
-      context.replyEphemeral(
-          "❌ Could not read a player from `"
-              + String.join(", ", playerRefs)
-              + "`. Pick one from the autocomplete list, which submits the account ID.");
+    PlayerIdParser.Result parsed = PlayerIdParser.parseAll(playerRefs);
+    if (parsed.ids().isEmpty() || !parsed.invalid().isEmpty()) {
+      context.replyEphemeral(invalidPlayerMessage(playerRefs, parsed));
       return;
     }
+    Set<Long> playerIds = parsed.ids();
 
     List<String> problems = channelReadiness.findProblems(context.getParentChannelId());
     if (!problems.isEmpty()) {
@@ -215,7 +214,7 @@ public class DbuffConfigCommand implements DbuffCommand {
     try {
       DbufInstanceConfigResponse response = instanceConfigService.register(request);
       AsyncReply reply = context.acknowledge("✅ Registered this channel.", "dbuff: register");
-      reply.postEmbed(configEmbed("✅ Registration Successful", response));
+      reply.postEmbed(registrationEmbed(response));
     } catch (IllegalStateException e) {
       context.replyEphemeral(
           "❌ This channel already has a registered instance. Use `/dbuff status` to view it.");
@@ -246,14 +245,12 @@ public class DbuffConfigCommand implements DbuffCommand {
     }
 
     List<String> playerRefs = context.getOptionAsList("player");
-    Set<Long> playerIds = numericIdsOrEmpty(playerRefs);
-    if (playerIds.isEmpty()) {
-      context.replyEphemeral(
-          "❌ Could not read a player from `"
-              + String.join(", ", playerRefs)
-              + "`. Pick one from the autocomplete list, which submits the account ID.");
+    PlayerIdParser.Result parsed = PlayerIdParser.parseAll(playerRefs);
+    if (parsed.ids().isEmpty() || !parsed.invalid().isEmpty()) {
+      context.replyEphemeral(invalidPlayerMessage(playerRefs, parsed));
       return;
     }
+    Set<Long> playerIds = parsed.ids();
 
     DbufInstanceConfigResponse updated =
         instanceConfigService.update(
@@ -396,19 +393,16 @@ public class DbuffConfigCommand implements DbuffCommand {
   }
 
   /**
-   * Account IDs for entries that are already numeric.
-   *
-   * <p>Used by {@code register} and {@code add}, where the player may not be in the focus group
-   * yet, so name resolution is not possible — the autocomplete submits the numeric ID for exactly
-   * this reason.
+   * Why a {@code player:} entry was refused. Names the entries that failed rather than the whole
+   * input, because dropping them and tracking the rest would answer a different request than the
+   * one made.
    */
-  private Set<Long> numericIdsOrEmpty(List<String> references) {
-    return references.stream()
-        .map(String::trim)
-        .filter(reference -> !reference.isEmpty())
-        .filter(reference -> reference.chars().allMatch(Character::isDigit))
-        .map(Long::parseLong)
-        .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+  private String invalidPlayerMessage(List<String> references, PlayerIdParser.Result parsed) {
+    List<String> failed = parsed.invalid().isEmpty() ? references : parsed.invalid();
+    return "❌ Could not read a player from `"
+        + String.join("`, `", failed)
+        + "`. Pick one from the autocomplete list, or paste an account ID, a Steam64 ID, or an"
+        + " OpenDota, Dotabuff or Stratz profile link.";
   }
 
   private String unresolvedMessage(
@@ -427,6 +421,18 @@ public class DbuffConfigCommand implements DbuffCommand {
                             .orElse(""))
             .toList();
     return message.append(String.join(", ", parts)).toString();
+  }
+
+  private MessageEmbed registrationEmbed(DbufInstanceConfigResponse response) {
+    return new EmbedBuilder(configEmbed("✅ Registration Successful", response))
+        .addField(
+            "Next steps",
+            "• `/dbuff add` — add the rest of the group\n"
+                + "• `/dbuff link` — connect players to Discord accounts\n"
+                + "• `/stats` — see how the group is doing\n"
+                + "Past matches are imported quietly; reports start with your next game.",
+            false)
+        .build();
   }
 
   private MessageEmbed configEmbed(String title, DbufInstanceConfigResponse config) {

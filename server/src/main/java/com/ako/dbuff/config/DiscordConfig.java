@@ -10,6 +10,4 @@ import org.springframework.context.annotation.Configuration;
 public class DiscordConfig {
 
   private String apiKey;
-
-  private String matchSummaryChannelId;
 }
