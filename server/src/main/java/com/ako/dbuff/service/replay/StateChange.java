@@ -3,6 +3,9 @@ package com.ako.dbuff.service.replay;
 /**
  * One change in what a hero has or can do, seen at a sample.
  *
+ * <p>The starting inventory shows up as items added at the first sample, before the horn. An item
+ * removed has no slot, so its {@code slotIndex} is -1.
+ *
  * <p>Changes are noticed on the sampling grid, so a time is accurate to a few seconds, but a
  * cooldown carries the moment it ends exactly: the replay stores the time remaining, and the sample
  * time plus that is when the ability is ready again.

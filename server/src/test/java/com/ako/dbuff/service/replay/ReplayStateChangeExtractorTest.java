@@ -37,6 +37,16 @@ class ReplayStateChangeExtractorTest {
     assertThat(cooldown.getPlayerSlot()).isEqualTo(128L);
     assertThat(cooldown.getReadyAtSeconds()).isEqualTo(130.0);
     assertThat(cooldown.getCooldownLength()).isEqualTo(30.0);
+    assertThat(cooldown.getAbilityLevel()).isNull();
+    ReplayStateChangeDomain item =
+        rows.stream().filter(r -> r.getKind().equals("ITEM_ADDED")).findFirst().orElseThrow();
+    assertThat(item.getReadyAtSeconds()).isNull();
+    assertThat(item.getCooldownLength()).isNull();
+    assertThat(item.getAbilityLevel()).isNull();
+    ReplayStateChangeDomain level =
+        rows.stream().filter(r -> r.getKind().equals("ABILITY_LEVEL")).findFirst().orElseThrow();
+    assertThat(level.getAbilityLevel()).isEqualTo(2);
+    assertThat(level.getReadyAtSeconds()).isNull();
   }
 
   @Test

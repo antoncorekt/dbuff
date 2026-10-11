@@ -37,33 +37,74 @@ final class StateRecorder implements SampleObserver {
   @Override
   public void sampled(long gridTick, List<Controllers.View> views) {
     StringTable names = stringTables.forName("EntityNames");
+    if (names == null) {
+      return;
+    }
     for (Controllers.View view : views) {
       if (view.hero() == null) {
         continue;
       }
       PlayerState state = players.computeIfAbsent(view.playerId(), id -> new PlayerState());
-      Map<String, Integer> items = new HashMap<>();
-      Map<String, Integer> firstSlot = new HashMap<>();
-      for (int i = 0; i < MAX_ITEMS; i++) {
-        Entity item = entity(view.hero(), "m_hItems", i);
-        if (item == null) {
-          continue;
-        }
-        String name = name(names, item);
-        items.merge(name, 1, Integer::sum);
-        firstSlot.putIfAbsent(name, i);
-        cooldown(state, view.playerId(), gridTick, "item" + i + name, name, i, item);
+      sampleItems(state, view, gridTick, names);
+      sampleAbilities(state, view, gridTick, names);
+    }
+  }
+
+  /**
+   * An item is followed by its name, not its slot, so moving it while it cools down is not a second
+   * use; of several copies the one with the longest cooldown counts.
+   */
+  private void sampleItems(PlayerState state, Controllers.View view, long tick, StringTable names) {
+    Map<String, Integer> counts = new HashMap<>();
+    Map<String, Integer> firstSlot = new HashMap<>();
+    Map<String, double[]> cooldowns = new HashMap<>();
+    for (int i = 0; i < MAX_ITEMS; i++) {
+      Entity item = entity(view.hero(), "m_hItems", i);
+      String name = item == null ? null : name(names, item);
+      if (name == null) {
+        continue;
       }
-      diffItems(state, view.playerId(), gridTick, items, firstSlot);
-      for (int i = 0; i < MAX_ABILITIES; i++) {
-        Entity ability = entity(view.hero(), "m_vecAbilities", i);
-        if (ability == null) {
-          continue;
-        }
-        String name = name(names, ability);
-        cooldown(state, view.playerId(), gridTick, "ability" + name, name, i, ability);
-        level(state, view.playerId(), gridTick, name, i, ability);
+      counts.merge(name, 1, Integer::sum);
+      firstSlot.putIfAbsent(name, i);
+      double remaining = number(item, "m_fCooldown");
+      double[] best = cooldowns.get(name);
+      if (best == null || remaining > best[0]) {
+        cooldowns.put(name, new double[] {remaining, number(item, "m_flCooldownLength")});
       }
+    }
+    diffItems(state, view.playerId(), tick, counts, firstSlot);
+    cooldowns.forEach(
+        (name, c) ->
+            cooldown(
+                state,
+                view.playerId(),
+                tick,
+                "item" + name,
+                name,
+                firstSlot.get(name),
+                c[0],
+                c[1]));
+  }
+
+  private void sampleAbilities(
+      PlayerState state, Controllers.View view, long tick, StringTable names) {
+    for (int i = 0; i < MAX_ABILITIES; i++) {
+      Entity ability = entity(view.hero(), "m_vecAbilities", i);
+      String name = ability == null ? null : name(names, ability);
+      if (name == null) {
+        continue;
+      }
+      String key = "ability" + i + name;
+      cooldown(
+          state,
+          view.playerId(),
+          tick,
+          key,
+          name,
+          i,
+          number(ability, "m_fCooldown"),
+          number(ability, "m_flCooldownLength"));
+      level(state, view.playerId(), tick, key, name, i, ability);
     }
   }
 
@@ -126,31 +167,30 @@ final class StateRecorder implements SampleObserver {
       String key,
       String name,
       int slot,
-      Entity entity) {
-    double remaining = number(entity, "m_fCooldown");
+      double remaining,
+      double length) {
     if (remaining <= MIN_COOLDOWN) {
+      state.readyAt.remove(key);
       return;
     }
     double readyAt = tick + remaining * TICKS_PER_SECOND;
     Double previous = state.readyAt.put(key, readyAt);
     if (previous == null || readyAt > previous + NEW_COOLDOWN_JUMP_TICKS) {
       changes.add(
-          new RawChange(
-              playerId,
-              tick,
-              StateChangeKind.COOLDOWN,
-              name,
-              slot,
-              readyAt,
-              number(entity, "m_flCooldownLength"),
-              0));
+          new RawChange(playerId, tick, StateChangeKind.COOLDOWN, name, slot, readyAt, length, 0));
     }
   }
 
   private void level(
-      PlayerState state, int playerId, long tick, String name, int slot, Entity ability) {
+      PlayerState state,
+      int playerId,
+      long tick,
+      String key,
+      String name,
+      int slot,
+      Entity ability) {
     int level = (int) number(ability, "m_iLevel");
-    Integer previous = state.levels.put(name, level);
+    Integer previous = state.levels.put(key, level);
     if (previous != null && level > previous) {
       changes.add(
           new RawChange(playerId, tick, StateChangeKind.ABILITY_LEVEL, name, slot, 0, 0, level));
@@ -165,15 +205,15 @@ final class StateRecorder implements SampleObserver {
     return entities.getByHandle(handle.intValue());
   }
 
+  /** The internal name, or null for an entity the name table does not know. */
   private static String name(StringTable names, Entity entity) {
     Object index =
         entity.hasProperty("m_pEntity.m_nameStringTableIndex")
             ? entity.getProperty("m_pEntity.m_nameStringTableIndex")
             : null;
-    if (index instanceof Number n && n.intValue() >= 0) {
-      return names.getNameByIndex(n.intValue());
-    }
-    return entity.getDtClass().getDtName();
+    return index instanceof Number n && n.intValue() >= 0
+        ? names.getNameByIndex(n.intValue())
+        : null;
   }
 
   private static double number(Entity entity, String property) {

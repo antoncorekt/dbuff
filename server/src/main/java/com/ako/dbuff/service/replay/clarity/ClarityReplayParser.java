@@ -180,6 +180,11 @@ public class ClarityReplayParser implements ReplayParser {
       }
     }
 
+    private StateRecorder stateRecorder() {
+      recorder();
+      return stateRecorder;
+    }
+
     private SampleRecorder recorder() {
       if (recorder == null) {
         recorder = new SampleRecorder(entities);
@@ -191,7 +196,6 @@ public class ClarityReplayParser implements ReplayParser {
 
     /** The facts with the samples of the whole game, once the replay has been read to its end. */
     ReplayFacts result() {
-      recorder();
       return ReplayFacts.builder()
           .clockStartTick(facts.clockStartTick())
           .gameStartTime(facts.gameStartTime())
@@ -200,7 +204,7 @@ public class ClarityReplayParser implements ReplayParser {
           .samples(recorder().result(facts.clockStartTick()))
           .combatLog(combatLog.result(facts.gameStartTime()))
           .map(map)
-          .stateChanges(stateRecorder.result(facts.clockStartTick()))
+          .stateChanges(stateRecorder().result(facts.clockStartTick()))
           .cutShort(cutShort)
           .build();
     }
