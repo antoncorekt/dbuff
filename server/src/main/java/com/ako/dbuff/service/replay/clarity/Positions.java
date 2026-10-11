@@ -18,8 +18,18 @@ final class Positions {
   }
 
   static boolean has(Entity entity) {
-    return entity.hasProperty("CBodyComponent.m_cellX")
-        && entity.getProperty("CBodyComponent.m_cellX") instanceof Number;
+    for (String property :
+        new String[] {
+          "CBodyComponent.m_cellX",
+          "CBodyComponent.m_cellY",
+          "CBodyComponent.m_vecX",
+          "CBodyComponent.m_vecY"
+        }) {
+      if (!entity.hasProperty(property) || !(entity.getProperty(property) instanceof Number)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static int world(Entity entity, String cell, String offset) {

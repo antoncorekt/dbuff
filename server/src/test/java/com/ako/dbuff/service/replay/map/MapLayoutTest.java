@@ -57,6 +57,27 @@ class MapLayoutTest {
   }
 
   @Test
+  void aLayoutThatCannotBeReadLeavesNoFrozenLayoutInsteadOfFailingStartup() {
+    MapLayouts broken = new MapLayouts(new ObjectMapper(), "replay/does-not-exist.json");
+
+    assertThat(broken.frozenVersion()).isNull();
+    assertThat(broken.forVersion("anything")).isEmpty();
+  }
+
+  @Test
+  void version_ignoresOutpostsAndLotusPoolsWhoseNamesCarrySpawnIds() {
+    MapFacts frozen = layout.facts();
+    java.util.List<MapFacts.Building> changed = new java.util.ArrayList<>(frozen.buildings());
+    changed.add(new MapFacts.Building("99999_npc_dota_lotus_pool_dire", 4, 1, 2));
+    changed.removeIf(b -> b.name().startsWith("npc_dota_watch_tower"));
+
+    assertThat(new MapFacts(changed, frozen.camps()).version()).isEqualTo(frozen.version());
+
+    changed.removeIf(b -> b.name().equals("dota_goodguys_tower1_top"));
+    assertThat(new MapFacts(changed, frozen.camps()).version()).isNotEqualTo(frozen.version());
+  }
+
+  @Test
   void aFrozenLayoutHasTheBuildingsAndTwentyEightCampsOfTheMap() {
     assertThat(layout.campCount()).isEqualTo(28);
     assertThat(layouts.frozenVersion()).hasSize(12);

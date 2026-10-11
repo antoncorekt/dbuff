@@ -47,7 +47,8 @@ class ReplayRunServiceTest {
   private final MapLayouts mapLayouts = mock(MapLayouts.class);
   private ReplayRunService service;
 
-  private final ReplayFacts facts = new ReplayFacts(17136, 596.5, List.of());
+  private final ReplayFacts facts =
+      ReplayFacts.builder().clockStartTick(17136).gameStartTime(596.5).players(List.of()).build();
 
   @BeforeEach
   void setUp() {

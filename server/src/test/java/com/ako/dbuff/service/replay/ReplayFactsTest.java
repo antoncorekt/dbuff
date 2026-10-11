@@ -10,13 +10,15 @@ class ReplayFactsTest {
   @Test
   void playersById_keepsTheFirstEntryOfAPlayerListedTwice() {
     ReplayFacts facts =
-        new ReplayFacts(
-            1,
-            1.0,
-            List.of(
-                new ReplayPlayerFact(0, 2, 1L, "Sniper"),
-                new ReplayPlayerFact(0, 2, 2L, "Axe"),
-                new ReplayPlayerFact(10, 3, 3L, "Sven")));
+        ReplayFacts.builder()
+            .clockStartTick(1)
+            .gameStartTime(1.0)
+            .players(
+                List.of(
+                    new ReplayPlayerFact(0, 2, 1L, "Sniper"),
+                    new ReplayPlayerFact(0, 2, 2L, "Axe"),
+                    new ReplayPlayerFact(10, 3, 3L, "Sven")))
+            .build();
 
     var byId = facts.playersById();
 

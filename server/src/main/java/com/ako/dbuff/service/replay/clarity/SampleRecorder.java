@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.SampleFacts;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import skadistats.clarity.model.Entity;
@@ -121,7 +122,10 @@ final class SampleRecorder {
     if (source == null) {
       return MinuteStat.MISSING;
     }
-    String path = stat.source().arrayPrefix() + String.format("%04d.", position) + stat.property();
+    String path =
+        stat.source().arrayPrefix()
+            + String.format(Locale.ROOT, "%04d.", position)
+            + stat.property();
     return source.hasProperty(path) && source.getProperty(path) instanceof Number n
         ? n.longValue()
         : MinuteStat.MISSING;

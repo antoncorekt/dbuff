@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.clarity;
 import com.ako.dbuff.service.replay.MapFacts;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import skadistats.clarity.model.Entity;
 import skadistats.clarity.model.StringTable;
 import skadistats.clarity.model.Vector;
@@ -43,7 +44,7 @@ final class MapReader {
   private static List<MapFacts.Camp> camps(Entity rules) {
     List<MapFacts.Camp> camps = new ArrayList<>();
     for (int i = 0; i < MAX_CAMPS; i++) {
-      String prefix = CAMPS + String.format("%04d.", i);
+      String prefix = CAMPS + String.format(Locale.ROOT, "%04d.", i);
       Object name = value(rules, prefix + "strCampName");
       Object type = value(rules, prefix + "nCampType");
       float[] origin = vector(rules, prefix + "vSpawnBoxOrigin");

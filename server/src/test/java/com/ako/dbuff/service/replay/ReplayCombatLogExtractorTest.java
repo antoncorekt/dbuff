@@ -50,7 +50,9 @@ class ReplayCombatLogExtractorTest {
 
   @Test
   void extract_storesNothingWhenThereWasNoCombatLog_andTheReaderReturnsAnEmptyList() {
-    extractor.extract(new ReplayFacts(1, 1.0, List.of()), MATCH);
+    extractor.extract(
+        ReplayFacts.builder().clockStartTick(1).gameStartTime(1.0).players(List.of()).build(),
+        MATCH);
     extractor.extract(facts(List.of()), MATCH);
 
     assertThat(repo.findAll()).isEmpty();
@@ -84,7 +86,12 @@ class ReplayCombatLogExtractorTest {
   }
 
   private static ReplayFacts facts(List<CombatEvent> events) {
-    return new ReplayFacts(1, 1.0, List.of(), null, null, new CombatLogFacts(events));
+    return ReplayFacts.builder()
+        .clockStartTick(1)
+        .gameStartTime(1.0)
+        .players(List.of())
+        .combatLog(new CombatLogFacts(events))
+        .build();
   }
 
   private static MatchDomain match() {

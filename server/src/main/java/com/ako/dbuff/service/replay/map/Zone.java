@@ -10,8 +10,7 @@ public record Zone(Kind kind, Lane lane, Half half, int camp) {
     BASE,
     LANE,
     RIVER,
-    JUNGLE,
-    OTHER
+    JUNGLE
   }
 
   public enum Lane {
