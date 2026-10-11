@@ -18,11 +18,13 @@ import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import skadistats.clarity.event.Insert;
+import skadistats.clarity.model.CombatLogEntry;
 import skadistats.clarity.model.Entity;
 import skadistats.clarity.model.FieldPath;
 import skadistats.clarity.processor.entities.Entities;
 import skadistats.clarity.processor.entities.OnEntityUpdated;
 import skadistats.clarity.processor.entities.UsesEntities;
+import skadistats.clarity.processor.gameevents.OnCombatLogEntry;
 import skadistats.clarity.processor.reader.OnTickStart;
 import skadistats.clarity.processor.runner.Context;
 import skadistats.clarity.processor.runner.SimpleRunner;
@@ -93,6 +95,10 @@ public class ClarityReplayParser implements ReplayParser {
   public static class Collector {
     private static final int PRE_GAME = 4;
     private static final int GAME_IN_PROGRESS = 5;
+
+    /** The Ancient's fall and the last deaths are logged just after the state changes. */
+    private static final int AFTER_GAME_TICKS = 300;
+
     private static final int POST_GAME = 6;
     private static final int POST_GAME_SCORES = 7;
     private static final int RADIANT = 2;
@@ -110,9 +116,11 @@ public class ClarityReplayParser implements ReplayParser {
     private final BooleanSupplier cancelled;
     ReplayFacts facts;
     private SampleRecorder recorder;
+    private final CombatLogRecorder combatLog = new CombatLogRecorder();
     private final List<DraftPick> picks = new ArrayList<>();
     private final BitSet picked = new BitSet();
     private long ticksSeen;
+    private long gameOverTick = -1;
 
     Collector(BooleanSupplier cancelled) {
       this.cancelled = cancelled;
@@ -121,9 +129,17 @@ public class ClarityReplayParser implements ReplayParser {
     @OnTickStart
     public void onTick(Context ctx, boolean synthetic) {
       recorder().tick(ctx.getTick());
+      if (gameOverTick >= 0 && ctx.getTick() - gameOverTick > AFTER_GAME_TICKS) {
+        throw new GameOver();
+      }
       if (++ticksSeen % CANCEL_CHECK_TICKS == 0 && cancelled.getAsBoolean()) {
         throw new CancelledParsing();
       }
+    }
+
+    @OnCombatLogEntry
+    public void onCombatLog(CombatLogEntry entry) {
+      combatLog.record(entry);
     }
 
     @OnEntityUpdated(classPattern = "CDOTAGamerulesProxy")
@@ -137,8 +153,8 @@ public class ClarityReplayParser implements ReplayParser {
         recorder().preGameStarted(ctx.getTick());
       } else if (state == POST_GAME || state == POST_GAME_SCORES) {
         recorder().stop();
-        if (facts != null) {
-          throw new GameOver();
+        if (facts != null && gameOverTick < 0) {
+          gameOverTick = ctx.getTick();
         }
       } else if (state == GAME_IN_PROGRESS && facts == null) {
         Number startTime = rules.getProperty(START_TIME);
@@ -163,7 +179,8 @@ public class ClarityReplayParser implements ReplayParser {
           facts.gameStartTime(),
           facts.players(),
           facts.draft(),
-          recorder().result(facts.clockStartTick()));
+          recorder().result(facts.clockStartTick()),
+          combatLog.result(facts.gameStartTime()));
     }
 
     /** A pick is the moment an entry's player id changes from "nobody" to a player. */
