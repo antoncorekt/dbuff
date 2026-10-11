@@ -1,21 +1,18 @@
 package com.ako.dbuff.service.replay.analysis.activity;
 
 import com.ako.dbuff.dao.model.PlayerActivitySegmentDomain;
-import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
-import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatHeroes;
 import com.ako.dbuff.service.replay.CombatLogReader;
-import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.map.MapLayout;
-import com.ako.dbuff.service.replay.map.MapLayouts;
+import com.ako.dbuff.service.replay.map.MatchMapLayout;
 import com.ako.dbuff.service.replay.map.Zone;
 import java.util.List;
 import java.util.Map;
@@ -38,11 +35,9 @@ public class ActivityAnalyzer implements ReplayAnalyzer {
 
   private final ReplayPlayerTrackRepo trackRepo;
   private final ReplayPlayerRepo playerRepo;
-  private final ReplayParseRunRepo runRepo;
   private final PlayerActivitySegmentRepo segmentRepo;
+  private final MatchMapLayout matchMapLayout;
   private final CombatLogReader combatLog;
-  private final MapLayouts mapLayouts;
-  private final ReplayProcessingProperties processing;
   private final ReplayAnalysisProperties analysis;
 
   @Override
@@ -64,7 +59,7 @@ public class ActivityAnalyzer implements ReplayAnalyzer {
   @Transactional
   public void analyze(long matchId) {
     deleteByMatchId(matchId);
-    MapLayout layout = layout(matchId);
+    MapLayout layout = matchMapLayout.of(matchId).orElse(null);
     if (layout == null) {
       log.info("Match {} was not played on the frozen map layout, no activity stored", matchId);
       return;
@@ -103,15 +98,6 @@ public class ActivityAnalyzer implements ReplayAnalyzer {
   @Transactional
   public void deleteByMatchId(long matchId) {
     segmentRepo.deleteByMatchId(matchId);
-  }
-
-  private MapLayout layout(long matchId) {
-    String version =
-        runRepo
-            .findByMatchIdAndParserVersion(matchId, processing.getParserVersion())
-            .map(ReplayParseRunDomain::getMapVersion)
-            .orElse(null);
-    return mapLayouts.forVersion(version).orElse(null);
   }
 
   private static ActivitySegmenter.Track toTrack(

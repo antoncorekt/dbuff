@@ -3,12 +3,10 @@ package com.ako.dbuff.service.replay.analysis.death;
 import com.ako.dbuff.dao.model.DeathAnalysisDomain;
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
-import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
-import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.service.replay.Buybacks;
 import com.ako.dbuff.service.replay.CombatEvent;
@@ -16,7 +14,6 @@ import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.CombatHeroes;
 import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.PlayerSlots;
-import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.fight.FightAssessor;
@@ -25,7 +22,7 @@ import com.ako.dbuff.service.replay.analysis.fight.PlayerTraces;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import com.ako.dbuff.service.replay.map.MapLayout;
-import com.ako.dbuff.service.replay.map.MapLayouts;
+import com.ako.dbuff.service.replay.map.MatchMapLayout;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,14 +44,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class DeathAnalyzer implements ReplayAnalyzer {
   private final PlayerTraces playerTraces;
   private final ReplayPlayerRepo playerRepo;
-  private final ReplayParseRunRepo runRepo;
   private final HeroStateTimelines timelines;
   private final FightRepo fightRepo;
   private final FightPlayerRepo fightPlayerRepo;
   private final DeathAnalysisRepo deathRepo;
+  private final MatchMapLayout matchMapLayout;
   private final CombatLogReader combatLog;
-  private final MapLayouts mapLayouts;
-  private final ReplayProcessingProperties processing;
   private final ReplayAnalysisProperties properties;
 
   @Override
@@ -87,7 +82,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
     Map<Integer, HeroStateTimeline> states = timelines.load(matchId);
     List<FightDomain> fights = fightRepo.findByMatchId(matchId);
     Map<String, Integer> deltas = frontlineDeltas(matchId);
-    MapLayout layout = layout(matchId);
+    MapLayout layout = matchMapLayout.of(matchId).orElse(null);
     DeathAssessor assessor = new DeathAssessor(properties.deathTuning());
     Map<Integer, Integer> deathsSoFar = new HashMap<>();
     Map<String, List<CombatEvent>> byTarget =
@@ -134,14 +129,6 @@ public class DeathAnalyzer implements ReplayAnalyzer {
   @Transactional
   public void deleteByMatchId(long matchId) {
     deathRepo.deleteByMatchId(matchId);
-  }
-
-  private MapLayout layout(long matchId) {
-    return runRepo
-        .findByMatchIdAndParserVersion(matchId, processing.getParserVersion())
-        .map(ReplayParseRunDomain::getMapVersion)
-        .flatMap(mapLayouts::forVersion)
-        .orElse(null);
   }
 
   /** Whether the hero paid for a buyback after this death and before he died again. */

@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Tells where a world coordinate is: in a base, on a lane, in the river, or in the jungle (and
@@ -108,6 +109,28 @@ public final class MapLayout {
       }
     }
     return Zone.NO_CAMP;
+  }
+
+  /**
+   * Where a building stands, by the name the combat log or the map uses; empty if unknown. The
+   * combat log's barracks and fourth towers are named differently from the map's, and its fourth
+   * tower has no lane, so one of the two, which stand side by side, answers for it.
+   */
+  public Optional<double[]> buildingPosition(String name) {
+    String key = name.startsWith("npc_") ? name.substring("npc_".length()) : name;
+    key = key.replaceAll("^dota_(good|bad)guys_(melee|range)_rax_(top|mid|bot)$", "$1_rax_$2_$3");
+    for (String candidate :
+        key.endsWith("_tower4") ? List.of(key + "_bot", key + "_top") : List.of(key)) {
+      Optional<double[]> found =
+          facts.buildings().stream()
+              .filter(b -> b.name().equals(candidate))
+              .findFirst()
+              .map(b -> new double[] {b.x(), b.y()});
+      if (found.isPresent()) {
+        return found;
+      }
+    }
+    return Optional.empty();
   }
 
   /** Radiant's third, second and first tower, then Dire's first, second and third. */

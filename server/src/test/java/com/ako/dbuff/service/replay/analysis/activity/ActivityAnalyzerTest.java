@@ -18,6 +18,7 @@ import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.map.MapLayouts;
+import com.ako.dbuff.service.replay.map.MatchMapLayout;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
   ActivityAnalyzer.class,
   CombatLogReader.class,
   MapLayouts.class,
+  MatchMapLayout.class,
   ReplayProcessingProperties.class,
   ReplayAnalysisProperties.class,
   ActivityAnalyzerTest.Json.class

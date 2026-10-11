@@ -3,18 +3,15 @@ package com.ako.dbuff.service.replay.analysis.fight;
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.PlayerActivitySegmentDomain;
-import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
-import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatHeroes;
 import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.PlayerSlots;
-import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.activity.Activity;
@@ -22,7 +19,7 @@ import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import com.ako.dbuff.service.replay.map.MapLayout;
-import com.ako.dbuff.service.replay.map.MapLayouts;
+import com.ako.dbuff.service.replay.map.MatchMapLayout;
 import com.ako.dbuff.service.replay.map.Zone;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,14 +40,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class FightAnalyzer implements ReplayAnalyzer {
   private final PlayerTraces playerTraces;
   private final ReplayPlayerRepo playerRepo;
-  private final ReplayParseRunRepo runRepo;
   private final PlayerActivitySegmentRepo segmentRepo;
   private final FightRepo fightRepo;
   private final FightPlayerRepo fightPlayerRepo;
   private final HeroStateTimelines timelines;
+  private final MatchMapLayout matchMapLayout;
   private final CombatLogReader combatLog;
-  private final MapLayouts mapLayouts;
-  private final ReplayProcessingProperties processing;
   private final ReplayAnalysisProperties properties;
 
   @Override
@@ -82,7 +77,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
     Map<Integer, FightAssessor.Trace> traces = playerTraces.load(matchId);
     Map<Integer, List<ActivitySegment>> activities = activities(matchId);
     Map<Integer, HeroStateTimeline> states = timelines.load(matchId);
-    MapLayout layout = layout(matchId);
+    MapLayout layout = matchMapLayout.of(matchId).orElse(null);
     List<FightDetector.Detected> detected =
         new FightDetector(properties.fightTuning()).detect(events, playerOf);
     FightAssessor assessor =
@@ -118,14 +113,6 @@ public class FightAnalyzer implements ReplayAnalyzer {
                   s.getSide() == null ? null : ActivitySegment.Side.valueOf(s.getSide())));
     }
     return bySlot;
-  }
-
-  private MapLayout layout(long matchId) {
-    return runRepo
-        .findByMatchIdAndParserVersion(matchId, processing.getParserVersion())
-        .map(ReplayParseRunDomain::getMapVersion)
-        .flatMap(mapLayouts::forVersion)
-        .orElse(null);
   }
 
   private FightDomain fightRow(

@@ -18,6 +18,7 @@ import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import com.ako.dbuff.service.replay.map.MapLayouts;
+import com.ako.dbuff.service.replay.map.MatchMapLayout;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
   HeroStateTimelines.class,
   PlayerTraces.class,
   MapLayouts.class,
+  MatchMapLayout.class,
   ReplayProcessingProperties.class,
   ReplayAnalysisProperties.class,
   FightAnalyzerTest.Json.class
