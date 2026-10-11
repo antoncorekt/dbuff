@@ -16,6 +16,7 @@ import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.activity.Activity;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,7 +58,7 @@ public class PhaseSummaryAnalyzer implements ReplayAnalyzer {
 
   @Override
   public Set<String> requires() {
-    return Set.of("players", "tracks");
+    return Set.of("players", "tracks", "combat-log", "state-changes");
   }
 
   @Override
@@ -69,7 +70,9 @@ public class PhaseSummaryAnalyzer implements ReplayAnalyzer {
         segments.stream().mapToInt(PlayerActivitySegmentDomain::getEndSeconds).max().orElse(0);
     List<PhaseWindows.Window> windows =
         PhaseWindows.of(
-            properties.getPhaseLaneEndMinutes(), properties.getPhaseMidEndMinutes(), gameSeconds);
+            Math.max(1, properties.getPhaseLaneEndMinutes()),
+            Math.max(1, properties.getPhaseMidEndMinutes()),
+            gameSeconds);
     if (windows.isEmpty()) {
       return;
     }
@@ -93,7 +96,8 @@ public class PhaseSummaryAnalyzer implements ReplayAnalyzer {
             .collect(Collectors.groupingBy(PlayerTimelineDomain::getPlayerSlot));
     Map<Integer, FightDomain> fights =
         fightRepo.findByMatchId(matchId).stream()
-            .collect(Collectors.toMap(FightDomain::getFightIndex, Function.identity()));
+            .collect(
+                Collectors.toMap(FightDomain::getFightIndex, Function.identity(), (a, b) -> a));
     Map<Long, List<FightPlayerDomain>> fightParts =
         fightPlayerRepo.findByMatchId(matchId).stream()
             .collect(Collectors.groupingBy(FightPlayerDomain::getPlayerSlot));
@@ -143,7 +147,7 @@ public class PhaseSummaryAnalyzer implements ReplayAnalyzer {
                   return f != null
                       && f.getStartSeconds() >= window.startSeconds()
                       && f.getStartSeconds() < window.endSeconds()
-                      && !p.getPresence().equals("ABSENT_DEAD");
+                      && !"ABSENT_DEAD".equals(p.getPresence());
                 })
             .toList();
     return PlayerPhaseSummaryDomain.builder()
@@ -189,25 +193,30 @@ public class PhaseSummaryAnalyzer implements ReplayAnalyzer {
       int minute) {
     return minutes.stream()
         .filter(m -> m.getGameMinute() <= minute && counter.apply(m) != null)
-        .max(java.util.Comparator.comparingInt(ReplayPlayerMinuteDomain::getGameMinute))
+        .max(Comparator.comparingInt(ReplayPlayerMinuteDomain::getGameMinute))
         .map(counter)
         .orElse(minute <= 0 ? Long.valueOf(0) : null);
   }
 
+  /** Income over the minutes the series really covers inside the phase. */
   private static Double perMinute(
       List<PlayerTimelineDomain> timeline,
       Function<PlayerTimelineDomain, Long> series,
       int from,
       int to) {
-    Long start = seriesAt(timeline, series, from);
-    Long end = seriesAt(timeline, series, to);
-    if (start == null || end == null || to <= from) {
+    PlayerTimelineDomain start = rowAtOrBefore(timeline, series, from);
+    PlayerTimelineDomain end = rowAtOrBefore(timeline, series, to);
+    long startValue = start == null ? 0 : series.apply(start);
+    int startMinute = start == null ? 0 : start.getGameMinute();
+    if (end == null || end.getGameMinute() <= startMinute) {
       return null;
     }
-    return Math.round((end - start) / (double) (to - from) * 10) / 10.0;
+    return Math.round(
+            (series.apply(end) - startValue) / (double) (end.getGameMinute() - startMinute) * 10)
+        / 10.0;
   }
 
-  private static Long seriesAt(
+  private static PlayerTimelineDomain rowAtOrBefore(
       List<PlayerTimelineDomain> timeline,
       Function<PlayerTimelineDomain, Long> series,
       int minute) {
@@ -215,8 +224,7 @@ public class PhaseSummaryAnalyzer implements ReplayAnalyzer {
         .filter(
             t ->
                 t.getGameMinute() != null && t.getGameMinute() <= minute && series.apply(t) != null)
-        .max(java.util.Comparator.comparingInt(PlayerTimelineDomain::getGameMinute))
-        .map(series)
+        .max(Comparator.comparingInt(PlayerTimelineDomain::getGameMinute))
         .orElse(null);
   }
 }

@@ -61,6 +61,9 @@ class PhaseSummaryAnalyzerTest {
     PlayerPhaseSummaryDomain mid = rows.get(1);
     assertThat(mid.getJungleFarmSeconds()).isEqualTo(280);
     assertThat(mid.getKills()).isEqualTo(1);
+    assertThat(mid.getGoldPerMinute())
+        .as("minutes 12 to 16, the last the series has")
+        .isEqualTo(400.0);
   }
 
   @Test
