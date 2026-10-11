@@ -65,7 +65,8 @@ subprojects {
         }
     }
     test {
-        useJUnitPlatform()
+        // Tests tagged 'replay' need a real replay file and run through :server:replayTest only.
+        useJUnitPlatform { excludeTags 'replay' }
     }
     tasks.withType(Test) { task ->
         maxHeapSize '1024m'
@@ -115,6 +116,14 @@ configurations {
 project('server') {
     apply plugin: 'org.springframework.boot'
     apply plugin: 'io.spring.dependency-management'
+
+    tasks.register('replayTest', Test) {
+        description = 'Runs the tests that parse a real replay; set REPLAY_FIXTURE_DIR first.'
+        group = 'verification'
+        testClassesDirs = sourceSets.test.output.classesDirs
+        classpath = sourceSets.test.runtimeClasspath
+        useJUnitPlatform { includeTags 'replay' }
+    }
     
     dependencies {
 
@@ -135,6 +144,11 @@ project('server') {
         implementation("org.postgresql:postgresql:42.7.7")
         implementation("io.hypersistence:hypersistence-utils-hibernate-60:3.9.4")
         implementation 'org.apache.commons:commons-collections4:4.5.0'
+
+        // Replay parsing: Clarity reads the .dem file; replays arrive Zstandard or bzip2 compressed
+        implementation 'com.skadistats:clarity:5.0.1'
+        implementation 'com.github.luben:zstd-jni:1.5.6-4'
+        implementation 'org.apache.commons:commons-compress:1.27.1'
         
         // OpenAI Java SDK for AI-based match analysis
         implementation 'com.openai:openai-java:0.8.1'

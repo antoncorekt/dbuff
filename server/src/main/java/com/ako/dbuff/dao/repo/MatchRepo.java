@@ -39,6 +39,23 @@ public interface MatchRepo extends JpaRepository<MatchDomain, Long> {
       @Param("recentAfter") Long recentAfter,
       Pageable pageable);
 
+  /**
+   * Matches whose OpenDota detail rows are stored and that have no replay run of this parser
+   * version yet, newest first. Only recent matches are listed because older replays are gone.
+   */
+  @Query(
+      """
+      select m from MatchDomain m
+      where m.detailsMappedAt is not null
+        and m.startTime > :recentAfter
+        and not exists (
+          select 1 from ReplayParseRunDomain r
+          where r.matchId = m.id and r.parserVersion = :version)
+      order by m.startTime desc
+      """)
+  List<MatchDomain> findMatchesWithoutReplayRun(
+      @Param("version") Integer version, @Param("recentAfter") Long recentAfter, Pageable pageable);
+
   /** Writes only the detail bookkeeping columns, leaving fields other jobs own untouched. */
   @Transactional
   @Modifying

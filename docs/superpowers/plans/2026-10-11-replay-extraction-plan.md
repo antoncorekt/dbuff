@@ -302,8 +302,9 @@ transient (retried with a cap):
   `SKIPPED_NOT_PLAYED`. A match abandoned in the draft or strategy phase yields exactly this.
 - **Very short game** (under `min-duration-sec`, default 300 s, an abandon or early surrender): parse only the draft
   and the roster, skip the analyses that need a lane phase, status `PARTIAL` with reason `SHORT_GAME`.
-- **Replay of a different match:** compare the replay's match id (demo header / `m_pGameRules`) with `matchId`, and
-  check the roster against the stored OpenDota players. Any mismatch: `FAILED_IDENTITY`, no rows. This also covers a
+- **Replay of a different match:** the replay's own id (`m_pGameRules.m_unMatchID64`) is a lobby id (448790562 for
+  match 9038725154) and cannot be compared. Check the roster instead: the same accounts on the same slots, falling
+  back to the hero for anonymous players (`ReplayRosterVerifier`). Any mismatch: `FAILED_IDENTITY`, no rows. This also covers a
   salt reused wrongly or a cached response.
 - **Leavers, disconnects, bots, anonymous players (`steamId = 0`):** the roster maps those by team and index. An
   unmapped slot is stored with a null `accountId` and its analyses are skipped; the rest of the match is unaffected.
