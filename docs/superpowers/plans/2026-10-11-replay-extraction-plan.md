@@ -34,6 +34,10 @@ the consolidated DB design; section 12 is the work-package order; section 13 is 
 **Method per work package:** read the section, run the listed spikes first, write code with tests, run only the
 targeted tests, open a PR. Each extractor must be independently switchable and must never fail match ingestion.
 
+**Base branch:** branch every work package from a freshly fetched `origin/main`, not from a local `main` that may be
+stale (the PR #6 classes below only exist after it). SSH is broken here: fetch over https with
+`git -c credential.helper='!gh auth git-credential' fetch https://github.com/antoncorekt/dbuff.git main`.
+
 **Patterns to reuse** (already merged to `main`, PR #6):
 - `MatchDetailMapper` + `MatchDetailService` (service/match/data): one bean per table slice, `replace()` is atomic,
   deletion is wired once. The replay pipeline should follow the same shape (`ReplayExtractor` beans).
@@ -141,8 +145,11 @@ Principles:
 2. **One parse pass, many extractors.** A single `ReplayContext` observer collects what all extractors need
    (per-second hero snapshots, combat log, entity create/delete) and extractors read from it; do not parse the file
    once per extractor.
-3. **Never block ingestion.** All replay work runs after the match is already stored, in its own transaction per
-   extractor; failures set `ReplayParseRun.status` and `extractorStatus[extractor]` and are retried by the backfill.
+3. **Never block ingestion, one replay at a time.** All replay work runs after the match is already stored, in its own
+   transaction per extractor; failures set `ReplayParseRun.status` and `extractorStatus[extractor]` and are retried by
+   the backfill. Memory is bounded by processing **one replay at a time**: the number in flight is configurable
+   (`replay.processing.max-concurrent`, default 1, see 3b.3) and the only entry points (queue job and admin recompute)
+   share that one semaphore.
 4. **Version everything.** `ReplayParseRun.parserVersion` (our extractor-set int) and `clarityVersion`; when the game
    changes a netprop, extractors must fail soft (status `PARTIAL` with a reason), never write partial rows silently.
 5. **Config, not constants.** All thresholds in `replay.analysis.*` properties bound by one `@ConfigurationProperties`
@@ -157,6 +164,92 @@ matches that have a salt, no successful run, and started within 90 days, newest 
 Dependencies to add: Clarity `com.skadistats:clarity:5.0.1`; Zstandard decompression (`com.github.luben:zstd-jni`
 ships aarch64; fall back to pure-Java `io.airlift:aircompressor` if the native load fails on the instance, verify
 in S8); `org.apache.commons:commons-compress` for bzip2. Clarity needs a seekable file, so decompress to a temp file.
+
+---------------------------------------------------------------------------------------------------
+
+## 3a. Integration with the existing OpenDota data
+
+PR #6 (on `origin/main`) already stores, per match: `TeamfightDomain`/`TeamfightPlayerDomain`, `DeathEventDomain`,
+`PlayerTimelineDomain`, `TeamTimelineDomain`, `ObjectiveEventDomain`, `ItemPurchaseEventDomain`, `DraftEventDomain`,
+`AbilityUpgradeDomain`, `HeroTargetStatDomain`. Replay data is an addition to these, never a second copy.
+
+**3a.1 Join keys (identical to OpenDota's).**
+- Match: `matchId`. Player: `playerSlot` (Radiant 0-4, Dire 128-132), the key of `PlayerTimelineDomain`,
+  `DeathEventDomain` and `TeamfightPlayerDomain`. `ReplayRoster` maps the replay player id to `playerSlot` and checks
+  every mapping against the stored OpenDota players (`account_id`, `hero_id`); on a mismatch the run ends
+  `FAILED_IDENTITY` and writes no rows.
+- Time: whole game seconds from 0:00, the unit of `TeamfightDomain.startTime`, `DeathEventDomain.deathTime` and the
+  purchase times. Replay columns use the same unit (`startSec`, `gameSecond`). S1 gains a check: every replay hero
+  death matches a `DeathEventDomain.deathTime` within 1 s.
+
+**3a.2 Entry condition.** Only matches with `MatchDomain.detailsMappedAt != null` (OpenDota parsed it, rows stored,
+`replayCluster`/`replaySalt` set by `MatchDetailService`) enter the replay queue. Replay analyses therefore always sit
+on complete OpenDota rows.
+
+**3a.3 Rule: OpenDota first, the replay only adds.** A replay table never stores a column an OpenDota table already
+holds for the same key.
+
+| Existing table | Replay side |
+|---|---|
+| `TeamfightDomain`/`TeamfightPlayerDomain` | `FightDomain` holds only **our** detectors (SKIRMISH, ENGAGEMENT, spatial split). The DEATHS_15S baseline is not copied: it is validated directly against `TeamfightDomain`; `openDotaFightIndex` links a fight to it. |
+| `DeathEventDomain` (matchId, playerSlot, deathIndex; goldLost, goldFed, timeDead, killer) | `DeathAnalysisDomain`, same natural key, 1:1 extension with replay-only fields (position, region, assists, flags, BKB, `preDeathWindow`, reason). Replaces `HeroDeathDomain` of section 9. |
+| `PlayerTimelineDomain` (gold, xp, lastHits, denies, networth, heroDamage, towerDamage, heroHealing, campsStacked per minute) | `ReplayPlayerMinuteDomain`, same key (matchId, playerSlot, gameMinute), **extras only**: gold by source, K/D/A, wards, runes, creeps stacked, misses, nearby creep deaths, buyback state, unspent gold. |
+| `TeamTimelineDomain` (radiantGoldAdv/XpAdv per minute) | `TeamMinuteStateDomain` drops net worth and XP; keeps towers, barracks, heroes alive, wards, buybacks. Group 6 uses the 30 s replay net worth when present, else `TeamTimelineDomain`. |
+| `ObjectiveEventDomain` (building kills, Roshan, aegis) | `BuildingKillContextDomain` (renamed from `BuildingKillDomain`) links to the objective row by building key and time (+-1 s) and stores only assists, siege, pressure, fight link. |
+| `ItemPurchaseEventDomain` (includes pre-horn purchases) | Read from it; do not parse PURCHASE from the combat log. |
+| `DraftEventDomain` | Add nullable `pickTick`, `secondsIntoDraft` (All Pick). Ability Draft tables stay new: OpenDota has no equivalent. |
+
+**3a.4 One read side.** Analyzers read through narrow interfaces that merge both sources, so they never know which
+table a value came from: `PlayerMinuteSeries` (`PlayerTimelineDomain` + replay extras) and `MatchDeaths`
+(`DeathEventDomain` + `DeathAnalysisDomain`), and so on per overlap. Without a replay (missing or expired) they return
+the OpenDota part only and the analyses degrade instead of failing.
+
+**3a.5 Timing.** `MatchParseCheckJob` reports right after the OpenDota parse; replay data arrives later from the queue.
+WP8 posts the replay findings as a follow-up message in the same thread when the run reaches `DONE`.
+
+---------------------------------------------------------------------------------------------------
+
+## 3b. Code structure (SOLID)
+
+Package `service/replay/`, following the PR #6 pattern (beans discovered as a `List`, as `MatchDetailService` does with
+`MatchDetailMapper`).
+
+| Responsibility (SRP) | Type | Notes |
+|---|---|---|
+| Fetch the file | `ReplayDownloader` | streams to a temp file, never into memory |
+| Decompress | `ReplayDecompressor` interface; `ZstdDecompressor`, `Bzip2Decompressor` | picked by magic bytes; a new format is a new class (OCP) |
+| Parse | `ReplayParser` interface; `ClarityReplayParser` | **only** `service/replay/clarity/` imports `skadistats` (DIP); returns `ReplayFacts` |
+| Facts in memory | `ReplayFacts` composed of narrow views: `ReplayClock`, `ReplayRoster`, `HeroTimeline`, `CombatLogView`, `EntityEvents`, `MapLayout` | ISP: an extractor depends only on the views it reads; tests feed the same views from fixtures |
+| Write L1 rows | `ReplayExtractor` beans: `name()`, `extract(ReplayFacts, MatchDomain)`, `deleteByMatchId(long)` | one table slice each; switchable with `replay.<name>.enabled` |
+| Compute L2 rows | `ReplayAnalyzer` beans: `name()`, `version()`, `analyze(long matchId)`, `deleteByMatchId(long)` | read only repositories and the 3a.4 interfaces, never `ReplayFacts`; ordered with `@Order` (activity pass 1, fights, activity pass 2, deaths, spikes) |
+| Orchestrate one match | `ReplayRunService` | download, parse, run extractors, release `ReplayFacts`, run analyzers; records `ReplayParseRunDomain` and per-extractor status; one extractor failing gives `PARTIAL`, the rest continue (LSP: all extractors honour one contract) |
+| Queue and limits | `ReplayProcessingJob` (Quartz) + `ReplayProcessingProperties` | see 3b.3 |
+| Delete | `ReplayDataService.deleteByMatchId` | iterates extractors and analyzers; `MatchDeletionService` gets one call, as it does for `matchDetailService` |
+
+`ReplayExtractor` deliberately does **not** implement `MatchDetailMapper`: its input is a parsed replay, not a
+`MatchResponse`, and forcing it in would break LSP/ISP. `MatchDetailService` stays unaware of replays (OCP); the job
+finds work by querying `MatchDomain`. A shared super-interface for `deleteByMatchId` would change existing code and is
+left as an optional later refactor; ask the user first.
+
+**3b.3 Memory: one replay at a time, configurable.**
+```
+replay.processing.enabled=false          # off until WP0 is verified on prod
+replay.processing.max-concurrent=1       # parses in flight; Semaphore bean in ConcurrencyConfig
+replay.processing.batch-size=5           # matches per job run, processed one after another
+replay.processing.cron=0 3/10 * * * ?
+replay.processing.max-age-days=90
+replay.processing.max-replay-bytes=150MB # rejected before decompressing
+replay.processing.temp-dir=${java.io.tmpdir}/dbuff-replays
+```
+- `ReplayProcessingJob` is the only automatic entry point: Quartz cron, `@DisallowConcurrentExecution`, honours
+  `QuietHoursGuard`, selects matches with `detailsMappedAt` set, a salt, no `DONE` run and age <= `max-age-days`,
+  newest first, and processes them sequentially. The admin recompute endpoint takes the same semaphore.
+- Inside one replay: download and decompress stream to disk; `ReplayFacts` keeps primitive arrays per player (not an
+  object per frame) and only the hero-relevant typed combat-log entries (not all ~57k); it is released in `finally`
+  before the L2 analyzers run; the temp file is always deleted.
+- One INFO line per replay: `parseMillis`, `replayBytes`, peak heap.
+- If the in-app parse at `-Xmx512m` fails the WP0 exit check, the fallback is a separate short-lived JVM per replay
+  (the repo already has `sidecars/`); do not build it before the check says it is needed.
 
 ---------------------------------------------------------------------------------------------------
 
@@ -316,7 +409,8 @@ bountyRuneAt0, scrollsBought, wardsPlacedPreHorn, smokeBought)`.
   pickedBySlot, pickedAtSec, contested (an enemy hero within R of the rune at spawn+pickup window), source`.
   Spawns from `CDOTA_Item_Rune` create/delete (`m_iRuneType`, `m_flRuneTime`, `m_szLocation`); pickup attribution =
   the per-player rune counter increment (`m_iBountyRunes/PowerRunes/WaterRunes`) in the same second the entity is
-  deleted. Verify in S5.
+  deleted. When several runes are taken in the same second (bounty runes at 0:00), attribute each deleted rune to the
+  nearest alive hero of a team whose counter increased, one rune per counter increment. Verify in S5.
 - `WardDomain`: `matchId, wardEntityId, kind OBS|SENTRY, team, ownerSlot, x, y, region, placedSec, endSec,
   lifetimeSec, endReason EXPIRED|KILLED|UNKNOWN, killedBySlot`. From entity create/delete of
   `CDOTA_NPC_Observer_Ward` (`m_hOwnerEntity` -> hero -> slot) and `..._TrueSight`; kill attribution from the DEATH
@@ -380,8 +474,10 @@ review of 10 engagements that the baseline missed.
   radiantHeroDamage, direHeroDamage, radiantGoldDelta, direGoldDelta, radiantXpDelta, direXpDelta,
   winnerTeam (RADIANT|DIRE|DRAW by the rule below), towersTakenWithin60s, roshanTakenWithin60s, aegisTaken,
   teamStateAtStart (AHEAD|EVEN|BEHIND for Radiant), openDotaFightIndex (nullable link)`.
-  Winner rule: more own kills per enemy death weighted by hero net worth; ties broken by who held the ground
-  (centroid of survivors after `end`); `DRAW` otherwise. Record the margin.
+  Winner rule: `score(team) = sum(net worth of enemy heroes that died) - sum(net worth of own heroes that died)`,
+  taken at death time; the team with the higher score wins when `|score difference| >= fightWinMarginPct` (default
+  10%) of the combined net worth of the heroes involved. Below that, the team that held the ground (centroid of
+  survivors 10 s after `end` closer to the fight centre) wins; `DRAW` when neither applies. Record the margin.
 - `FightPlayerDomain` (10 rows per fight): everything needed to answer "why was X absent / quiet":
   `presence` enum `ACTIVE | PRESENT_PASSIVE | ABSENT_ALIVE_FAR | ABSENT_DEAD | ABSENT_TELEPORTING | ABSENT_FARMING |
   ABSENT_PUSHING | ABSENT_OBJECTIVE | ABSENT_FOUNTAIN | ABSENT_SPLIT_FIGHT`, `absenceReason` (`NO_TP`,
@@ -441,7 +537,7 @@ Use only the engage moment, not the whole fight (positions mix during the brawl)
 ## 8. Group 4 - Team and player movement, objectives, game state
 
 ### 8.1 Towers and buildings
-- `BuildingKillDomain`: `matchId, eventSec, buildingName, tier (1-4), lane, kind TOWER|BARRACKS_MELEE|BARRACKS_RANGED|
+- `BuildingKillContextDomain` (time, building and killer stay in `ObjectiveEventDomain`; this row adds context only): `matchId, buildingName, tier (1-4), lane, kind TOWER|BARRACKS_MELEE|BARRACKS_RANGED|
   FORT|OUTPOST, team (owner), killerSlot, denied (killer team == owner), assistSlots[] (own heroes within 1500 units of
   the building in the 10 s before), fightIndex (nullable), siegeCreepsPresent, pushStartSec`.
   From `DOTA_COMBATLOG_TEAM_BUILDING_KILL` (the target name carries tier/lane; the killer hero is in `valueName`).
@@ -490,7 +586,7 @@ Config `endGameStartSec` default: the later of 30:00 and the first time either t
 all analyses below apply to all deaths, and the report prioritises those in the end game window and in fights tagged
 `HIGHGROUND` or with `winnerTeam` deciding the game.
 
-### 9.2 Death analysis (L1+L2): `HeroDeathDomain`
+### 9.2 Death analysis (L1+L2): `DeathAnalysisDomain` (1:1 extension of `DeathEventDomain`, see 3a.3)
 One row per hero death (about 50 per game): `matchId, deathIndex, deathSec, victimSlot, killerSlot, killerKind
 HERO|CREEP|TOWER|NEUTRAL|ROSHAN|SELF, assistSlots[], x, y, region, fightIndex, respawnSec, goldLost, buybackUsed,
 canBuyback, reason (enum), flags (jsonb), preDeathWindow (jsonb)`.
@@ -522,7 +618,7 @@ Availability model for `canBuyback`: dead hero with `unspentGold >= buybackCost`
 (`m_flBuybackCooldownTime`); the cost formula depends on level and net worth (S11: derive from observed
 buybacks in the sample games before using a formula). `missedBuyback` = a player died in the last fight before the
 ancient fell with `canBuyback = true` and did not use it; `BuybackReadinessDomain` is not needed, the flag lives on
-`FightPlayerDomain`/`HeroDeathDomain`.
+`FightPlayerDomain`/`DeathAnalysisDomain`.
 ### 9.5 `EndGameAnalysisDomain` (1 row per game)
 `matchId, endGameStartSec, decisiveFightIndex, losingTeamBuybacksAvailable, winningTeamBuybacksUsed, ancientFallSec,
 lastCarryDeathIndex, primaryReason` plus refs to the supporting death/fight ids.
@@ -537,7 +633,7 @@ lastCarryDeathIndex, primaryReason` plus refs to the supporting death/fight ids.
 
 ### 10.1 Inputs
 `ReplayPlayerMinute` (gold by source, net worth per player, XP), `TeamMinuteState`, `FightDomain/FightPlayerDomain`,
-`HeroDeathDomain`, `BuildingKillDomain`, OpenDota `purchase_log` / `ItemPurchaseEventDomain` (key item timings),
+`DeathAnalysisDomain`, `BuildingKillContextDomain`, OpenDota `purchase_log` / `ItemPurchaseEventDomain` (key item timings),
 `ObjectiveEventDomain` (Roshan, aegis), `BuybackEventDomain`, `LaneAssignmentDomain`. No replay needed (L2 only).
 
 ### 10.2 Spike detection
@@ -554,7 +650,7 @@ For the window compute the gold change of each team split by **source** (differe
 **player** (delta net worth), then attach events:
 1. Fights in the window (their `winnerTeam`, kills, who died, `FightPlayerDomain.presence` anomalies such as a missing
    core with `ABSENT_FARMING`, `NO_TP`).
-2. Deaths: single `HeroDeathDomain` rows with high `goldLost` + the feed value (a core dying twice in 2 minutes).
+2. Deaths: single `DeathEventDomain` joined with `DeathAnalysisDomain` rows with high `goldLost` + the feed value (a core dying twice in 2 minutes).
 3. Objectives: tower/barracks kills, Roshan/aegis, tormentor, with their gold share.
 4. Item power spikes: a key item bought in the previous 3 min by a participant of the swing. A **key item** is
    config-driven (default: net-worth cost >= 2000 or one of Blink, BKB, Aghanim's Scepter/Shard, Black King Bar,
@@ -576,7 +672,7 @@ For each player compute `nwShareOfTeam(t)` and the cumulative gold by source. Fl
 below the team median. Explain it: the source with the largest contribution vs the team median, the change point of
 his income slope (CUSUM on gold/min) and what happened there (item purchase, camp type, a kill streak, farming with no
 fights, enemies feeding that hero), and the opponent side: enemy deaths to that hero, enemy absences. Also flag
-`FEEDER` (net worth share below `1/10`-half and deaths far above median) and `SHARED_GOLD` effects if
+`FEEDER` (net worth share of the team below `feederShare`, default 10%, for >= 5 minutes, and deaths above twice the team median) and `SHARED_GOLD` effects if
 `m_iSharedGold` is large.
 
 ### 10.5 Tables
@@ -609,7 +705,9 @@ deletion goes through one service (`ReplayDataService.deleteByMatchId`) called f
 | `AbilityDraftPickDomain` | L1 | 40 | 1 | |
 | `AbilityDraftPoolDomain` | L1 | 48 | 1 | |
 | `ReplayPlayerTrackDomain` | L1 | 10 | 2-5 | arrays, 5 s |
-| `ReplayPlayerMinuteDomain` | L1 | ~450 | 2,6 | per player per minute |
+| `ReplayPlayerMinuteDomain` | L1 | ~450 | 2,6 | per player per minute; **extras only**, same key as `PlayerTimelineDomain` (3a.3) |
+| `ReplayCombatLogDomain` | L1 | 10-20 per match as chunks | 3,5,6 | zstd-compressed `bytea` of the hero-relevant combat-log entries (damage, death, ability, item, whitelisted modifiers, gold, XP; ~15-20k entries, a few hundred KB). Makes the L2 tables recomputable after the replay expires |
+| `ReplayStateChangeDomain` | L1 | ~3000 | 3,5 | inventory and ability change events (item gained/lost, cooldown started, level up, charges) per player; lets TP/BKB/cooldown/mana questions be answered without the replay |
 | `RuneEventDomain` | L1 | ~25 | 2 | |
 | `WardDomain` | L1 | ~40 | 2,4 | |
 | `CourierEventDomain` | L1 | ~5 | 2 | |
@@ -618,24 +716,28 @@ deletion goes through one service (`ReplayDataService.deleteByMatchId`) called f
 | `LaneAssignmentDomain` / `LaneMatchupDomain` | L2 | 10 / 3 | 2 | |
 | `PlayerActivitySegmentDomain` | L2 | ~1500 | 3,4 | |
 | `ModifierEventDomain` (whitelist) | L1 | ~1500 | 3,5 | `matchId, targetSlot, sourceSlot, modifierName, kind DISABLE|IMMUNE|TELEPORT|INVIS|OTHER, startSec, endSec, durationSec, ability` |
-| `FightDomain` | L2 | ~15 | 3 | |
-| `FightPlayerDomain` | L2 | ~150 | 3 | |
-| `FightAbilityUseDomain` | L2 | ~900 | 3 | |
-| `FightDamageFlowDomain` | L2 | ~600 | 3 | P1 |
-| `BuildingKillDomain` | L1 | ~22 | 4 | |
+| `FightDomain` | L2 | ~40 | 3 | our detectors only; baseline is `TeamfightDomain` (3a.3). ~40 with skirmishes and engagements |
+| `FightPlayerDomain` | L2 | ~400 | 3 | |
+| `FightAbilityUseDomain` | L2 | ~2500 | 3 | |
+| `FightDamageFlowDomain` | L2 | ~1600 | 3 | P1 |
+| `BuildingKillContextDomain` | L1 | ~22 | 4 | links to `ObjectiveEventDomain` (3a.3) |
 | `BuildingPressureDomain` | L1 | ~200 | 4 | P1 |
 | `TeamMinuteStateDomain` | L2 | ~90 | 4 | |
 | `GameStateSegmentDomain` | L2 | ~8 | 4 | |
 | `PlayerPhaseSummaryDomain` | L2 | 30 | 4 | |
 | `TeamBehaviorDomain` | L2 | ~6 | 4 | metrics jsonb |
-| `HeroDeathDomain` | L2 | ~50 | 5 | `preDeathWindow` jsonb |
+| `DeathAnalysisDomain` | L2 | ~50 | 5 | 1:1 with `DeathEventDomain`, replay-only fields; `preDeathWindow` jsonb (the name `HeroDeathDomain` used in sections 7-10 means this table) |
 | `BuybackEventDomain` | L1 | ~3 | 5 | |
 | `EndGameAnalysisDomain` | L2 | 1 | 5 | |
 | `GameSpikeDomain` / `GameSpikeFactorDomain` / `PlayerOutlierDomain` | L2 | ~8 / ~40 / ~3 | 6 | |
 | `AbilityPairStatDomain`, `AbilityPickPositionStatDomain` | aggregate | global | 1 | nightly job |
 
-Estimated volume: about 5,500 rows and 0.6-1.0 MB per game (arrays and jsonb dominate; Postgres TOAST-compresses the
-arrays). 1,000 games is about 1 GB, well inside the 40 GB disk; keep L1 forever, recompute L2 on demand.
+Estimated volume: about 9,000 rows and 1.5-2 MB per game (arrays, jsonb and the combat-log blob dominate; Postgres
+TOAST-compresses them). 1,000 games is about 2 GB, well inside the 40 GB disk; keep L1 forever, recompute L2 on demand.
+**Recompute rule:** an L2 analyzer may only read L1 tables, OpenDota tables and the 3a.4 read interfaces. Anything
+that needs a value that exists only during the parse (TP/BKB cooldown, per-second mana, the 8 s pre-death window,
+creep kills, 1 s positions) must first be captured in an L1 table (`ReplayCombatLogDomain`, `ReplayStateChangeDomain`,
+or the tracks); otherwise that table is frozen at parse time and says so in its `analysisVersion` note.
 Insert with `saveAll` in batches of 25 (already configured); sequence generators with `allocationSize = 50`.
 Raw combat-log events are **not** stored (57k per game); only the whitelisted modifier events, deaths with their
 pre-death window, and per-fight aggregates are.
@@ -650,7 +752,7 @@ Queries for focus players join `ReplayPlayerDomain` on `accountId`, so the focus
 
 | WP | Scope | Depends on | Size | Done when |
 |---|---|---|---|---|
-| WP0 | Foundation: dependencies, `ReplayDownloadService` (sniff zstd/bz2), `ReplayParseService`, `ReplayClock`, `ReplayRoster`, `ReplayParseRunDomain`, feature flag + semaphore, trigger from `MatchParseCheckJob`, backfill scheduler (matches with salt, <= 90 days, quiet hours, one parse at a time), deletion hook. Spikes S1, S2, S3, S8 | - | M | one real replay is downloaded, parsed, and a `ReplayParseRun` row says `DONE` with identity rows; CI green |
+| WP0 | Foundation per 3b: branch from fetched `origin/main`; dependencies; `ReplayDownloader`, `ReplayDecompressor`s, `ReplayParser`/`ClarityReplayParser`, `ReplayFacts` views, `ReplayRoster` with the OpenDota identity check, `ReplayParseRunDomain`, `ReplayProcessingProperties`, `ReplayProcessingJob` (3b.3: sequential, `max-concurrent` semaphore, quiet hours, `detailsMappedAt` entry condition), `ReplayDataService` + deletion hook. Spikes S1, S2, S3, S8 | - | M | one real replay is downloaded, parsed **inside the app at `-Xmx512m`** (INFO line with parseMillis, replayBytes, peak heap), and a `ReplayParseRun` row says `DONE` with identity rows; CI green |
 | WP1 | Group 1 extractor + derived queries + aggregate job; AP draft capture (after S9) | WP0 | M | section 5.4 |
 | WP2 | `ReplaySampler`, `CombatLogIndex`, `MapLayout`, `ActivitySegmenter`, `TeamStateSegmenter`, tracks and minute tables. Spikes S5, S7 | WP0 | L | track arrays and minute rows verified against counters; lane classification >= 90% vs OpenDota |
 | WP3 | Group 2: runes, wards, couriers, lane equilibrium, pre-game summary, lane assignment/matchups | WP2 | M | section 6.5 |
@@ -659,7 +761,7 @@ Queries for focus players join `ReplayPlayerDomain` on `accountId`, so the focus
 | WP6 | Group 5: deaths, BKB logic, buybacks, end game row. Spikes S4, S11 | WP4 | M | section 9.6 |
 | WP7 | Group 6: spikes, factors, outliers. Spike S10 thresholds | WP3-WP6 | M | section 10.6 |
 | WP8 | Reports: analyzers under `service/match/report/analyzer/` (draft, lane, fight, death, spike), `/stats draft`, `/match` replay detail, AI prompt inputs | WP1-WP7 | M | a Discord report shows draft + lane + fight findings for a focus player |
-| WP9 | Operations: metrics/logging, admin recompute of an `analysisVersion`, retention checks, disk/temp cleanup, load test with 20 replays on the prod-sized heap | WP0-WP7 | S | parse of 20 replays at `-Xmx512m` without GC thrash; temp files always deleted |
+| WP9 | Operations: admin recompute of an `analysisVersion` (shares the one-replay semaphore), retention checks, disk/temp cleanup, load test with 20 replays one after another on the prod-sized heap (the single-replay memory check is already a WP0 exit criterion) | WP0-WP7 | S | 20 replays at `-Xmx512m` without GC thrash; temp files always deleted |
 
 Order and parallelism: WP0 first. WP1 and WP2 can run in parallel after WP0. WP3 and WP4 depend on WP2 (WP4 also on
 the lane results). WP5, WP6 follow WP4; WP7 last. Each WP is its own branch/PR; ask the user before merging.
@@ -688,8 +790,9 @@ the two spiked matches and assert on them. Run only targeted tests; ask before t
 | S10 | Fight and state thresholds: detector precision/recall vs OpenDota, hysteresis, engagement thresholds | 20 replays, scripted comparison | WP4, WP7 |
 | S11 | Buyback cost model and availability; anonymous players (`steamId = 0`); Meepo/illusion/clone handling in the roster | find matches with buybacks and anonymous players via OpenDota | WP6 |
 
-The throwaway spike programs used so far (Dump, Fields, Timeline, DraftSnapshot, Probe, CombatProbe, ItemProbe) lived
-in the session scratchpad and are not in the repo; recreate from the descriptions or ask the user to keep a copy.
+The throwaway spike programs used so far (Dump, Fields, AbilityFields, Heroes, Timeline, DraftSnapshot, Probe,
+CombatProbe, ItemProbe) are kept in `scripts/replay-spikes/` with their `build.gradle` (not part of the build; replays
+are not committed). Adjust the replay path inside them before running.
 Useful Clarity 5.0.1 facts: `OnTickStart` is in `skadistats.clarity.processor.reader`; use
 `Entities.stream()` with `Entities.byDtName`, `getByHandle`, `EntityState.fieldPathIterator()`;
 `@OnCombatLogEntry` in `processor.gameevents`; string table names via `StringTables.forName("EntityNames")`.
@@ -706,7 +809,8 @@ Entities are cleaned up at the end of the replay, so snapshot mid-game or while 
 | Retention | L1 kept forever, L2 recomputable; raw combat log never stored |
 | Modes | Ability Draft (18) and All Draft/"All Pick" (22) only |
 | Replay age limit | 90 days; older matches get `EXPIRED` |
-| Concurrency | one replay parse at a time; quiet hours respected for downloads |
+| Concurrency | one replay parse at a time, configurable `replay.processing.max-concurrent` (default 1); queue settings in 3b.3; quiet hours respected for downloads |
+| Table overlap with PR #6 | extend the OpenDota tables with replay-only columns/tables, never copy (3a.3) |
 | Thresholds | all in `replay.analysis.*`, snapshot in `ReplayParseRun.analysisConfig` |
 | Lane result rule | relative lane net worth at 10:00 differing by > 8% = win |
 | Fight baseline | OpenDota rule (>= 3 deaths, 15 s cooldown) plus skirmish and engagement layers |
