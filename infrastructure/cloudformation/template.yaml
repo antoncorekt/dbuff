@@ -54,6 +54,14 @@ Parameters:
     Default: 0.0.0.0/0
     Description: CIDR block allowed for SSH access
 
+  AllowedApiCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: >-
+      CIDR block allowed to reach the REST API on port 8080. The bot itself needs no inbound
+      access (Discord is outbound, deploy health checks use localhost), so this can be narrowed to
+      your own IP or closed down without affecting it.
+
 # ---------- VPC ----------
 Resources:
   VPC:
@@ -146,7 +154,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: 8080
           ToPort: 8080
-          CidrIp: 0.0.0.0/0
+          CidrIp: !Ref AllowedApiCidr
           Description: Spring Boot application
       SecurityGroupEgress:
         - IpProtocol: '-1'

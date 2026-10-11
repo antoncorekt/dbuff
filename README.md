@@ -84,6 +84,20 @@ Group admins: see [docs/ONBOARDING.md](docs/ONBOARDING.md). The bot logs its inv
 
 ## API Endpoints
 
+Every endpoint except `/actuator/health` requires the key in an `X-Api-Key` header:
+
+```bash
+curl -H "X-Api-Key: $DBUFF_API_KEY" http://localhost:8080/api/v1/register
+```
+
+Set `DBUFF_API_KEY` in `.env` (generate one with `openssl rand -hex 32`). Locally an empty key leaves
+the API open; in production a missing key closes it. To install or rotate the production key, run
+`scripts/set-api-key.sh <instance-id>`.
+
+The API is plain HTTP on port 8080, so the key is sent unencrypted: anyone on the caller's network
+path can read it. Until TLS is in front, narrow `ALLOWED_API_CIDR` to your own IP (see
+`.env.example`) or reach the API through an SSM port-forward.
+
 | Endpoint | Description |
 |----------|-------------|
 | `GET /players/{accountId}` | Get player information |
