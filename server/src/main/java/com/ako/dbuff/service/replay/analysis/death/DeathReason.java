@@ -14,6 +14,8 @@ public enum DeathReason {
   BKB_ON_COOLDOWN,
   DISABLE_CHAIN,
   CAUGHT_OUT,
+  /** Stood well in front of where his attack range puts him in the fight he died in. */
+  OUT_OF_POSITION,
   TOWER,
   BURST,
   /** Killed by a hero with no BKB owned, and nothing more specific explains it. */

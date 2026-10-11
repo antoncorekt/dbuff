@@ -99,6 +99,27 @@ class DeathAssessorTest {
     assertThat(a.topSources()).isEqualTo("npc_dota_hero_a:900,npc_dota_hero_b:300");
   }
 
+  @Test
+  void assess_callsAHeroWhoStoodWellInFrontOfHisRangeOutOfPosition_afterTheSharperCauses() {
+    assertThat(positioned(-2, List.of())).isEqualTo(DeathReason.OUT_OF_POSITION);
+    assertThat(positioned(-1, List.of())).isEqualTo(DeathReason.NO_BKB);
+    assertThat(positioned(null, List.of())).isEqualTo(DeathReason.NO_BKB);
+    assertThat(positioned(-3, List.of(stun(195, 400), stun(197, 300))))
+        .isEqualTo(DeathReason.DISABLE_CHAIN);
+  }
+
+  private DeathReason positioned(Integer delta, List<CombatEvent> events) {
+    return assessor
+        .assess(
+            death(CombatEvent.ATTACKER_HERO),
+            traces(0),
+            new HeroStateTimeline(),
+            events,
+            null,
+            delta)
+        .reason();
+  }
+
   private DeathReason reason(HeroStateTimeline state, List<CombatEvent> events) {
     return assessor
         .assess(death(CombatEvent.ATTACKER_HERO), traces(0), state, events, null)

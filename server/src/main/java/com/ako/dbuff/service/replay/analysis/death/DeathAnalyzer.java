@@ -2,9 +2,11 @@ package com.ako.dbuff.service.replay.analysis.death;
 
 import com.ako.dbuff.dao.model.DeathAnalysisDomain;
 import com.ako.dbuff.dao.model.FightDomain;
+import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
+import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
@@ -45,6 +47,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
   private final ReplayParseRunRepo runRepo;
   private final HeroStateTimelines timelines;
   private final FightRepo fightRepo;
+  private final FightPlayerRepo fightPlayerRepo;
   private final DeathAnalysisRepo deathRepo;
   private final CombatLogReader combatLog;
   private final MapLayouts mapLayouts;
@@ -58,7 +61,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 1;
+    return 2;
   }
 
   @Override
@@ -80,6 +83,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
     Map<Integer, FightAssessor.Trace> traces = playerTraces.load(matchId);
     Map<Integer, HeroStateTimeline> states = timelines.load(matchId);
     List<FightDomain> fights = fightRepo.findByMatchId(matchId);
+    Map<String, Integer> deltas = frontlineDeltas(matchId);
     MapLayout layout = layout(matchId);
     DeathAssessor assessor = new DeathAssessor(properties.deathTuning());
     Map<Integer, Integer> deathsSoFar = new HashMap<>();
@@ -103,7 +107,8 @@ public class DeathAnalyzer implements ReplayAnalyzer {
               traces,
               states.getOrDefault(victim, new HeroStateTimeline()),
               aboutVictim,
-              layout);
+              layout,
+              deltas.get(fightKey(fightIndex(fights, e.gameSecond()), victim)));
       int index = deathsSoFar.merge(victim, 1, Integer::sum) - 1;
       rows.add(row(matchId, index, death, a, fightIndex(fights, e.gameSecond())));
     }
@@ -122,6 +127,22 @@ public class DeathAnalyzer implements ReplayAnalyzer {
         .map(ReplayParseRunDomain::getMapVersion)
         .flatMap(mapLayouts::forVersion)
         .orElse(null);
+  }
+
+  private Map<String, Integer> frontlineDeltas(long matchId) {
+    Map<String, Integer> deltas = new HashMap<>();
+    for (FightPlayerDomain p : fightPlayerRepo.findByMatchId(matchId)) {
+      if (p.getFrontlineDelta() != null) {
+        deltas.put(
+            fightKey(p.getFightIndex(), PlayerSlots.index(p.getPlayerSlot())),
+            p.getFrontlineDelta());
+      }
+    }
+    return deltas;
+  }
+
+  private static String fightKey(Integer fightIndex, int player) {
+    return fightIndex + ":" + player;
   }
 
   private static Integer fightIndex(List<FightDomain> fights, double second) {
@@ -163,6 +184,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
         .topSources(a.topSources())
         .saveItemsOwned(a.saveItemsOwned())
         .teleportReady(a.teleportReady())
+        .frontlineDelta(a.frontlineDelta())
         .reason(a.reason().name())
         .analysisVersion(version())
         .build();

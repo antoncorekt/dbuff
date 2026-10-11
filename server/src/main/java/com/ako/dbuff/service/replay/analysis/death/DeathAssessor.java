@@ -57,13 +57,16 @@ public final class DeathAssessor {
    * @param isolationRadius a hero with no ally and two enemies this close was caught out
    * @param disableSeconds disabled this long in the lookback is a disable chain
    * @param reincarnationSeconds alive this long after dying means Aegis or reincarnation
+   * @param outOfPositionRanks standing this many places further forward than his attack range
+   *     suggests, in the fight he died in, is being out of position
    */
   public record Tuning(
       int lookbackSeconds,
       int burstDamage,
       int isolationRadius,
       int disableSeconds,
-      int reincarnationSeconds) {}
+      int reincarnationSeconds,
+      int outOfPositionRanks) {}
 
   /** A hero death from the combat log. {@code killerFlags} are the CombatEvent flag bits. */
   public record Death(double second, int victim, String killer, int killerFlags, int assistMask) {}
@@ -88,7 +91,8 @@ public final class DeathAssessor {
       String topSources,
       String saveItemsOwned,
       boolean teleportReady,
-      DeathReason reason) {}
+      DeathReason reason,
+      Integer frontlineDelta) {}
 
   private static final Pattern BUILDING_NAME =
       Pattern.compile("^npc_dota_(goodguys|badguys)_(tower|fort|.*rax)");
@@ -109,6 +113,20 @@ public final class DeathAssessor {
       HeroStateTimeline state,
       List<CombatEvent> victimEvents,
       MapLayout layout) {
+    return assess(death, traces, state, victimEvents, layout, null);
+  }
+
+  /**
+   * @param frontlineDelta how far forward the hero stood in the fight he died in compared with his
+   *     attack range, as {@link FrontlineRanker} says; null when he died outside a fight
+   */
+  public Assessment assess(
+      Death death,
+      Map<Integer, Trace> traces,
+      HeroStateTimeline state,
+      List<CombatEvent> victimEvents,
+      MapLayout layout,
+      Integer frontlineDelta) {
     double from = death.second() - tuning.lookbackSeconds();
     KillerKind kind = kind(death);
     int[] position = position(traces.get(death.victim()), death.second());
@@ -152,6 +170,7 @@ public final class DeathAssessor {
             usedInLookback,
             disabled,
             isolated,
+            frontlineDelta != null && frontlineDelta <= -tuning.outOfPositionRanks(),
             lastThree);
     return new Assessment(
         kind,
@@ -170,7 +189,8 @@ public final class DeathAssessor {
         topSources(hits),
         String.join(",", saves),
         teleport,
-        reason);
+        reason,
+        frontlineDelta);
   }
 
   private DeathReason reason(
@@ -184,6 +204,7 @@ public final class DeathAssessor {
       boolean usedInLookback,
       double disabled,
       boolean isolated,
+      boolean outOfPosition,
       long lastThree) {
     if (reincarnated) {
       return DeathReason.REINCARNATED;
@@ -205,6 +226,9 @@ public final class DeathAssessor {
     }
     if (isolated) {
       return DeathReason.CAUGHT_OUT;
+    }
+    if (outOfPosition) {
+      return DeathReason.OUT_OF_POSITION;
     }
     if (kind == KillerKind.TOWER) {
       return DeathReason.TOWER;

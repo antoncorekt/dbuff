@@ -1,11 +1,15 @@
 package com.ako.dbuff.service.replay.analysis.death;
 
 import com.ako.dbuff.dao.model.DeathAnalysisDomain;
+import com.ako.dbuff.dao.model.FightDomain;
+import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.ReplayCombatLogDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.dao.model.ReplayStateChangeDomain;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
+import com.ako.dbuff.dao.repo.FightPlayerRepo;
+import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.ReplayCombatLogRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
@@ -54,6 +58,8 @@ class DeathAnalyzerTest {
   @Autowired private ReplayCombatLogRepo combatLogRepo;
   @Autowired private ReplayStateChangeRepo stateRepo;
   @Autowired private DeathAnalysisRepo deathRepo;
+  @Autowired private FightRepo fightRepo;
+  @Autowired private FightPlayerRepo fightPlayerRepo;
 
   @Test
   void analyze_storesEachDeathWithItsReasonOnOpenDotaSlots_andReplacesAnEarlierRun() {
@@ -72,6 +78,33 @@ class DeathAnalyzerTest {
     assertThat(death.getReason()).isEqualTo("BKB_READY_UNUSED");
     assertThat(death.getReincarnated()).isFalse();
     assertThat(death.getTopSources()).startsWith("npc_dota_hero_hero0:");
+  }
+
+  @Test
+  void analyze_carriesTheFrontlineDeltaOfTheFightTheHeroDiedIn() {
+    stored();
+    fightRepo.saveAndFlush(
+        FightDomain.builder()
+            .matchId(MATCH)
+            .fightIndex(0)
+            .type("SKIRMISH")
+            .startSeconds(95.0)
+            .endSeconds(110.0)
+            .build());
+    fightPlayerRepo.saveAndFlush(
+        FightPlayerDomain.builder()
+            .matchId(MATCH)
+            .fightIndex(0)
+            .playerSlot(128L)
+            .frontlineRank(1)
+            .frontlineDelta(-3)
+            .build());
+
+    analyzer.analyze(MATCH);
+
+    DeathAnalysisDomain death = deathRepo.findByMatchId(MATCH).getFirst();
+    assertThat(death.getFightIndex()).isZero();
+    assertThat(death.getFrontlineDelta()).isEqualTo(-3);
   }
 
   @Test

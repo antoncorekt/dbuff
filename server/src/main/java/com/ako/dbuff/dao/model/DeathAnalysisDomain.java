@@ -58,6 +58,12 @@ public class DeathAnalysisDomain {
   private Integer fightIndex;
 
   private Boolean isolated;
+
+  /**
+   * The fight's frontline delta of the hero (negative: further forward than his range suggests).
+   */
+  private Integer frontlineDelta;
+
   private Boolean reincarnated;
   private Boolean bkbOwned;
 

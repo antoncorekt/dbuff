@@ -59,6 +59,9 @@ public class ReplayAnalysisProperties {
   /** A hero who dies this soon into a fight is said to have had no time to use what he held. */
   private int fightEarlyDeathSeconds = 5;
 
+  /** A hero this many places further forward than his attack range suggests was out of position. */
+  private int deathOutOfPositionRanks = 2;
+
   public FightDetector.Tuning fightTuning() {
     return new FightDetector.Tuning(
         fightMergeGapSeconds,
@@ -74,7 +77,8 @@ public class ReplayAnalysisProperties {
         deathBurstDamage,
         deathIsolationRadius,
         deathDisableSeconds,
-        deathReincarnationSeconds);
+        deathReincarnationSeconds,
+        deathOutOfPositionRanks);
   }
 
   public ActivityTuning activityTuning() {
