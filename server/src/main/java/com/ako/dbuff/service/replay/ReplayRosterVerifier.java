@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class ReplayRosterVerifier {
   private static final int PLAYERS_PER_MATCH = 10;
-  private static final String HERO_PREFIX = "npc_dota_hero_";
 
   /**
    * @throws ReplayException {@code FAILED_IDENTITY} on the first mismatch
@@ -50,7 +49,7 @@ public class ReplayRosterVerifier {
       }
       return;
     }
-    if (!sameHero(player.heroEntityName(), expected.getHeroName())) {
+    if (!HeroNames.matches(player.heroEntityName(), expected.getHeroName())) {
       throw mismatch(
           matchId,
           "slot "
@@ -60,19 +59,6 @@ public class ReplayRosterVerifier {
               + ", expected "
               + expected.getHeroName());
     }
-  }
-
-  /** Replay hero names are CamelCase entity names; OpenDota's are snake_case with a prefix. */
-  static boolean sameHero(String entityName, String openDotaName) {
-    if (entityName == null || openDotaName == null) {
-      return false;
-    }
-    String stored =
-        openDotaName.startsWith(HERO_PREFIX)
-            ? openDotaName.substring(HERO_PREFIX.length())
-            : openDotaName;
-    String snake = entityName.replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase();
-    return snake.equals(stored) || snake.replace("_", "").equals(stored.replace("_", ""));
   }
 
   private static ReplayException mismatch(long matchId, String detail) {

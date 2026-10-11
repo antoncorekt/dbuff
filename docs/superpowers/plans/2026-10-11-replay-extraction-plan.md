@@ -396,6 +396,8 @@ hash) is stored as a JSON resource; at parse time compute the hash and warn when
 `ENEMY_JUNGLE` (+ camp id), `OWN_BASE`, `ENEMY_BASE`, `ROSHAN`, `OTHER`. Calibrate in spike S7 with the two replays:
 plot heroes during minutes 1-8 and check the lane classification matches OpenDota `lane` for >= 90% of players.
 
+> **Implemented (first version):** `ActivityAnalyzer` / `ActivitySegmenter` in `service/replay/analysis/activity/`, rules version 1. Activities: DEAD, TELEPORTING, IN_BASE, JUNGLE_FARM, LANE_FARM, PUSHING, TRAVELING, POSITIONED, decided per 5 s sample in that order. Farming is a creep last hit by the hero within `replay.analysis.activity-farm-window-seconds` (10) of the sample, taken from the stored combat log (neutral kills vs lane-creep kills, which agree with OpenDota's `neutral_kills` and `lane_kills`). Not yet: ROAM, DEFEND, FIGHT, OBJECTIVE, IDLE; the fight override comes with the fight detector.
+
 ### 4.6 `ActivitySegmenter` (shared by Groups 2, 3, 4, 5)
 Classifies each player's every 5 s into one activity, then merges into segments:
 `LANE_FARM`, `JUNGLE_FARM`, `ROAM`, `PUSH` (near enemy tower/creeps in enemy lane half), `DEFEND`, `FIGHT`,
