@@ -59,6 +59,16 @@ class TeamStateSegmenterTest {
   }
 
   @Test
+  void segment_leavesOutAStateThatWouldStartAtTheLastSample() {
+    double[] leads = {0.08, 0.08, 0.08, 0.08, 0.0};
+
+    List<Segment> segments = segmenter.segment(leads, 60);
+
+    assertThat(segments)
+        .allSatisfy(s -> assertThat(s.endSeconds()).isGreaterThan(s.startSeconds()));
+  }
+
+  @Test
   void segment_ofNothingIsEmpty() {
     assertThat(segmenter.segment(new double[0], 60)).isEmpty();
   }

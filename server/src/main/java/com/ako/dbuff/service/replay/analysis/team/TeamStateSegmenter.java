@@ -59,7 +59,8 @@ public final class TeamStateSegmenter {
         start = Math.max(start, switchAt);
       }
     }
-    if (leads.length > 0) {
+    boolean lastSampleOnly = start == leads.length - 1 && !segments.isEmpty();
+    if (leads.length > 0 && !lastSampleOnly) {
       segments.add(segment(state, leads, start, leads.length - 1, leads.length - 1, stepSeconds));
     }
     return segments;

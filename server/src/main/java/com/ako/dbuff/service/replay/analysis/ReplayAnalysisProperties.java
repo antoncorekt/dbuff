@@ -74,7 +74,9 @@ public class ReplayAnalysisProperties {
 
   public TeamStateSegmenter.Tuning teamStateTuning() {
     return new TeamStateSegmenter.Tuning(
-        teamAheadPercent / 100.0, teamStateEnterSeconds, teamStateLeaveSeconds);
+        Math.max(1, teamAheadPercent) / 100.0,
+        Math.max(1, teamStateEnterSeconds),
+        Math.max(1, teamStateLeaveSeconds));
   }
 
   public FightDetector.Tuning fightTuning() {
