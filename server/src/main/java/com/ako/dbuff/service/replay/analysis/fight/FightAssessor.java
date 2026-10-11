@@ -60,6 +60,12 @@ public final class FightAssessor {
       return level[i] == 0 || attackRange[i] <= 0 ? null : attackRange[i];
     }
 
+    /** The first sample at or after the time, so a sample cannot fall before an event of it. */
+    public int indexAtOrAfter(double second) {
+      int i = (int) Math.ceil((second - startSeconds) / stepSeconds);
+      return Math.max(0, Math.min(x.length - 1, i));
+    }
+
     public int indexAt(double second) {
       int i = (int) Math.round((second - startSeconds) / stepSeconds);
       return Math.max(0, Math.min(x.length - 1, i));

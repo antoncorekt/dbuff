@@ -24,6 +24,7 @@ import com.ako.dbuff.service.replay.analysis.fight.PlayerTraces;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import com.ako.dbuff.service.replay.map.MapLayouts;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -105,6 +106,34 @@ class DeathAnalyzerTest {
     DeathAnalysisDomain death = deathRepo.findByMatchId(MATCH).getFirst();
     assertThat(death.getFightIndex()).isZero();
     assertThat(death.getFrontlineDelta()).isEqualTo(-3);
+  }
+
+  @Test
+  void analyze_doesNotTakeAHeroBackFromABuybackForAnAegis() {
+    stored();
+    ReplayPlayerTrackDomain victim =
+        trackRepo.findAll().stream()
+            .filter(t -> t.getPlayerSlot() == 128L)
+            .findFirst()
+            .orElseThrow();
+    victim.setFlags(filled(40, 1));
+    trackRepo.saveAndFlush(victim);
+
+    analyzer.analyze(MATCH);
+    assertThat(deathRepo.findByMatchId(MATCH).getFirst().getReincarnated()).isTrue();
+
+    ReplayCombatLogDomain log = combatLogRepo.findAll().getFirst();
+    List<CombatEvent> events = new ArrayList<>(CombatLogCodec.decode(log.getData()));
+    events.add(new CombatEvent(CombatEventKind.BUYBACK, 104, "", "", "", 0, 5, 0, 0, 0, 0, 0, 0));
+    log.setData(CombatLogCodec.encode(events));
+    log.setEventCount(events.size());
+    combatLogRepo.saveAndFlush(log);
+
+    analyzer.analyze(MATCH);
+
+    DeathAnalysisDomain death = deathRepo.findByMatchId(MATCH).getFirst();
+    assertThat(death.getReincarnated()).isFalse();
+    assertThat(death.getBoughtBack()).isTrue();
   }
 
   @Test

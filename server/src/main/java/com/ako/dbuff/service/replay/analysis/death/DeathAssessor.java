@@ -52,6 +52,7 @@ public final class DeathAssessor {
   private static final int CENTISECONDS = 100;
   private static final int DEFAULT_IMMUNITY_SECONDS = 10;
   private static final int TOP_SOURCES = 3;
+  private static final int REINCARNATION_RADIUS = 3000;
 
   /**
    * @param lookbackSeconds how far back damage, disables and BKB use are looked at
@@ -71,7 +72,18 @@ public final class DeathAssessor {
       int outOfPositionRanks) {}
 
   /** A hero death from the combat log. {@code killerFlags} are the CombatEvent flag bits. */
-  public record Death(double second, int victim, String killer, int killerFlags, int assistMask) {}
+  public record Death(
+      double second,
+      int victim,
+      String killer,
+      int killerFlags,
+      int assistMask,
+      boolean boughtBack) {
+
+    public Death(double second, int victim, String killer, int killerFlags, int assistMask) {
+      this(second, victim, killer, killerFlags, assistMask, false);
+    }
+  }
 
   /**
    * @param x null when the hero had no position
@@ -95,7 +107,8 @@ public final class DeathAssessor {
       boolean teleportReady,
       DeathReason reason,
       Integer frontlineDelta,
-      String immunityPiercedBy) {}
+      String immunityPiercedBy,
+      boolean boughtBack) {}
 
   private static final Pattern BUILDING_NAME =
       Pattern.compile("^npc_dota_(goodguys|badguys)_(tower|fort|.*rax)");
@@ -134,7 +147,10 @@ public final class DeathAssessor {
     KillerKind kind = kind(death);
     int[] position = position(traces.get(death.victim()), death.second());
     Zone zone = layout == null || position == null ? null : layout.zone(position[0], position[1]);
-    boolean reincarnated = aliveLater(traces.get(death.victim()), death.second());
+    boolean reincarnated =
+        !death.boughtBack()
+            && cameBackWhereHeDied(
+                traces.get(death.victim()), death.second(), tuning.reincarnationSeconds());
     List<double[]> immunity = immunityWindows(victimEvents);
     boolean owned = state.owns(BKB, death.second());
     boolean ownedThroughout = owned && state.owns(BKB, from);
@@ -200,7 +216,8 @@ public final class DeathAssessor {
         teleport,
         reason,
         frontlineDelta,
-        pierced.isEmpty() ? null : pierced);
+        pierced.isEmpty() ? null : pierced,
+        death.boughtBack());
   }
 
   private DeathReason reason(
@@ -276,13 +293,21 @@ public final class DeathAssessor {
     return trace.level()[i] == 0 ? null : new int[] {trace.x()[i], trace.y()[i]};
   }
 
-  /** A hero still or again alive a few seconds after dying was brought back, not respawned. */
-  private boolean aliveLater(Trace trace, double second) {
+  /**
+   * A hero alive again a few seconds after dying, within a walk of where he died, was brought back
+   * by Aegis or reincarnation. One back at his fountain from the far side of the map is not: that
+   * is a respawn of another kind (seen in a replay as an instant respawn with full health).
+   */
+  public static boolean cameBackWhereHeDied(Trace trace, double second, int afterSeconds) {
     if (trace == null || trace.x().length == 0) {
       return false;
     }
-    int i = trace.indexAt(second + tuning.reincarnationSeconds());
-    return trace.level()[i] > 0 && (trace.flags()[i] & 1) == 1;
+    int died = trace.indexAt(second);
+    int later = trace.indexAtOrAfter(second + afterSeconds);
+    return trace.level()[later] > 0
+        && (trace.flags()[later] & 1) == 1
+        && Math.hypot(trace.x()[later] - trace.x()[died], trace.y()[later] - trace.y()[died])
+            <= REINCARNATION_RADIUS;
   }
 
   private boolean isolated(Death death, Map<Integer, Trace> traces) {

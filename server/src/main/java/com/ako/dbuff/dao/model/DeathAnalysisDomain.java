@@ -70,6 +70,9 @@ public class DeathAnalysisDomain {
   @Column(length = 1000)
   private String immunityPiercedBy;
 
+  /** The hero paid for a buyback after this death, so being alive again is not an Aegis. */
+  private Boolean boughtBack;
+
   private Boolean reincarnated;
   private Boolean bkbOwned;
 

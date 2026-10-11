@@ -10,6 +10,7 @@ import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
+import com.ako.dbuff.service.replay.Buybacks;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.CombatHeroes;
@@ -61,7 +62,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 3;
+    return 4;
   }
 
   @Override
@@ -90,6 +91,8 @@ public class DeathAnalyzer implements ReplayAnalyzer {
     Map<String, List<CombatEvent>> byTarget =
         events.stream().collect(Collectors.groupingBy(CombatEvent::target));
     List<DeathAnalysisDomain> rows = new ArrayList<>();
+    Map<Integer, List<Double>> deathTimes = deathTimes(events, playerOf);
+    List<Buybacks.Buyback> buybacks = Buybacks.of(events);
     for (CombatEvent e : events) {
       if (e.kind() != CombatEventKind.DEATH
           || !e.targetIsRealHero()
@@ -99,7 +102,13 @@ public class DeathAnalyzer implements ReplayAnalyzer {
       int victim = playerOf.get(e.target());
       Integer fightIndex = fightIndex(fights, e.gameSecond());
       DeathAssessor.Death death =
-          new DeathAssessor.Death(e.gameSecond(), victim, e.attacker(), e.flags(), e.assistMask());
+          new DeathAssessor.Death(
+              e.gameSecond(),
+              victim,
+              e.attacker(),
+              e.flags(),
+              e.assistMask(),
+              boughtBack(buybacks, victim, e.gameSecond(), deathTimes.get(victim)));
       List<CombatEvent> aboutVictim =
           byTarget.get(e.target()).stream().filter(x -> x.gameSecond() <= e.gameSecond()).toList();
       DeathAssessor.Assessment a =
@@ -128,6 +137,33 @@ public class DeathAnalyzer implements ReplayAnalyzer {
         .map(ReplayParseRunDomain::getMapVersion)
         .flatMap(mapLayouts::forVersion)
         .orElse(null);
+  }
+
+  private static Map<Integer, List<Double>> deathTimes(
+      List<CombatEvent> events, Map<String, Integer> playerOf) {
+    Map<Integer, List<Double>> times = new HashMap<>();
+    for (CombatEvent e : events) {
+      if (e.kind() == CombatEventKind.DEATH
+          && e.targetIsRealHero()
+          && playerOf.containsKey(e.target())) {
+        times.computeIfAbsent(playerOf.get(e.target()), k -> new ArrayList<>()).add(e.gameSecond());
+      }
+    }
+    return times;
+  }
+
+  /** Whether the hero paid for a buyback after this death and before he died again. */
+  private static boolean boughtBack(
+      List<Buybacks.Buyback> buybacks, int victim, double death, List<Double> victimDeaths) {
+    double next =
+        victimDeaths.stream().filter(t -> t > death).min(Double::compare).orElse(Double.MAX_VALUE);
+    return buybacks.stream()
+        .anyMatch(
+            b ->
+                b.player() == victim
+                    && b.second() >= death
+                    && b.second() < next
+                    && b.second() - death <= Buybacks.LONGEST_AFTER_DEATH_SECONDS);
   }
 
   private Map<String, Integer> frontlineDeltas(long matchId) {
@@ -187,6 +223,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
         .teleportReady(a.teleportReady())
         .frontlineDelta(a.frontlineDelta())
         .immunityPiercedBy(a.immunityPiercedBy())
+        .boughtBack(a.boughtBack())
         .reason(a.reason().name())
         .analysisVersion(version())
         .build();
