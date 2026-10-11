@@ -10,7 +10,6 @@ import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dotapi.invoker.ApiException;
 import com.ako.dbuff.dotapi.model.MatchResponse;
 import com.ako.dbuff.service.ScrapperApiService;
-import com.ako.dbuff.service.match.data.MatchDetailService;
 import com.ako.dbuff.service.match.DotaApiMatchDetailsService;
 import com.ako.dbuff.service.match.DotabuffMatchScrapperService;
 import com.ako.dbuff.service.match.mapper.DotabuffMatchMapperService;
@@ -37,7 +36,6 @@ public class MatchParserHandler {
   private final ItemRepository itemRepository;
   private final KillLogRepo killLogRepo;
   private final ScrapperApiService scrapperApiService;
-  private final MatchDetailService matchDetailService;
 
   /**
    * Handles the processing of a match by its ID. Uses ScopedValue context for logging - matchId
@@ -82,7 +80,6 @@ public class MatchParserHandler {
     abilityRepo.deleteByMatchId(matchId);
     itemRepository.deleteByMatchId(matchId);
     killLogRepo.deleteByMatchId(matchId);
-    matchDetailService.deleteByMatchId(matchId);
     log.debug("{} Cleaned up existing data for match {}", ctx, matchId);
 
     basicMatchDetailsMapper.handle(matchResponse, matchDomain);

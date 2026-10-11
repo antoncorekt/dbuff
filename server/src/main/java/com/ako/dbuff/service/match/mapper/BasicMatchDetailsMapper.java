@@ -61,7 +61,6 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
     mapTimeInfo(matchResponse, matchDomain);
     mapPatchInfo(matchResponse, matchDomain);
     mapScoreInfo(matchResponse, matchDomain);
-    mapReplayInfo(matchResponse, matchDomain);
 
     List<MatchResponsePlayersInner> players =
         CollectionUtils.emptyIfNull(matchResponse.getPlayers()).stream().toList();
@@ -73,6 +72,7 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
 
     players.forEach(player -> playersMapper.handle(matchDomain, player, heroToPlayerMap));
 
+    matchDetailService.replace(matchResponse, matchDomain);
     matchRepo.save(matchDomain);
 
     checkAndScrapeAdditionalData(matchDomain);
@@ -149,14 +149,6 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
     matchDomain.setRadiantWin(radiantWin);
     matchDomain.setRadiantScore(matchResponse.getRadiantScore());
     matchDomain.setDireScore(matchResponse.getDireScore());
-  }
-
-  private void mapReplayInfo(MatchResponse matchResponse, MatchDomain matchDomain) {
-    matchDomain.setReplayCluster(matchResponse.getCluster());
-    matchDomain.setReplaySalt(matchResponse.getReplaySalt());
-    matchDomain.setHasParsed(
-        matchResponse.getOdData() != null
-            && Boolean.TRUE.equals(matchResponse.getOdData().getHasParsed()));
   }
 
   private void checkAndScrapeAdditionalData(MatchDomain matchDomain) {

@@ -30,7 +30,8 @@ public class PlayerTimelineMapper implements MatchDetailMapper {
                   size(player.getGoldT()),
                   size(player.getXpT()),
                   size(player.getLhT()),
-                  size(player.getDnT()))
+                  size(player.getDnT()),
+                  size(player.getNetworthT()))
               .max()
               .orElse(0);
       for (int minute = 0; minute < minutes; minute++) {
@@ -44,6 +45,11 @@ public class PlayerTimelineMapper implements MatchDetailMapper {
                 .xp(MatchPayload.at(player.getXpT(), minute))
                 .lastHits(MatchPayload.at(player.getLhT(), minute))
                 .denies(MatchPayload.at(player.getDnT(), minute))
+                .networth(MatchPayload.at(player.getNetworthT(), minute))
+                .heroDamage(MatchPayload.at(player.getHeroDamageT(), minute))
+                .towerDamage(MatchPayload.at(player.getTowerDamageT(), minute))
+                .heroHealing(MatchPayload.at(player.getHeroHealingT(), minute))
+                .campsStacked(MatchPayload.at(player.getCampsStackedT(), minute))
                 .build());
       }
     }
