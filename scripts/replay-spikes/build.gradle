@@ -1,0 +1,9 @@
+plugins { id 'java'; id 'application' }
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+dependencies {
+  implementation 'com.skadistats:clarity:5.0.1'
+  implementation 'org.slf4j:slf4j-simple:2.0.16'
+}
+sourceSets { main { java { srcDirs = ['.'] } } }
+application { mainClass = project.findProperty("mc") ?: "spike.Dump" }
