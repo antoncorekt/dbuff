@@ -61,6 +61,12 @@ public interface CommandContext {
   /** Guild ID, or empty in a direct message. */
   Optional<String> getGuildId();
 
+  /**
+   * Whether the invoker may change this channel's configuration (Manage Server, or Manage Channel
+   * on the parent channel). False in a direct message.
+   */
+  boolean invokerCanManageChannel();
+
   /** True when invoked inside a thread, where a new thread cannot be created. */
   boolean isInsideThread();
 

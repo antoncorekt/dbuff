@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.match.report.handlers;
 
+import com.ako.dbuff.dao.model.InstanceSettings;
 import com.ako.dbuff.service.match.report.MatchReportContext;
 import com.ako.dbuff.service.match.report.analyzer.FullDataAvailable;
 import com.ako.dbuff.service.match.report.analyzer.Report;
@@ -30,5 +31,11 @@ public class AiSummaryReportHandler implements ReportAnalyzer, FullDataAvailable
   @Override
   public int getOrder() {
     return 5;
+  }
+
+  /** Governed by its own switch rather than the detail level: it is the one costly report. */
+  @Override
+  public boolean isEnabledFor(InstanceSettings settings) {
+    return settings.isAiSummaryOn();
   }
 }

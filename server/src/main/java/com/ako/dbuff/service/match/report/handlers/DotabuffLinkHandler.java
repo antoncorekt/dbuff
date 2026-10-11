@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.match.report.handlers;
 
+import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.service.match.report.MatchReportContext;
 import com.ako.dbuff.service.match.report.analyzer.LinkReport;
 import com.ako.dbuff.service.match.report.analyzer.PartialDataAvailable;
@@ -28,5 +29,10 @@ public class DotabuffLinkHandler implements ReportAnalyzer, PartialDataAvailable
   @Override
   public int getOrder() {
     return -1;
+  }
+
+  @Override
+  public ReportDetail getMinimumDetail() {
+    return ReportDetail.MINIMAL;
   }
 }

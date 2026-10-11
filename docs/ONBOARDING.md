@@ -1,0 +1,75 @@
+# Adding DBuff to your Discord server
+
+DBuff posts a report thread for every Dota 2 match your group plays, and answers `/stats` and
+`/hero` questions about the group. Setup takes about two minutes and happens entirely in Discord.
+
+## 1. Invite the bot
+
+Use the invite link from the bot's owner. It requests exactly the permissions the bot needs:
+View Channel, Send Messages, Send Messages in Threads, Create Public Threads, Embed Links and
+Read Message History. Slash commands appear in your server straight away; the bot also posts a
+short welcome message.
+
+## 2. Register a channel
+
+In the channel where reports should appear, run:
+
+```
+/dbuff register player:<pick from the list>
+```
+
+You need the **Manage Channel** permission (or Manage Server) for any command that changes
+tracking. `/dbuff status` and `/dbuff help` work for everyone.
+
+If the channel is not ready, `register` tells you exactly what is missing — usually a channel
+permission the bot lacks. Fix it and run the command again.
+
+**Finding a player:** type a name in the `player:` box and pick a result. You can also paste an
+account ID, a Steam64 ID, or a profile link from OpenDota, Dotabuff or Stratz. Steam vanity links
+(`steamcommunity.com/id/...`) cannot be used; paste the numeric profile link instead.
+
+**Your history is imported quietly.** Registering does not post a thread for every old game. The
+bot imports each player's recent matches so `/stats` has data from day one, says so in one
+message, and starts reporting with the first game that ends after registration. Adding a player
+later works the same way for that player's recent games.
+
+## 3. Add the rest of the group
+
+```
+/dbuff add player:<name>            add someone to tracking
+/dbuff add player:<name> user:@them also link their Discord account
+/dbuff link player:<name> user:@them
+/dbuff modes mode:<game mode>       add a tracked game mode (remove:true to drop one)
+```
+
+## 4. Use it
+
+- New matches appear as a thread in the channel; the report fills in once OpenDota has parsed the
+  game, usually within a few minutes.
+- `/stats` and `/hero` summarise the group's games. They default to Ability Draft; pass
+  `game_mode:all` for everything.
+- `/match` reruns or retries a report. `/dbuff help` lists every command.
+
+## Channel settings
+
+`/dbuff settings` shows the current settings to anyone; changing them needs Manage Channel.
+Add options to change them. Anything you leave
+alone keeps its value, and `default` resets a setting.
+
+| Option | What it does |
+|--------|--------------|
+| `detail:` | How much each report includes: `minimal` (the Dotabuff link, plus the AI summary if it is on), `standard` (plus items and abilities) or `full` (everything). |
+| `ai_summary:` | Post the AI match summary or not. |
+| `quiet_hours:` | Pause match checks, e.g. `01:00-09:00`, `off`, or `default` for the server's window. Games are picked up when it ends. |
+| `timezone:` | The timezone quiet hours use, e.g. `Europe/Kyiv`. Pick from the list. |
+| `game_mode:` | The game mode `/stats` and `/hero` use when you do not name one. Registering with a `mode:` sets this too. |
+
+## Stopping and restarting
+
+`/dbuff deactivate` stops tracking in the channel. `/dbuff register` brings it back. Removing the
+bot from the server deactivates everything it tracked there.
+
+## Bot owner checklist
+
+In the Discord developer portal: **Public Bot** on, **Message Content Intent** on, and the invite
+scopes `bot` and `applications.commands`. The invite URL is logged at startup.

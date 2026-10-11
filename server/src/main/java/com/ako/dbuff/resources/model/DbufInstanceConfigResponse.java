@@ -36,6 +36,9 @@ public class DbufInstanceConfigResponse {
   /** Game modes being tracked */
   private Set<String> gameModes;
 
+  /** Per-channel settings, with unset values resolved to what actually applies */
+  private InstanceSettingsResponse settings;
+
   /** Additional configuration */
   private Map<String, Object> extraConfig;
 

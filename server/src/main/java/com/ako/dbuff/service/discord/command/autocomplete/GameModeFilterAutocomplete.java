@@ -10,7 +10,8 @@ import net.dv8tion.jda.api.interactions.commands.Command;
 import org.springframework.stereotype.Component;
 
 /**
- * The {@code game_mode:} statistics filter on {@code /stats} and {@code /hero}.
+ * The {@code game_mode:} option on {@code /stats} and {@code /hero}, and the channel default for it
+ * in {@code /dbuff settings}.
  *
  * <p>Autocomplete rather than the fixed choice list Discord offers, because the filter is
  * list-valued — "Ability Draft and All Pick" is a reasonable question and a static choice option
@@ -39,7 +40,7 @@ public class GameModeFilterAutocomplete implements AutocompleteProvider {
 
   @Override
   public Set<String> getCommandNames() {
-    return Set.of("stats", "hero");
+    return Set.of("stats", "hero", "dbuff");
   }
 
   @Override

@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.instance;
 
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
+import com.ako.dbuff.dao.model.InstanceSettings;
 import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.repo.DbufInstanceConfigRepository;
 import com.ako.dbuff.dao.repo.PlayerRepo;
@@ -8,6 +9,7 @@ import com.ako.dbuff.dotapi.api.PlayersApi;
 import com.ako.dbuff.dotapi.invoker.ApiException;
 import com.ako.dbuff.dotapi.model.PlayersResponse;
 import com.ako.dbuff.resources.model.DbufInstanceConfigResponse;
+import com.ako.dbuff.resources.model.InstanceSettingsResponse;
 import com.ako.dbuff.resources.model.PlayerInfo;
 import com.ako.dbuff.resources.model.RegisterInstanceRequest;
 import com.ako.dbuff.resources.model.UpdateInstanceRequest;
@@ -52,6 +54,7 @@ public class DbufInstanceConfigService {
   private final ConstantsManagers constantsManagers;
   private final ObjectMapper objectMapper;
   private final InstanceSchedulerService instanceSchedulerService;
+  private final InstanceSettingsApplier settingsApplier;
 
   /**
    * Registers a new Dbuf instance configuration.
@@ -65,9 +68,11 @@ public class DbufInstanceConfigService {
   public DbufInstanceConfigResponse register(RegisterInstanceRequest request) {
     validateRegistrationRequest(request);
 
-    // Check if Discord channel already has an instance
-    if (request.getDiscordChannelId() != null
-        && repository.existsByDiscordChannelId(request.getDiscordChannelId())) {
+    Optional<DbufInstanceConfigDomain> existing =
+        request.getDiscordChannelId() == null
+            ? Optional.empty()
+            : repository.findByDiscordChannelId(request.getDiscordChannelId());
+    if (existing.isPresent() && Boolean.TRUE.equals(existing.get().getActive())) {
       throw new IllegalStateException(
           "Discord channel "
               + request.getDiscordChannelId()
@@ -89,22 +94,29 @@ public class DbufInstanceConfigService {
     Set<Long> gameModeIds = validateAndConvertGameModes(request.getGameModes());
 
     LocalDateTime now = LocalDateTime.now();
-    DbufInstanceConfigDomain domain =
-        DbufInstanceConfigDomain.builder()
-            .discordChannelId(request.getDiscordChannelId())
-            .discordGuildId(request.getDiscordGuildId())
-            .name(request.getName())
-            .players(players)
-            .gameModeIds(gameModeIds)
-            .extraConfig(serializeExtraConfig(request.getExtraConfig()))
-            .createdAt(now)
-            .updatedAt(now)
-            .active(true)
-            .build();
+    // A deactivated channel is brought back rather than rejected, so deactivate -> register works.
+    DbufInstanceConfigDomain domain = existing.orElseGet(DbufInstanceConfigDomain::new);
+    if (existing.isEmpty()) {
+      domain.setCreatedAt(now);
+    }
+    domain.setDiscordChannelId(request.getDiscordChannelId());
+    domain.setDiscordGuildId(request.getDiscordGuildId());
+    domain.setName(request.getName());
+    domain.setPlayers(players);
+    domain.setGameModeIds(gameModeIds);
+    domain.setExtraConfig(serializeExtraConfig(request.getExtraConfig()));
+    domain.setUpdatedAt(now);
+    InstanceSettings settings = domain.effectiveSettings();
+    settingsApplier.seedDefaultModes(settings, request.getGameModes());
+    domain.setSettings(settings);
+    domain.setTrackingSince(now);
+    domain.getPlayerTrackingSince().clear();
+    domain.setActive(true);
 
     DbufInstanceConfigDomain saved = repository.save(domain);
     log.info(
-        "Registered new instance configuration: id={}, players={}, gameModeIds={}",
+        "{} instance configuration: id={}, players={}, gameModeIds={}",
+        existing.isPresent() ? "Reactivated" : "Registered new",
         saved.getId(),
         saved.getPlayerIds(),
         saved.getGameModeIds());
@@ -131,13 +143,20 @@ public class DbufInstanceConfigService {
 
     // Update players
     if (request.getAddPlayerIds() != null && !request.getAddPlayerIds().isEmpty()) {
+      LocalDateTime now = LocalDateTime.now();
       for (Long playerId : request.getAddPlayerIds()) {
         PlayerDomain player = getOrCreatePlayer(playerId);
-        domain.getPlayers().add(player);
+        // A new player arrives with ~20 recent matches that are history, not news. Only their
+        // cutoff moves; re-adding someone already tracked changes nothing, and the players
+        // already tracked keep reporting theirs.
+        if (domain.getPlayers().add(player)) {
+          domain.getPlayerTrackingSince().put(player.getId(), now);
+        }
       }
     }
     if (request.getRemovePlayerIds() != null && !request.getRemovePlayerIds().isEmpty()) {
       domain.getPlayers().removeIf(player -> request.getRemovePlayerIds().contains(player.getId()));
+      domain.getPlayerTrackingSince().keySet().removeAll(request.getRemovePlayerIds());
     }
 
     // Update game modes (convert names to IDs)
@@ -148,6 +167,12 @@ public class DbufInstanceConfigService {
     if (request.getRemoveGameModes() != null && !request.getRemoveGameModes().isEmpty()) {
       Set<Long> removeModeIds = validateAndConvertGameModes(request.getRemoveGameModes());
       domain.getGameModeIds().removeAll(removeModeIds);
+    }
+
+    if (request.hasSettingsChange()) {
+      InstanceSettings settings = domain.effectiveSettings();
+      settingsApplier.apply(settings, request);
+      domain.setSettings(settings);
     }
 
     // Update name if provided
@@ -166,8 +191,14 @@ public class DbufInstanceConfigService {
     }
 
     // Update active status if provided
+    boolean wasActive = Boolean.TRUE.equals(domain.getActive());
     if (request.getActive() != null) {
       domain.setActive(request.getActive());
+      if (!wasActive && request.getActive()) {
+        // Matches played while it was off are history, as on a fresh registration.
+        domain.setTrackingSince(LocalDateTime.now());
+        domain.getPlayerTrackingSince().clear();
+      }
     }
 
     domain.setUpdatedAt(LocalDateTime.now());
@@ -177,6 +208,13 @@ public class DbufInstanceConfigService {
         saved.getId(),
         saved.getPlayerIds(),
         saved.getGameModeIds());
+
+    boolean isActive = Boolean.TRUE.equals(saved.getActive());
+    if (!wasActive && isActive) {
+      instanceSchedulerService.scheduleJobsForInstance(saved.getId());
+    } else if (wasActive && !isActive) {
+      instanceSchedulerService.unscheduleJobsForInstance(saved.getId());
+    }
 
     return toResponse(saved);
   }
@@ -266,6 +304,21 @@ public class DbufInstanceConfigService {
   }
 
   /**
+   * Deactivates every active instance registered from a guild, used when the bot is removed from
+   * it: the channels are unreachable, so their jobs would only fail on every run.
+   *
+   * @param guildId the Discord guild ID
+   * @return how many instances were deactivated
+   */
+  @Transactional
+  public int deactivateAllForGuild(String guildId) {
+    List<DbufInstanceConfigDomain> instances =
+        repository.findByDiscordGuildIdAndActiveTrue(guildId);
+    instances.forEach(instance -> deactivate(instance.getId()));
+    return instances.size();
+  }
+
+  /**
    * Deletes an instance configuration.
    *
    * @param instanceId the instance ID
@@ -280,45 +333,45 @@ public class DbufInstanceConfigService {
   /**
    * Gets or creates a PlayerDomain entity for the given player ID. Fetches player info from
    * OpenDota API if not found locally.
+   *
+   * <p>Players are keyed by display name, so two accounts can share one. An existing row for a
+   * <em>different</em> account is never repointed — that would silently move another group's
+   * tracked player onto this account — so the newcomer is stored as {@code "name (accountId)"}.
    */
   private PlayerDomain getOrCreatePlayer(Long playerId) {
-    // First try to find by ID
-    Optional<PlayerDomain> existingPlayer =
-        playerRepo.findAll().stream().filter(p -> playerId.equals(p.getId())).findFirst();
-
-    if (existingPlayer.isPresent()) {
-      return existingPlayer.get();
+    List<PlayerDomain> known = playerRepo.findByAccountIds(List.of(playerId));
+    if (!known.isEmpty()) {
+      return known.get(0);
     }
 
-    // Fetch from OpenDota API
+    PlayersResponse playerResp;
     try {
-      PlayersResponse playerResp = playersApi.getPlayersByAccountId(playerId);
-      String playerName =
-          playerResp.getProfile() != null
-              ? playerResp.getProfile().getPersonaname()
-              : "Player_" + playerId;
-
-      log.info("Fetched player from API: id={}, name={}", playerId, playerName);
-
-      // Check if player with this name exists
-      Optional<PlayerDomain> byName = playerRepo.findByName(playerName);
-      if (byName.isPresent()) {
-        // Update the ID if needed
-        PlayerDomain player = byName.get();
-        if (player.getId() == null || !player.getId().equals(playerId)) {
-          player.setId(playerId);
-          return playerRepo.save(player);
-        }
-        return player;
-      }
-
-      // Create new player
-      PlayerDomain newPlayer = PlayerDomain.builder().id(playerId).name(playerName).build();
-      return playerRepo.save(newPlayer);
-
+      playerResp = playersApi.getPlayersByAccountId(playerId);
     } catch (ApiException e) {
       throw new RuntimeException("Can't find information about player_id " + playerId, e);
     }
+
+    String persona =
+        playerResp.getProfile() != null ? playerResp.getProfile().getPersonaname() : null;
+    String playerName = persona == null || persona.isBlank() ? "Player_" + playerId : persona;
+    log.info("Fetched player from API: id={}, name={}", playerId, playerName);
+
+    Optional<PlayerDomain> sameName = playerRepo.findByName(playerName);
+    if (sameName.isPresent()) {
+      PlayerDomain existing = sameName.get();
+      if (existing.getId() == null) {
+        existing.setId(playerId);
+        return playerRepo.save(existing);
+      }
+      playerName = playerName + " (" + playerId + ")";
+      log.info(
+          "Name already used by account {}, storing account {} as '{}'",
+          existing.getId(),
+          playerId,
+          playerName);
+    }
+
+    return playerRepo.save(PlayerDomain.builder().id(playerId).name(playerName).build());
   }
 
   /**
@@ -455,6 +508,7 @@ public class DbufInstanceConfigService {
         .name(domain.getName())
         .players(playerInfos)
         .gameModes(convertGameModeIdsToNames(domain.getGameModeIds()))
+        .settings(InstanceSettingsResponse.from(domain.effectiveSettings()))
         .extraConfig(deserializeExtraConfig(domain.getExtraConfig()))
         .createdAt(domain.getCreatedAt())
         .updatedAt(domain.getUpdatedAt())

@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.discord.command;
 
+import com.ako.dbuff.resources.model.DbufInstanceConfigResponse;
 import com.ako.dbuff.service.constant.ConstantNameResolver;
 import com.ako.dbuff.service.constant.CurrentPatchDateResolver;
 import com.ako.dbuff.service.constant.GameModeResolver;
@@ -113,7 +114,9 @@ public class StatsRequestResolver {
   public Optional<StatsRequest> prepare(CommandContext context) {
     String channelId = context.getParentChannelId();
 
-    if (instanceConfigService.getByDiscordChannelId(channelId).isEmpty()) {
+    Optional<DbufInstanceConfigResponse> instance =
+        instanceConfigService.getByDiscordChannelId(channelId);
+    if (instance.isEmpty()) {
       context.replyEphemeral(
           "ℹ️ This channel is not tracking any players yet. Use `/dbuff register` first.");
       return Optional.empty();
@@ -173,7 +176,9 @@ public class StatsRequestResolver {
       return Optional.empty();
     }
 
-    GameModeSelection modes = gameModeResolver.resolveOrDefault(optionAsSet(context, "game_mode"));
+    GameModeSelection modes =
+        gameModeResolver.resolveOrDefault(
+            optionAsSet(context, "game_mode"), channelDefaultModes(instance.get()));
     if (modes.hasUnresolved()) {
       context.replyEphemeral(unknownGameModeMessage(modes));
       return Optional.empty();
@@ -193,6 +198,10 @@ public class StatsRequestResolver {
             periodLabel(period, range),
             modes.label(),
             omittedPlayers));
+  }
+
+  private static Set<String> channelDefaultModes(DbufInstanceConfigResponse instance) {
+    return instance.getSettings() == null ? Set.of() : instance.getSettings().getDefaultGameModes();
   }
 
   /** Clamps rather than rejects: a user asking for 100 rows wants "as many as you can". */

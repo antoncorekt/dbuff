@@ -3,16 +3,21 @@ package com.ako.dbuff.service.discord.command.impl;
 import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.repo.PlayerRepo;
 import com.ako.dbuff.resources.model.DbufInstanceConfigResponse;
+import com.ako.dbuff.resources.model.InstanceSettingsResponse;
 import com.ako.dbuff.resources.model.PlayerInfo;
 import com.ako.dbuff.resources.model.RegisterInstanceRequest;
 import com.ako.dbuff.resources.model.UpdateInstanceRequest;
+import com.ako.dbuff.service.constant.GameModeResolver;
+import com.ako.dbuff.service.discord.ChannelReadinessService;
 import com.ako.dbuff.service.discord.command.AsyncReply;
 import com.ako.dbuff.service.discord.command.CommandContext;
 import com.ako.dbuff.service.discord.command.CommandRegistry;
 import com.ako.dbuff.service.discord.command.DbuffCommand;
+import com.ako.dbuff.service.discord.command.PlayerIdParser;
 import com.ako.dbuff.service.discord.command.PlayerReferenceResolver;
 import com.ako.dbuff.service.instance.DbufInstanceConfigService;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,19 +47,26 @@ public class DbuffConfigCommand implements DbuffCommand {
 
   private static final int EMBED_COLOR = 0x00AE86;
 
+  /** Subcommands that change configuration; the rest only read it. */
+  private static final Set<String> MANAGE_ONLY =
+      Set.of("register", "add", "remove", "link", "modes", "deactivate");
+
   private final DbufInstanceConfigService instanceConfigService;
   private final PlayerReferenceResolver playerResolver;
   private final PlayerRepo playerRepo;
+  private final ChannelReadinessService channelReadiness;
   private final CommandRegistry registry;
 
   public DbuffConfigCommand(
       DbufInstanceConfigService instanceConfigService,
       PlayerReferenceResolver playerResolver,
       PlayerRepo playerRepo,
+      ChannelReadinessService channelReadiness,
       @Lazy CommandRegistry registry) {
     this.instanceConfigService = instanceConfigService;
     this.playerResolver = playerResolver;
     this.playerRepo = playerRepo;
+    this.channelReadiness = channelReadiness;
     // Lazy because the registry collects every DbuffCommand, including this one.
     this.registry = registry;
   }
@@ -98,6 +110,35 @@ public class DbuffConfigCommand implements DbuffCommand {
                 .addOptions(
                     new OptionData(OptionType.STRING, "mode", "Game mode", true, true),
                     new OptionData(OptionType.BOOLEAN, "remove", "Remove instead of add", false)),
+            new SubcommandData("settings", "Show or change this channel's report settings")
+                .addOptions(
+                    new OptionData(
+                        OptionType.BOOLEAN, "ai_summary", "Post the AI match summary", false),
+                    new OptionData(
+                            OptionType.STRING,
+                            "detail",
+                            "How much each match report includes",
+                            false)
+                        .addChoice("Minimal - Dotabuff link (and AI summary)", "minimal")
+                        .addChoice("Standard - plus items and abilities", "standard")
+                        .addChoice("Full - everything", "full"),
+                    new OptionData(
+                        OptionType.STRING,
+                        "quiet_hours",
+                        "Pause match checks, e.g. 01:00-09:00, off, or default",
+                        false),
+                    new OptionData(
+                        OptionType.STRING,
+                        "timezone",
+                        "Timezone the quiet hours use, e.g. Europe/Kyiv",
+                        false,
+                        true),
+                    new OptionData(
+                        OptionType.STRING,
+                        "game_mode",
+                        "Default game mode for /stats and /hero",
+                        false,
+                        true)),
             new SubcommandData("deactivate", "Stop tracking in this channel"),
             new SubcommandData("help", "List every command"));
   }
@@ -150,13 +191,21 @@ public class DbuffConfigCommand implements DbuffCommand {
 
   @Override
   public void execute(String subcommand, CommandContext context) {
-    switch (subcommand == null ? "help" : subcommand) {
+    String resolved = subcommand == null ? "help" : subcommand;
+    if (MANAGE_ONLY.contains(resolved) && !context.invokerCanManageChannel()) {
+      context.replyEphemeral(
+          "❌ Changing tracking needs the **Manage Channel** permission on this channel"
+              + " (or Manage Server).");
+      return;
+    }
+    switch (resolved) {
       case "register" -> register(context);
       case "status" -> status(context);
       case "add" -> addPlayer(context);
       case "remove" -> removePlayer(context);
       case "link" -> link(context);
       case "modes" -> modes(context);
+      case "settings" -> settings(context);
       case "deactivate" -> deactivate(context);
       default -> help(context);
     }
@@ -169,12 +218,19 @@ public class DbuffConfigCommand implements DbuffCommand {
       return;
     }
 
-    Set<Long> playerIds = numericIdsOrEmpty(playerRefs);
-    if (playerIds.isEmpty()) {
+    PlayerIdParser.Result parsed = PlayerIdParser.parseAll(playerRefs);
+    if (parsed.ids().isEmpty() || !parsed.invalid().isEmpty()) {
+      context.replyEphemeral(invalidPlayerMessage(playerRefs, parsed));
+      return;
+    }
+    Set<Long> playerIds = parsed.ids();
+
+    List<String> problems = channelReadiness.findProblems(context.getParentChannelId());
+    if (!problems.isEmpty()) {
       context.replyEphemeral(
-          "❌ Could not read a player from `"
-              + String.join(", ", playerRefs)
-              + "`. Pick one from the autocomplete list, which submits the account ID.");
+          "❌ This channel is not ready for reports:\n- "
+              + String.join("\n- ", problems)
+              + "\nFix that, then run `/dbuff register` again.");
       return;
     }
 
@@ -191,7 +247,7 @@ public class DbuffConfigCommand implements DbuffCommand {
     try {
       DbufInstanceConfigResponse response = instanceConfigService.register(request);
       AsyncReply reply = context.acknowledge("✅ Registered this channel.", "dbuff: register");
-      reply.postEmbed(configEmbed("✅ Registration Successful", response));
+      reply.postEmbed(registrationEmbed(response));
     } catch (IllegalStateException e) {
       context.replyEphemeral(
           "❌ This channel already has a registered instance. Use `/dbuff status` to view it.");
@@ -208,7 +264,16 @@ public class DbuffConfigCommand implements DbuffCommand {
       return;
     }
     AsyncReply reply = context.acknowledge("📊 Fetching configuration…", "dbuff: status");
-    reply.postEmbed(configEmbed("📊 Instance Configuration", config.get()));
+    reply.postEmbed(
+        new EmbedBuilder(configEmbed("📊 Instance Configuration", config.get()))
+            .addField(
+                "Settings",
+                describeSettings(config.get().getSettings()) + "\nChange with `/dbuff settings`.",
+                false)
+            .build());
+    channelReadiness
+        .findProblems(context.getParentChannelId())
+        .forEach(problem -> reply.post("⚠️ " + problem));
   }
 
   private void addPlayer(CommandContext context) {
@@ -219,14 +284,12 @@ public class DbuffConfigCommand implements DbuffCommand {
     }
 
     List<String> playerRefs = context.getOptionAsList("player");
-    Set<Long> playerIds = numericIdsOrEmpty(playerRefs);
-    if (playerIds.isEmpty()) {
-      context.replyEphemeral(
-          "❌ Could not read a player from `"
-              + String.join(", ", playerRefs)
-              + "`. Pick one from the autocomplete list, which submits the account ID.");
+    PlayerIdParser.Result parsed = PlayerIdParser.parseAll(playerRefs);
+    if (parsed.ids().isEmpty() || !parsed.invalid().isEmpty()) {
+      context.replyEphemeral(invalidPlayerMessage(playerRefs, parsed));
       return;
     }
+    Set<Long> playerIds = parsed.ids();
 
     DbufInstanceConfigResponse updated =
         instanceConfigService.update(
@@ -328,6 +391,94 @@ public class DbuffConfigCommand implements DbuffCommand {
     }
   }
 
+  private void settings(CommandContext context) {
+    Optional<DbufInstanceConfigResponse> config = currentInstance(context);
+    if (config.isEmpty()) {
+      context.replyEphemeral("❌ No instance registered. Use `/dbuff register` first.");
+      return;
+    }
+
+    Boolean aiSummary = parseSwitch(context.getOption("ai_summary"));
+    if (context.getOption("ai_summary") != null && aiSummary == null) {
+      context.replyEphemeral(
+          "❌ Could not read `ai_summary` value `"
+              + context.getOption("ai_summary")
+              + "`. Use true or false.");
+      return;
+    }
+
+    List<String> modes = context.getOptionAsList("game_mode");
+    UpdateInstanceRequest request =
+        UpdateInstanceRequest.builder()
+            .aiSummaryEnabled(aiSummary)
+            .reportDetail(context.getOption("detail"))
+            .quietHours(context.getOption("quiet_hours"))
+            .timezone(context.getOption("timezone"))
+            .defaultGameModes(modes.isEmpty() ? null : new LinkedHashSet<>(modes))
+            .build();
+
+    DbufInstanceConfigResponse current = config.get();
+    String title = "⚙️ Channel Settings";
+    if (request.hasSettingsChange()) {
+      // Viewing is open to everyone; only a change needs the permission.
+      if (!context.invokerCanManageChannel()) {
+        context.replyEphemeral(
+            "❌ Changing settings needs the **Manage Channel** permission on this channel"
+                + " (or Manage Server).");
+        return;
+      }
+      try {
+        current = instanceConfigService.update(current.getId(), request);
+        title = "✅ Settings Updated";
+      } catch (IllegalArgumentException e) {
+        context.replyEphemeral("❌ " + e.getMessage());
+        return;
+      }
+    }
+
+    AsyncReply reply = context.acknowledge("⚙️ Channel settings", "dbuff: settings");
+    reply.postEmbed(
+        new EmbedBuilder()
+            .setTitle(title)
+            .setDescription(describeSettings(current.getSettings()))
+            .setColor(EMBED_COLOR)
+            .build());
+  }
+
+  /** True/on/yes/1 and false/off/no/0, since the text surface passes the raw word through. */
+  private static Boolean parseSwitch(String raw) {
+    if (raw == null) {
+      return null;
+    }
+    return switch (raw.trim().toLowerCase()) {
+      case "true", "on", "yes", "1" -> Boolean.TRUE;
+      case "false", "off", "no", "0" -> Boolean.FALSE;
+      default -> null;
+    };
+  }
+
+  private String describeSettings(InstanceSettingsResponse settings) {
+    if (settings == null) {
+      return "Defaults for everything.";
+    }
+    String modes =
+        settings.getDefaultGameModes().isEmpty()
+            ? "Ability Draft (default)"
+            : settings.getDefaultGameModes().stream()
+                .map(mode -> GameModeResolver.prettyName(mode, mode))
+                .collect(Collectors.joining(", "));
+    return "**AI summary:** "
+        + (settings.isAiSummaryEnabled() ? "on" : "off")
+        + "\n**Report detail:** "
+        + settings.getReportDetail().toLowerCase()
+        + "\n**Quiet hours:** "
+        + settings.getQuietHours()
+        + "\n**Timezone:** "
+        + settings.getTimezone()
+        + "\n**Default game mode:** "
+        + modes;
+  }
+
   private void deactivate(CommandContext context) {
     Optional<DbufInstanceConfigResponse> config = currentInstance(context);
     if (config.isEmpty()) {
@@ -369,19 +520,16 @@ public class DbuffConfigCommand implements DbuffCommand {
   }
 
   /**
-   * Account IDs for entries that are already numeric.
-   *
-   * <p>Used by {@code register} and {@code add}, where the player may not be in the focus group
-   * yet, so name resolution is not possible — the autocomplete submits the numeric ID for exactly
-   * this reason.
+   * Why a {@code player:} entry was refused. Names the entries that failed rather than the whole
+   * input, because dropping them and tracking the rest would answer a different request than the
+   * one made.
    */
-  private Set<Long> numericIdsOrEmpty(List<String> references) {
-    return references.stream()
-        .map(String::trim)
-        .filter(reference -> !reference.isEmpty())
-        .filter(reference -> reference.chars().allMatch(Character::isDigit))
-        .map(Long::parseLong)
-        .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+  private String invalidPlayerMessage(List<String> references, PlayerIdParser.Result parsed) {
+    List<String> failed = parsed.invalid().isEmpty() ? references : parsed.invalid();
+    return "❌ Could not read a player from `"
+        + String.join("`, `", failed)
+        + "`. Pick one from the autocomplete list, or paste an account ID, a Steam64 ID, or an"
+        + " OpenDota, Dotabuff or Stratz profile link.";
   }
 
   private String unresolvedMessage(
@@ -400,6 +548,18 @@ public class DbuffConfigCommand implements DbuffCommand {
                             .orElse(""))
             .toList();
     return message.append(String.join(", ", parts)).toString();
+  }
+
+  private MessageEmbed registrationEmbed(DbufInstanceConfigResponse response) {
+    return new EmbedBuilder(configEmbed("✅ Registration Successful", response))
+        .addField(
+            "Next steps",
+            "• `/dbuff add` — add the rest of the group\n"
+                + "• `/dbuff link` — connect players to Discord accounts\n"
+                + "• `/stats` — see how the group is doing\n"
+                + "Past matches are imported quietly; reports start with your next game.",
+            false)
+        .build();
   }
 
   private MessageEmbed configEmbed(String title, DbufInstanceConfigResponse config) {
