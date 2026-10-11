@@ -99,7 +99,7 @@ Optional enrichment from Valve replays, off by default (`replay.processing.enabl
 - **Fights are found from the stored combat log** (`FightAnalyzer`, after `ActivityAnalyzer` by `@Order`). `FightDetector` clusters hero-to-hero damage bursts and hero deaths; `FightAssessor` places the fight, picks a winner by the levels of the heroes killed (then by damage) and says for each of the ten players whether they were `ACTIVE`, `PRESENT_PASSIVE` or absent and why. The three types are TEAMFIGHT (3 or more deaths, as OpenDota counts), SKIRMISH (1-2) and ENGAGEMENT (none, both sides hit hard). Tuning is in `ReplayAnalysisProperties` (`replay.analysis.fight-*`).
 - **What heroes hold and can cast is stored as changes** (`ReplayStateChangeDomain`, by `StateRecorder` on the same 5-second grid): items gained and lost (counted by name), cooldowns starting, and skill level-ups. A hero item or ability's `m_fCooldown` is the time *remaining*, so a cooldown change carries the exact second it ends; its `m_flCooldownLength` may be 0 for some abilities. Together with the combat log's ability and item uses this answers "was it ready".
 - **Tests that parse a real replay are tagged `replay`** and run only through `./gradlew :server:replayTest` with `REPLAY_FIXTURE_DIR` set; `:server:test` and CI skip them. Replays are never committed.
-- The design lives in `docs/superpowers/plans/2026-10-11-replay-extraction-plan.md`.
+- **To resume the replay work, read `docs/superpowers/plans/2026-10-12-replay-status-and-next-steps.md` first** (what is done, how to build and test, what is unverified, the next PRs). The design is in `docs/superpowers/plans/2026-10-11-replay-extraction-plan.md` and the Discord reports in `2026-10-11-replay-discord-report-plan.md`.
 
 ### REST API access
 
