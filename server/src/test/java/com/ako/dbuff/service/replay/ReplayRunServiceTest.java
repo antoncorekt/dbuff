@@ -8,6 +8,7 @@ import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.service.replay.file.ReplayFile;
 import com.ako.dbuff.service.replay.file.ReplayFileProvider;
+import com.ako.dbuff.service.replay.map.MapLayouts;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -43,6 +44,7 @@ class ReplayRunServiceTest {
   private final ReplayExtractor brokenExtractor = mock(ReplayExtractor.class);
   private final Semaphore semaphore = new Semaphore(1);
   private final ReplayProcessingProperties properties = new ReplayProcessingProperties();
+  private final MapLayouts mapLayouts = mock(MapLayouts.class);
   private ReplayRunService service;
 
   private final ReplayFacts facts = new ReplayFacts(17136, 596.5, List.of());
@@ -210,7 +212,8 @@ class ReplayRunServiceTest {
         verifier,
         extractors,
         properties,
-        semaphore);
+        semaphore,
+        mapLayouts);
   }
 
   private static MatchDomain match() {

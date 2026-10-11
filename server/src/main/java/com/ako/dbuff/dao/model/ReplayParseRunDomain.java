@@ -55,6 +55,9 @@ public class ReplayParseRunDomain {
   private Long parseMillis;
   private String clarityVersion;
 
+  /** Fingerprint of the map the game was played on; see MapFacts.version(). */
+  private String mapVersion;
+
   /** Game clock start on the demo clock, in ticks; the replay's 0:00. */
   private Integer clockStartTick;
 

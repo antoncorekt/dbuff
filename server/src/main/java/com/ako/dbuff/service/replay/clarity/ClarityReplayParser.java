@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.service.replay.DraftFacts;
 import com.ako.dbuff.service.replay.DraftPick;
 import com.ako.dbuff.service.replay.DraftPoolEntry;
+import com.ako.dbuff.service.replay.MapFacts;
 import com.ako.dbuff.service.replay.ReplayException;
 import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.ReplayParser;
@@ -28,6 +29,8 @@ import skadistats.clarity.processor.gameevents.OnCombatLogEntry;
 import skadistats.clarity.processor.reader.OnTickStart;
 import skadistats.clarity.processor.runner.Context;
 import skadistats.clarity.processor.runner.SimpleRunner;
+import skadistats.clarity.processor.stringtables.StringTables;
+import skadistats.clarity.processor.stringtables.UsesStringTable;
 import skadistats.clarity.source.MappedFileSource;
 
 /**
@@ -92,6 +95,7 @@ public class ClarityReplayParser implements ReplayParser {
   }
 
   @UsesEntities
+  @UsesStringTable("EntityNames")
   public static class Collector {
     private static final int PRE_GAME = 4;
     private static final int GAME_IN_PROGRESS = 5;
@@ -112,11 +116,13 @@ public class ClarityReplayParser implements ReplayParser {
     private static final String START_TIME = "m_pGameRules.m_flGameStartTime";
 
     @Insert Entities entities;
+    @Insert StringTables stringTables;
 
     private final BooleanSupplier cancelled;
     ReplayFacts facts;
     private SampleRecorder recorder;
     private final CombatLogRecorder combatLog = new CombatLogRecorder();
+    private MapFacts map;
     private final List<DraftPick> picks = new ArrayList<>();
     private final BitSet picked = new BitSet();
     private long ticksSeen;
@@ -162,6 +168,7 @@ public class ClarityReplayParser implements ReplayParser {
             new ReplayFacts(
                 ctx.getTick(), startTime.doubleValue(), readPlayers(), readDraft(rules));
         recorder().gameStarted(ctx.getTick());
+        map = MapReader.read(entities, stringTables.forName("EntityNames"), rules);
       }
     }
 
@@ -180,7 +187,8 @@ public class ClarityReplayParser implements ReplayParser {
           facts.players(),
           facts.draft(),
           recorder().result(facts.clockStartTick()),
-          combatLog.result(facts.gameStartTime()));
+          combatLog.result(facts.gameStartTime()),
+          map);
     }
 
     /** A pick is the moment an entry's player id changes from "nobody" to a player. */
