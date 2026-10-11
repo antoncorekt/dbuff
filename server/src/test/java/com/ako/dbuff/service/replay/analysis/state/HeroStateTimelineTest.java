@@ -1,4 +1,4 @@
-package com.ako.dbuff.service.replay.analysis.death;
+package com.ako.dbuff.service.replay.analysis.state;
 
 import com.ako.dbuff.service.replay.StateChangeKind;
 import org.junit.jupiter.api.Test;

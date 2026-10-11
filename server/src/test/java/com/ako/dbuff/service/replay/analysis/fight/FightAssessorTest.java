@@ -1,7 +1,9 @@
 package com.ako.dbuff.service.replay.analysis.fight;
 
+import com.ako.dbuff.service.replay.StateChangeKind;
 import com.ako.dbuff.service.replay.analysis.activity.Activity;
 import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
+import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import com.ako.dbuff.service.replay.map.Zone;
 import java.util.HashMap;
 import java.util.List;
@@ -25,7 +27,7 @@ class FightAssessorTest {
             0,
             0);
 
-    var assessment = assessor.assess(fight, traces(), Map.of());
+    var assessment = assessor.assess(fight, traces(), Map.of(), Map.of());
 
     assertThat(assessment.winner()).isEqualTo("RADIANT");
     assertThat(assessment.direDeaths()).isEqualTo(2);
@@ -37,8 +39,10 @@ class FightAssessorTest {
     var evenDamage = fight(Set.of(0, 5), List.of(), 1000, 1000);
     var radiantDamage = fight(Set.of(0, 5), List.of(), 3000, 1000);
 
-    assertThat(assessor.assess(evenDamage, traces(), Map.of()).winner()).isEqualTo("DRAW");
-    assertThat(assessor.assess(radiantDamage, traces(), Map.of()).winner()).isEqualTo("RADIANT");
+    assertThat(assessor.assess(evenDamage, traces(), Map.of(), Map.of()).winner())
+        .isEqualTo("DRAW");
+    assertThat(assessor.assess(radiantDamage, traces(), Map.of(), Map.of()).winner())
+        .isEqualTo("RADIANT");
   }
 
   @Test
@@ -56,7 +60,10 @@ class FightAssessorTest {
     var fight = fight(Set.of(0, 5), List.of(), 1000, 1000);
 
     var parts = new HashMap<Integer, FightAssessor.PlayerPart>();
-    assessor.assess(fight, traces, activities).parts().forEach(p -> parts.put(p.player(), p));
+    assessor
+        .assess(fight, traces, activities, Map.of())
+        .parts()
+        .forEach(p -> parts.put(p.player(), p));
 
     assertThat(parts.get(0).presence()).isEqualTo(Presence.ACTIVE);
     assertThat(parts.get(2).presence()).isEqualTo(Presence.PRESENT_PASSIVE);
@@ -66,6 +73,45 @@ class FightAssessorTest {
     assertThat(parts.get(7).presence()).isEqualTo(Presence.ABSENT_TELEPORTING);
     assertThat(parts.get(4).activityAtStart()).isEqualTo("JUNGLE_FARM");
     assertThat(parts.get(1).distanceToCenter()).isGreaterThan(5000);
+  }
+
+  @Test
+  void assess_saysWhyAHeroAwayFromTheFightDidNotTeleportIn() {
+    Map<Integer, FightAssessor.Trace> traces = traces();
+    for (int away : List.of(1, 3, 4, 6)) {
+      traces.put(away, trace(9000, 9000, 1, away == 3 ? 0 : 1));
+    }
+    Map<Integer, HeroStateTimeline> states =
+        Map.of(
+            4, timeline(change(10, StateChangeKind.ITEM_ADDED, "item_tpscroll", 0)),
+            6,
+                timeline(
+                    change(10, StateChangeKind.ITEM_ADDED, "item_tpscroll", 0),
+                    change(90, StateChangeKind.COOLDOWN, "item_tpscroll", 130)));
+    var fight = fight(Set.of(0, 5), List.of(), 1000, 1000);
+
+    var parts = new HashMap<Integer, FightAssessor.PlayerPart>();
+    assessor.assess(fight, traces, Map.of(), states).parts().forEach(p -> parts.put(p.player(), p));
+
+    assertThat(parts.get(1).absenceReason()).isEqualTo(AbsenceReason.NO_TP);
+    assertThat(parts.get(4).absenceReason()).isEqualTo(AbsenceReason.HAD_TP_NOT_USED);
+    assertThat(parts.get(6).absenceReason()).isEqualTo(AbsenceReason.TP_ON_COOLDOWN);
+    assertThat(parts.get(6).teleportCooldownLeft()).isEqualTo(30);
+    assertThat(parts.get(3).absenceReason()).isNull();
+    assertThat(parts.get(0).absenceReason()).isNull();
+  }
+
+  private static HeroStateTimeline timeline(HeroStateTimeline.Change... changes) {
+    HeroStateTimeline timeline = new HeroStateTimeline();
+    for (HeroStateTimeline.Change c : changes) {
+      timeline.add(c);
+    }
+    return timeline;
+  }
+
+  private static HeroStateTimeline.Change change(
+      double second, StateChangeKind kind, String name, double readyAt) {
+    return new HeroStateTimeline.Change(second, kind, name, readyAt);
   }
 
   private static ActivitySegment segment(Activity activity) {

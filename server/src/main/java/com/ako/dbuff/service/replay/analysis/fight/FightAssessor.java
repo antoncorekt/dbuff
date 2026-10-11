@@ -2,9 +2,12 @@ package com.ako.dbuff.service.replay.analysis.fight;
 
 import com.ako.dbuff.service.replay.analysis.activity.Activity;
 import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
+import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Says where a detected fight was, who won it and how each player took part, from the players'
@@ -15,6 +18,14 @@ public final class FightAssessor {
   private static final String RADIANT = "RADIANT";
   private static final String DIRE = "DIRE";
   private static final String DRAW = "DRAW";
+  private static final List<String> TELEPORTS =
+      List.of("item_tpscroll", "item_travel_boots", "item_travel_boots_2");
+  private static final Set<Presence> AWAY_BUT_ALIVE =
+      EnumSet.of(
+          Presence.ABSENT_FAR,
+          Presence.ABSENT_FARMING,
+          Presence.ABSENT_BASE,
+          Presence.ABSENT_PUSHING);
 
   private final int participationRadius;
   private final int winMarginPercent;
@@ -44,7 +55,9 @@ public final class FightAssessor {
       long damageTaken,
       int deaths,
       Integer distanceToCenter,
-      String activityAtStart) {}
+      String activityAtStart,
+      AbsenceReason absenceReason,
+      Integer teleportCooldownLeft) {}
 
   /**
    * @param centerX null when no participant had a position
@@ -64,7 +77,8 @@ public final class FightAssessor {
   public Assessment assess(
       FightDetector.Detected fight,
       Map<Integer, Trace> traces,
-      Map<Integer, List<ActivitySegment>> activities) {
+      Map<Integer, List<ActivitySegment>> activities,
+      Map<Integer, HeroStateTimeline> states) {
     double middle = (fight.start() + fight.end()) / 2;
     int[] center = center(fight, traces, middle);
     int radiantDeaths = 0;
@@ -92,6 +106,7 @@ public final class FightAssessor {
               fight,
               traces.get(player),
               activities.getOrDefault(player, List.of()),
+              states.getOrDefault(player, new HeroStateTimeline()),
               center));
     }
     return new Assessment(
@@ -161,6 +176,7 @@ public final class FightAssessor {
       FightDetector.Detected fight,
       Trace trace,
       List<ActivitySegment> segments,
+      HeroStateTimeline state,
       int[] center) {
     long dealt = fight.damageDealt().getOrDefault(player, 0L);
     long taken = fight.damageTaken().getOrDefault(player, 0L);
@@ -168,14 +184,37 @@ public final class FightAssessor {
     Integer distance = distanceAtStart(trace, fight.start(), center);
     ActivitySegment atStart = segmentAt(segments, fight.start());
     String activity = atStart == null ? null : atStart.activity().name();
+    Presence presence = presence(player, fight, trace, atStart, center);
+    boolean couldHaveTeleported = AWAY_BUT_ALIVE.contains(presence);
     return new PlayerPart(
         player,
-        presence(player, fight, trace, atStart, center),
+        presence,
         dealt,
         taken,
         deaths,
         distance,
-        activity);
+        activity,
+        couldHaveTeleported ? absenceReason(state, fight.start()) : null,
+        couldHaveTeleported ? teleportCooldownLeft(state, fight.start()) : null);
+  }
+
+  private static AbsenceReason absenceReason(HeroStateTimeline state, double second) {
+    if (TELEPORTS.stream().noneMatch(t -> state.owns(t, second))) {
+      return AbsenceReason.NO_TP;
+    }
+    return teleportCooldownLeft(state, second) > 0
+        ? AbsenceReason.TP_ON_COOLDOWN
+        : AbsenceReason.HAD_TP_NOT_USED;
+  }
+
+  /** The shortest wait among the teleports the hero held, null when he held none. */
+  private static Integer teleportCooldownLeft(HeroStateTimeline state, double second) {
+    return TELEPORTS.stream()
+        .filter(t -> state.owns(t, second))
+        .mapToInt(t -> (int) Math.ceil(state.cooldownLeft(t, second)))
+        .boxed()
+        .min(Integer::compare)
+        .orElse(null);
   }
 
   private Presence presence(

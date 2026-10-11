@@ -21,6 +21,8 @@ import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.activity.Activity;
 import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
+import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
+import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import com.ako.dbuff.service.replay.map.MapLayout;
 import com.ako.dbuff.service.replay.map.MapLayouts;
 import com.ako.dbuff.service.replay.map.Zone;
@@ -47,6 +49,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
   private final PlayerActivitySegmentRepo segmentRepo;
   private final FightRepo fightRepo;
   private final FightPlayerRepo fightPlayerRepo;
+  private final HeroStateTimelines timelines;
   private final CombatLogReader combatLog;
   private final MapLayouts mapLayouts;
   private final ReplayProcessingProperties processing;
@@ -64,7 +67,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
 
   @Override
   public Set<String> requires() {
-    return Set.of("players", "tracks", "combat-log");
+    return Set.of("players", "tracks", "combat-log", "state-changes");
   }
 
   @Override
@@ -80,6 +83,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
     }
     Map<Integer, FightAssessor.Trace> traces = traces(matchId);
     Map<Integer, List<ActivitySegment>> activities = activities(matchId);
+    Map<Integer, HeroStateTimeline> states = timelines.load(matchId);
     MapLayout layout = layout(matchId);
     List<FightDetector.Detected> detected =
         new FightDetector(properties.fightTuning()).detect(events, playerOf);
@@ -88,7 +92,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
             properties.getFightParticipationRadius(), properties.getFightWinMarginPercent());
     for (int index = 0; index < detected.size(); index++) {
       FightDetector.Detected fight = detected.get(index);
-      FightAssessor.Assessment assessment = assessor.assess(fight, traces, activities);
+      FightAssessor.Assessment assessment = assessor.assess(fight, traces, activities, states);
       fightRepo.save(fightRow(matchId, index, fight, assessment, layout));
       fightPlayerRepo.saveAll(playerRows(matchId, index, assessment));
     }
@@ -190,6 +194,8 @@ public class FightAnalyzer implements ReplayAnalyzer {
                     .deaths(p.deaths())
                     .distanceToCenter(p.distanceToCenter())
                     .activityAtStart(p.activityAtStart())
+                    .absenceReason(p.absenceReason() == null ? null : p.absenceReason().name())
+                    .teleportCooldownLeft(p.teleportCooldownLeft())
                     .analysisVersion(version())
                     .build())
         .toList();

@@ -1,4 +1,4 @@
-package com.ako.dbuff.service.replay.analysis.death;
+package com.ako.dbuff.service.replay.analysis.state;
 
 import com.ako.dbuff.service.replay.StateChangeKind;
 import java.util.ArrayList;
@@ -43,6 +43,11 @@ public final class HeroStateTimeline {
    * it. A thing never seen on cooldown counts as ready, so ask {@link #owns} first for items.
    */
   public boolean ready(String name, double second) {
+    return cooldownLeft(name, second) == 0;
+  }
+
+  /** Seconds the last cooldown seen before the time still has to run, 0 when none does. */
+  public double cooldownLeft(String name, double second) {
     double readyAt = Double.NEGATIVE_INFINITY;
     for (Change c : changes) {
       if (c.second() > second) {
@@ -52,6 +57,6 @@ public final class HeroStateTimeline {
         readyAt = c.readyAtSeconds();
       }
     }
-    return readyAt <= second;
+    return Math.max(0, readyAt - second);
   }
 }

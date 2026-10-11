@@ -5,23 +5,22 @@ import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
-import com.ako.dbuff.dao.model.ReplayStateChangeDomain;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
-import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.CombatHeroes;
 import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.PlayerSlots;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
-import com.ako.dbuff.service.replay.StateChangeKind;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.fight.FightAssessor;
+import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
+import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import com.ako.dbuff.service.replay.map.MapLayout;
 import com.ako.dbuff.service.replay.map.MapLayouts;
 import java.util.ArrayList;
@@ -45,7 +44,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
   private final ReplayPlayerTrackRepo trackRepo;
   private final ReplayPlayerRepo playerRepo;
   private final ReplayParseRunRepo runRepo;
-  private final ReplayStateChangeRepo stateRepo;
+  private final HeroStateTimelines timelines;
   private final FightRepo fightRepo;
   private final DeathAnalysisRepo deathRepo;
   private final CombatLogReader combatLog;
@@ -80,7 +79,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
       return;
     }
     Map<Integer, FightAssessor.Trace> traces = traces(matchId);
-    Map<Integer, HeroStateTimeline> states = states(matchId);
+    Map<Integer, HeroStateTimeline> states = timelines.load(matchId);
     List<FightDomain> fights = fightRepo.findByMatchId(matchId);
     MapLayout layout = layout(matchId);
     DeathAssessor assessor = new DeathAssessor(properties.deathTuning());
@@ -135,21 +134,6 @@ public class DeathAnalyzer implements ReplayAnalyzer {
               t.getFlags()));
     }
     return traces;
-  }
-
-  private Map<Integer, HeroStateTimeline> states(long matchId) {
-    Map<Integer, HeroStateTimeline> states = new HashMap<>();
-    for (ReplayStateChangeDomain c : stateRepo.findByMatchIdOrderByGameSeconds(matchId)) {
-      states
-          .computeIfAbsent(PlayerSlots.index(c.getPlayerSlot()), k -> new HeroStateTimeline())
-          .add(
-              new HeroStateTimeline.Change(
-                  c.getGameSeconds(),
-                  StateChangeKind.valueOf(c.getKind()),
-                  c.getName(),
-                  c.getReadyAtSeconds() == null ? 0 : c.getReadyAtSeconds()));
-    }
-    return states;
   }
 
   private MapLayout layout(long matchId) {

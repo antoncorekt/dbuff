@@ -45,5 +45,11 @@ public class FightPlayerDomain {
   /** What the activity classifier says the hero was doing when the fight began. */
   private String activityAtStart;
 
+  /** One of the AbsenceReason values; null unless the hero was alive and away from the fight. */
+  private String absenceReason;
+
+  /** Seconds until the quickest teleport he held was ready; null when he held none. */
+  private Integer teleportCooldownLeft;
+
   private Integer analysisVersion;
 }

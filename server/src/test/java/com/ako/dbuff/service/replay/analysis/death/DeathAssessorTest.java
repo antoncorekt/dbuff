@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.StateChangeKind;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.fight.FightAssessor;
+import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
