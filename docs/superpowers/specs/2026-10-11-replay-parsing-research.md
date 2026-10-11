@@ -45,14 +45,14 @@ Flow: `RecentMatchesJob` → `DotaApiMatchDetailsService` (`GET /matches/{id}`) 
 
 ### 3.1 Getting the replay
 - URL: `http://replay{cluster}.valve.net/570/{match_id}_{replay_salt}.dem.bz2`. `cluster` + `replay_salt` (and `replay_url`) appear in OpenDota's match response **after** the match is parsed — we already request parsing, so we can read them in `MatchParseCheckJob`.
-- Valve retention is short and unofficial (community reports ~1–2 weeks for public matches). → Download right after the parse check succeeds; don't rely on backfill for old matches.
+- Valve retention is unofficial; measured ~3 months for the sampled matches (see the plan). → Download after the parse check succeeds and backfill matches up to 90 days old.
 - Fallback without OpenDota: fetch salt from the Dota GC with a Steam account (JavaSteam + Dota GC `CMsgGCMatchDetailsRequest`). More moving parts; only if OpenDota proves unreliable.
 - Size ~30–100 MB `.bz2`; stream-decompress, parse, discard. Don't store raw replays.
 
 ### 3.2 Parsing library — recommendation: **Clarity** (`com.skadistats:clarity:5.0.1`)
 - Java, BSD-3, requires Java 21 → matches our toolchain (`build.gradle` `languageVersion 21`); runs in-process inside the Spring app, no extra service.
 - Supports combat log, entities (heroes, players, game rules), modifiers, user messages, game events, string tables, end-of-game overview.
-- It is what OpenDota's own parser (`odota/parser`, Java HTTP service on :5600, POST `.dem` → line-JSON) is built on. Their `Parse.java` is the best reference for which entity properties to read: `m_vecPlayerTeamData` (hero, level, KDA, randomed, facet), `m_vecDataTeam` (gold, xp, lh, dn, networth, stuns…), hero `m_hAbilities.N`→`m_iLevel` (ability level changes), `m_hItems.N` (inventory), `CBodyComponent` (x,y), game rules (`m_nGameState`, `m_BannedHeroes`, `m_SelectedHeroes`, draft timings).
+- It is what OpenDota's own parser (`odota/parser`, Java HTTP service on :5600, POST `.dem` → line-JSON) is built on. Their `Parse.java` is the best reference for which entity properties to read: `m_vecPlayerTeamData` (hero, level, KDA, randomed, facet), `m_vecDataTeam` (gold, xp, lh, dn, networth, stuns…), hero `m_vecAbilities.N`→`m_iLevel` (ability level changes), `m_hItems.N` (inventory), `CBodyComponent` (x,y), game rules (`m_nGameState`, `m_BannedHeroes`, `m_SelectedHeroes`, draft timings).
 - Alternatives considered: `manta` (Go, Dotabuff) and running `odota/parser` as a Docker sidecar. Sidecar is a faster MVP but gives us no AD draft data either and adds a service; in-process Clarity is the better long-term fit.
 - **Unverified / spike needed:** odota parser has *no* AD draft handling. AD draft state must be read from game-rules entity fields during the draft phase (pool, current drafter, picked ability per player) or derived from abilities appearing on hero entities in draft order. A spike dumps all `CDOTAGamerulesProxy` field changes during `DOTA_GAMERULES_STATE_HERO_SELECTION` for one AD replay to identify exact field names.
 
@@ -107,7 +107,7 @@ Conclusions:
 
 ## 5. Implementation roadmap (each phase its own worktree/branch)
 - **Phase 0 - doc**: this file.
-- **Phase 1 - OpenDota completeness (both modes)**: new tables/mappers for `picks_bans` (AP), ordered `ability_upgrades_arr` incl. talents, `*_t` series (+ AD-only `networth_t`), `radiant_gold_adv/xp_adv`, `purchase_log`, `damage_targets`, `teamfights`, replay `cluster/salt/url`. One focused mapper per table, Flyway `V6__...`. Add `has_parsed` + completeness flags; make mappers null-tolerant.
+- **Phase 1 - OpenDota completeness (both modes)**: new tables/mappers for `picks_bans` (AP), ordered `ability_upgrades_arr` incl. talents, `*_t` series (+ AD-only `networth_t`), `radiant_gold_adv/xp_adv`, `purchase_log`, `damage_targets`, `teamfights`, replay `cluster/salt/url`. One focused mapper per table (no Flyway: Hibernate `ddl-auto=update` owns the schema). Add `has_parsed` + completeness flags; make mappers null-tolerant.
 - **Phase 1b - replay-window capture (small, do early)**: store `replay_url/salt/cluster` for every parsed match now, so Phase 3 can backfill anything newer than ~3 months.
 - **Phase 2 - spike**: one recent AD replay (e.g. 9038725154: `http://replay191.valve.net/570/9038725154_496163112.dem.bz2`) through Clarity; dump `CDOTAGamerulesProxy` / hero-ability entity changes during hero selection to find pool + pick fields. Also check whether OpenDota facet 0 can be read from the replay (`m_iHeroFacetKey`).
 - **Phase 3 - replay pipeline**: `ReplayDownloadService`, `ReplayParseService` (Clarity, bounded executor), extractors (`AbilityDraftExtractor`, `TimelineExtractor`, `LaneExtractor`, `CombatExtractor`), triggered from `MatchParseCheckJob`; backfill job for matches inside the 3-month window.
@@ -118,7 +118,7 @@ Ask before any large refactor or full build/test run (token budget rule).
 ## Verification
 - Phase 0: doc renders, all class/file references exist.
 - Phase 1: unit tests for new mappers using a saved OpenDota JSON fixture; `./gradlew :server:test --tests '*Mapper*'`; run app locally against Postgres, `/match retry` one AD and one AP match, check new tables populated.
-- Phase 2: spike prints for a known AD match: 40 picks in order with player slot, and pool of 60 (48+12); compare against the in-game scoreboard/replay.
+- Phase 2: spike prints for a known AD match: 40 picks in order with player slot, and pool of 48 (the 48+12 figure does not hold for the current patch); compare against the in-game scoreboard/replay.
 - Phase 3: parse a match end-to-end, timeline row count ≈ 10 × minutes, lane NW diff @10 matches OpenDota's `gold_t` within tolerance; check parse time and heap.
 
 ## Sources

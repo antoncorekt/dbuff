@@ -80,7 +80,7 @@ All of this was read with Clarity 5.0.1 on JDK 21. Items marked (verify) were no
 - Player ids in the replay are **2 x the player index**: 0,2,4,6,8 Radiant (`m_iTeamNum` 2), 10..18 Dire (3).
   `CDOTAPlayerController`: `m_nPlayerID`, `m_steamID` (account id = steamID - 76561197960265728; 0 for an
   anonymous player, verify), `m_hAssignedHero`, `m_iTeamNum`. Map to the existing `player_slot` convention
-  (Radiant 0-4, Dire 128-132) as `slot = idx < 5 ? idx : 128 + idx - 5`, and cross-check against OpenDota's
+  (Radiant 0-4, Dire 128-132) as `idx = replayPlayerId / 2; slot = idx < 5 ? idx : 128 + idx - 5` (never apply the formula to the raw id), and cross-check against OpenDota's
   `players[].account_id` and `hero_id`.
 - Hero entity: `CDOTA_Unit_Hero_<Name>`; `m_iPlayerID` is also on the hero; entity handles resolve with
   `entities.getByHandle`.
@@ -157,9 +157,11 @@ Principles:
 6. **Scope of modes.** Start with Ability Draft (18) and All Draft/"All Pick" ranked (22), the modes dbuff
    tracks; skip others as `SKIPPED_NOT_SUPPORTED`. Replays older than 90 days are `EXPIRED`.
 
-Parse trigger and backfill: reuse `MatchDomain.replayCluster/replaySalt` (already stored). `MatchParseCheckJob` calls
-the replay pipeline asynchronously after a match is parsed; a Quartz job like `MatchDetailBackfillScheduler` walks
-matches that have a salt, no successful run, and started within 90 days, newest first, honouring quiet hours.
+Parse trigger and backfill: reuse `MatchDomain.replayCluster/replaySalt` (already stored). There is **one** entry point,
+`ReplayProcessingJob` (3b.3): a Quartz job like `MatchDetailBackfillScheduler` that walks matches with
+`detailsMappedAt` set, a salt, no successful run, and started within 90 days, newest first, honouring quiet hours,
+one replay at a time. `MatchParseCheckJob` does not start parses; a freshly parsed match is simply picked up by the
+next run. Nothing else may take a parse outside the shared semaphore.
 
 Dependencies to add: Clarity `com.skadistats:clarity:5.0.1`; Zstandard decompression (`com.github.luben:zstd-jni`
 ships aarch64; fall back to pure-Java `io.airlift:aircompressor` if the native load fails on the instance, verify
@@ -377,7 +379,7 @@ raw numbers so the rule can change.
 | P0 | lane assignment, partners, roaming, lane swaps, who is 2v1 | explains the numbers above | tracks + `MapLayout` |
 | P0 | creep equilibrium and creep wave position per lane | pushed/frozen lanes, tower pressure | lane creep positions every 5 s |
 | P0 | runes: bounty at 0:00/3:00/..., power/water runes: who took them, contests | free gold/tempo, support rotation | rune entities + counters |
-| P0 | starting items and early purchases (pre-horn), TP scroll timing | decisions before 0:00 | purchases with negative times (already in OpenDota `purchase_log`), combat log PURCHASE |
+| P0 | starting items and early purchases (pre-horn), TP scroll timing | decisions before 0:00 | purchases with negative times from `ItemPurchaseEventDomain` only (3a.3), no combat-log PURCHASE |
 | P0 | observer/sentry placement: count, time, place, lifetime, killed by whom | vision control and its trade | ward entities, `m_iObserverWardsPlaced`, DEATH |
 | P1 | camps stacked, creeps stacked, pulls | support farm economy | counters `m_iCampsStacked/CreepsStacked` |
 | P1 | courier deaths, courier kills | tempo and gold swing (courier gold) | DEATH target `npc_dota_courier`, `m_iCourierKills` |
@@ -388,7 +390,7 @@ raw numbers so the rule can change.
 | P2 | wisdom shrine, watcher/outpost captures | minor early objectives | team data counters |
 
 ### 6.2 "Before and around 0:00"
-Window `[-90 s, +120 s]`. Extract and store: positions every 5 s (tracks), purchases with their gold, ward items
+Window `[-90 s, +120 s]`. Extract and store: positions every 5 s (tracks), purchases with their gold (from `ItemPurchaseEventDomain`), ward items
 used/placed pre-horn, courier initial actions (who owns it, first deliveries), who walked to which lane by +30/+60 s,
 bounty runes at 0:00 (who got which and from where), smoke usage, TP scrolls bought, the first fight/kill and where.
 Summary row: `PreGameSummaryDomain(matchId, playerSlot, startingItemsJson, goldSpentPreHorn, laneAtPlus60, firstMoveRegion,
@@ -792,7 +794,7 @@ the two spiked matches and assert on them. Run only targeted tests; ask before t
 
 The throwaway spike programs used so far (Dump, Fields, AbilityFields, Heroes, Timeline, DraftSnapshot, Probe,
 CombatProbe, ItemProbe) are kept in `scripts/replay-spikes/` with their `build.gradle` (not part of the build; replays
-are not committed). Adjust the replay path inside them before running.
+are not committed). Each takes the replay path as `args[0]`: `gradle run -Pmc=spike.Timeline --args=<file.dem>`.
 Useful Clarity 5.0.1 facts: `OnTickStart` is in `skadistats.clarity.processor.reader`; use
 `Entities.stream()` with `Entities.byDtName`, `getByHandle`, `EntityState.fieldPathIterator()`;
 `@OnCombatLogEntry` in `processor.gameevents`; string table names via `StringTables.forName("EntityNames")`.
