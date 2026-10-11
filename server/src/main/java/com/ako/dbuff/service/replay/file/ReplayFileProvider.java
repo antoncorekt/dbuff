@@ -80,19 +80,15 @@ public class ReplayFileProvider {
 
   private void copyLimited(InputStream in, OutputStream out, ReplaySource source)
       throws IOException {
-    long limit = properties.getMaxDemoBytes().toBytes();
-    long total = 0;
-    byte[] buffer = new byte[64 * 1024];
-    int read;
-    while ((read = in.read(buffer)) != -1) {
-      total += read;
-      if (total > limit) {
-        throw new ReplayException(
-            ReplayStatus.TOO_LARGE,
-            "Replay of match " + source.matchId() + " unpacks past " + limit + " bytes");
-      }
-      out.write(buffer, 0, read);
-    }
+    long total =
+        LimitedCopier.copy(
+            in,
+            out,
+            properties.getMaxDemoBytes().toBytes(),
+            limit ->
+                new ReplayException(
+                    ReplayStatus.TOO_LARGE,
+                    "Replay of match " + source.matchId() + " unpacks past " + limit + " bytes"));
     if (total == 0) {
       throw new ReplayException(ReplayStatus.FAILED_DOWNLOAD, "Downloaded replay is empty");
     }

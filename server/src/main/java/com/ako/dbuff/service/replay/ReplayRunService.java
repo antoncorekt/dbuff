@@ -168,7 +168,11 @@ public class ReplayRunService {
   }
 
   private ReplayStatus fail(ReplayParseRunDomain run, ReplayStatus status, String message) {
-    if (!status.isPermanent() && run.getAttempts() < properties.getMaxAttempts()) {
+    int cap =
+        status == ReplayStatus.PARTIAL
+            ? properties.getMaxPartialAttempts()
+            : properties.getMaxAttempts();
+    if (!status.isPermanent() && run.getAttempts() < cap) {
       long hours = (long) properties.getRetryBackoffHours() << (run.getAttempts() - 1);
       run.setNextAttemptAt(LocalDateTime.now().plusHours(hours));
     }

@@ -37,8 +37,12 @@ public class MatchDetailService {
   }
 
   private void applyReplayInfo(MatchResponse response, MatchDomain match) {
-    match.setReplayCluster(response.getCluster());
-    match.setReplaySalt(response.getReplaySalt());
+    if (response.getCluster() != null) {
+      match.setReplayCluster(response.getCluster());
+    }
+    if (response.getReplaySalt() != null) {
+      match.setReplaySalt(response.getReplaySalt());
+    }
     match.setHasParsed(
         response.getOdData() != null && Boolean.TRUE.equals(response.getOdData().getHasParsed()));
   }

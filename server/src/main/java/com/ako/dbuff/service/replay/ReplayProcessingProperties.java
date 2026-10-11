@@ -30,6 +30,10 @@ public class ReplayProcessingProperties {
   private Path tempDir = Path.of(System.getProperty("java.io.tmpdir"), "dbuff-replays");
 
   private int maxAttempts = 5;
+
+  /** A run where an extractor failed is tried again fewer times: the cause is often permanent. */
+  private int maxPartialAttempts = 2;
+
   private int retryBackoffHours = 1;
   private int maxDurationMin = 120;
   private int maxParseSeconds = 120;

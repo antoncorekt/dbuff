@@ -21,6 +21,8 @@ public final class CombatLogCodec {
   /** Bumped whenever the layout changes, so an old blob is never read as a new one. */
   public static final int VERSION = 1;
 
+  private static final int MAX_NAMES = 65_535;
+  private static final int MAX_ASSIST_MASK = 0xFFFF;
   private static final double CENTISECONDS = 100.0;
   private static final CombatEventKind[] KINDS = CombatEventKind.values();
 
@@ -41,6 +43,10 @@ public final class CombatLogCodec {
               });
         }
       }
+      if (table.size() > MAX_NAMES) {
+        throw new IllegalArgumentException(
+            "Combat log has " + table.size() + " distinct names, the format holds " + MAX_NAMES);
+      }
       out.writeInt(VERSION);
       out.writeInt(table.size());
       for (String name : table) {
@@ -48,6 +54,7 @@ public final class CombatLogCodec {
       }
       out.writeInt(events.size());
       for (CombatEvent e : events) {
+        checkRange(e);
         out.writeByte(e.kind().ordinal());
         out.writeInt((int) Math.round(e.gameSecond() * CENTISECONDS));
         out.writeShort(names.get(e.attacker()));
@@ -66,6 +73,20 @@ public final class CombatLogCodec {
       throw new UncheckedIOException(e);
     }
     return bytes.toByteArray();
+  }
+
+  /** What the layout stores in 8 or 16 bits must fit, or it would be corrupted silently. */
+  private static void checkRange(CombatEvent e) {
+    if (e.flags() < 0
+        || e.flags() > Byte.MAX_VALUE * 2 + 1
+        || e.assistMask() < 0
+        || e.assistMask() > MAX_ASSIST_MASK
+        || e.x() < Short.MIN_VALUE
+        || e.x() > Short.MAX_VALUE
+        || e.y() < Short.MIN_VALUE
+        || e.y() > Short.MAX_VALUE) {
+      throw new IllegalArgumentException("Combat event does not fit the format: " + e);
+    }
   }
 
   public static List<CombatEvent> decode(byte[] blob) {
