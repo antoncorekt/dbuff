@@ -18,7 +18,7 @@ public record SampleFacts(
    * all zeros, so a level of 0 means "no data".
    *
    * @param mana the mana points, as against {@code manaPercent}
-   * @param attackRange the hero's attack range in world units, bonuses included
+   * @param attackRange the hero's attack range in world units, as the game reports it
    * @param flags bit 0 is set while the hero is alive
    */
   public record PlayerSeries(

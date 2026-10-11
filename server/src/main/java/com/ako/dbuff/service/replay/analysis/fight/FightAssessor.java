@@ -177,7 +177,7 @@ public final class FightAssessor {
         continue;
       }
       int i = trace.indexAt(fight.start());
-      if (trace.level()[i] > 0) {
+      if (trace.level()[i] > 0 && (trace.flags()[i] & 1) == 1) {
         positions.put(part.player(), new int[] {trace.x()[i], trace.y()[i]});
         if (part.attackRange() != null) {
           ranges.put(part.player(), part.attackRange());

@@ -42,5 +42,7 @@ class FrontlineRankerTest {
 
     assertThat(result.get(1).rank()).isEqualTo(1);
     assertThat(result.get(1).delta()).isNull();
+    assertThat(result.get(0).rank()).isEqualTo(2);
+    assertThat(result.get(0).delta()).as("the only hero with a known range").isZero();
   }
 }

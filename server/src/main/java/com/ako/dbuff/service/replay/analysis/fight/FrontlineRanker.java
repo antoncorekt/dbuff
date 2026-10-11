@@ -15,8 +15,9 @@ public final class FrontlineRanker {
   /**
    * @param rank 1 is the hero closest to the enemy
    * @param delta rank minus the rank his attack range suggests, zero within a group of equal
-   *     ranges; negative means further forward than his range suggests. Null when a range of the
-   *     team is unknown.
+   *     ranges; negative means further forward than his range suggests. Teammates with an unknown
+   *     range are left out of the comparison, and the hero has none himself when his own range is
+   *     unknown.
    */
   public record Position(int rank, Integer delta) {}
 
@@ -50,15 +51,22 @@ public final class FrontlineRanker {
                               + (positions.get(p)[1] - ownCentre[1]) * ay)
                           / length)
               .thenComparing(Comparator.naturalOrder()));
-      boolean rangesKnown = own.stream().allMatch(attackRanges::containsKey);
+      List<Integer> withRange = own.stream().filter(attackRanges::containsKey).toList();
       for (int i = 0; i < byFront.size(); i++) {
         int player = byFront.get(i);
-        result.put(
-            player,
-            new Position(i + 1, rangesKnown ? delta(player, i + 1, own, attackRanges) : null));
+        Integer delta =
+            attackRanges.containsKey(player)
+                ? delta(player, rankAmong(byFront, withRange, i), withRange, attackRanges)
+                : null;
+        result.put(player, new Position(i + 1, delta));
       }
     }
     return result;
+  }
+
+  /** The place of the hero at {@code index} among those of the line whose range is known. */
+  private static int rankAmong(List<Integer> line, List<Integer> known, int index) {
+    return (int) line.subList(0, index + 1).stream().filter(known::contains).count();
   }
 
   private static int delta(int player, int rank, List<Integer> own, Map<Integer, Integer> ranges) {
