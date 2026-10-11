@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay;
 
 import com.ako.dbuff.service.constant.ConstantPrecacheStarter;
+import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.clarity.ClarityReplayParser;
 import com.ako.dbuff.service.replay.file.ReplayDecompressor;
 import java.util.List;
@@ -28,6 +29,7 @@ class ReplayWiringTest {
   @Autowired private List<ReplayDecompressor> decompressors;
   @Autowired private List<ReplayExtractor> extractors;
   @Autowired private ReplayProcessingProperties properties;
+  @Autowired private List<ReplayAnalyzer> analyzers;
 
   @Autowired
   @Qualifier("replayParseSemaphore")
@@ -41,5 +43,12 @@ class ReplayWiringTest {
     assertThat(extractors).extracting(ReplayExtractor::name).contains("players");
     assertThat(properties.isEnabled()).isFalse();
     assertThat(semaphore.availablePermits()).isEqualTo(properties.getMaxConcurrent());
+  }
+
+  @Test
+  void theFightAnalyzerRunsAfterTheActivityAnalyzerItReadsFrom() {
+    assertThat(analyzers)
+        .extracting(ReplayAnalyzer::name)
+        .containsSubsequence("activity", "fights");
   }
 }

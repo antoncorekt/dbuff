@@ -25,11 +25,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Stores what each hero was doing through the game, from the stored tracks and combat log. */
 @Slf4j
+@Order(10)
 @Component
 @RequiredArgsConstructor
 public class ActivityAnalyzer implements ReplayAnalyzer {
