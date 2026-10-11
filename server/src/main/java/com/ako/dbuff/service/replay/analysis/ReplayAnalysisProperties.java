@@ -56,6 +56,9 @@ public class ReplayAnalysisProperties {
   /** A hero alive this long after dying came back by Aegis or reincarnation. */
   private int deathReincarnationSeconds = 5;
 
+  /** A hero who dies this soon into a fight is said to have had no time to use what he held. */
+  private int fightEarlyDeathSeconds = 5;
+
   public FightDetector.Tuning fightTuning() {
     return new FightDetector.Tuning(
         fightMergeGapSeconds,
