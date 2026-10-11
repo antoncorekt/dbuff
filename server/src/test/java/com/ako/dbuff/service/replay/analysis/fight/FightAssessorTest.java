@@ -83,6 +83,7 @@ class FightAssessorTest {
     }
     Map<Integer, HeroStateTimeline> states =
         Map.of(
+            1, timeline(),
             4, timeline(change(10, StateChangeKind.ITEM_ADDED, "item_tpscroll", 0)),
             6,
                 timeline(
@@ -98,6 +99,7 @@ class FightAssessorTest {
     assertThat(parts.get(6).absenceReason()).isEqualTo(AbsenceReason.TP_ON_COOLDOWN);
     assertThat(parts.get(6).teleportCooldownLeft()).isEqualTo(30);
     assertThat(parts.get(3).absenceReason()).isNull();
+    assertThat(parts.get(7).absenceReason()).as("no state stored for him").isNull();
     assertThat(parts.get(0).absenceReason()).isNull();
   }
 

@@ -106,7 +106,7 @@ public final class FightAssessor {
               fight,
               traces.get(player),
               activities.getOrDefault(player, List.of()),
-              states.getOrDefault(player, new HeroStateTimeline()),
+              states.get(player),
               center));
     }
     return new Assessment(
@@ -185,7 +185,8 @@ public final class FightAssessor {
     ActivitySegment atStart = segmentAt(segments, fight.start());
     String activity = atStart == null ? null : atStart.activity().name();
     Presence presence = presence(player, fight, trace, atStart, center);
-    boolean couldHaveTeleported = AWAY_BUT_ALIVE.contains(presence);
+    boolean couldHaveTeleported = state != null && AWAY_BUT_ALIVE.contains(presence);
+    Integer cooldownLeft = couldHaveTeleported ? teleportCooldownLeft(state, fight.start()) : null;
     return new PlayerPart(
         player,
         presence,
@@ -194,25 +195,22 @@ public final class FightAssessor {
         deaths,
         distance,
         activity,
-        couldHaveTeleported ? absenceReason(state, fight.start()) : null,
-        couldHaveTeleported ? teleportCooldownLeft(state, fight.start()) : null);
+        couldHaveTeleported ? absenceReason(cooldownLeft) : null,
+        cooldownLeft);
   }
 
-  private static AbsenceReason absenceReason(HeroStateTimeline state, double second) {
-    if (TELEPORTS.stream().noneMatch(t -> state.owns(t, second))) {
+  private static AbsenceReason absenceReason(Integer cooldownLeft) {
+    if (cooldownLeft == null) {
       return AbsenceReason.NO_TP;
     }
-    return teleportCooldownLeft(state, second) > 0
-        ? AbsenceReason.TP_ON_COOLDOWN
-        : AbsenceReason.HAD_TP_NOT_USED;
+    return cooldownLeft > 0 ? AbsenceReason.TP_ON_COOLDOWN : AbsenceReason.HAD_TP_NOT_USED;
   }
 
   /** The shortest wait among the teleports the hero held, null when he held none. */
   private static Integer teleportCooldownLeft(HeroStateTimeline state, double second) {
     return TELEPORTS.stream()
         .filter(t -> state.owns(t, second))
-        .mapToInt(t -> (int) Math.ceil(state.cooldownLeft(t, second)))
-        .boxed()
+        .map(t -> (int) Math.ceil(state.cooldownLeft(t, second)))
         .min(Integer::compare)
         .orElse(null);
   }
