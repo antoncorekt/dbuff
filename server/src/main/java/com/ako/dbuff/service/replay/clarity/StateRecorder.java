@@ -200,7 +200,7 @@ final class StateRecorder implements SampleObserver {
       Entity ability) {
     int level = (int) number(ability, "m_iLevel");
     Integer previous = state.levels.put(key, level);
-    if (previous != null && level > previous) {
+    if (level > (previous == null ? 0 : previous)) {
       changes.add(
           new RawChange(playerId, tick, StateChangeKind.ABILITY_LEVEL, name, slot, 0, 0, level, 0));
     }

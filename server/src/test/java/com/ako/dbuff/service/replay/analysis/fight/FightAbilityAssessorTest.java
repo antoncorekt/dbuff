@@ -77,6 +77,18 @@ class FightAbilityAssessorTest {
     assertThat(bkb.reason()).isEqualTo(NonCastReason.ON_COOLDOWN);
   }
 
+  @Test
+  void assess_leavesOutConsumablesAndTeleports() {
+    HeroStateTimeline state = state();
+    state.add(change(StateChangeKind.ITEM_ADDED, "item_tpscroll", 0, 0));
+    state.add(change(StateChangeKind.ITEM_ADDED, "item_tango", 0, 0));
+    state.add(change(StateChangeKind.COOLDOWN, "item_tpscroll", 50, 60));
+
+    var uses = assessor.assess(100, 120, state, 400, Map.of(), List.of());
+
+    assertThat(uses).noneMatch(FightAbilityAssessor.Use::item);
+  }
+
   private NonCastReason reason(
       HeroStateTimeline state, Integer mana, List<Double> deaths, String ability) {
     return assessor.assess(100, 120, state, mana, Map.of(), deaths).stream()

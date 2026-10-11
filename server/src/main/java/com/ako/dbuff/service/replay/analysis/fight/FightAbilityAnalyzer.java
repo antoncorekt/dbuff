@@ -149,13 +149,14 @@ public class FightAbilityAnalyzer implements ReplayAnalyzer {
     return tracks;
   }
 
-  /** Null when the hero has no track, or one stored before mana points were recorded. */
+  /** Null when the hero has no track, was not alive in the sample, or the track predates mana. */
   private static Integer manaAt(ReplayPlayerTrackDomain track, double second) {
     if (track == null || track.getMana() == null || track.getMana().length == 0) {
       return null;
     }
     int i = (int) Math.round((second - track.getStartSeconds()) / track.getStepSeconds());
-    return track.getMana()[Math.max(0, Math.min(track.getMana().length - 1, i))];
+    i = Math.max(0, Math.min(track.getMana().length - 1, i));
+    return (track.getFlags()[i] & 1) == 0 ? null : track.getMana()[i];
   }
 
   private FightAbilityUseDomain row(

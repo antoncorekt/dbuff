@@ -17,6 +17,23 @@ import java.util.Set;
 public final class FightAbilityAssessor {
   private static final String ITEM_PREFIX = "item_";
 
+  /** Carried for upkeep or travel, not for fighting; teleports are covered by AbsenceReason. */
+  private static final Set<String> NOT_FOR_FIGHTING =
+      Set.of(
+          "item_tpscroll",
+          "item_travel_boots",
+          "item_travel_boots_2",
+          "item_tango",
+          "item_flask",
+          "item_clarity",
+          "item_enchanted_mango",
+          "item_faerie_fire",
+          "item_smoke_of_deceit",
+          "item_ward_observer",
+          "item_ward_sentry",
+          "item_ward_dispenser",
+          "item_bottle");
+
   private final int earlyDeathSeconds;
 
   public FightAbilityAssessor(int earlyDeathSeconds) {
@@ -116,7 +133,7 @@ public final class FightAbilityAssessor {
       }
     }
     for (String item : state.itemsAt(start)) {
-      if (usable(item, start, state, byName)) {
+      if (!NOT_FOR_FIGHTING.contains(item) && usable(item, start, state, byName)) {
         names.add(item);
       }
     }

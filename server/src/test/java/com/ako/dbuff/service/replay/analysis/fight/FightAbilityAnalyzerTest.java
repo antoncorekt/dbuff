@@ -98,6 +98,23 @@ class FightAbilityAnalyzerTest {
   }
 
   @Test
+  void analyze_ignoresTheManaOfAHeroWhoWasNotAliveInTheSample() {
+    stored();
+    fightAnalyzer.analyze(MATCH);
+    trackRepo
+        .findAll()
+        .forEach(
+            t -> {
+              t.setFlags(new int[t.getFlags().length]);
+              trackRepo.saveAndFlush(t);
+            });
+
+    analyzer.analyze(MATCH);
+
+    assertThat(useRepo.findAll()).allMatch(u -> u.getManaAtStart() == null);
+  }
+
+  @Test
   void deleteByMatchId_removesTheUses() {
     stored();
     fightAnalyzer.analyze(MATCH);
