@@ -72,6 +72,12 @@ public class ReplayAnalysisProperties {
   /** A lead must have faded this long before the team counts as even again. */
   private int teamStateLeaveSeconds = 60;
 
+  /** The laning phase ends at this game minute. */
+  private int phaseLaneEndMinutes = 12;
+
+  /** The mid game ends at this game minute; the late game follows. */
+  private int phaseMidEndMinutes = 25;
+
   public TeamStateSegmenter.Tuning teamStateTuning() {
     return new TeamStateSegmenter.Tuning(
         Math.max(1, teamAheadPercent) / 100.0,
