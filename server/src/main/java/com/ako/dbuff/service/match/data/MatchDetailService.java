@@ -16,14 +16,20 @@ public class MatchDetailService {
 
   /**
    * Replaces every stored detail row of the match with the ones in the payload and stamps the match
-   * with the parse state and replay location. The caller persists the match itself.
+   * with the parse state and replay location. All rows are written or none are. A match OpenDota
+   * has not parsed yet is only marked as attempted, so it stays eligible for a later backfill. The
+   * caller persists the match itself.
    */
   @Transactional
   public void replace(MatchResponse response, MatchDomain match) {
     applyReplayInfo(response, match);
     deleteByMatchId(match.getId());
     mappers.forEach(mapper -> mapper.map(response, match));
-    match.setDetailsMappedAt(LocalDateTime.now());
+    LocalDateTime now = LocalDateTime.now();
+    match.setDetailsAttemptedAt(now);
+    if (Boolean.TRUE.equals(match.getHasParsed())) {
+      match.setDetailsMappedAt(now);
+    }
   }
 
   public void deleteByMatchId(long matchId) {

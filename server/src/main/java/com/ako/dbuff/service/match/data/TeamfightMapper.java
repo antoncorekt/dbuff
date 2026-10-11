@@ -11,8 +11,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class TeamfightMapper implements MatchDetailMapper {
@@ -58,7 +60,16 @@ public class TeamfightMapper implements MatchDetailMapper {
       List<MatchResponsePlayersInner> players) {
     List<?> entries =
         fight.get("players") instanceof List<?> list ? list : List.of();
-    for (int p = 0; p < entries.size() && players != null && p < players.size(); p++) {
+    if (players == null || entries.size() != players.size()) {
+      log.warn(
+          "Match {} fight {} lists {} players against {} in the match, skipping player rows",
+          match.getId(),
+          fightIndex,
+          entries.size(),
+          players == null ? 0 : players.size());
+      return;
+    }
+    for (int p = 0; p < entries.size(); p++) {
       Long slot = players.get(p).getPlayerSlot();
       if (slot == null) {
         continue;

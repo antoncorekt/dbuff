@@ -72,7 +72,7 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
 
     players.forEach(player -> playersMapper.handle(matchDomain, player, heroToPlayerMap));
 
-    matchDetailService.replace(matchResponse, matchDomain);
+    storeDetails(matchResponse, matchDomain);
     matchRepo.save(matchDomain);
 
     checkAndScrapeAdditionalData(matchDomain);
@@ -149,6 +149,23 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
     matchDomain.setRadiantWin(radiantWin);
     matchDomain.setRadiantScore(matchResponse.getRadiantScore());
     matchDomain.setDireScore(matchResponse.getDireScore());
+  }
+
+  /**
+   * The detail rows are supplementary: when they cannot be stored the match is still processed, and
+   * the backfill retries them because the match stays without {@code detailsMappedAt}.
+   */
+  private void storeDetails(MatchResponse matchResponse, MatchDomain matchDomain) {
+    try {
+      matchDetailService.replace(matchResponse, matchDomain);
+    } catch (RuntimeException e) {
+      log.error(
+          "{} Could not store detail rows for match {}: {}",
+          ProcessContext.getContextString(),
+          matchDomain.getId(),
+          e.getMessage(),
+          e);
+    }
   }
 
   private void checkAndScrapeAdditionalData(MatchDomain matchDomain) {

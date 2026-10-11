@@ -5,9 +5,7 @@ import lombok.*;
 
 /** One player's contribution to one teamfight. */
 @Entity
-@Table(
-    uniqueConstraints = @UniqueConstraint(columnNames = {"matchId", "fightIndex", "playerSlot"}),
-    indexes = @Index(name = "idx_teamfight_player_match", columnList = "matchId"))
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"matchId", "fightIndex", "playerSlot"}))
 @Data
 @Builder
 @NoArgsConstructor

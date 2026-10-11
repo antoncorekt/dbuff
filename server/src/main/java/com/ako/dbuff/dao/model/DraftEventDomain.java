@@ -5,9 +5,7 @@ import lombok.*;
 
 /** Hero pick or ban in an All Pick or Captains Mode draft; absent for Ability Draft. */
 @Entity
-@Table(
-    uniqueConstraints = @UniqueConstraint(columnNames = {"matchId", "draftOrder"}),
-    indexes = @Index(name = "idx_draft_event_match", columnList = "matchId"))
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"matchId", "draftOrder"}))
 @Data
 @Builder
 @NoArgsConstructor

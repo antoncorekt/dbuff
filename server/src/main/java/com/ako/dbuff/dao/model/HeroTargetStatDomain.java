@@ -8,8 +8,7 @@ import lombok.*;
 @Table(
     uniqueConstraints =
         @UniqueConstraint(
-            columnNames = {"matchId", "playerSlot", "statKind", "inflictor", "targetHeroName"}),
-    indexes = @Index(name = "idx_hero_target_stat_match", columnList = "matchId"))
+            columnNames = {"matchId", "playerSlot", "statKind", "inflictor", "targetHeroName"}))
 @Data
 @Builder
 @NoArgsConstructor
@@ -25,7 +24,6 @@ public class HeroTargetStatDomain {
 
   private Long matchId;
   private Long playerSlot;
-  /** Account id, -1 for anonymous players. */
   private Long playerId;
   @Enumerated(EnumType.STRING)
   private TargetStatKind statKind;

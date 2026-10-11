@@ -53,8 +53,10 @@ public class MatchDomain {
   /** Valve replay server cluster; with replaySalt it forms the replay download URL. */
   private Long replayCluster;
   private Long replaySalt;
-  /** When the OpenDota detail rows were last written; null means they were never stored. */
+  /** When complete OpenDota detail rows were stored; null until the match is parsed there. */
   private LocalDateTime detailsMappedAt;
+  /** Last time the detail rows were tried, successful or not; paces the backfill retries. */
+  private LocalDateTime detailsAttemptedAt;
   private Boolean parseRequested;
   private LocalDateTime parseRequestedAt;
 

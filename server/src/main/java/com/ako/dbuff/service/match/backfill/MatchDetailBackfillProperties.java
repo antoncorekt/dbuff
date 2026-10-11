@@ -13,4 +13,8 @@ public class MatchDetailBackfillProperties {
   /** Matches refetched per run; each costs one Dota API request from the shared rate limit. */
   private int batchSize = 20;
   private String cron = "0 7/10 * * * ?";
+  /** Wait before retrying a match that was tried but not stored. */
+  private int retryAfterHours = 24;
+  /** Matches older than this are not retried after a failed attempt. */
+  private int retryWithinDays = 7;
 }

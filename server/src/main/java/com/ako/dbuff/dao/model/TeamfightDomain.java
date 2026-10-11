@@ -5,9 +5,7 @@ import lombok.*;
 
 /** One teamfight as detected by the OpenDota parser. */
 @Entity
-@Table(
-    uniqueConstraints = @UniqueConstraint(columnNames = {"matchId", "fightIndex"}),
-    indexes = @Index(name = "idx_teamfight_match", columnList = "matchId"))
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"matchId", "fightIndex"}))
 @Data
 @Builder
 @NoArgsConstructor
@@ -23,11 +21,8 @@ public class TeamfightDomain {
 
   private Long matchId;
   private Integer fightIndex;
-  /** Game time in seconds. */
   private Long startTime;
-  /** Game time in seconds. */
   private Long endTime;
-  /** Game time in seconds. */
   private Long lastDeathTime;
   private Long deaths;
 }

@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class MatchPayload {
 
+  /** Account id stored for players who hide their profile; they are told apart by slot. */
   static final long ANONYMOUS = -1L;
 
   static Long playerIdOf(MatchResponsePlayersInner player) {

@@ -5,9 +5,7 @@ import lombok.*;
 
 /** Per-minute gold, xp, last hit and deny totals for one player. */
 @Entity
-@Table(
-    uniqueConstraints = @UniqueConstraint(columnNames = {"matchId", "playerSlot", "gameMinute"}),
-    indexes = @Index(name = "idx_player_timeline_match", columnList = "matchId"))
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"matchId", "playerSlot", "gameMinute"}))
 @Data
 @Builder
 @NoArgsConstructor
@@ -23,7 +21,6 @@ public class PlayerTimelineDomain {
 
   private Long matchId;
   private Long playerSlot;
-  /** Account id, -1 for anonymous players. */
   private Long playerId;
   private Integer gameMinute;
   private Long gold;

@@ -3,6 +3,7 @@ package com.ako.dbuff.dao.repo;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.ako.dbuff.dao.model.MatchDomain;
+import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -15,41 +16,78 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class MatchRepoBackfillQueryTest {
 
+  private static final LocalDateTime NOW = LocalDateTime.now();
+  private static final LocalDateTime RETRY_BEFORE = NOW.minusHours(24);
+  private static final long RECENT_AFTER = 1_000L;
+
   @Autowired private MatchRepo matchRepo;
+  @Autowired private EntityManager entityManager;
 
   @Test
   void findMatchesWithoutDetails_returnsProcessedUnmappedMatchesNewestFirst() {
-    LocalDateTime done = LocalDateTime.now();
-    save(1L, 100L, done, null, null);
-    save(2L, 300L, done, null, false);
-    save(3L, 200L, done, done, null);
-    save(4L, 400L, null, null, null);
-    save(5L, 500L, done, null, true);
+    save(1L, 1_100L, NOW, null, null, null);
+    save(2L, 1_300L, NOW, null, null, false);
+    save(3L, 1_200L, NOW, NOW, null, null);
+    save(4L, 1_400L, null, null, null, null);
+    save(5L, 1_500L, NOW, null, null, true);
 
-    List<MatchDomain> found = matchRepo.findMatchesWithoutDetails(PageRequest.of(0, 10));
-
-    assertThat(found).extracting(MatchDomain::getId).containsExactly(2L, 1L);
+    assertThat(ids(PageRequest.of(0, 10))).containsExactly(2L, 1L);
   }
 
   @Test
   void findMatchesWithoutDetails_honoursThePageSize() {
-    LocalDateTime done = LocalDateTime.now();
-    save(1L, 100L, done, null, null);
-    save(2L, 200L, done, null, null);
+    save(1L, 1_100L, NOW, null, null, null);
+    save(2L, 1_200L, NOW, null, null, null);
 
-    assertThat(matchRepo.findMatchesWithoutDetails(PageRequest.of(0, 1)))
-        .extracting(MatchDomain::getId)
-        .containsExactly(2L);
+    assertThat(ids(PageRequest.of(0, 1))).containsExactly(2L);
   }
 
-  private void save(
-      long id, long startTime, LocalDateTime end, LocalDateTime mapped, Boolean apiFailed) {
-    matchRepo.save(
+  @Test
+  void findMatchesWithoutDetails_retriesATriedMatchOnlyAfterTheCooldownAndWhileItIsRecent() {
+    LocalDateTime longAgo = NOW.minusDays(2);
+    save(1L, 1_100L, NOW, null, NOW.minusHours(1), null);
+    save(2L, 1_200L, NOW, null, longAgo, null);
+    save(3L, 500L, NOW, null, longAgo, null);
+
+    assertThat(ids(PageRequest.of(0, 10))).containsExactly(2L);
+  }
+
+  @Test
+  void updateDetailState_changesOnlyTheBookkeepingColumns() {
+    MatchDomain match = save(1L, 1_100L, NOW, null, null, null);
+    match.setError("set by another job");
+    matchRepo.saveAndFlush(match);
+
+    matchRepo.updateDetailState(1L, true, 7L, 8L, NOW, NOW);
+    entityManager.clear();
+
+    MatchDomain reloaded = matchRepo.findAll().getFirst();
+    assertThat(reloaded.getHasParsed()).isTrue();
+    assertThat(reloaded.getReplaySalt()).isEqualTo(8L);
+    assertThat(reloaded.getDetailsMappedAt()).isNotNull();
+    assertThat(reloaded.getError()).isEqualTo("set by another job");
+  }
+
+  private List<Long> ids(PageRequest page) {
+    return matchRepo.findMatchesWithoutDetails(RETRY_BEFORE, RECENT_AFTER, page).stream()
+        .map(MatchDomain::getId)
+        .toList();
+  }
+
+  private MatchDomain save(
+      long id,
+      long startTime,
+      LocalDateTime end,
+      LocalDateTime mapped,
+      LocalDateTime attempted,
+      Boolean apiFailed) {
+    return matchRepo.saveAndFlush(
         MatchDomain.builder()
             .id(id)
             .startTime(startTime)
             .endProcess(end)
             .detailsMappedAt(mapped)
+            .detailsAttemptedAt(attempted)
             .dotaApiFailed(apiFailed)
             .build());
   }

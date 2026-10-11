@@ -6,8 +6,7 @@ import lombok.*;
 /** One item purchase, unlike ItemDomain which keeps a single row per item. */
 @Entity
 @Table(
-    uniqueConstraints = @UniqueConstraint(columnNames = {"matchId", "playerSlot", "purchaseIndex"}),
-    indexes = @Index(name = "idx_item_purchase_match", columnList = "matchId"))
+    uniqueConstraints = @UniqueConstraint(columnNames = {"matchId", "playerSlot", "purchaseIndex"}))
 @Data
 @Builder
 @NoArgsConstructor
@@ -23,7 +22,6 @@ public class ItemPurchaseEventDomain {
 
   private Long matchId;
   private Long playerSlot;
-  /** Account id, -1 for anonymous players. */
   private Long playerId;
   /** Order of the purchase within the player log. */
   private Integer purchaseIndex;

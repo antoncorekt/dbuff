@@ -138,6 +138,36 @@ class MatchDetailMappersTest {
   }
 
   @Test
+  void parsedMatchIsStampedAsMapped() throws IOException {
+    service.replace(realPayload(), match);
+
+    assertThat(match.getHasParsed()).isTrue();
+    assertThat(match.getReplayCluster()).isNotNull();
+    assertThat(match.getDetailsMappedAt()).isNotNull();
+    assertThat(match.getDetailsAttemptedAt()).isNotNull();
+  }
+
+  @Test
+  void unparsedMatchIsOnlyMarkedAsAttempted() {
+    service.replace(response(), match);
+
+    assertThat(match.getHasParsed()).isFalse();
+    assertThat(match.getDetailsMappedAt()).isNull();
+    assertThat(match.getDetailsAttemptedAt()).isNotNull();
+  }
+
+  @Test
+  void teamfightPlayersAreSkippedWhenTheyDoNotLineUpWithTheMatchPlayers() throws IOException {
+    MatchResponse payload = realPayload();
+    payload.setPlayers(payload.getPlayers().subList(0, 2));
+
+    service.replace(payload, match);
+
+    assertThat(teamfightRepo.count()).isEqualTo(2);
+    assertThat(teamfightPlayerRepo.count()).isZero();
+  }
+
+  @Test
   void unparsedMatchWritesNothing() {
     MatchResponse bare = new MatchResponse();
     bare.setPlayers(List.of(new MatchResponsePlayersInner().playerSlot(0L)));

@@ -5,9 +5,7 @@ import lombok.*;
 
 /** One objective event: building kill, Roshan, Aegis, first blood, courier kill. */
 @Entity
-@Table(
-    uniqueConstraints = @UniqueConstraint(columnNames = {"matchId", "objectiveIndex"}),
-    indexes = @Index(name = "idx_objective_event_match", columnList = "matchId"))
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"matchId", "objectiveIndex"}))
 @Data
 @Builder
 @NoArgsConstructor
@@ -24,7 +22,6 @@ public class ObjectiveEventDomain {
   private Long matchId;
   /** Order of the event within the match. */
   private Integer objectiveIndex;
-  /** Game time in seconds. */
   private Long eventTime;
   private String eventType;
   private String unit;

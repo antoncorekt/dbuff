@@ -1,7 +1,9 @@
 package com.ako.dbuff.service.match.mapper;
 
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ako.dbuff.dao.model.MatchDomain;
@@ -39,6 +41,30 @@ class BasicMatchDetailsMapperTest {
 
   @Test
   void handle_storesDetailRowsBeforePersistingTheMatch() {
+    MatchResponse response = ordinaryMatch();
+    MatchDomain match = MatchDomain.builder().id(1L).build();
+
+    mapper.handle(response, match);
+
+    InOrder order = inOrder(matchDetailService, matchRepo);
+    order.verify(matchDetailService).replace(response, match);
+    order.verify(matchRepo).save(match);
+  }
+
+  @Test
+  void handle_stillPersistsTheMatchWhenDetailRowsCannotBeStored() {
+    MatchResponse response = ordinaryMatch();
+    MatchDomain match = MatchDomain.builder().id(1L).build();
+    doThrow(new IllegalStateException("bad shape"))
+        .when(matchDetailService)
+        .replace(response, match);
+
+    mapper.handle(response, match);
+
+    verify(matchRepo).save(match);
+  }
+
+  private MatchResponse ordinaryMatch() {
     MatchTypeConstant mode = mock(MatchTypeConstant.class);
     when(mode.getName()).thenReturn("game_mode_ability_draft");
     when(constants.getMatchTypeConstantMap()).thenReturn(Map.of("18", mode));
@@ -48,12 +74,6 @@ class BasicMatchDetailsMapperTest {
     response.setGameMode(18L);
     response.setStartTime(1_700_000_000L);
     response.setPlayers(List.of());
-    MatchDomain match = MatchDomain.builder().id(1L).build();
-
-    mapper.handle(response, match);
-
-    InOrder order = inOrder(matchDetailService, matchRepo);
-    order.verify(matchDetailService).replace(response, match);
-    order.verify(matchRepo).save(match);
+    return response;
   }
 }

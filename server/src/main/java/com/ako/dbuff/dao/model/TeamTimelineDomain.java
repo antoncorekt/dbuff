@@ -5,9 +5,7 @@ import lombok.*;
 
 /** Per-minute Radiant advantage; negative values favour Dire. */
 @Entity
-@Table(
-    uniqueConstraints = @UniqueConstraint(columnNames = {"matchId", "gameMinute"}),
-    indexes = @Index(name = "idx_team_timeline_match", columnList = "matchId"))
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"matchId", "gameMinute"}))
 @Data
 @Builder
 @NoArgsConstructor
