@@ -771,7 +771,8 @@ Each WP lands behind `replay.<extractor>.enabled` so it can be turned off in pro
 
 **Test strategy.** Do not commit replays (40-75 MB). Extractors are written against small interfaces (`TickSource`,
 `CombatLogSource`) so tests feed hand-built or recorded JSON fixtures. One opt-in integration test tagged `replay`
-runs the real parser when `REPLAY_FIXTURE_DIR` is set and is skipped in CI. Record golden outputs (a few KB JSON) for
+runs the real parser **locally only**: guard it with `@EnabledIfEnvironmentVariable(named = "REPLAY_FIXTURE_DIR", matches = ".+")`
+and exclude the `replay` tag from the Gradle `test` task, so CI never needs a replay file. Record golden outputs (a few KB JSON) for
 the two spiked matches and assert on them. Run only targeted tests; ask before the full suite.
 
 ---------------------------------------------------------------------------------------------------
