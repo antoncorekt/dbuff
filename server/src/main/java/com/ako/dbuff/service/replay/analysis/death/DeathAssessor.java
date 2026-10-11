@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -88,6 +89,9 @@ public final class DeathAssessor {
       boolean teleportReady,
       DeathReason reason) {}
 
+  private static final Pattern BUILDING_NAME =
+      Pattern.compile("^npc_dota_(goodguys|badguys)_(tower|fort|.*rax)");
+
   private final Tuning tuning;
 
   public DeathAssessor(Tuning tuning) {
@@ -111,7 +115,8 @@ public final class DeathAssessor {
     boolean reincarnated = aliveLater(traces.get(death.victim()), death.second());
     List<double[]> immunity = immunityWindows(victimEvents);
     boolean owned = state.owns(BKB, death.second());
-    boolean ready = owned && state.ready(BKB, from);
+    boolean ownedThroughout = owned && state.owns(BKB, from);
+    boolean ready = ownedThroughout && state.ready(BKB, from);
     boolean active =
         immunity.stream().anyMatch(w -> death.second() >= w[0] && death.second() <= w[1]);
     boolean expired =
@@ -139,6 +144,7 @@ public final class DeathAssessor {
             kind,
             reincarnated,
             owned,
+            ownedThroughout,
             ready,
             active,
             expired,
@@ -170,6 +176,7 @@ public final class DeathAssessor {
       KillerKind kind,
       boolean reincarnated,
       boolean owned,
+      boolean ownedThroughout,
       boolean ready,
       boolean active,
       boolean expired,
@@ -186,10 +193,10 @@ public final class DeathAssessor {
     if (expired) {
       return DeathReason.BKB_EXPIRED;
     }
-    if (owned && ready && !usedInLookback) {
+    if (kind == KillerKind.HERO && ready && !usedInLookback) {
       return DeathReason.BKB_READY_UNUSED;
     }
-    if (owned && !ready) {
+    if (kind == KillerKind.HERO && ownedThroughout && !ready) {
       return DeathReason.BKB_ON_COOLDOWN;
     }
     if (disabled >= tuning.disableSeconds()) {
@@ -216,7 +223,7 @@ public final class DeathAssessor {
     if (killer.startsWith("npc_dota_neutral_")) {
       return KillerKind.NEUTRAL;
     }
-    if (killer.contains("_tower") || killer.contains("fort") || killer.contains("rax")) {
+    if (BUILDING_NAME.matcher(killer).find()) {
       return KillerKind.TOWER;
     }
     if (killer.startsWith("npc_dota_creep_")) {

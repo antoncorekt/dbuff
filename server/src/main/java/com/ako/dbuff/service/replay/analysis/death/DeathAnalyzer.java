@@ -24,10 +24,12 @@ import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.fight.FightAssessor;
 import com.ako.dbuff.service.replay.map.MapLayout;
 import com.ako.dbuff.service.replay.map.MapLayouts;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -83,6 +85,9 @@ public class DeathAnalyzer implements ReplayAnalyzer {
     MapLayout layout = layout(matchId);
     DeathAssessor assessor = new DeathAssessor(properties.deathTuning());
     Map<Integer, Integer> deathsSoFar = new HashMap<>();
+    Map<String, List<CombatEvent>> byTarget =
+        events.stream().collect(Collectors.groupingBy(CombatEvent::target));
+    List<DeathAnalysisDomain> rows = new ArrayList<>();
     for (CombatEvent e : events) {
       if (e.kind() != CombatEventKind.DEATH
           || !e.targetIsRealHero()
@@ -93,9 +98,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
       DeathAssessor.Death death =
           new DeathAssessor.Death(e.gameSecond(), victim, e.attacker(), e.flags(), e.assistMask());
       List<CombatEvent> aboutVictim =
-          events.stream()
-              .filter(x -> e.target().equals(x.target()) && x.gameSecond() <= e.gameSecond())
-              .toList();
+          byTarget.get(e.target()).stream().filter(x -> x.gameSecond() <= e.gameSecond()).toList();
       DeathAssessor.Assessment a =
           assessor.assess(
               death,
@@ -104,8 +107,9 @@ public class DeathAnalyzer implements ReplayAnalyzer {
               aboutVictim,
               layout);
       int index = deathsSoFar.merge(victim, 1, Integer::sum) - 1;
-      deathRepo.save(row(matchId, index, death, a, fightIndex(fights, e.gameSecond())));
+      rows.add(row(matchId, index, death, a, fightIndex(fights, e.gameSecond())));
     }
+    deathRepo.saveAll(rows);
   }
 
   @Override
