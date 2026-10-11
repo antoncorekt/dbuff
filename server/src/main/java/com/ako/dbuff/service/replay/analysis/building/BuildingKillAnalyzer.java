@@ -57,7 +57,7 @@ public class BuildingKillAnalyzer implements ReplayAnalyzer {
 
   @Override
   public Set<String> requires() {
-    return Set.of("combat-log");
+    return Set.of("players", "tracks", "combat-log");
   }
 
   @Override
@@ -73,8 +73,9 @@ public class BuildingKillAnalyzer implements ReplayAnalyzer {
     }
     List<ObjectiveEventDomain> objectives = new ArrayList<>(objectiveRepo.findByMatchId(matchId));
     List<FightDomain> fights = fightRepo.findByMatchId(matchId);
-    Map<Integer, FightAssessor.Trace> traces = playerTraces.load(matchId);
     var layout = matchMapLayout.of(matchId);
+    Map<Integer, FightAssessor.Trace> traces =
+        layout.isPresent() ? playerTraces.load(matchId) : Map.of();
     List<BuildingKillContextDomain> rows = new ArrayList<>();
     for (CombatEvent kill : kills) {
       Optional<BuildingName> building = BuildingName.parse(kill.target());
@@ -161,8 +162,11 @@ public class BuildingKillAnalyzer implements ReplayAnalyzer {
         continue;
       }
       FightAssessor.Trace t = e.getValue();
-      for (int i = t.indexAtOrAfter(second - LOOKBACK_SECONDS); i <= t.indexAt(second); i++) {
-        if (t.level()[i] > 0
+      for (int i = 0; i < t.x().length; i++) {
+        double sampledAt = t.startSeconds() + (double) i * t.stepSeconds();
+        if (sampledAt >= second - LOOKBACK_SECONDS
+            && sampledAt <= second
+            && t.level()[i] > 0
             && (t.flags()[i] & 1) == 1
             && Math.hypot(t.x()[i] - at[0], t.y()[i] - at[1]) <= NEAR_UNITS) {
           slots.add(PlayerSlots.slot(e.getKey()));
