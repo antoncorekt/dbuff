@@ -3,6 +3,7 @@ package com.ako.dbuff.dao.repo;
 import com.ako.dbuff.dao.model.MatchDomain;
 import jakarta.persistence.QueryHint;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Stream;
 import org.springframework.data.domain.Pageable;
@@ -40,21 +41,29 @@ public interface MatchRepo extends JpaRepository<MatchDomain, Long> {
       Pageable pageable);
 
   /**
-   * Matches whose OpenDota detail rows are stored and that have no replay run of this parser
-   * version yet, newest first. Only recent matches are listed because older replays are gone.
+   * Matches that can have a replay worth fetching (details stored, replay location known, a
+   * supported mode, actually played) and no run of this parser version yet, newest first. Only
+   * recent matches are listed because older replays are gone.
    */
   @Query(
       """
       select m from MatchDomain m
       where m.detailsMappedAt is not null
         and m.startTime > :recentAfter
+        and m.replayCluster is not null
+        and m.replaySalt is not null
+        and m.duration > 0
+        and m.gameModeId in :modes
         and not exists (
           select 1 from ReplayParseRunDomain r
           where r.matchId = m.id and r.parserVersion = :version)
       order by m.startTime desc
       """)
   List<MatchDomain> findMatchesWithoutReplayRun(
-      @Param("version") Integer version, @Param("recentAfter") Long recentAfter, Pageable pageable);
+      @Param("version") Integer version,
+      @Param("recentAfter") Long recentAfter,
+      @Param("modes") Collection<Long> modes,
+      Pageable pageable);
 
   /** Writes only the detail bookkeeping columns, leaving fields other jobs own untouched. */
   @Transactional

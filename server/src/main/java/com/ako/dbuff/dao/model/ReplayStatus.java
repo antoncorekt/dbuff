@@ -4,7 +4,7 @@ package com.ako.dbuff.dao.model;
 public enum ReplayStatus {
   RUNNING(false),
   DONE(true),
-  PARTIAL(true),
+  PARTIAL(false),
   SKIPPED_NO_REPLAY_INFO(true),
   SKIPPED_NOT_SUPPORTED(true),
   SKIPPED_NOT_PLAYED(true),
@@ -13,7 +13,8 @@ public enum ReplayStatus {
   FAILED_IDENTITY(true),
   FAILED_PARSER(true),
   FAILED_DOWNLOAD(false),
-  FAILED_RESOURCE(false);
+  FAILED_RESOURCE(false),
+  FAILED_TIMEOUT(false);
 
   private final boolean permanent;
 
@@ -27,6 +28,6 @@ public enum ReplayStatus {
   }
 
   public boolean isRetryable() {
-    return this == FAILED_DOWNLOAD || this == FAILED_RESOURCE || this == RUNNING;
+    return !permanent && this != DONE;
   }
 }

@@ -89,6 +89,7 @@ class ReplayRunServiceTest {
     assertThat(service.process(match())).isEqualTo(ReplayStatus.PARTIAL);
 
     assertThat(runs.get(1L).getError()).contains("broken");
+    assertThat(runs.get(1L).getNextAttemptAt()).isNotNull();
     verify(goodExtractor).extract(any(), any());
   }
 
@@ -139,6 +140,15 @@ class ReplayRunServiceTest {
   @Test
   void process_turnsAnOutOfMemoryErrorIntoAResourceFailureAndFreesThePermit() {
     when(parser.parse(any(), any())).thenThrow(new OutOfMemoryError("heap"));
+
+    assertThat(service.process(match())).isEqualTo(ReplayStatus.FAILED_RESOURCE);
+
+    assertThat(semaphore.availablePermits()).isEqualTo(1);
+  }
+
+  @Test
+  void process_turnsALibraryLoadFailureIntoAResourceFailure() {
+    when(parser.parse(any(), any())).thenThrow(new UnsatisfiedLinkError("zstd-jni"));
 
     assertThat(service.process(match())).isEqualTo(ReplayStatus.FAILED_RESOURCE);
 

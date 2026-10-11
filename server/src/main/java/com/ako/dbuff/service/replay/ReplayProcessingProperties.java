@@ -46,4 +46,7 @@ public class ReplayProcessingProperties {
 
   private int connectTimeoutSeconds = 10;
   private int readTimeoutSeconds = 120;
+
+  /** Whole download, headers and body; a stalled body is cut off when this passes. */
+  private int maxDownloadSeconds = 300;
 }

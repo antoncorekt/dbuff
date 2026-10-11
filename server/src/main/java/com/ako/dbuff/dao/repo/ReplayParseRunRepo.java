@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -19,12 +20,16 @@ public interface ReplayParseRunRepo extends JpaRepository<ReplayParseRunDomain, 
       """
       select r from ReplayParseRunDomain r
       where r.parserVersion = :version
-        and ((r.status in ('FAILED_DOWNLOAD', 'FAILED_RESOURCE') and r.nextAttemptAt <= :now)
-             or (r.status = 'RUNNING' and r.leaseUntil < :now))
+        and ((r.status in ('FAILED_DOWNLOAD', 'FAILED_RESOURCE', 'FAILED_TIMEOUT', 'PARTIAL')
+              and r.nextAttemptAt <= :now)
+             or (r.status = 'RUNNING' and r.leaseUntil < :now and r.attempts < :maxAttempts))
       order by r.id
       """)
   List<ReplayParseRunDomain> findDueRetries(
-      @Param("version") Integer version, @Param("now") LocalDateTime now);
+      @Param("version") Integer version,
+      @Param("now") LocalDateTime now,
+      @Param("maxAttempts") Integer maxAttempts,
+      Pageable pageable);
 
   @Transactional
   @Modifying

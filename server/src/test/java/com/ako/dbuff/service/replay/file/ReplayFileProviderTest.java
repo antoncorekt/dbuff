@@ -34,6 +34,7 @@ class ReplayFileProviderTest {
   private HttpServer server;
   private final AtomicInteger status = new AtomicInteger(200);
   private volatile byte[] body = new byte[0];
+  private volatile boolean stall;
   private ReplayProcessingProperties properties;
   private ReplayFileProvider provider;
 
@@ -43,8 +44,15 @@ class ReplayFileProviderTest {
     server.createContext(
         "/",
         exchange -> {
-          exchange.sendResponseHeaders(status.get(), body.length == 0 ? -1 : body.length);
-          if (body.length > 0) {
+          exchange.sendResponseHeaders(
+              status.get(), stall ? 1_000_000 : body.length == 0 ? -1 : body.length);
+          if (stall) {
+            try {
+              Thread.sleep(5_000);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          } else if (body.length > 0) {
             exchange.getResponseBody().write(body);
           }
           exchange.close();
@@ -122,6 +130,18 @@ class ReplayFileProviderTest {
     body = java.util.Arrays.copyOf(whole, whole.length / 2);
 
     assertThat(statusOfFailure()).isEqualTo(ReplayStatus.FAILED_DOWNLOAD);
+    assertThat(filesIn(properties.getTempDir())).isEmpty();
+  }
+
+  @Test
+  void open_cutsOffABodyThatStallsAfterTheHeaders() throws IOException {
+    properties.setMaxDownloadSeconds(1);
+    stall = true;
+
+    long started = System.nanoTime();
+    assertThat(statusOfFailure()).isEqualTo(ReplayStatus.FAILED_DOWNLOAD);
+
+    assertThat((System.nanoTime() - started) / 1_000_000).isLessThan(4_000);
     assertThat(filesIn(properties.getTempDir())).isEmpty();
   }
 

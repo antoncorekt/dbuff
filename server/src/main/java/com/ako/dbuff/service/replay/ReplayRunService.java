@@ -78,6 +78,11 @@ public class ReplayRunService {
       return fail(run, ReplayStatus.FAILED_DOWNLOAD, "Interrupted while waiting to parse");
     } catch (OutOfMemoryError e) {
       return fail(run, ReplayStatus.FAILED_RESOURCE, "Out of memory while parsing");
+    } catch (LinkageError e) {
+      log.error("Replay libraries cannot be loaded", e);
+      return fail(run, ReplayStatus.FAILED_RESOURCE, "Library failure: " + e);
+    } catch (StackOverflowError e) {
+      return fail(run, ReplayStatus.FAILED_PARSER, "Stack overflow while parsing");
     } catch (RuntimeException e) {
       log.warn("Replay run for match {} failed unexpectedly", match.getId(), e);
       return fail(
@@ -90,11 +95,11 @@ public class ReplayRunService {
   }
 
   private ReplayStatus parse(MatchDomain match, ReplayParseRunDomain run) {
-    long started = System.nanoTime();
-    long deadline = started + properties.getMaxParseSeconds() * NANOS_PER_SECOND;
     ReplaySource source =
         new ReplaySource(match.getId(), match.getReplayCluster(), match.getReplaySalt());
     try (ReplayFile file = fileProvider.open(source)) {
+      long started = System.nanoTime();
+      long deadline = started + properties.getMaxParseSeconds() * NANOS_PER_SECOND;
       ReplayFacts facts = parser.parse(file.path(), () -> System.nanoTime() > deadline);
       rosterVerifier.verify(
           match.getId(), facts.players(), playerStatRepo.findAllByMatchId(match.getId()));
@@ -106,7 +111,7 @@ public class ReplayRunService {
       if (failed.isEmpty()) {
         return finish(run, ReplayStatus.DONE, null);
       }
-      return finish(run, ReplayStatus.PARTIAL, "Failed extractors: " + String.join(", ", failed));
+      return fail(run, ReplayStatus.PARTIAL, "Failed extractors: " + String.join(", ", failed));
     }
   }
 

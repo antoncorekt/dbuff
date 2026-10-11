@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay;
 
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
+import com.ako.dbuff.service.replay.file.ReplayTempCleaner;
 import java.util.List;
 import java.util.stream.LongStream;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,9 @@ class ReplayBatchServiceTest {
   private final ReplayQueue queue = mock(ReplayQueue.class);
   private final ReplayRunService runService = mock(ReplayRunService.class);
   private final ReplayProcessingProperties properties = new ReplayProcessingProperties();
-  private final ReplayBatchService batch = new ReplayBatchService(queue, runService, properties);
+  private final ReplayTempCleaner tempCleaner = mock(ReplayTempCleaner.class);
+  private final ReplayBatchService batch =
+      new ReplayBatchService(queue, runService, tempCleaner, properties);
 
   @Test
   void runBatch_processesMatchesOneAfterAnotherAndCountsStoredOnes() {
@@ -59,6 +62,17 @@ class ReplayBatchServiceTest {
     batch.runBatch();
 
     verify(runService, times(5)).process(any());
+  }
+
+  @Test
+  void runBatch_sweepsLeftoverFilesFirst_andKeepsGoingAfterATimeout() {
+    when(queue.next(properties.getBatchSize())).thenReturn(matches(3));
+    when(runService.process(any())).thenReturn(ReplayStatus.FAILED_TIMEOUT);
+
+    batch.runBatch();
+
+    verify(tempCleaner).sweep();
+    verify(runService, times(3)).process(any());
   }
 
   @Test

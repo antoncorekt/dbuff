@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay;
 
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
+import com.ako.dbuff.service.replay.file.ReplayTempCleaner;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,12 +17,14 @@ public class ReplayBatchService {
 
   private final ReplayQueue queue;
   private final ReplayRunService runService;
+  private final ReplayTempCleaner tempCleaner;
   private final ReplayProcessingProperties properties;
 
   /**
    * @return number of matches whose run ended DONE or PARTIAL
    */
   public int runBatch() {
+    tempCleaner.sweep();
     List<MatchDomain> matches = queue.next(properties.getBatchSize());
     int stored = 0;
     int downloadFailures = 0;

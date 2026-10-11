@@ -42,7 +42,7 @@ public class ClarityReplayParser implements ReplayParser {
     } catch (StopParsing stop) {
       // The collector has what it needs.
     } catch (CancelledParsing cancel) {
-      throw new ReplayException(ReplayStatus.FAILED_RESOURCE, "Parse stopped: timed out");
+      throw new ReplayException(ReplayStatus.FAILED_TIMEOUT, "Parse stopped: timed out");
     } catch (Exception e) {
       throw new ReplayException(
           ReplayStatus.FAILED_PARSER, "Replay could not be parsed: " + e.getMessage(), e);

@@ -52,10 +52,14 @@ public class HttpReplayDownloader implements ReplayDownloader {
       target = Files.createTempFile(targetDir, source.matchId() + "-", ".replay");
       HttpResponse<InputStream> response =
           client.send(request, HttpResponse.BodyHandlers.ofInputStream());
-      try (InputStream body = response.body()) {
+      try (InputStream body = response.body();
+          Watchdog watchdog = new Watchdog(body, properties.getMaxDownloadSeconds())) {
         checkStatus(response.statusCode(), source);
         checkDeclaredSize(response, source);
         copyLimited(body, target, source);
+        if (watchdog.fired()) {
+          throw new IOException("Download exceeded " + properties.getMaxDownloadSeconds() + " s");
+        }
       }
       return target;
     } catch (ReplayException e) {
@@ -112,6 +116,41 @@ public class HttpReplayDownloader implements ReplayDownloader {
         }
         out.write(buffer, 0, read);
       }
+    }
+  }
+
+  /**
+   * The request timeout only covers the headers, so a body that stalls would block the read
+   * forever. Closing the stream after the deadline makes that read fail.
+   */
+  private static final class Watchdog implements AutoCloseable {
+    private final Thread thread;
+    private volatile boolean fired;
+
+    Watchdog(InputStream body, int seconds) {
+      thread =
+          Thread.ofVirtual()
+              .start(
+                  () -> {
+                    try {
+                      Thread.sleep(Duration.ofSeconds(seconds));
+                      fired = true;
+                      body.close();
+                    } catch (InterruptedException e) {
+                      // The download finished first.
+                    } catch (IOException e) {
+                      log.debug("Closing a stalled download failed: {}", e.getMessage());
+                    }
+                  });
+    }
+
+    boolean fired() {
+      return fired;
+    }
+
+    @Override
+    public void close() {
+      thread.interrupt();
     }
   }
 
