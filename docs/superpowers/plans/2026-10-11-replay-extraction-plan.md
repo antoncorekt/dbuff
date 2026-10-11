@@ -272,7 +272,7 @@ transient (retried with a cap):
 | Status | Kind | Cause | Handling |
 |---|---|---|---|
 | `DONE` | final | all extractors ok | - |
-| `PARTIAL` | final | some extractors failed, reasons in `extractorStatus` | kept; failed extractors retried only when `parserVersion` changes |
+| `PARTIAL` | transient | some extractors failed, reasons in `error` | the run is retried with backoff up to `max-attempts` (extractors are idempotent, so rows are replaced, not duplicated) |
 | `SKIPPED_NO_REPLAY_INFO` | permanent | `replayCluster`/`replaySalt` null (OpenDota has no replay data, private or very old match) | never queued; re-evaluated if a later OpenDota refetch fills the salt |
 | `SKIPPED_NOT_SUPPORTED` | permanent | game mode outside the supported set | - |
 | `SKIPPED_NOT_PLAYED` | permanent | match never started or ended in pre-game (see 3c.3) | - |
@@ -281,7 +281,8 @@ transient (retried with a cap):
 | `FAILED_IDENTITY` | permanent | replay does not belong to the match (see 3c.3) | no rows written; logged at WARN |
 | `FAILED_PARSER` | retried on new `parserVersion` | Clarity throws, unknown entity or field layout (new game patch) | not retried with the same version |
 | `FAILED_DOWNLOAD` | transient | timeout, 5xx, 403, connection reset, truncated or corrupt file | retry with backoff, capped by `max-attempts` (default 5, backoff 1 h doubling); then it stays failed |
-| `FAILED_RESOURCE` | transient, capped | out of memory, disk full, parse timeout | retried at most `max-attempts`; the message names the limit that was hit |
+| `FAILED_RESOURCE` | transient, capped | out of memory, a native library that cannot load, disk full | retried at most `max-attempts`; stops the current batch because the next replay would likely fail the same way |
+| `FAILED_TIMEOUT` | transient, capped | the parse passed `max-parse-seconds`, counted from the start of parsing and not the download | retried at most `max-attempts`; does not stop the batch, because one bad replay says nothing about the host |
 | `RUNNING` | transient | in progress | lease (3c.5) |
 
 **3c.2 Download and file integrity.**
@@ -324,7 +325,7 @@ transient (retried with a cap):
 - Sampling degrades before failing: past `reduced-sampling-after-min` (default 80), position tracks drop from 5 s to
   10 s and the step is stored in `ReplayPlayerTrackDomain.stepSec`, so readers do not assume 5 s.
 - Parse timeout `max-parse-seconds` (default 120): the parse runs on its own thread and the Clarity run checks
-  a cancel flag every tick batch, so a stuck parse ends as `FAILED_RESOURCE` and frees the semaphore.
+  a cancel flag every tick batch, so a stuck parse ends as `FAILED_TIMEOUT` and frees the semaphore.
 - `OutOfMemoryError` is caught at the run boundary only, the facts are released, `FAILED_RESOURCE` is stored, and the
   job stops the current run (a following replay would likely fail the same way). Free disk space is checked before
   the download; `temp-dir` is cleaned at startup and after every run (`finally`).
