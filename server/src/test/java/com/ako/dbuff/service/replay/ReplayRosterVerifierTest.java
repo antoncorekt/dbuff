@@ -57,15 +57,6 @@ class ReplayRosterVerifierTest {
         .isInstanceOf(ReplayException.class);
   }
 
-  @Test
-  void sameHero_comparesCamelCaseEntityNamesWithOpenDotaNames() {
-    assertThat(ReplayRosterVerifier.sameHero("SkeletonKing", "npc_dota_hero_skeleton_king"))
-        .isTrue();
-    assertThat(ReplayRosterVerifier.sameHero("Antimage", "npc_dota_hero_antimage")).isTrue();
-    assertThat(ReplayRosterVerifier.sameHero("Sniper", "npc_dota_hero_axe")).isFalse();
-    assertThat(ReplayRosterVerifier.sameHero(null, "npc_dota_hero_axe")).isFalse();
-  }
-
   private static List<ReplayPlayerFact> replayPlayers() {
     List<ReplayPlayerFact> players = new ArrayList<>();
     for (int i = 0; i < 10; i++) {

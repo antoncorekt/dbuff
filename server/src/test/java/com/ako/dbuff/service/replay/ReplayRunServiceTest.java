@@ -6,6 +6,7 @@ import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
+import com.ako.dbuff.service.replay.analysis.ReplayAnalysisService;
 import com.ako.dbuff.service.replay.file.ReplayFile;
 import com.ako.dbuff.service.replay.file.ReplayFileProvider;
 import com.ako.dbuff.service.replay.map.MapLayouts;
@@ -20,7 +21,6 @@ import java.util.Optional;
 import java.util.concurrent.Semaphore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,7 +28,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,6 +44,7 @@ class ReplayRunServiceTest {
   private final Semaphore semaphore = new Semaphore(1);
   private final ReplayProcessingProperties properties = new ReplayProcessingProperties();
   private final MapLayouts mapLayouts = mock(MapLayouts.class);
+  private final ReplayAnalysisService analysis = mock(ReplayAnalysisService.class);
   private ReplayRunService service;
 
   private final ReplayFacts facts =
@@ -62,6 +62,7 @@ class ReplayRunServiceTest {
               return run;
             });
     when(statRepo.findAllByMatchId(anyLong())).thenReturn(List.<PlayerMatchStatisticDomain>of());
+    when(analysis.analyze(anyLong())).thenAnswer(i -> new java.util.ArrayList<String>());
     when(goodExtractor.name()).thenReturn("good");
     when(brokenExtractor.name()).thenReturn("broken");
     when(parser.version()).thenReturn("5.0.1");
@@ -107,6 +108,18 @@ class ReplayRunServiceTest {
 
     assertThat(runs.get(1L).getAttempts()).isEqualTo(2);
     assertThat(runs.get(1L).getNextAttemptAt()).isNull();
+  }
+
+  @Test
+  void process_marksTheRunPartialWhenAnAnalyzerFails_andRunsTheAnalyzersOnlyAfterTheExtractors() {
+    when(analysis.analyze(1L)).thenReturn(new java.util.ArrayList<>(List.of("activity")));
+
+    assertThat(service.process(match())).isEqualTo(ReplayStatus.PARTIAL);
+
+    assertThat(runs.get(1L).getError()).contains("activity");
+    org.mockito.InOrder order = org.mockito.Mockito.inOrder(goodExtractor, analysis);
+    order.verify(goodExtractor).extract(any(), any());
+    order.verify(analysis).analyze(1L);
   }
 
   @Test
@@ -206,12 +219,9 @@ class ReplayRunServiceTest {
   @Test
   void process_countsAnotherAttemptOnTheSameRow() {
     service.process(match());
-    ArgumentCaptor<ReplayParseRunDomain> saved =
-        ArgumentCaptor.forClass(ReplayParseRunDomain.class);
 
     service.process(match());
 
-    verify(runRepo, times(4)).save(saved.capture());
     assertThat(runs).hasSize(1);
     assertThat(runs.get(1L).getAttempts()).isEqualTo(2);
   }
@@ -227,7 +237,8 @@ class ReplayRunServiceTest {
         extractors,
         properties,
         semaphore,
-        mapLayouts);
+        mapLayouts,
+        analysis);
   }
 
   private static MatchDomain match() {

@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
+import com.ako.dbuff.service.replay.analysis.ReplayAnalysisService;
 import com.ako.dbuff.service.replay.file.ReplayFile;
 import com.ako.dbuff.service.replay.file.ReplayFileProvider;
 import com.ako.dbuff.service.replay.map.MapLayouts;
@@ -37,6 +38,7 @@ public class ReplayRunService {
   private final ReplayProcessingProperties properties;
   private final Semaphore parseSemaphore;
   private final MapLayouts mapLayouts;
+  private final ReplayAnalysisService analysis;
 
   public ReplayRunService(
       ReplayParseRunRepo runRepo,
@@ -48,7 +50,8 @@ public class ReplayRunService {
       List<ReplayExtractor> extractors,
       ReplayProcessingProperties properties,
       @Qualifier("replayParseSemaphore") Semaphore parseSemaphore,
-      MapLayouts mapLayouts) {
+      MapLayouts mapLayouts,
+      ReplayAnalysisService analysis) {
     this.runRepo = runRepo;
     this.playerStatRepo = playerStatRepo;
     this.eligibility = eligibility;
@@ -59,6 +62,7 @@ public class ReplayRunService {
     this.properties = properties;
     this.parseSemaphore = parseSemaphore;
     this.mapLayouts = mapLayouts;
+    this.analysis = analysis;
   }
 
   /**
@@ -108,6 +112,18 @@ public class ReplayRunService {
   }
 
   private ReplayStatus parse(MatchDomain match, ReplayParseRunDomain run) {
+    List<String> failed = readAndExtract(match, run);
+    failed.addAll(analysis.analyze(match.getId()));
+    if (failed.isEmpty()) {
+      return finish(run, ReplayStatus.DONE, null);
+    }
+    return fail(run, ReplayStatus.PARTIAL, "Failed: " + String.join(", ", failed));
+  }
+
+  /**
+   * Everything that needs the replay itself, so that its facts are out of reach once it returns.
+   */
+  private List<String> readAndExtract(MatchDomain match, ReplayParseRunDomain run) {
     ReplaySource source =
         new ReplaySource(match.getId(), match.getReplayCluster(), match.getReplaySalt());
     try (ReplayFile file = fileProvider.open(source)) {
@@ -122,10 +138,8 @@ public class ReplayRunService {
       run.setClarityVersion(parser.version());
       recordMapVersion(run, facts);
       run.setParseMillis((System.nanoTime() - started) / 1_000_000);
-      if (failed.isEmpty()) {
-        return finish(run, ReplayStatus.DONE, null);
-      }
-      return fail(run, ReplayStatus.PARTIAL, "Failed extractors: " + String.join(", ", failed));
+      runRepo.save(run);
+      return failed;
     }
   }
 
