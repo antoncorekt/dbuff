@@ -96,6 +96,19 @@ class ReplayRunServiceTest {
   }
 
   @Test
+  void process_triesAPartialRunAgainOnlyOnce_becauseTheCauseIsOftenPermanent() {
+    doThrow(new IllegalStateException("mapping bug")).when(brokenExtractor).extract(any(), any());
+    service = serviceWith(List.of(brokenExtractor));
+
+    service.process(match());
+    assertThat(runs.get(1L).getNextAttemptAt()).isNotNull();
+    service.process(match());
+
+    assertThat(runs.get(1L).getAttempts()).isEqualTo(2);
+    assertThat(runs.get(1L).getNextAttemptAt()).isNull();
+  }
+
+  @Test
   void process_skipsAnIneligibleMatchWithoutTouchingTheNetwork() {
     MatchDomain noLocation = match();
     noLocation.setReplaySalt(null);

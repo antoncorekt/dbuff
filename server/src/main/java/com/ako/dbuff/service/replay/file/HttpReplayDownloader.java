@@ -101,22 +101,16 @@ public class HttpReplayDownloader implements ReplayDownloader {
     }
   }
 
-  /** Counts the bytes itself, because the declared length may be missing or wrong. */
   private void copyLimited(InputStream in, Path target, ReplaySource source) throws IOException {
-    long limit = properties.getMaxReplayBytes().toBytes();
-    long total = 0;
-    byte[] buffer = new byte[64 * 1024];
     try (OutputStream out = Files.newOutputStream(target)) {
-      int read;
-      while ((read = in.read(buffer)) != -1) {
-        total += read;
-        if (total > limit) {
-          throw new ReplayException(
-              ReplayStatus.TOO_LARGE,
-              "Replay of match " + source.matchId() + " is over " + limit + " bytes");
-        }
-        out.write(buffer, 0, read);
-      }
+      LimitedCopier.copy(
+          in,
+          out,
+          properties.getMaxReplayBytes().toBytes(),
+          limit ->
+              new ReplayException(
+                  ReplayStatus.TOO_LARGE,
+                  "Replay of match " + source.matchId() + " is over " + limit + " bytes"));
     }
   }
 

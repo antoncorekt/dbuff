@@ -92,6 +92,29 @@ class CombatLogCodecTest {
   }
 
   @Test
+  void encode_refusesWhatDoesNotFitTheFormatInsteadOfCorruptingIt() {
+    CombatEvent badMask =
+        new CombatEvent(CombatEventKind.DEATH, 1, "", "", "", 0, 0, 0, 0, 0, 0, 0, 1 << 16);
+    CombatEvent badPlace =
+        new CombatEvent(CombatEventKind.GOLD, 1, "", "", "", 0, 0, 0, 0, 0, 40_000, 0, 0);
+    List<CombatEvent> tooManyNames =
+        java.util.stream.IntStream.range(0, 65_536)
+            .mapToObj(
+                i ->
+                    new CombatEvent(
+                        CombatEventKind.ABILITY, 1, "hero" + i, "", "", 0, 0, 0, 0, 0, 0, 0, 0))
+            .toList();
+
+    assertThatThrownBy(() -> CombatLogCodec.encode(List.of(badMask)))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> CombatLogCodec.encode(List.of(badPlace)))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> CombatLogCodec.encode(tooManyNames))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("names");
+  }
+
+  @Test
   void decode_refusesABlobOfAnotherVersion() throws Exception {
     ByteArrayOutputStream raw = new ByteArrayOutputStream();
     try (DataOutputStream out = new DataOutputStream(raw)) {
