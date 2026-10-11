@@ -16,6 +16,7 @@ package com.ako.dbuff.dotapi.model;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerBuybackLogInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerConnectionLogInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerCosmeticsInner;
+import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerDeathsLogInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerKillsLogInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerNeutralItemHistoryInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerNeutralTokensLogInner;
@@ -1214,6 +1215,54 @@ public class MatchResponsePlayersInnerTest {
     @Test
     public void isContributorTest() {
         // TODO: test isContributor
+    }
+
+    /**
+     * Test the property 'networthT'
+     */
+    @Test
+    public void networthTTest() {
+        // TODO: test networthT
+    }
+
+    /**
+     * Test the property 'heroDamageT'
+     */
+    @Test
+    public void heroDamageTTest() {
+        // TODO: test heroDamageT
+    }
+
+    /**
+     * Test the property 'towerDamageT'
+     */
+    @Test
+    public void towerDamageTTest() {
+        // TODO: test towerDamageT
+    }
+
+    /**
+     * Test the property 'heroHealingT'
+     */
+    @Test
+    public void heroHealingTTest() {
+        // TODO: test heroHealingT
+    }
+
+    /**
+     * Test the property 'campsStackedT'
+     */
+    @Test
+    public void campsStackedTTest() {
+        // TODO: test campsStackedT
+    }
+
+    /**
+     * Test the property 'deathsLog'
+     */
+    @Test
+    public void deathsLogTest() {
+        // TODO: test deathsLog
     }
 
 }

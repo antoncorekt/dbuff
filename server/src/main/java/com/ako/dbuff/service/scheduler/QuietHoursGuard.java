@@ -4,6 +4,7 @@ import com.ako.dbuff.config.QuietHoursProperties;
 import com.ako.dbuff.dao.model.InstanceSettings;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -27,6 +28,11 @@ public class QuietHoursGuard {
    */
   public boolean isQuietTime(InstanceSettings settings) {
     return isQuietTime(settings, Instant.now());
+  }
+
+  /** For jobs that belong to no channel, so only the server-wide window applies. */
+  public boolean isServerQuietTime() {
+    return isQuietTime(LocalTime.now(ZoneId.systemDefault()));
   }
 
   boolean isQuietTime(InstanceSettings settings, Instant moment) {

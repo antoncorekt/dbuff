@@ -8,6 +8,7 @@ import com.ako.dbuff.dao.repo.KillLogRepo;
 import com.ako.dbuff.dao.repo.MatchAnalysisRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
+import com.ako.dbuff.service.match.data.MatchDetailService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class MatchDeletionService {
   private final AbilityRepo abilityRepo;
   private final KillLogRepo killLogRepo;
   private final MatchAnalysisRepo matchAnalysisRepo;
+  private final MatchDetailService matchDetailService;
 
   /**
    * Deletes a match and all related data.
@@ -65,6 +67,9 @@ public class MatchDeletionService {
     // Delete kill logs associated with the match
     log.debug("Deleting kill logs for match {}", matchId);
     killLogRepo.deleteByMatchId(matchId);
+
+    log.debug("Deleting match detail data for match {}", matchId);
+    matchDetailService.deleteByMatchId(matchId);
 
     // Delete player statistics associated with the match
     log.debug("Deleting player statistics for match {}", matchId);

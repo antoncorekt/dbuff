@@ -3667,17 +3667,17 @@ components:
         series_type: 7
         barracks_status_radiant: 6
         radiant_team: "{}"
-        comeback: 9
+        comeback: 6
         cosmetics:
           key: 7
         duration: 1
-        patch: 4
-        loss: 9
+        patch: 0
+        loss: 2
         pauses:
-        - duration: 0
-          time: 6
-        - duration: 0
-          time: 6
+        - duration: 3
+          time: 2
+        - duration: 3
+          time: 2
         radiant_win: true
         radiant_xp_adv:
         - 2.8841621266687802
@@ -3695,7 +3695,7 @@ components:
           team: 9
           is_pick: true
           order: 6
-        win: 7
+        win: 4
         dire_team: "{}"
         replay_url: replay_url
         tower_status_radiant: 5
@@ -3716,12 +3716,18 @@ components:
             key: 5
           observer_kills: 1
           purchase_tpscroll: 7
+          camps_stacked_t:
+          - 9
+          - 9
           obs_log:
           - "{}"
           - "{}"
           lane_role: 7
           observer_uses: 5
           patch: 4
+          hero_healing_t:
+          - 9
+          - 9
           neutral_kills: 6
           roshan_kills: 5
           item_uses: "{}"
@@ -3762,6 +3768,9 @@ components:
           gold_t:
           - 9
           - 9
+          networth_t:
+          - 4
+          - 4
           first_purchase_time: "{}"
           additional_units:
           - "{}"
@@ -3775,6 +3784,9 @@ components:
             key: key
           - time: 8
             key: key
+          hero_damage_t:
+          - 0
+          - 0
           team_number: 0
           purchase_time: "{}"
           sen: "{}"
@@ -3845,6 +3857,17 @@ components:
           kills: 2
           hero_damage: 0
           tower_kills: 4
+          deaths_log:
+          - gold_fed: 0
+            time: 7
+            gold_lost: 6
+            key: key
+            time_dead: 4
+          - gold_fed: 0
+            time: 7
+            gold_lost: 6
+            key: key
+            time_dead: 4
           backpack_1: 7
           damage_targets: "{}"
           backpack_2: 3
@@ -3914,6 +3937,9 @@ components:
           aghanims_scepter: 2
           purchase: "{}"
           lobby_type: 3
+          tower_damage_t:
+          - 0
+          - 0
           ability_targets: "{}"
           killed: "{}"
           sen_placed: 7
@@ -3944,12 +3970,18 @@ components:
             key: 5
           observer_kills: 1
           purchase_tpscroll: 7
+          camps_stacked_t:
+          - 9
+          - 9
           obs_log:
           - "{}"
           - "{}"
           lane_role: 7
           observer_uses: 5
           patch: 4
+          hero_healing_t:
+          - 9
+          - 9
           neutral_kills: 6
           roshan_kills: 5
           item_uses: "{}"
@@ -3990,6 +4022,9 @@ components:
           gold_t:
           - 9
           - 9
+          networth_t:
+          - 4
+          - 4
           first_purchase_time: "{}"
           additional_units:
           - "{}"
@@ -4003,6 +4038,9 @@ components:
             key: key
           - time: 8
             key: key
+          hero_damage_t:
+          - 0
+          - 0
           team_number: 0
           purchase_time: "{}"
           sen: "{}"
@@ -4073,6 +4111,17 @@ components:
           kills: 2
           hero_damage: 0
           tower_kills: 4
+          deaths_log:
+          - gold_fed: 0
+            time: 7
+            gold_lost: 6
+            key: key
+            time_dead: 4
+          - gold_fed: 0
+            time: 7
+            gold_lost: 6
+            key: key
+            time_dead: 4
           backpack_1: 7
           damage_targets: "{}"
           backpack_2: 3
@@ -4142,6 +4191,9 @@ components:
           aghanims_scepter: 2
           purchase: "{}"
           lobby_type: 3
+          tower_damage_t:
+          - 0
+          - 0
           ability_targets: "{}"
           killed: "{}"
           sen_placed: 7
@@ -4180,7 +4232,7 @@ components:
           total_time_taken: 1
           order: 3
           extra_time: 1
-        throw: 0
+        throw: 1
         od_data:
           has_parsed: true
           has_api: true
@@ -4207,7 +4259,7 @@ components:
         - "{}"
         - "{}"
         barracks_status_dire: 0
-        region: 0
+        region: 7
         radiant_gold_adv:
         - 6.965117697638846
         - 6.965117697638846
@@ -5999,6 +6051,30 @@ components:
           description: Neutral enhancement name
           type: string
       type: object
+    MatchResponse_players_inner_deaths_log_inner:
+      example:
+        gold_fed: 0
+        time: 7
+        gold_lost: 6
+        key: key
+        time_dead: 4
+      properties:
+        time:
+          description: Time in seconds the player died
+          type: integer
+        key:
+          description: Hero that killed the player
+          type: string
+        gold_lost:
+          description: Gold lost on death
+          type: integer
+        gold_fed:
+          description: Gold the killers earned
+          type: integer
+        time_dead:
+          description: Seconds spent dead
+          type: integer
+      type: object
     MatchResponse_players_inner:
       description: player
       example:
@@ -6015,12 +6091,18 @@ components:
           key: 5
         observer_kills: 1
         purchase_tpscroll: 7
+        camps_stacked_t:
+        - 9
+        - 9
         obs_log:
         - "{}"
         - "{}"
         lane_role: 7
         observer_uses: 5
         patch: 4
+        hero_healing_t:
+        - 9
+        - 9
         neutral_kills: 6
         roshan_kills: 5
         item_uses: "{}"
@@ -6061,6 +6143,9 @@ components:
         gold_t:
         - 9
         - 9
+        networth_t:
+        - 4
+        - 4
         first_purchase_time: "{}"
         additional_units:
         - "{}"
@@ -6074,6 +6159,9 @@ components:
           key: key
         - time: 8
           key: key
+        hero_damage_t:
+        - 0
+        - 0
         team_number: 0
         purchase_time: "{}"
         sen: "{}"
@@ -6144,6 +6232,17 @@ components:
         kills: 2
         hero_damage: 0
         tower_kills: 4
+        deaths_log:
+        - gold_fed: 0
+          time: 7
+          gold_lost: 6
+          key: key
+          time_dead: 4
+        - gold_fed: 0
+          time: 7
+          gold_lost: 6
+          key: key
+          time_dead: 4
         backpack_1: 7
         damage_targets: "{}"
         backpack_2: 3
@@ -6213,6 +6312,9 @@ components:
         aghanims_scepter: 2
         purchase: "{}"
         lobby_type: 3
+        tower_damage_t:
+        - 0
+        - 0
         ability_targets: "{}"
         killed: "{}"
         sen_placed: 7
@@ -6757,11 +6859,41 @@ components:
         is_contributor:
           description: Whether the player is a contributor
           type: boolean
+        networth_t:
+          description: Net worth at each minute
+          items:
+            type: integer
+          type: array
+        hero_damage_t:
+          description: Cumulative hero damage at each minute
+          items:
+            type: integer
+          type: array
+        tower_damage_t:
+          description: Cumulative tower damage at each minute
+          items:
+            type: integer
+          type: array
+        hero_healing_t:
+          description: Cumulative hero healing at each minute
+          items:
+            type: integer
+          type: array
+        camps_stacked_t:
+          description: Camps stacked at each minute
+          items:
+            type: integer
+          type: array
+        deaths_log:
+          description: Array containing information on each death of the player
+          items:
+            $ref: "#/components/schemas/MatchResponse_players_inner_deaths_log_inner"
+          type: array
       type: object
     MatchResponse_pauses_inner:
       example:
-        duration: 0
-        time: 6
+        duration: 3
+        time: 2
       properties:
         time:
           description: Time in seconds at which pause started

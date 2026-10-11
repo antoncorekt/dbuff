@@ -13,6 +13,7 @@ import com.ako.dbuff.service.constant.data.MatchTypeConstant;
 import com.ako.dbuff.service.constant.data.PatchConstant;
 import com.ako.dbuff.service.details.DotabuffBuildDetailsParser;
 import com.ako.dbuff.service.details.ScrapperService;
+import com.ako.dbuff.service.match.data.MatchDetailService;
 import com.ako.dbuff.service.match.mapper.PlayersMapper.PlayerHeroInfo;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -41,6 +42,7 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
   private final ScrapperService dotaBuffMatchDetailsScrapper;
   private final DotabuffBuildDetailsParser dotabuffBuildDetailsParser;
   private final ScrapperApiService scrapperApiService;
+  private final MatchDetailService matchDetailService;
 
   private final Cache<Long, Document> scrappedDotabufPage = Caffeine.newBuilder().build();
 
@@ -70,6 +72,7 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
 
     players.forEach(player -> playersMapper.handle(matchDomain, player, heroToPlayerMap));
 
+    storeDetails(matchResponse, matchDomain);
     matchRepo.save(matchDomain);
 
     checkAndScrapeAdditionalData(matchDomain);
@@ -146,6 +149,23 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
     matchDomain.setRadiantWin(radiantWin);
     matchDomain.setRadiantScore(matchResponse.getRadiantScore());
     matchDomain.setDireScore(matchResponse.getDireScore());
+  }
+
+  /**
+   * The detail rows are supplementary: when they cannot be stored the match is still processed, and
+   * the backfill retries them because the match stays without {@code detailsMappedAt}.
+   */
+  private void storeDetails(MatchResponse matchResponse, MatchDomain matchDomain) {
+    try {
+      matchDetailService.replace(matchResponse, matchDomain);
+    } catch (RuntimeException e) {
+      log.error(
+          "{} Could not store detail rows for match {}: {}",
+          ProcessContext.getContextString(),
+          matchDomain.getId(),
+          e.getMessage(),
+          e);
+    }
   }
 
   private void checkAndScrapeAdditionalData(MatchDomain matchDomain) {

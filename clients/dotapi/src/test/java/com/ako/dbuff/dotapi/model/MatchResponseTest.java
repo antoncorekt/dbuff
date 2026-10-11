@@ -15,6 +15,7 @@ package com.ako.dbuff.dotapi.model;
 
 import com.ako.dbuff.dotapi.model.MatchResponseChatInner;
 import com.ako.dbuff.dotapi.model.MatchResponseDraftTimingsInner;
+import com.ako.dbuff.dotapi.model.MatchResponseOdData;
 import com.ako.dbuff.dotapi.model.MatchResponsePausesInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePicksBansInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInner;
@@ -426,6 +427,14 @@ public class MatchResponseTest {
     @Test
     public void pausesTest() {
         // TODO: test pauses
+    }
+
+    /**
+     * Test the property 'odData'
+     */
+    @Test
+    public void odDataTest() {
+        // TODO: test odData
     }
 
 }

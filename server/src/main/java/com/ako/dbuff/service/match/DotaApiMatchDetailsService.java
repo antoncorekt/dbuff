@@ -19,14 +19,19 @@ public class DotaApiMatchDetailsService {
   private final RateLimiter dotaApiRateLimiter;
   private final MatchesApi matchesApi;
 
+  /** One rate-limited request, leaving retry policy to the caller. */
+  public MatchResponse fetchOnce(long matchId) throws ApiException {
+    dotaApiRateLimiter.acquire();
+    return matchesApi.getMatchesByMatchId(matchId);
+  }
+
   public MatchResponse fetchMatchDetails(long matchId) {
     ApiException lastException = null;
 
     for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
-        dotaApiRateLimiter.acquire();
         log.info("Fetching match {} (attempt {})", matchId, attempt + 1);
-        MatchResponse response = matchesApi.getMatchesByMatchId(matchId);
+        MatchResponse response = fetchOnce(matchId);
         log.info("Finished fetching match {}", matchId);
         return response;
       } catch (ApiException e) {

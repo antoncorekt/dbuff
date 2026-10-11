@@ -36,6 +36,11 @@ class QuietHoursGuardTest {
   }
 
   @Test
+  void serverWideCheck_isNeverQuietWhenDisabled() {
+    assertThat(guard(false, LocalTime.MIN, LocalTime.MAX).isServerQuietTime()).isFalse();
+  }
+
+  @Test
   void disabled_isNeverQuiet() {
     QuietHoursGuard guard = guard(false, LocalTime.of(1, 0), LocalTime.of(9, 0));
 

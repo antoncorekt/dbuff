@@ -1,0 +1,791 @@
+{
+ "match_id": 9038725154,
+ "duration": 2307,
+ "cluster": 191,
+ "replay_salt": 496163112,
+ "od_data": {
+  "has_api": true,
+  "has_gcdata": true,
+  "has_parsed": true,
+  "has_archive": false
+ },
+ "radiant_gold_adv": [
+  0,
+  -272,
+  -22,
+  599,
+  158
+ ],
+ "radiant_xp_adv": [
+  0,
+  -12,
+  188,
+  250,
+  -207
+ ],
+ "picks_bans": [],
+ "teamfights": [
+  {
+   "start": 127,
+   "end": 169,
+   "last_death": 154,
+   "deaths": 3,
+   "players": [
+    {
+     "deaths_pos": {},
+     "ability_uses": {},
+     "ability_targets": {},
+     "item_uses": {
+      "tango": 1
+     },
+     "killed": {},
+     "deaths": 0,
+     "buybacks": 0,
+     "damage": 388,
+     "healing": 233,
+     "gold_delta": 338,
+     "xp_delta": 240,
+     "xp_start": 310,
+     "xp_end": 550
+    },
+    {
+     "deaths_pos": {},
+     "ability_uses": {
+      "sniper_shrapnel": 1
+     },
+     "ability_targets": {},
+     "item_uses": {
+      "tango": 1,
+      "branches": 1
+     },
+     "killed": {},
+     "deaths": 0,
+     "buybacks": 0,
+     "damage": 198,
+     "healing": 386,
+     "gold_delta": 129,
+     "xp_delta": 186,
+     "xp_start": 896,
+     "xp_end": 1082
+    },
+    {
+     "deaths_pos": {},
+     "ability_uses": {
+      "venomancer_snakebite": 1,
+      "jakiro_ice_path": 1,
+      "ability_lamp_use": 1
+     },
+     "ability_targets": {},
+     "item_uses": {
+      "tango": 1,
+      "blood_grenade": 1,
+      "magic_wand": 1
+     },
+     "killed": {},
+     "deaths": 0,
+     "buybacks": 0,
+     "damage": 591,
+     "healing": 270,
+     "gold_delta": 266,
+     "xp_delta": 240,
+     "xp_start": 188,
+     "xp_end": 428
+    }
+   ]
+  },
+  {
+   "start": 365,
+   "end": 397,
+   "last_death": 382,
+   "deaths": 3,
+   "players": [
+    {
+     "deaths_pos": {},
+     "ability_uses": {
+      "terrorblade_conjure_image": 1
+     },
+     "ability_targets": {},
+     "item_uses": {},
+     "killed": {},
+     "deaths": 0,
+     "buybacks": 0,
+     "damage": 377,
+     "healing": 411,
+     "gold_delta": 91,
+     "xp_delta": 245,
+     "xp_start": 1351,
+     "xp_end": 1596
+    },
+    {
+     "deaths_pos": {
+      "120": {
+       "114": 1
+      }
+     },
+     "ability_uses": {
+      "terrorblade_sunder": 1,
+      "sniper_shrapnel": 1
+     },
+     "ability_targets": {},
+     "item_uses": {
+      "bottle": 3
+     },
+     "killed": {},
+     "deaths": 1,
+     "buybacks": 0,
+     "damage": 1050,
+     "healing": 604,
+     "gold_delta": 246,
+     "xp_delta": 138,
+     "xp_start": 2791,
+     "xp_end": 2929
+    },
+    {
+     "deaths_pos": {
+      "76": {
+       "147": 1
+      }
+     },
+     "ability_uses": {
+      "jakiro_ice_path": 1,
+      "rattletrap_battery_assault": 1
+     },
+     "ability_targets": {},
+     "item_uses": {
+      "magic_wand": 1
+     },
+     "killed": {},
+     "deaths": 1,
+     "buybacks": 0,
+     "damage": 191,
+     "healing": 117,
+     "gold_delta": -38,
+     "xp_delta": 62,
+     "xp_start": 1319,
+     "xp_end": 1381
+    }
+   ]
+  }
+ ],
+ "objectives": [
+  {
+   "time": 3,
+   "type": "CHAT_MESSAGE_FIRSTBLOOD",
+   "key": "9",
+   "slot": 1,
+   "player_slot": 1,
+   "victim_player_slot": 132
+  },
+  {
+   "time": 502,
+   "type": "building_kill",
+   "unit": "npc_dota_goodguys_siege",
+   "key": "npc_dota_badguys_tower1_top"
+  },
+  {
+   "time": 718,
+   "type": "CHAT_MESSAGE_COURIER_LOST",
+   "team": 2,
+   "value": 50,
+   "killer": 131
+  },
+  {
+   "time": 753,
+   "type": "CHAT_MESSAGE_COURIER_LOST",
+   "team": 2,
+   "value": 50,
+   "killer": 131
+  },
+  {
+   "time": 760,
+   "type": "building_kill",
+   "unit": "npc_dota_creep_badguys_melee",
+   "key": "npc_dota_goodguys_tower1_mid"
+  }
+ ],
+ "players": [
+  {
+   "player_slot": 0,
+   "account_id": 149113137,
+   "hero_id": 35,
+   "ability_upgrades_arr": [
+    5246,
+    5156,
+    5156,
+    5620,
+    5156
+   ],
+   "gold_t": [
+    0,
+    193,
+    406,
+    918,
+    1095
+   ],
+   "xp_t": [
+    0,
+    133,
+    310,
+    580,
+    808
+   ],
+   "lh_t": [
+    0,
+    1,
+    4,
+    7,
+    9
+   ],
+   "dn_t": [
+    0,
+    1,
+    1,
+    2,
+    3
+   ],
+   "networth_t": [
+    600,
+    793,
+    946,
+    1428,
+    1566
+   ],
+   "hero_damage_t": [
+    385,
+    787,
+    1092,
+    1480,
+    1646
+   ],
+   "tower_damage_t": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "hero_healing_t": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "camps_stacked_t": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "purchase_log": [
+    {
+     "time": -89,
+     "key": "tango"
+    },
+    {
+     "time": -89,
+     "key": "wraith_band"
+    },
+    {
+     "time": 149,
+     "key": "boots"
+    },
+    {
+     "time": 239,
+     "key": "boots_of_elves"
+    },
+    {
+     "time": 301,
+     "key": "gloves"
+    }
+   ],
+   "deaths_log": [
+    {
+     "gold_fed": 285,
+     "time": 233,
+     "gold_lost": 39,
+     "key": "npc_dota_hero_terrorblade",
+     "time_dead": 18
+    },
+    {
+     "gold_fed": 403,
+     "time": 664,
+     "gold_lost": 81,
+     "key": "npc_dota_hero_terrorblade",
+     "time_dead": 28
+    },
+    {
+     "gold_fed": 389,
+     "time": 820,
+     "gold_lost": 103,
+     "key": "npc_dota_hero_jakiro",
+     "time_dead": 30
+    },
+    {
+     "gold_fed": 409,
+     "time": 904,
+     "gold_lost": 109,
+     "key": "npc_dota_hero_sven",
+     "time_dead": 32
+    },
+    {
+     "gold_fed": 434,
+     "time": 969,
+     "gold_lost": 118,
+     "key": "npc_dota_hero_jakiro",
+     "time_dead": 32
+    }
+   ],
+   "damage_targets": {
+    "null": {
+     "npc_dota_hero_venomancer": 3268,
+     "npc_dota_hero_terrorblade": 7309,
+     "npc_dota_hero_sniper": 359,
+     "npc_dota_hero_furion": 7215,
+     "npc_dota_hero_sven": 6004,
+     "npc_dota_hero_jakiro": 6093
+    },
+    "maelstrom": {
+     "npc_dota_hero_venomancer": 155,
+     "npc_dota_hero_terrorblade": 577,
+     "npc_dota_hero_furion": 927,
+     "npc_dota_hero_sven": 380,
+     "npc_dota_hero_jakiro": 338
+    },
+    "sniper_assassinate": {
+     "npc_dota_hero_sven": 540
+    },
+    "mjollnir": {
+     "npc_dota_hero_venomancer": 546,
+     "npc_dota_hero_terrorblade": 255
+    },
+    "dust": {
+     "npc_dota_hero_terrorblade": 86
+    }
+   },
+   "ability_targets": {
+    "oracle_false_promise": {
+     "npc_dota_hero_phantom_assassin": 3,
+     "npc_dota_hero_sniper": 6,
+     "npc_dota_hero_death_prophet": 1
+    }
+   }
+  },
+  {
+   "player_slot": 1,
+   "account_id": 386813493,
+   "hero_id": 58,
+   "ability_upgrades_arr": [
+    5270,
+    5154,
+    5270,
+    5154,
+    5270
+   ],
+   "gold_t": [
+    0,
+    534,
+    928,
+    1184,
+    1552
+   ],
+   "xp_t": [
+    0,
+    253,
+    896,
+    1139,
+    1593
+   ],
+   "lh_t": [
+    0,
+    4,
+    10,
+    13,
+    19
+   ],
+   "dn_t": [
+    0,
+    2,
+    2,
+    3,
+    3
+   ],
+   "networth_t": [
+    600,
+    1084,
+    1448,
+    1619,
+    1987
+   ],
+   "hero_damage_t": [
+    424,
+    576,
+    842,
+    1187,
+    1858
+   ],
+   "tower_damage_t": [
+    0,
+    0,
+    18,
+    18,
+    18
+   ],
+   "hero_healing_t": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "camps_stacked_t": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "purchase_log": [
+    {
+     "time": -75,
+     "key": "ward_observer"
+    },
+    {
+     "time": -75,
+     "key": "ward_sentry"
+    },
+    {
+     "time": -64,
+     "key": "tango"
+    },
+    {
+     "time": -63,
+     "key": "circlet"
+    },
+    {
+     "time": -63,
+     "key": "mantle"
+    }
+   ],
+   "deaths_log": [
+    {
+     "gold_fed": 415,
+     "time": 382,
+     "gold_lost": 79,
+     "key": "npc_dota_hero_jakiro",
+     "time_dead": 27
+    },
+    {
+     "gold_fed": 460,
+     "time": 512,
+     "gold_lost": 111,
+     "key": "npc_dota_hero_furion",
+     "time_dead": 28
+    },
+    {
+     "gold_fed": 521,
+     "time": 660,
+     "gold_lost": 135,
+     "key": "npc_dota_hero_sven",
+     "time_dead": 32
+    },
+    {
+     "gold_fed": 455,
+     "time": 749,
+     "gold_lost": 145,
+     "key": "npc_dota_hero_furion",
+     "time_dead": 32
+    },
+    {
+     "gold_fed": 844,
+     "time": 1319,
+     "gold_lost": 295,
+     "key": "npc_dota_hero_terrorblade",
+     "time_dead": 48
+    }
+   ],
+   "damage_targets": {
+    "terrorblade_sunder": {
+     "npc_dota_hero_sniper": 425,
+     "npc_dota_hero_death_prophet": 1044,
+     "npc_dota_hero_furion": 1167,
+     "npc_dota_hero_sven": 276,
+     "npc_dota_hero_jakiro": 3881
+    },
+    "witch_blade": {
+     "npc_dota_hero_venomancer": 529,
+     "npc_dota_hero_terrorblade": 390,
+     "npc_dota_hero_furion": 730,
+     "npc_dota_hero_sven": 260,
+     "npc_dota_hero_jakiro": 240
+    },
+    "sniper_shrapnel": {
+     "npc_dota_hero_venomancer": 1037,
+     "npc_dota_hero_terrorblade": 1355,
+     "npc_dota_hero_furion": 1030,
+     "npc_dota_hero_sven": 1126,
+     "npc_dota_hero_jakiro": 1803
+    },
+    "null": {
+     "npc_dota_hero_enchantress": 401,
+     "npc_dota_hero_venomancer": 1247,
+     "npc_dota_hero_terrorblade": 1749,
+     "npc_dota_hero_furion": 3146,
+     "npc_dota_hero_sven": 3143,
+     "npc_dota_hero_jakiro": 2688
+    },
+    "enchantress_impetus": {
+     "npc_dota_hero_venomancer": 1823,
+     "npc_dota_hero_terrorblade": 3762,
+     "npc_dota_hero_furion": 4253,
+     "npc_dota_hero_sven": 4559,
+     "npc_dota_hero_jakiro": 1694
+    },
+    "furion_sprout": {
+     "npc_dota_hero_furion": 159
+    },
+    "sniper_assassinate": {
+     "npc_dota_hero_sven": 465
+    },
+    "bloodthorn": {
+     "npc_dota_hero_jakiro": 218
+    },
+    "devastator": {
+     "npc_dota_hero_terrorblade": 468,
+     "npc_dota_hero_furion": 456,
+     "npc_dota_hero_sven": 246
+    },
+    "phantom_assassin_stifling_dagger": {
+     "npc_dota_hero_venomancer": 101
+    },
+    "terrorblade_demon_zeal": {
+     "npc_dota_hero_enchantress": 3372
+    },
+    "sven_storm_bolt": {
+     "npc_dota_hero_sven": 221
+    }
+   },
+   "ability_targets": {
+    "terrorblade_sunder": {
+     "npc_dota_hero_sniper": 1,
+     "npc_dota_hero_death_prophet": 1,
+     "npc_dota_hero_furion": 3,
+     "npc_dota_hero_sven": 1,
+     "npc_dota_hero_jakiro": 5
+    }
+   }
+  },
+  {
+   "player_slot": 2,
+   "account_id": null,
+   "hero_id": 32,
+   "ability_upgrades_arr": [
+    5298,
+    1749,
+    5237,
+    5237,
+    5237
+   ],
+   "gold_t": [
+    0,
+    159,
+    249,
+    654,
+    783
+   ],
+   "xp_t": [
+    0,
+    48,
+    188,
+    458,
+    743
+   ],
+   "lh_t": [
+    0,
+    0,
+    1,
+    1,
+    2
+   ],
+   "dn_t": [
+    0,
+    0,
+    0,
+    0,
+    1
+   ],
+   "networth_t": [
+    600,
+    743,
+    693,
+    1018,
+    1087
+   ],
+   "hero_damage_t": [
+    148,
+    148,
+    148,
+    664,
+    851
+   ],
+   "tower_damage_t": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "hero_healing_t": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "camps_stacked_t": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "purchase_log": [
+    {
+     "time": -89,
+     "key": "tango"
+    },
+    {
+     "time": -89,
+     "key": "magic_stick"
+    },
+    {
+     "time": -89,
+     "key": "branches"
+    },
+    {
+     "time": -89,
+     "key": "branches"
+    },
+    {
+     "time": -89,
+     "key": "blood_grenade"
+    }
+   ],
+   "deaths_log": [
+    {
+     "gold_fed": 247,
+     "time": 11,
+     "gold_lost": 16,
+     "key": "npc_dota_hero_terrorblade",
+     "time_dead": 12
+    },
+    {
+     "gold_fed": 301,
+     "time": 380,
+     "gold_lost": 38,
+     "key": "npc_dota_hero_terrorblade",
+     "time_dead": 21
+    },
+    {
+     "gold_fed": 307,
+     "time": 466,
+     "gold_lost": 41,
+     "key": "npc_dota_hero_sven",
+     "time_dead": 24
+    },
+    {
+     "gold_fed": 323,
+     "time": 527,
+     "gold_lost": 52,
+     "key": "npc_dota_hero_jakiro",
+     "time_dead": 24
+    },
+    {
+     "gold_fed": 377,
+     "time": 672,
+     "gold_lost": 63,
+     "key": "npc_dota_hero_terrorblade",
+     "time_dead": 26
+    }
+   ],
+   "damage_targets": {
+    "venomancer_snakebite": {
+     "npc_dota_hero_terrorblade": 742,
+     "npc_dota_hero_furion": 622,
+     "npc_dota_hero_sven": 1649,
+     "npc_dota_hero_jakiro": 398
+    },
+    "jakiro_ice_path": {
+     "npc_dota_hero_venomancer": 37,
+     "npc_dota_hero_terrorblade": 427,
+     "npc_dota_hero_furion": 171,
+     "npc_dota_hero_sven": 544,
+     "npc_dota_hero_jakiro": 202
+    },
+    "null": {
+     "npc_dota_hero_terrorblade": 654,
+     "npc_dota_hero_furion": 241,
+     "npc_dota_hero_sven": 590,
+     "npc_dota_hero_jakiro": 246
+    },
+    "sniper_assassinate": {
+     "npc_dota_hero_sven": 319
+    },
+    "venomancer_noxious_plague": {
+     "npc_dota_hero_terrorblade": 672,
+     "npc_dota_hero_furion": 1031,
+     "npc_dota_hero_sven": 800,
+     "npc_dota_hero_jakiro": 377
+    },
+    "chipped_vest": {
+     "npc_dota_hero_terrorblade": 67,
+     "npc_dota_hero_sven": 19
+    },
+    "urn_of_shadows": {
+     "npc_dota_hero_terrorblade": 172,
+     "npc_dota_hero_furion": 178,
+     "npc_dota_hero_sven": 476,
+     "npc_dota_hero_jakiro": 164
+    },
+    "blood_grenade": {
+     "npc_dota_hero_riki": 75,
+     "npc_dota_hero_terrorblade": 92,
+     "npc_dota_hero_sven": 48
+    },
+    "phantom_assassin_stifling_dagger": {
+     "npc_dota_hero_venomancer": 121
+    },
+    "rattletrap_battery_assault": {
+     "npc_dota_hero_terrorblade": 1167,
+     "npc_dota_hero_furion": 662,
+     "npc_dota_hero_sven": 1037,
+     "npc_dota_hero_jakiro": 253
+    },
+    "dust": {
+     "npc_dota_hero_terrorblade": 69
+    },
+    "riki_innate_backstab": {
+     "npc_dota_hero_terrorblade": 141,
+     "npc_dota_hero_furion": 172,
+     "npc_dota_hero_sven": 160,
+     "npc_dota_hero_jakiro": 97
+    }
+   },
+   "ability_targets": {
+    "venomancer_snakebite": {
+     "npc_dota_hero_terrorblade": 4,
+     "npc_dota_hero_furion": 2,
+     "npc_dota_hero_sven": 8,
+     "npc_dota_hero_jakiro": 3
+    },
+    "venomancer_noxious_plague": {
+     "npc_dota_hero_terrorblade": 2,
+     "npc_dota_hero_furion": 3,
+     "npc_dota_hero_sven": 1,
+     "npc_dota_hero_jakiro": 2
+    }
+   }
+  }
+ ]
+}

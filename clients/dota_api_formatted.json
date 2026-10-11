@@ -1684,6 +1684,70 @@
                 "is_contributor": {
                   "description": "Whether the player is a contributor",
                   "type": "boolean"
+                },
+                "networth_t": {
+                  "description": "Net worth at each minute",
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                "hero_damage_t": {
+                  "description": "Cumulative hero damage at each minute",
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                "tower_damage_t": {
+                  "description": "Cumulative tower damage at each minute",
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                "hero_healing_t": {
+                  "description": "Cumulative hero healing at each minute",
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                "camps_stacked_t": {
+                  "description": "Camps stacked at each minute",
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                "deaths_log": {
+                  "description": "Array containing information on each death of the player",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "time": {
+                        "description": "Time in seconds the player died",
+                        "type": "integer"
+                      },
+                      "key": {
+                        "description": "Hero that killed the player",
+                        "type": "string"
+                      },
+                      "gold_lost": {
+                        "description": "Gold lost on death",
+                        "type": "integer"
+                      },
+                      "gold_fed": {
+                        "description": "Gold the killers earned",
+                        "type": "integer"
+                      },
+                      "time_dead": {
+                        "description": "Seconds spent dead",
+                        "type": "integer"
+                      }
+                    }
+                  }
                 }
               }
             }

@@ -19,6 +19,7 @@ import java.util.HashMap;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerBuybackLogInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerConnectionLogInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerCosmeticsInner;
+import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerDeathsLogInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerKillsLogInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerNeutralItemHistoryInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerNeutralTokensLogInner;
@@ -192,7 +193,13 @@ import com.ako.dbuff.dotapi.invoker.JSON;
   MatchResponsePlayersInner.JSON_PROPERTY_NET_WORTH,
   MatchResponsePlayersInner.JSON_PROPERTY_COMPUTED_MMR,
   MatchResponsePlayersInner.JSON_PROPERTY_IS_SUBSCRIBER,
-  MatchResponsePlayersInner.JSON_PROPERTY_IS_CONTRIBUTOR
+  MatchResponsePlayersInner.JSON_PROPERTY_IS_CONTRIBUTOR,
+  MatchResponsePlayersInner.JSON_PROPERTY_NETWORTH_T,
+  MatchResponsePlayersInner.JSON_PROPERTY_HERO_DAMAGE_T,
+  MatchResponsePlayersInner.JSON_PROPERTY_TOWER_DAMAGE_T,
+  MatchResponsePlayersInner.JSON_PROPERTY_HERO_HEALING_T,
+  MatchResponsePlayersInner.JSON_PROPERTY_CAMPS_STACKED_T,
+  MatchResponsePlayersInner.JSON_PROPERTY_DEATHS_LOG
 })
 @JsonTypeName("MatchResponse_players_inner")
 @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
@@ -768,6 +775,30 @@ public class MatchResponsePlayersInner {
   public static final String JSON_PROPERTY_IS_CONTRIBUTOR = "is_contributor";
   @jakarta.annotation.Nullable
   private Boolean isContributor;
+
+  public static final String JSON_PROPERTY_NETWORTH_T = "networth_t";
+  @jakarta.annotation.Nullable
+  private List<Long> networthT = new ArrayList<>();
+
+  public static final String JSON_PROPERTY_HERO_DAMAGE_T = "hero_damage_t";
+  @jakarta.annotation.Nullable
+  private List<Long> heroDamageT = new ArrayList<>();
+
+  public static final String JSON_PROPERTY_TOWER_DAMAGE_T = "tower_damage_t";
+  @jakarta.annotation.Nullable
+  private List<Long> towerDamageT = new ArrayList<>();
+
+  public static final String JSON_PROPERTY_HERO_HEALING_T = "hero_healing_t";
+  @jakarta.annotation.Nullable
+  private List<Long> heroHealingT = new ArrayList<>();
+
+  public static final String JSON_PROPERTY_CAMPS_STACKED_T = "camps_stacked_t";
+  @jakarta.annotation.Nullable
+  private List<Long> campsStackedT = new ArrayList<>();
+
+  public static final String JSON_PROPERTY_DEATHS_LOG = "deaths_log";
+  @jakarta.annotation.Nullable
+  private List<MatchResponsePlayersInnerDeathsLogInner> deathsLog = new ArrayList<>();
 
   public MatchResponsePlayersInner() { 
   }
@@ -4641,6 +4672,204 @@ public class MatchResponsePlayersInner {
   }
 
 
+  public MatchResponsePlayersInner networthT(@jakarta.annotation.Nullable List<Long> networthT) {
+    this.networthT = networthT;
+    return this;
+  }
+
+  public MatchResponsePlayersInner addNetworthTItem(Long networthTItem) {
+    if (this.networthT == null) {
+      this.networthT = new ArrayList<>();
+    }
+    this.networthT.add(networthTItem);
+    return this;
+  }
+
+  /**
+   * Net worth at each minute
+   * @return networthT
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_NETWORTH_T)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public List<Long> getNetworthT() {
+    return networthT;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_NETWORTH_T)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setNetworthT(@jakarta.annotation.Nullable List<Long> networthT) {
+    this.networthT = networthT;
+  }
+
+
+  public MatchResponsePlayersInner heroDamageT(@jakarta.annotation.Nullable List<Long> heroDamageT) {
+    this.heroDamageT = heroDamageT;
+    return this;
+  }
+
+  public MatchResponsePlayersInner addHeroDamageTItem(Long heroDamageTItem) {
+    if (this.heroDamageT == null) {
+      this.heroDamageT = new ArrayList<>();
+    }
+    this.heroDamageT.add(heroDamageTItem);
+    return this;
+  }
+
+  /**
+   * Cumulative hero damage at each minute
+   * @return heroDamageT
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_HERO_DAMAGE_T)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public List<Long> getHeroDamageT() {
+    return heroDamageT;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_HERO_DAMAGE_T)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setHeroDamageT(@jakarta.annotation.Nullable List<Long> heroDamageT) {
+    this.heroDamageT = heroDamageT;
+  }
+
+
+  public MatchResponsePlayersInner towerDamageT(@jakarta.annotation.Nullable List<Long> towerDamageT) {
+    this.towerDamageT = towerDamageT;
+    return this;
+  }
+
+  public MatchResponsePlayersInner addTowerDamageTItem(Long towerDamageTItem) {
+    if (this.towerDamageT == null) {
+      this.towerDamageT = new ArrayList<>();
+    }
+    this.towerDamageT.add(towerDamageTItem);
+    return this;
+  }
+
+  /**
+   * Cumulative tower damage at each minute
+   * @return towerDamageT
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_TOWER_DAMAGE_T)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public List<Long> getTowerDamageT() {
+    return towerDamageT;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_TOWER_DAMAGE_T)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setTowerDamageT(@jakarta.annotation.Nullable List<Long> towerDamageT) {
+    this.towerDamageT = towerDamageT;
+  }
+
+
+  public MatchResponsePlayersInner heroHealingT(@jakarta.annotation.Nullable List<Long> heroHealingT) {
+    this.heroHealingT = heroHealingT;
+    return this;
+  }
+
+  public MatchResponsePlayersInner addHeroHealingTItem(Long heroHealingTItem) {
+    if (this.heroHealingT == null) {
+      this.heroHealingT = new ArrayList<>();
+    }
+    this.heroHealingT.add(heroHealingTItem);
+    return this;
+  }
+
+  /**
+   * Cumulative hero healing at each minute
+   * @return heroHealingT
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_HERO_HEALING_T)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public List<Long> getHeroHealingT() {
+    return heroHealingT;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_HERO_HEALING_T)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setHeroHealingT(@jakarta.annotation.Nullable List<Long> heroHealingT) {
+    this.heroHealingT = heroHealingT;
+  }
+
+
+  public MatchResponsePlayersInner campsStackedT(@jakarta.annotation.Nullable List<Long> campsStackedT) {
+    this.campsStackedT = campsStackedT;
+    return this;
+  }
+
+  public MatchResponsePlayersInner addCampsStackedTItem(Long campsStackedTItem) {
+    if (this.campsStackedT == null) {
+      this.campsStackedT = new ArrayList<>();
+    }
+    this.campsStackedT.add(campsStackedTItem);
+    return this;
+  }
+
+  /**
+   * Camps stacked at each minute
+   * @return campsStackedT
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_CAMPS_STACKED_T)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public List<Long> getCampsStackedT() {
+    return campsStackedT;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_CAMPS_STACKED_T)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setCampsStackedT(@jakarta.annotation.Nullable List<Long> campsStackedT) {
+    this.campsStackedT = campsStackedT;
+  }
+
+
+  public MatchResponsePlayersInner deathsLog(@jakarta.annotation.Nullable List<MatchResponsePlayersInnerDeathsLogInner> deathsLog) {
+    this.deathsLog = deathsLog;
+    return this;
+  }
+
+  public MatchResponsePlayersInner addDeathsLogItem(MatchResponsePlayersInnerDeathsLogInner deathsLogItem) {
+    if (this.deathsLog == null) {
+      this.deathsLog = new ArrayList<>();
+    }
+    this.deathsLog.add(deathsLogItem);
+    return this;
+  }
+
+  /**
+   * Array containing information on each death of the player
+   * @return deathsLog
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_DEATHS_LOG)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public List<MatchResponsePlayersInnerDeathsLogInner> getDeathsLog() {
+    return deathsLog;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_DEATHS_LOG)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setDeathsLog(@jakarta.annotation.Nullable List<MatchResponsePlayersInnerDeathsLogInner> deathsLog) {
+    this.deathsLog = deathsLog;
+  }
+
+
   /**
    * Return true if this MatchResponse_players_inner object is equal to o.
    */
@@ -4797,7 +5026,13 @@ public class MatchResponsePlayersInner {
         Objects.equals(this.netWorth, matchResponsePlayersInner.netWorth) &&
         Objects.equals(this.computedMmr, matchResponsePlayersInner.computedMmr) &&
         Objects.equals(this.isSubscriber, matchResponsePlayersInner.isSubscriber) &&
-        Objects.equals(this.isContributor, matchResponsePlayersInner.isContributor);
+        Objects.equals(this.isContributor, matchResponsePlayersInner.isContributor) &&
+        Objects.equals(this.networthT, matchResponsePlayersInner.networthT) &&
+        Objects.equals(this.heroDamageT, matchResponsePlayersInner.heroDamageT) &&
+        Objects.equals(this.towerDamageT, matchResponsePlayersInner.towerDamageT) &&
+        Objects.equals(this.heroHealingT, matchResponsePlayersInner.heroHealingT) &&
+        Objects.equals(this.campsStackedT, matchResponsePlayersInner.campsStackedT) &&
+        Objects.equals(this.deathsLog, matchResponsePlayersInner.deathsLog);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -4806,7 +5041,7 @@ public class MatchResponsePlayersInner {
 
   @Override
   public int hashCode() {
-    return Objects.hash(matchId, hashCodeNullable(playerSlot), abilityUpgradesArr, abilityUses, abilityTargets, damageTargets, accountId, actions, hashCodeNullable(additionalUnits), assists, backpack0, backpack1, backpack2, buybackLog, campsStacked, connectionLog, creepsStacked, damage, damageInflictor, damageInflictorReceived, damageTaken, deaths, denies, dnT, gold, goldPerMin, goldReasons, goldSpent, goldT, heroDamage, heroHealing, heroHits, heroId, item0, item1, item2, item3, item4, item5, itemUses, killStreaks, killed, killedBy, kills, killsLog, lanePos, lastHits, leaverStatus, level, lhT, lifeState, maxHeroHit, multiKills, obs, obsLeftLog, obsLog, obsPlaced, partyId, permanentBuffs, heroVariant, pings, purchase, purchaseLog, runePickups, runes, runesLog, sen, senLeftLog, senLog, senPlaced, stuns, times, towerDamage, xpPerMin, xpReasons, xpT, hashCodeNullable(personaname), hashCodeNullable(name), hashCodeNullable(lastLogin), hashCodeNullable(radiantWin), startTime, duration, cluster, lobbyType, gameMode, patch, region, isRadiant, win, lose, totalGold, totalXp, killsPerMin, kda, abandons, neutralKills, towerKills, courierKills, laneKills, heroKills, observerKills, sentryKills, roshanKills, necronomiconKills, ancientKills, buybackCount, observerUses, sentryUses, laneEfficiency, laneEfficiencyPct, hashCodeNullable(lane), hashCodeNullable(laneRole), hashCodeNullable(isRoaming), purchaseTime, firstPurchaseTime, itemWin, itemUsage, purchaseTpscroll, actionsPerMin, lifeStateDead, rankTier, cosmetics, benchmarks, neutralTokensLog, neutralItemHistory, aghanimsScepter, aghanimsShard, moonshard, firstbloodClaimed, teamfightParticipation, towersKilled, roshansKilled, observersPlaced, healing, randomed, predVict, partySize, teamNumber, teamSlot, itemNeutral, itemNeutral2, netWorth, computedMmr, isSubscriber, isContributor);
+    return Objects.hash(matchId, hashCodeNullable(playerSlot), abilityUpgradesArr, abilityUses, abilityTargets, damageTargets, accountId, actions, hashCodeNullable(additionalUnits), assists, backpack0, backpack1, backpack2, buybackLog, campsStacked, connectionLog, creepsStacked, damage, damageInflictor, damageInflictorReceived, damageTaken, deaths, denies, dnT, gold, goldPerMin, goldReasons, goldSpent, goldT, heroDamage, heroHealing, heroHits, heroId, item0, item1, item2, item3, item4, item5, itemUses, killStreaks, killed, killedBy, kills, killsLog, lanePos, lastHits, leaverStatus, level, lhT, lifeState, maxHeroHit, multiKills, obs, obsLeftLog, obsLog, obsPlaced, partyId, permanentBuffs, heroVariant, pings, purchase, purchaseLog, runePickups, runes, runesLog, sen, senLeftLog, senLog, senPlaced, stuns, times, towerDamage, xpPerMin, xpReasons, xpT, hashCodeNullable(personaname), hashCodeNullable(name), hashCodeNullable(lastLogin), hashCodeNullable(radiantWin), startTime, duration, cluster, lobbyType, gameMode, patch, region, isRadiant, win, lose, totalGold, totalXp, killsPerMin, kda, abandons, neutralKills, towerKills, courierKills, laneKills, heroKills, observerKills, sentryKills, roshanKills, necronomiconKills, ancientKills, buybackCount, observerUses, sentryUses, laneEfficiency, laneEfficiencyPct, hashCodeNullable(lane), hashCodeNullable(laneRole), hashCodeNullable(isRoaming), purchaseTime, firstPurchaseTime, itemWin, itemUsage, purchaseTpscroll, actionsPerMin, lifeStateDead, rankTier, cosmetics, benchmarks, neutralTokensLog, neutralItemHistory, aghanimsScepter, aghanimsShard, moonshard, firstbloodClaimed, teamfightParticipation, towersKilled, roshansKilled, observersPlaced, healing, randomed, predVict, partySize, teamNumber, teamSlot, itemNeutral, itemNeutral2, netWorth, computedMmr, isSubscriber, isContributor, networthT, heroDamageT, towerDamageT, heroHealingT, campsStackedT, deathsLog);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -4965,6 +5200,12 @@ public class MatchResponsePlayersInner {
     sb.append("    computedMmr: ").append(toIndentedString(computedMmr)).append("\n");
     sb.append("    isSubscriber: ").append(toIndentedString(isSubscriber)).append("\n");
     sb.append("    isContributor: ").append(toIndentedString(isContributor)).append("\n");
+    sb.append("    networthT: ").append(toIndentedString(networthT)).append("\n");
+    sb.append("    heroDamageT: ").append(toIndentedString(heroDamageT)).append("\n");
+    sb.append("    towerDamageT: ").append(toIndentedString(towerDamageT)).append("\n");
+    sb.append("    heroHealingT: ").append(toIndentedString(heroHealingT)).append("\n");
+    sb.append("    campsStackedT: ").append(toIndentedString(campsStackedT)).append("\n");
+    sb.append("    deathsLog: ").append(toIndentedString(deathsLog)).append("\n");
     sb.append("}");
     return sb.toString();
   }
