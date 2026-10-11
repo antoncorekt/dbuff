@@ -18,6 +18,7 @@ package com.ako.dbuff.service.replay;
  * @param cooldownLength for a cooldown, its full length in seconds; 0 when the replay does not say
  *     (some abilities leave it unset)
  * @param level for an ability level change, the new level; otherwise 0
+ * @param manaCost for a mana cost change, the new cost; otherwise 0
  */
 public record StateChange(
     int replayPlayerId,
@@ -27,4 +28,5 @@ public record StateChange(
     int slotIndex,
     double readyAtSeconds,
     double cooldownLength,
-    int level) {}
+    int level,
+    int manaCost) {}

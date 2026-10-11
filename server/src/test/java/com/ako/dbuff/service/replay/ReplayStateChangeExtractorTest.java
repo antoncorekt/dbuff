@@ -30,7 +30,7 @@ class ReplayStateChangeExtractorTest {
     extractor.extract(facts, MATCH);
 
     List<ReplayStateChangeDomain> rows = repo.findByMatchIdOrderByGameSeconds(MATCH.getId());
-    assertThat(rows).hasSize(3);
+    assertThat(rows).hasSize(4);
     assertThat(rows).extracting(ReplayStateChangeDomain::getGameSeconds).isSorted();
     ReplayStateChangeDomain cooldown =
         rows.stream().filter(r -> r.getKind().equals("COOLDOWN")).findFirst().orElseThrow();
@@ -47,6 +47,10 @@ class ReplayStateChangeExtractorTest {
         rows.stream().filter(r -> r.getKind().equals("ABILITY_LEVEL")).findFirst().orElseThrow();
     assertThat(level.getAbilityLevel()).isEqualTo(2);
     assertThat(level.getReadyAtSeconds()).isNull();
+    ReplayStateChangeDomain cost =
+        rows.stream().filter(r -> r.getKind().equals("MANA_COST")).findFirst().orElseThrow();
+    assertThat(cost.getManaCost()).isEqualTo(110);
+    assertThat(level.getManaCost()).isNull();
   }
 
   @Test
@@ -58,7 +62,7 @@ class ReplayStateChangeExtractorTest {
                 new StateFacts(
                     List.of(
                         new StateChange(
-                            4, 5, StateChangeKind.ITEM_ADDED, "item_tango", 0, 0, 0, 0))))
+                            4, 5, StateChangeKind.ITEM_ADDED, "item_tango", 0, 0, 0, 0, 0))))
             .build(),
         MATCH);
     assertThat(repo.findAll()).isEmpty();
@@ -75,11 +79,14 @@ class ReplayStateChangeExtractorTest {
         .stateChanges(
             new StateFacts(
                 List.of(
-                    new StateChange(0, -85, StateChangeKind.ITEM_ADDED, "item_tango", 0, 0, 0, 0),
                     new StateChange(
-                        10, 100, StateChangeKind.COOLDOWN, "sven_storm_bolt", 1, 130, 30, 0),
+                        0, -85, StateChangeKind.ITEM_ADDED, "item_tango", 0, 0, 0, 0, 0),
                     new StateChange(
-                        0, 205, StateChangeKind.ABILITY_LEVEL, "sniper_take_aim", 2, 0, 0, 2))))
+                        10, 100, StateChangeKind.COOLDOWN, "sven_storm_bolt", 1, 130, 30, 0, 0),
+                    new StateChange(
+                        0, 205, StateChangeKind.ABILITY_LEVEL, "sniper_take_aim", 2, 0, 0, 2, 0),
+                    new StateChange(
+                        10, 100, StateChangeKind.MANA_COST, "sven_storm_bolt", 1, 0, 0, 0, 110))))
         .build();
   }
 

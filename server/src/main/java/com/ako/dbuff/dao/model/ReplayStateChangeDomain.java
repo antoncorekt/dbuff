@@ -54,4 +54,7 @@ public class ReplayStateChangeDomain {
 
   /** For an ability level change, the new level. */
   private Integer abilityLevel;
+
+  /** For a mana cost change, the new cost. */
+  private Integer manaCost;
 }

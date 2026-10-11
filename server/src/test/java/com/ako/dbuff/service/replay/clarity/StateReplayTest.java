@@ -4,6 +4,7 @@ import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.StateChange;
 import com.ako.dbuff.service.replay.StateChangeKind;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -71,6 +72,20 @@ class StateReplayTest {
         .filteredOn(c -> c.name().equals("sniper_take_aim"))
         .extracting(StateChange::level)
         .containsExactly(1, 2, 3, 4);
+  }
+
+  @Test
+  void manaCostsAreRecordedAndMoveWithTheSkillLevel() {
+    assertThat(changes(StateChangeKind.MANA_COST))
+        .filteredOn(c -> c.name().equals("furion_teleportation"))
+        .extracting(StateChange::manaCost)
+        .containsExactly(50, 60, 70, 80);
+    assertThat(changes(StateChangeKind.MANA_COST))
+        .filteredOn(c -> c.name().equals("item_tpscroll"))
+        .extracting(StateChange::manaCost)
+        .containsExactly(75);
+    assertThat(Arrays.stream(facts.samples().series().get(SNIPER).mana()).max().orElse(0))
+        .isGreaterThan(300);
   }
 
   private long cooldowns(String name) {

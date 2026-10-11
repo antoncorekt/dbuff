@@ -57,6 +57,11 @@ public class ReplayPlayerTrackDomain {
   @Column(columnDefinition = "integer array")
   private int[] manaPercent;
 
+  /** Mana points; null for tracks stored before this was recorded. */
+  @JdbcTypeCode(SqlTypes.ARRAY)
+  @Column(columnDefinition = "integer array")
+  private int[] mana;
+
   /** Zero before the hero exists. */
   @JdbcTypeCode(SqlTypes.ARRAY)
   @Column(columnDefinition = "integer array")

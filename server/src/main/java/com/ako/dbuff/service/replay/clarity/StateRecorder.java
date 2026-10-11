@@ -58,6 +58,7 @@ final class StateRecorder implements SampleObserver {
     Map<String, Integer> counts = new HashMap<>();
     Map<String, Integer> firstSlot = new HashMap<>();
     Map<String, double[]> cooldowns = new HashMap<>();
+    Map<String, Entity> firstEntity = new HashMap<>();
     for (int i = 0; i < MAX_ITEMS; i++) {
       Entity item = entity(view.hero(), "m_hItems", i);
       String name = item == null ? null : name(names, item);
@@ -66,6 +67,7 @@ final class StateRecorder implements SampleObserver {
       }
       counts.merge(name, 1, Integer::sum);
       firstSlot.putIfAbsent(name, i);
+      firstEntity.putIfAbsent(name, item);
       double remaining = number(item, "m_fCooldown");
       double[] best = cooldowns.get(name);
       if (best == null || remaining > best[0]) {
@@ -73,6 +75,9 @@ final class StateRecorder implements SampleObserver {
       }
     }
     diffItems(state, view.playerId(), tick, counts, firstSlot);
+    firstEntity.forEach(
+        (name, item) ->
+            manaCost(state, view.playerId(), tick, "item" + name, name, firstSlot.get(name), item));
     cooldowns.forEach(
         (name, c) ->
             cooldown(
@@ -105,6 +110,7 @@ final class StateRecorder implements SampleObserver {
           number(ability, "m_fCooldown"),
           number(ability, "m_flCooldownLength"));
       level(state, view.playerId(), tick, key, name, i, ability);
+      manaCost(state, view.playerId(), tick, key, name, i, ability);
     }
   }
 
@@ -123,7 +129,8 @@ final class StateRecorder implements SampleObserver {
                   ? (c.readyAtTick() - clockStartTick) / (double) TICKS_PER_SECOND
                   : 0,
               c.length(),
-              c.level()));
+              c.level(),
+              c.manaCost()));
     }
     return new StateFacts(List.copyOf(result));
   }
@@ -146,6 +153,7 @@ final class StateRecorder implements SampleObserver {
                 firstSlot.get(entry.getKey()),
                 0,
                 0,
+                0,
                 0));
       }
     }
@@ -154,7 +162,7 @@ final class StateRecorder implements SampleObserver {
       for (int n = after; n < entry.getValue(); n++) {
         changes.add(
             new RawChange(
-                playerId, tick, StateChangeKind.ITEM_REMOVED, entry.getKey(), -1, 0, 0, 0));
+                playerId, tick, StateChangeKind.ITEM_REMOVED, entry.getKey(), -1, 0, 0, 0, 0));
       }
     }
     state.items = now;
@@ -177,7 +185,8 @@ final class StateRecorder implements SampleObserver {
     Double previous = state.readyAt.put(key, readyAt);
     if (previous == null || readyAt > previous + NEW_COOLDOWN_JUMP_TICKS) {
       changes.add(
-          new RawChange(playerId, tick, StateChangeKind.COOLDOWN, name, slot, readyAt, length, 0));
+          new RawChange(
+              playerId, tick, StateChangeKind.COOLDOWN, name, slot, readyAt, length, 0, 0));
     }
   }
 
@@ -193,7 +202,17 @@ final class StateRecorder implements SampleObserver {
     Integer previous = state.levels.put(key, level);
     if (previous != null && level > previous) {
       changes.add(
-          new RawChange(playerId, tick, StateChangeKind.ABILITY_LEVEL, name, slot, 0, 0, level));
+          new RawChange(playerId, tick, StateChangeKind.ABILITY_LEVEL, name, slot, 0, 0, level, 0));
+    }
+  }
+
+  private void manaCost(
+      PlayerState state, int playerId, long tick, String key, String name, int slot, Entity e) {
+    int cost = (int) number(e, "m_iManaCost");
+    Integer previous = state.manaCosts.put(key, cost);
+    if ((previous == null && cost > 0) || (previous != null && cost != previous)) {
+      changes.add(
+          new RawChange(playerId, tick, StateChangeKind.MANA_COST, name, slot, 0, 0, 0, cost));
     }
   }
 
@@ -230,11 +249,13 @@ final class StateRecorder implements SampleObserver {
       int slot,
       double readyAtTick,
       double length,
-      int level) {}
+      int level,
+      int manaCost) {}
 
   private static final class PlayerState {
     private Map<String, Integer> items = new HashMap<>();
     private final Map<String, Double> readyAt = new HashMap<>();
     private final Map<String, Integer> levels = new HashMap<>();
+    private final Map<String, Integer> manaCosts = new HashMap<>();
   }
 }

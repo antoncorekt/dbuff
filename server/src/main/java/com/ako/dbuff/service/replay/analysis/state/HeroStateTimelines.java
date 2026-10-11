@@ -26,7 +26,9 @@ public class HeroStateTimelines {
                   c.getGameSeconds(),
                   StateChangeKind.valueOf(c.getKind()),
                   c.getName(),
-                  c.getReadyAtSeconds() == null ? 0 : c.getReadyAtSeconds()));
+                  c.getReadyAtSeconds() == null ? 0 : c.getReadyAtSeconds(),
+                  c.getAbilityLevel() == null ? 0 : c.getAbilityLevel(),
+                  c.getManaCost() == null ? 0 : c.getManaCost()));
     }
     return states;
   }

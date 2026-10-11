@@ -44,6 +44,7 @@ public class ReplayTrackExtractor implements ReplayExtractor {
                         .y(series.y())
                         .hpPercent(series.hpPercent())
                         .manaPercent(series.manaPercent())
+                        .mana(series.mana())
                         .level(series.level())
                         .flags(series.flags())
                         .build())
