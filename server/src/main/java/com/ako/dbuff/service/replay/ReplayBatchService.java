@@ -18,6 +18,7 @@ public class ReplayBatchService {
   private final ReplayQueue queue;
   private final ReplayRunService runService;
   private final ReplayTempCleaner tempCleaner;
+  private final ReplayRunJanitor janitor;
   private final ReplayProcessingProperties properties;
 
   /**
@@ -25,6 +26,7 @@ public class ReplayBatchService {
    */
   public int runBatch() {
     tempCleaner.sweep();
+    janitor.closeAbandoned();
     List<MatchDomain> matches = queue.next(properties.getBatchSize());
     int stored = 0;
     int downloadFailures = 0;

@@ -14,6 +14,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -57,7 +58,7 @@ public class HttpReplayDownloader implements ReplayDownloader {
         checkStatus(response.statusCode(), source);
         checkDeclaredSize(response, source);
         copyLimited(body, target, source);
-        if (watchdog.fired()) {
+        if (!watchdog.finishedInTime()) {
           throw new IOException("Download exceeded " + properties.getMaxDownloadSeconds() + " s");
         }
       }
@@ -125,7 +126,7 @@ public class HttpReplayDownloader implements ReplayDownloader {
    */
   private static final class Watchdog implements AutoCloseable {
     private final Thread thread;
-    private volatile boolean fired;
+    private final AtomicBoolean settled = new AtomicBoolean();
 
     Watchdog(InputStream body, int seconds) {
       thread =
@@ -134,8 +135,9 @@ public class HttpReplayDownloader implements ReplayDownloader {
                   () -> {
                     try {
                       Thread.sleep(Duration.ofSeconds(seconds));
-                      fired = true;
-                      body.close();
+                      if (settled.compareAndSet(false, true)) {
+                        body.close();
+                      }
                     } catch (InterruptedException e) {
                       // The download finished first.
                     } catch (IOException e) {
@@ -144,8 +146,9 @@ public class HttpReplayDownloader implements ReplayDownloader {
                   });
     }
 
-    boolean fired() {
-      return fired;
+    /** True when the copy ended before the deadline; false when the watchdog got there first. */
+    boolean finishedInTime() {
+      return settled.compareAndSet(false, true);
     }
 
     @Override

@@ -45,19 +45,30 @@ public class ClarityReplayParser implements ReplayParser {
     Collector collector = new Collector(cancelled);
     try {
       new SimpleRunner(new MappedFileSource(demoFile.toString())).runWith(collector);
-    } catch (StopParsing stop) {
-      // The collector has what it needs.
-    } catch (CancelledParsing cancel) {
-      throw new ReplayException(ReplayStatus.FAILED_TIMEOUT, "Parse stopped: timed out");
     } catch (Exception e) {
-      throw new ReplayException(
-          ReplayStatus.FAILED_PARSER, "Replay could not be parsed: " + e.getMessage(), e);
+      if (hasCause(e, CancelledParsing.class)) {
+        throw new ReplayException(ReplayStatus.FAILED_TIMEOUT, "Parse stopped: timed out");
+      }
+      if (!hasCause(e, StopParsing.class)) {
+        throw new ReplayException(
+            ReplayStatus.FAILED_PARSER, "Replay could not be parsed: " + e.getMessage(), e);
+      }
     }
     if (collector.facts == null) {
       throw new ReplayException(
           ReplayStatus.SKIPPED_NOT_PLAYED, "Replay never reached the playing phase");
     }
     return collector.facts;
+  }
+
+  /** The runner may wrap what a handler throws, so the control exceptions are looked up. */
+  private static boolean hasCause(Throwable error, Class<? extends Throwable> type) {
+    for (Throwable t = error; t != null; t = t.getCause()) {
+      if (type.isInstance(t)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static final class StopParsing extends RuntimeException {
@@ -91,6 +102,7 @@ public class ClarityReplayParser implements ReplayParser {
     ReplayFacts facts;
     private final List<DraftPick> picks = new ArrayList<>();
     private final BitSet picked = new BitSet();
+    private long ticksSeen;
 
     Collector(BooleanSupplier cancelled) {
       this.cancelled = cancelled;
@@ -98,7 +110,7 @@ public class ClarityReplayParser implements ReplayParser {
 
     @OnTickStart
     public void onTick(Context ctx, boolean synthetic) {
-      if (ctx.getTick() % CANCEL_CHECK_TICKS == 0 && cancelled.getAsBoolean()) {
+      if (++ticksSeen % CANCEL_CHECK_TICKS == 0 && cancelled.getAsBoolean()) {
         throw new CancelledParsing();
       }
     }
