@@ -91,6 +91,7 @@ Optional enrichment from Valve replays, off by default (`replay.processing.enabl
 - **One entry point, one replay at a time.** `ReplayProcessingJob` (Quartz, global) takes `replay.processing.batch-size` matches through `ReplayBatchService`, sequentially; `replayParseSemaphore` (`replay.processing.max-concurrent`, default 1) bounds parses on the 2 GiB host. `ReplayQueue` picks due retries first, then new matches whose OpenDota details are stored (`detailsMappedAt`).
 - **Only `service/replay/clarity/` imports Clarity.** Extractors read `ReplayFacts`; a new table slice is a new `ReplayExtractor` bean, a new compression format a new `ReplayDecompressor` bean.
 - **Identity is the roster, not the match id.** The replay's `m_unMatchID64` is a lobby id. `ReplayRosterVerifier` compares accounts per slot (hero for anonymous players); a mismatch is `FAILED_IDENTITY` and writes nothing.
+- **Extractors store facts, not conclusions.** `AbilityDraftExtractor` writes the 40 picks and the 48-skill pool and stores nothing for a draft of another shape, rather than a partial one. The ability names come through the small `AbilityNames` interface, so the extractor does not depend on the constants cache.
 - **Tests that parse a real replay are tagged `replay`** and run only through `./gradlew :server:replayTest` with `REPLAY_FIXTURE_DIR` set; `:server:test` and CI skip them. Replays are never committed.
 - The design lives in `docs/superpowers/plans/2026-10-11-replay-extraction-plan.md`.
 

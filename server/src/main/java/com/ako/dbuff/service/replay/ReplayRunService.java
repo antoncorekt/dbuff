@@ -61,6 +61,15 @@ public class ReplayRunService {
    * @return the status the run ended with
    */
   public ReplayStatus process(MatchDomain match) {
+    try {
+      return run(match);
+    } catch (RuntimeException e) {
+      log.error("Replay run for match {} could not be recorded", match.getId(), e);
+      return ReplayStatus.FAILED_RESOURCE;
+    }
+  }
+
+  private ReplayStatus run(MatchDomain match) {
     ReplayParseRunDomain run = start(match);
     var skip = eligibility.skipReason(match);
     if (skip.isPresent()) {
@@ -75,7 +84,7 @@ public class ReplayRunService {
       return fail(run, e.getStatus(), e.getMessage());
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      return fail(run, ReplayStatus.FAILED_DOWNLOAD, "Interrupted while waiting to parse");
+      return release(run, "Interrupted while waiting to parse");
     } catch (OutOfMemoryError e) {
       return fail(run, ReplayStatus.FAILED_RESOURCE, "Out of memory while parsing");
     } catch (LinkageError e) {
@@ -149,6 +158,13 @@ public class ReplayRunService {
     run.setLeaseUntil(now.plusMinutes(properties.getLeaseMinutes()));
     run.setError(null);
     return runRepo.save(run);
+  }
+
+  /** Nothing was tried, so the attempt is given back and the match is due again at once. */
+  private ReplayStatus release(ReplayParseRunDomain run, String message) {
+    run.setAttempts(run.getAttempts() - 1);
+    run.setNextAttemptAt(LocalDateTime.now());
+    return finish(run, ReplayStatus.FAILED_RESOURCE, message);
   }
 
   private ReplayStatus fail(ReplayParseRunDomain run, ReplayStatus status, String message) {

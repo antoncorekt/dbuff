@@ -1,6 +1,8 @@
 package com.ako.dbuff.service.replay.clarity;
 
 import com.ako.dbuff.dao.model.ReplayStatus;
+import com.ako.dbuff.service.replay.DraftFacts;
+import com.ako.dbuff.service.replay.DraftPick;
 import com.ako.dbuff.service.replay.ReplayException;
 import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.ReplayPlayerFact;
@@ -40,11 +42,36 @@ class ClarityReplayParserReplayTest {
   }
 
   @Test
+  void parse_readsTheAbilityDraftOfARealReplay() {
+    DraftFacts draft = parser.parse(replay(MATCH), () -> false).draft();
+
+    assertThat(draft).isNotNull();
+    assertThat(draft.pool()).hasSize(48);
+    assertThat(draft.picks()).hasSize(40);
+    assertThat(draft.pool().stream().filter(entry -> !entry.picked())).hasSize(8);
+    assertThat(draft.picks()).extracting(DraftPick::order).isSorted();
+    assertThat(draft.picks()).extracting(DraftPick::tick).isSorted();
+    assertThat(draft.picks().getFirst().replayPlayerId()).isEqualTo(0);
+    assertThat(draft.picks().getFirst().poolIndex()).isEqualTo(26);
+    assertThat(draft.picks().getFirst().tick()).isBetween(1900, 2000);
+    assertThat(draft.pool()).allMatch(entry -> entry.abilityId() > 0 && entry.abilityId() < 10000);
+  }
+
+  @Test
+  void parse_readsTheSameDraftShapeFromAnotherReplay() {
+    DraftFacts draft = parser.parse(replay("9037038717.dem"), () -> false).draft();
+
+    assertThat(draft.pool()).hasSize(48);
+    assertThat(draft.picks()).hasSize(40);
+    assertThat(draft.pool().stream().filter(entry -> !entry.picked())).hasSize(8);
+  }
+
+  @Test
   void parse_stopsWhenCancelled() {
     assertThatThrownBy(() -> parser.parse(replay(MATCH), () -> true))
         .isInstanceOfSatisfying(
             ReplayException.class,
-            e -> assertThat(e.getStatus()).isEqualTo(ReplayStatus.FAILED_RESOURCE));
+            e -> assertThat(e.getStatus()).isEqualTo(ReplayStatus.FAILED_TIMEOUT));
   }
 
   @Test

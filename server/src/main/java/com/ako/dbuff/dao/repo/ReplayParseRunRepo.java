@@ -31,6 +31,19 @@ public interface ReplayParseRunRepo extends JpaRepository<ReplayParseRunDomain, 
       @Param("maxAttempts") Integer maxAttempts,
       Pageable pageable);
 
+  @Query(
+      """
+      select r from ReplayParseRunDomain r
+      where r.parserVersion = :version
+        and r.status = 'RUNNING'
+        and r.leaseUntil < :now
+        and r.attempts >= :maxAttempts
+      """)
+  List<ReplayParseRunDomain> findAbandonedWithoutAttemptsLeft(
+      @Param("version") Integer version,
+      @Param("now") LocalDateTime now,
+      @Param("maxAttempts") Integer maxAttempts);
+
   @Transactional
   @Modifying
   @Query("delete from ReplayParseRunDomain r where r.matchId = :matchId")

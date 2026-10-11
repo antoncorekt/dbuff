@@ -166,6 +166,28 @@ class ReplayRunServiceTest {
   }
 
   @Test
+  void process_neverThrowsWhenTheRunCannotBeRecorded() {
+    when(runRepo.save(any(ReplayParseRunDomain.class)))
+        .thenThrow(new IllegalStateException("db down"));
+
+    assertThat(service.process(match())).isEqualTo(ReplayStatus.FAILED_RESOURCE);
+  }
+
+  @Test
+  void process_givesTheAttemptBackWhenInterruptedBeforeParsing() throws InterruptedException {
+    semaphore.acquire();
+    Thread.currentThread().interrupt();
+
+    ReplayStatus status = service.process(match());
+
+    assertThat(Thread.interrupted()).isTrue();
+    assertThat(status).isEqualTo(ReplayStatus.FAILED_RESOURCE);
+    assertThat(runs.get(1L).getAttempts()).isZero();
+    assertThat(runs.get(1L).getNextAttemptAt()).isNotNull();
+    verify(fileProvider, never()).open(any());
+  }
+
+  @Test
   void process_countsAnotherAttemptOnTheSameRow() {
     service.process(match());
     ArgumentCaptor<ReplayParseRunDomain> saved =

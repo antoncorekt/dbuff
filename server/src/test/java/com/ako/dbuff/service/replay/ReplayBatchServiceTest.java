@@ -20,8 +20,9 @@ class ReplayBatchServiceTest {
   private final ReplayRunService runService = mock(ReplayRunService.class);
   private final ReplayProcessingProperties properties = new ReplayProcessingProperties();
   private final ReplayTempCleaner tempCleaner = mock(ReplayTempCleaner.class);
+  private final ReplayRunJanitor janitor = mock(ReplayRunJanitor.class);
   private final ReplayBatchService batch =
-      new ReplayBatchService(queue, runService, tempCleaner, properties);
+      new ReplayBatchService(queue, runService, tempCleaner, janitor, properties);
 
   @Test
   void runBatch_processesMatchesOneAfterAnotherAndCountsStoredOnes() {
@@ -72,6 +73,7 @@ class ReplayBatchServiceTest {
     batch.runBatch();
 
     verify(tempCleaner).sweep();
+    verify(janitor).closeAbandoned();
     verify(runService, times(3)).process(any());
   }
 
