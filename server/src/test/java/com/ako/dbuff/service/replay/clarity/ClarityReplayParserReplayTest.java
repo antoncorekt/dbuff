@@ -128,12 +128,8 @@ class ClarityReplayParserReplayTest {
       throws Exception {
     Path cut = dir.resolve("cut.dem");
     long keep = Files.size(replay(MATCH)) * 3 / 4;
-    try (var in = Files.newInputStream(replay(MATCH));
-        var out = Files.newOutputStream(cut)) {
-      in.readNBytes((int) keep);
-      try (var again = Files.newInputStream(replay(MATCH))) {
-        out.write(again.readNBytes((int) keep));
-      }
+    try (var in = Files.newInputStream(replay(MATCH))) {
+      Files.write(cut, in.readNBytes((int) keep));
     }
 
     ReplayFacts facts = parser.parse(cut, () -> false);
