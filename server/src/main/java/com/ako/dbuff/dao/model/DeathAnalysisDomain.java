@@ -60,7 +60,8 @@ public class DeathAnalysisDomain {
   private Boolean isolated;
 
   /**
-   * The fight's frontline delta of the hero (negative: further forward than his range suggests).
+   * The hero's frontline delta when the fight he died in began (negative: further forward than his
+   * range suggests), not where he stood when he died.
    */
   private Integer frontlineDelta;
 

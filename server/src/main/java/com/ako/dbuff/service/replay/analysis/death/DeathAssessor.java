@@ -227,14 +227,14 @@ public final class DeathAssessor {
     if (isolated) {
       return DeathReason.CAUGHT_OUT;
     }
-    if (outOfPosition) {
-      return DeathReason.OUT_OF_POSITION;
-    }
     if (kind == KillerKind.TOWER) {
       return DeathReason.TOWER;
     }
     if (lastThree >= tuning.burstDamage()) {
       return DeathReason.BURST;
+    }
+    if (outOfPosition) {
+      return DeathReason.OUT_OF_POSITION;
     }
     return !owned && kind == KillerKind.HERO ? DeathReason.NO_BKB : DeathReason.OTHER;
   }

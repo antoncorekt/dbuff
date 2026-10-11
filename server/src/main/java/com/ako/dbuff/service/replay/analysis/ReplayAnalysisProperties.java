@@ -78,7 +78,7 @@ public class ReplayAnalysisProperties {
         deathIsolationRadius,
         deathDisableSeconds,
         deathReincarnationSeconds,
-        deathOutOfPositionRanks);
+        Math.max(1, deathOutOfPositionRanks));
   }
 
   public ActivityTuning activityTuning() {

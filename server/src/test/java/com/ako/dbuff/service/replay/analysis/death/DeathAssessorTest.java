@@ -106,6 +106,7 @@ class DeathAssessorTest {
     assertThat(positioned(null, List.of())).isEqualTo(DeathReason.NO_BKB);
     assertThat(positioned(-3, List.of(stun(195, 400), stun(197, 300))))
         .isEqualTo(DeathReason.DISABLE_CHAIN);
+    assertThat(positioned(-3, List.of(damage(199, 1600)))).isEqualTo(DeathReason.BURST);
   }
 
   private DeathReason positioned(Integer delta, List<CombatEvent> events) {

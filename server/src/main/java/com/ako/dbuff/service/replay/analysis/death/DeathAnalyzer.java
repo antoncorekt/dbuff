@@ -97,6 +97,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
         continue;
       }
       int victim = playerOf.get(e.target());
+      Integer fightIndex = fightIndex(fights, e.gameSecond());
       DeathAssessor.Death death =
           new DeathAssessor.Death(e.gameSecond(), victim, e.attacker(), e.flags(), e.assistMask());
       List<CombatEvent> aboutVictim =
@@ -108,9 +109,9 @@ public class DeathAnalyzer implements ReplayAnalyzer {
               states.getOrDefault(victim, new HeroStateTimeline()),
               aboutVictim,
               layout,
-              deltas.get(fightKey(fightIndex(fights, e.gameSecond()), victim)));
+              fightIndex == null ? null : deltas.get(fightKey(fightIndex, victim)));
       int index = deathsSoFar.merge(victim, 1, Integer::sum) - 1;
-      rows.add(row(matchId, index, death, a, fightIndex(fights, e.gameSecond())));
+      rows.add(row(matchId, index, death, a, fightIndex));
     }
     deathRepo.saveAll(rows);
   }
