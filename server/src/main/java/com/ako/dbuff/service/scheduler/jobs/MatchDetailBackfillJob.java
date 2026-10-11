@@ -20,7 +20,7 @@ public class MatchDetailBackfillJob implements Job {
 
   @Override
   public void execute(JobExecutionContext context) throws JobExecutionException {
-    if (quietHoursGuard.isQuietTime()) {
+    if (quietHoursGuard.isServerQuietTime()) {
       log.debug("Skipping match detail backfill during quiet hours");
       return;
     }
