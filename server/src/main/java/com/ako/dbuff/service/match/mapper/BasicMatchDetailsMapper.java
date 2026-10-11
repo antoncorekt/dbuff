@@ -13,6 +13,7 @@ import com.ako.dbuff.service.constant.data.MatchTypeConstant;
 import com.ako.dbuff.service.constant.data.PatchConstant;
 import com.ako.dbuff.service.details.DotabuffBuildDetailsParser;
 import com.ako.dbuff.service.details.ScrapperService;
+import com.ako.dbuff.service.match.data.MatchDetailService;
 import com.ako.dbuff.service.match.mapper.PlayersMapper.PlayerHeroInfo;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -41,6 +42,7 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
   private final ScrapperService dotaBuffMatchDetailsScrapper;
   private final DotabuffBuildDetailsParser dotabuffBuildDetailsParser;
   private final ScrapperApiService scrapperApiService;
+  private final MatchDetailService matchDetailService;
 
   private final Cache<Long, Document> scrappedDotabufPage = Caffeine.newBuilder().build();
 
@@ -59,6 +61,7 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
     mapTimeInfo(matchResponse, matchDomain);
     mapPatchInfo(matchResponse, matchDomain);
     mapScoreInfo(matchResponse, matchDomain);
+    mapReplayInfo(matchResponse, matchDomain);
 
     List<MatchResponsePlayersInner> players =
         CollectionUtils.emptyIfNull(matchResponse.getPlayers()).stream().toList();
@@ -146,6 +149,14 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
     matchDomain.setRadiantWin(radiantWin);
     matchDomain.setRadiantScore(matchResponse.getRadiantScore());
     matchDomain.setDireScore(matchResponse.getDireScore());
+  }
+
+  private void mapReplayInfo(MatchResponse matchResponse, MatchDomain matchDomain) {
+    matchDomain.setReplayCluster(matchResponse.getCluster());
+    matchDomain.setReplaySalt(matchResponse.getReplaySalt());
+    matchDomain.setHasParsed(
+        matchResponse.getOdData() != null
+            && Boolean.TRUE.equals(matchResponse.getOdData().getHasParsed()));
   }
 
   private void checkAndScrapeAdditionalData(MatchDomain matchDomain) {
