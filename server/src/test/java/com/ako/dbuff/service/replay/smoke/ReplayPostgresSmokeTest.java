@@ -2,15 +2,18 @@ package com.ako.dbuff.service.replay.smoke;
 
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
+import com.ako.dbuff.dao.model.PlayerTimelineDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.repo.BuybackEventRepo;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
+import com.ako.dbuff.dao.repo.GameStateSegmentRepo;
 import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerPhaseSummaryRepo;
+import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
 import com.ako.dbuff.dao.repo.ReplayCombatLogRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerMinuteRepo;
@@ -29,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -54,7 +58,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * stands in for Valve, the real downloader, decompressor, parser, extractors and analyzers run, and
  * the tables are created by Hibernate as in production. It needs a PostgreSQL URL in {@code
  * SMOKE_PG_URL} (user postgres, password password) and the replays and OpenDota's JSON of them in
- * {@code REPLAY_FIXTURE_DIR}, as {@code <id>.dem.zst} and {@code <id>.json}.
+ * {@code REPLAY_FIXTURE_DIR}, as {@code <id>.dem.zst} and {@code <id>.json}. OpenDota's gold stands
+ * in for the net worth timeline, so the analyzers that read it run too.
  */
 @Tag("replay")
 @EnabledIfEnvironmentVariable(named = "SMOKE_PG_URL", matches = ".+")
@@ -77,10 +82,13 @@ import static org.assertj.core.api.Assertions.assertThat;
         @ComponentScan.Filter(
             type = FilterType.REGEX,
             pattern =
-                ".*\\.(ReplayProcessingJob|ReplayRunJanitor|ReplayQueue|ReplayBatchService|ConstantAbilityNames|ReplayTempCleaner)|.*Test.*"))
+                ".*\\.(ReplayProcessingJob|ReplayRunJanitor|ReplayQueue|ReplayBatchService|ConstantAbilityNames|ReplayTempCleaner)|.*Test(\\$.*)?"))
 @Import(ReplayPostgresSmokeTest.Config.class)
 @TestPropertySource(properties = "replay.processing.enabled=true")
 class ReplayPostgresSmokeTest {
+
+  /** Net worth is never zero, as gold is at the first minute; this stands in for the items. */
+  private static final long STARTING_WORTH = 4000;
 
   private static final String[] MATCHES = {"9040889566", "9040892342"};
   private static HttpServer server;
@@ -108,8 +116,14 @@ class ReplayPostgresSmokeTest {
   }
 
   @AfterAll
-  static void stop() {
+  static void stop() throws IOException {
     server.stop(0);
+    Path dir = Path.of(System.getProperty("java.io.tmpdir"), "smoke");
+    if (Files.isDirectory(dir)) {
+      try (var files = Files.list(dir)) {
+        files.forEach(f -> f.toFile().delete());
+      }
+    }
   }
 
   @TestConfiguration
@@ -140,11 +154,17 @@ class ReplayPostgresSmokeTest {
   @Autowired private BuybackEventRepo buybackRepo;
   @Autowired private PlayerPhaseSummaryRepo phaseRepo;
   @Autowired private GameSpikeRepo spikeRepo;
+  @Autowired private GameStateSegmentRepo stateSegmentRepo;
+  @Autowired private PlayerTimelineRepo timelineRepo;
 
   @Test
   @Commit
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   void aRealReplayGoesThroughEveryStageAndLandsInPostgres() throws Exception {
+    Assumptions.assumeTrue(
+        System.getenv("SMOKE_PG_URL").contains("localhost")
+            || System.getenv("SMOKE_PG_URL").contains("127.0.0.1"),
+        "The smoke test changes the schema and commits data, so it only runs against localhost");
     for (String id : MATCHES) {
       MatchDomain match = match(id);
 
@@ -165,7 +185,8 @@ class ReplayPostgresSmokeTest {
       assertThat(deathRepo.findByMatchId(match.getId())).hasSizeGreaterThan(40);
       assertThat(phaseRepo.findByMatchId(match.getId())).hasSizeGreaterThanOrEqualTo(20);
       assertThat(buybackRepo.findByMatchId(match.getId())).isNotEmpty();
-      assertThat(spikeRepo.findByMatchId(match.getId())).isEmpty();
+      assertThat(spikeRepo.findByMatchId(match.getId())).isNotEmpty();
+      assertThat(stateSegmentRepo.findByMatchId(match.getId())).isNotEmpty();
     }
     ReplayStatus again = runService.process(match(MATCHES[0]));
     assertThat(again).as("a second run replaces the first").isEqualTo(ReplayStatus.DONE);
@@ -185,7 +206,22 @@ class ReplayPostgresSmokeTest {
     match.setGameModeId(json.get("game_mode").asLong());
     match.setDuration(json.get("duration").asLong());
     match.setStartTime(json.get("start_time").asLong());
+    playerStatRepo.deleteAll(playerStatRepo.findAllByMatchId(match.getId()));
+    timelineRepo.deleteByMatchId(match.getId());
     for (JsonNode p : json.get("players")) {
+      long slot = p.get("player_slot").asLong();
+      for (int minute = 0; minute < p.get("gold_t").size(); minute++) {
+        long gold = p.get("gold_t").get(minute).asLong();
+        timelineRepo.save(
+            PlayerTimelineDomain.builder()
+                .matchId(match.getId())
+                .playerSlot(slot)
+                .gameMinute(minute)
+                .gold(gold)
+                .xp(p.get("xp_t").get(minute).asLong())
+                .networth(gold + STARTING_WORTH)
+                .build());
+      }
       PlayerMatchStatisticDomain stat = new PlayerMatchStatisticDomain();
       stat.setMatchId(match.getId());
       stat.setPlayerSlot(p.get("player_slot").asLong());
