@@ -47,6 +47,8 @@ public final class DeathAssessor {
           "modifier_fear",
           "modifier_taunt");
   private static final int EXPIRY_WINDOW_SECONDS = 3;
+  private static final int LONGEST_DISABLE_SECONDS = 60;
+  private static final double MIN_HELD_SECONDS = 0.25;
   private static final int CENTISECONDS = 100;
   private static final int DEFAULT_IMMUNITY_SECONDS = 10;
   private static final int TOP_SOURCES = 3;
@@ -146,8 +148,12 @@ public final class DeathAssessor {
                     w -> w[1] >= death.second() - EXPIRY_WINDOW_SECONDS && w[1] < death.second());
     boolean usedInLookback =
         immunity.stream().anyMatch(w -> w[1] >= from && w[0] <= death.second());
-    double disabled = disabledSeconds(victimEvents, from, death.second());
-    String pierced = piercedBy(victimEvents, immunity);
+    List<CombatEvent> recent =
+        victimEvents.stream()
+            .filter(e -> e.gameSecond() >= from - LONGEST_DISABLE_SECONDS)
+            .toList();
+    double disabled = disabledSeconds(recent, from, death.second());
+    String pierced = piercedBy(recent, immunity, from, death.second());
     List<CombatEvent> hits = damage(victimEvents, from, death.second());
     long lookbackDamage = hits.stream().mapToLong(CombatEvent::value).sum();
     long lastThree =
@@ -379,14 +385,21 @@ public final class DeathAssessor {
         .orElse(Double.POSITIVE_INFINITY);
   }
 
-  /** The disables that took hold while spell immunity was on, so went through it. */
-  private static String piercedBy(List<CombatEvent> events, List<double[]> immunity) {
+  /**
+   * The disables of the lookback that took hold while spell immunity was on, so went through it. A
+   * disable taken off at once, as when immunity blocks or strips it, did not take hold.
+   */
+  private static String piercedBy(
+      List<CombatEvent> events, List<double[]> immunity, double from, double to) {
     return events.stream()
         .filter(
             e ->
                 disableLength(e) > 0
+                    && e.gameSecond() >= from
+                    && e.gameSecond() <= to
+                    && removedAt(events, e) - e.gameSecond() > MIN_HELD_SECONDS
                     && immunity.stream()
-                        .anyMatch(w -> e.gameSecond() > w[0] && e.gameSecond() <= w[1]))
+                        .anyMatch(w -> e.gameSecond() > w[0] && e.gameSecond() < w[1]))
         .map(CombatEvent::inflictor)
         .distinct()
         .sorted()

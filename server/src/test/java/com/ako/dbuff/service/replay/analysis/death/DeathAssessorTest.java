@@ -142,6 +142,25 @@ class DeathAssessorTest {
   }
 
   @Test
+  void assess_doesNotCallADisableTakenOffAtOnceOrLongBeforeAPierce() {
+    CombatEvent blocked = modifier(CombatEventKind.MODIFIER_ADD, 192, "modifier_stunned", 300, 0);
+    CombatEvent stripped =
+        modifier(CombatEventKind.MODIFIER_REMOVE, 192.1, "modifier_stunned", 0, 0);
+    CombatEvent old = modifier(CombatEventKind.MODIFIER_ADD, 100, "modifier_stunned", 300, 0);
+
+    var a =
+        assessor.assess(
+            death(CombatEvent.ATTACKER_HERO),
+            traces(0),
+            timeline(BKB),
+            List.of(old, immuneAdd(190, 60), blocked, stripped),
+            null);
+
+    assertThat(a.reason()).isEqualTo(DeathReason.DIED_IMMUNE);
+    assertThat(a.immunityPiercedBy()).isNull();
+  }
+
+  @Test
   void assess_countsADisableOnlyUntilItWasRemoved() {
     List<CombatEvent> events =
         List.of(

@@ -1,5 +1,6 @@
 package com.ako.dbuff.dao.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -66,6 +67,7 @@ public class DeathAnalysisDomain {
   private Integer frontlineDelta;
 
   /** The disables that took hold while spell immunity was on, comma separated; null if none. */
+  @Column(length = 1000)
   private String immunityPiercedBy;
 
   private Boolean reincarnated;
