@@ -242,6 +242,11 @@ replay.processing.cron=0 3/10 * * * ?
 replay.processing.max-age-days=90
 replay.processing.max-replay-bytes=150MB # rejected before decompressing
 replay.processing.temp-dir=${java.io.tmpdir}/dbuff-replays
+replay.processing.max-attempts=5
+replay.processing.max-duration-min=120
+replay.processing.max-parse-seconds=120
+replay.processing.reduced-sampling-after-min=80
+replay.processing.min-duration-sec=300
 ```
 - `ReplayProcessingJob` is the only automatic entry point: Quartz cron, `@DisallowConcurrentExecution`, honours
   `QuietHoursGuard`, selects matches with `detailsMappedAt` set, a salt, no `DONE` run and age <= `max-age-days`,
@@ -252,6 +257,95 @@ replay.processing.temp-dir=${java.io.tmpdir}/dbuff-replays
 - One INFO line per replay: `parseMillis`, `replayBytes`, peak heap.
 - If the in-app parse at `-Xmx512m` fails the WP0 exit check, the fallback is a separate short-lived JVM per replay
   (the repo already has `sidecars/`); do not build it before the check says it is needed.
+
+---------------------------------------------------------------------------------------------------
+
+## 3c. Failure modes and resilience
+
+Replay work is optional enrichment. **Every failure ends in a stored status on `ReplayParseRunDomain`, never in an
+exception that reaches ingestion, reports or the scheduler**; reports built from OpenDota data keep working with no
+replay rows at all (3a.4).
+
+**3c.1 Status model.** `ReplayParseRunDomain.status`, split into permanent (never retried automatically) and
+transient (retried with a cap):
+
+| Status | Kind | Cause | Handling |
+|---|---|---|---|
+| `DONE` | final | all extractors ok | - |
+| `PARTIAL` | final | some extractors failed, reasons in `extractorStatus` | kept; failed extractors retried only when `parserVersion` changes |
+| `SKIPPED_NO_REPLAY_INFO` | permanent | `replayCluster`/`replaySalt` null (OpenDota has no replay data, private or very old match) | never queued; re-evaluated if a later OpenDota refetch fills the salt |
+| `SKIPPED_NOT_SUPPORTED` | permanent | game mode outside the supported set | - |
+| `SKIPPED_NOT_PLAYED` | permanent | match never started or ended in pre-game (see 3c.3) | - |
+| `EXPIRED` | permanent | download answers 404/410, or match older than `max-age-days` | never retried; L1 data stored earlier stays |
+| `TOO_LARGE` | permanent | over a size or duration limit (see 3c.4) | - |
+| `FAILED_IDENTITY` | permanent | replay does not belong to the match (see 3c.3) | no rows written; logged at WARN |
+| `FAILED_PARSER` | retried on new `parserVersion` | Clarity throws, unknown entity or field layout (new game patch) | not retried with the same version |
+| `FAILED_DOWNLOAD` | transient | timeout, 5xx, 403, connection reset, truncated or corrupt file | retry with backoff, capped by `max-attempts` (default 5, backoff 1 h doubling); then it stays failed |
+| `FAILED_RESOURCE` | transient, capped | out of memory, disk full, parse timeout | retried at most `max-attempts`; the message names the limit that was hit |
+| `RUNNING` | transient | in progress | lease (3c.5) |
+
+**3c.2 Download and file integrity.**
+- No cluster or salt: `SKIPPED_NO_REPLAY_INFO` before any network call. Build the URL only from numeric fields.
+- The 404/410 answers mean Valve has deleted the file: `EXPIRED`, not an error. Timeouts (connect and read, config),
+  5xx, 429 and connection errors are transient. A 403 is treated as transient too, because it also appears when the
+  CDN throttles.
+- Check `Content-Length` against `max-replay-bytes` before downloading; stop streaming when the byte count passes the
+  limit even if the header lies.
+- Sniff the magic bytes. Anything that is neither zstd nor bzip2 (an HTML error page returned with 200, an empty
+  body) is `FAILED_DOWNLOAD`, not a parser error. A decompression error or a file that ends early is
+  `FAILED_DOWNLOAD` and the partial temp file is deleted.
+- Circuit breaker: three consecutive transient download failures stop the current job run (as
+  `MatchDetailBackfillService` does on a rate limit or outage), so an outage costs three requests, not a full batch.
+
+**3c.3 Replays that are not a normal game.**
+- **Never started:** OpenDota duration 0 or missing, or the replay has no game state 5 (GAME_IN_PROGRESS):
+  `SKIPPED_NOT_PLAYED`. A match abandoned in the draft or strategy phase yields exactly this.
+- **Very short game** (under `min-duration-sec`, default 300 s, an abandon or early surrender): parse only the draft
+  and the roster, skip the analyses that need a lane phase, status `PARTIAL` with reason `SHORT_GAME`.
+- **Replay of a different match:** compare the replay's match id (demo header / `m_pGameRules`) with `matchId`, and
+  check the roster against the stored OpenDota players. Any mismatch: `FAILED_IDENTITY`, no rows. This also covers a
+  salt reused wrongly or a cached response.
+- **Leavers, disconnects, bots, anonymous players (`steamId = 0`):** the roster maps those by team and index. An
+  unmapped slot is stored with a null `accountId` and its analyses are skipped; the rest of the match is unaffected.
+- **Pauses:** the clock subtracts `m_nTotalPausedTicks`. If the pause counters are inconsistent (clock later than the
+  combat-log time by more than 2 s), flag `CLOCK_UNCERTAIN` on the run and skip the analyses that compare replay time
+  with OpenDota times (3a.1), instead of writing shifted data.
+- **Game ended by ancient or by abandon:** the last frames may be incomplete; extractors must tolerate a final missing
+  sample and never index past the last tick.
+
+**3c.4 Long matches and resource limits (for example a 90-minute game).**
+- Memory use grows with duration (about 2x a 45-minute game for per-second data). Limits in
+  `ReplayProcessingProperties`: `max-duration-min` (default 120) and `max-replay-bytes`; over either:
+  `TOO_LARGE`, not an attempt to parse.
+- The sizing in 4.3 is per second, so a 90-minute game costs about 10 x 5400 x 60 B = 3.2 MB for frames and a
+  proportionally larger combat-log view. Both are inside the one-replay budget; spike S8 and the WP0 exit check
+  measure a 90-minute replay explicitly and record the peak heap.
+- Sampling degrades before failing: past `reduced-sampling-after-min` (default 80), position tracks drop from 5 s to
+  10 s and the step is stored in `ReplayPlayerTrackDomain.stepSec`, so readers do not assume 5 s.
+- Parse timeout `max-parse-seconds` (default 120): the parse runs on its own thread and the Clarity run checks
+  a cancel flag every tick batch, so a stuck parse ends as `FAILED_RESOURCE` and frees the semaphore.
+- `OutOfMemoryError` is caught at the run boundary only, the facts are released, `FAILED_RESOURCE` is stored, and the
+  job stops the current run (a following replay would likely fail the same way). Free disk space is checked before
+  the download; `temp-dir` is cleaned at startup and after every run (`finally`).
+
+**3c.5 Interrupted work and consistency.**
+- A crash or restart while `RUNNING` leaves a stale row: `RUNNING` carries a `leaseUntil`; the queue treats an
+  expired lease as failed and counts it as one attempt. No process holds a replay run across restarts.
+- Each extractor writes in its own transaction with delete-then-insert for the match, so a retry replaces rather
+  than duplicates. A failed extractor leaves no half-written rows.
+- Extractors and analyzers are idempotent and keyed by `matchId` (+ `analysisVersion` for L2), so reprocessing is
+  always safe.
+- A **poison match** (fails repeatedly) is bounded by `max-attempts`; it never blocks the queue, because the job moves
+  on to the next match after each failure.
+- Match deletion removes replay rows through `ReplayDataService`, and a replay run for a deleted match ends quietly.
+
+**3c.6 Observability.** One INFO line per replay run (status, attempts, parseMillis, replayBytes, peak heap), WARN for
+`FAILED_*` with the reason, and a count of runs per status exposed as a metric. No per-tick logging.
+
+**3c.7 Tests.** Unit tests per row of 3c.1 with fakes (`ReplayDownloader` returning 404, a truncated stream, a wrong
+magic, a mismatching roster, a cancelled parse, a thrown `OutOfMemoryError`), plus a test that a failing replay run
+leaves the match, its OpenDota rows and the report untouched. The real-replay integration test (section 12) adds a
+paused match and a 90-minute match when such replays are available locally.
 
 ---------------------------------------------------------------------------------------------------
 
