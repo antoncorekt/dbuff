@@ -1,8 +1,5 @@
 package com.ako.dbuff.service.match.data;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.tuple;
-
 import com.ako.dbuff.dao.model.AbilityUpgradeDomain;
 import com.ako.dbuff.dao.model.DraftEventDomain;
 import com.ako.dbuff.dao.model.HeroTargetStatDomain;
@@ -35,6 +32,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest
 @ActiveProfiles("test")

@@ -1,11 +1,11 @@
 package com.ako.dbuff.service.scheduler;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import com.ako.dbuff.config.QuietHoursProperties;
 import com.ako.dbuff.dao.model.InstanceSettings;
 import java.time.LocalTime;
 import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class QuietHoursGuardTest {
 
