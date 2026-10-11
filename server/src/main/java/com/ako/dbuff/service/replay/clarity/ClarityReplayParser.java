@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import skadistats.clarity.event.Insert;
 import skadistats.clarity.model.Entity;
@@ -31,6 +32,7 @@ import skadistats.clarity.source.MappedFileSource;
  * Reads the replay with Clarity. It stops as soon as the game clock has started, which is all the
  * foundation needs; later extractors extend what this pass collects.
  */
+@Slf4j
 @Component
 public class ClarityReplayParser implements ReplayParser {
   static final String CLARITY_VERSION = "5.0.1";
@@ -49,8 +51,13 @@ public class ClarityReplayParser implements ReplayParser {
       if (hasCause(e, CancelledParsing.class)) {
         throw new ReplayException(ReplayStatus.FAILED_TIMEOUT, "Parse stopped: timed out");
       }
-      throw new ReplayException(
-          ReplayStatus.FAILED_PARSER, "Replay could not be parsed: " + e.getMessage(), e);
+      if (collector.facts == null) {
+        throw new ReplayException(
+            ReplayStatus.FAILED_PARSER, "Replay could not be parsed: " + e.getMessage(), e);
+      }
+      if (!hasCause(e, GameOver.class)) {
+        log.warn("Replay of the game was cut short, keeping what was read: {}", e.getMessage());
+      }
     }
     if (collector.facts == null) {
       throw new ReplayException(
@@ -67,6 +74,13 @@ public class ClarityReplayParser implements ReplayParser {
       }
     }
     return false;
+  }
+
+  /** Thrown when the game ends, so that nothing after it is read. */
+  private static final class GameOver extends RuntimeException {
+    GameOver() {
+      super(null, null, false, false);
+    }
   }
 
   private static final class CancelledParsing extends RuntimeException {
@@ -123,6 +137,9 @@ public class ClarityReplayParser implements ReplayParser {
         recorder().preGameStarted(ctx.getTick());
       } else if (state == POST_GAME || state == POST_GAME_SCORES) {
         recorder().stop();
+        if (facts != null) {
+          throw new GameOver();
+        }
       } else if (state == GAME_IN_PROGRESS && facts == null) {
         Number startTime = rules.getProperty(START_TIME);
         facts =
@@ -146,7 +163,7 @@ public class ClarityReplayParser implements ReplayParser {
           facts.gameStartTime(),
           facts.players(),
           facts.draft(),
-          recorder().result());
+          recorder().result(facts.clockStartTick()));
     }
 
     /** A pick is the moment an entry's player id changes from "nobody" to a player. */

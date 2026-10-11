@@ -18,8 +18,8 @@ import skadistats.clarity.processor.entities.Entities;
 final class SampleRecorder {
   private static final int STEP_TICKS = 150;
   private static final int STEP_SECONDS = 5;
+  private static final int TICKS_PER_SECOND = 30;
   private static final int PRE_GAME_TICKS = 2700;
-  private static final int PRE_GAME_SECONDS = 90;
   private static final int MINUTE_TICKS = 1800;
   private static final int MINUTE_OFFSET_TICKS = 900;
   private static final int CELL_SIZE = 128;
@@ -28,7 +28,7 @@ final class SampleRecorder {
 
   private final Entities entities;
   private final Map<Integer, Series> series = new TreeMap<>();
-  private final List<SampleFacts.MinuteSnapshot> minutes = new ArrayList<>();
+  private final List<RawSnapshot> snapshots = new ArrayList<>();
   private long anchorTick = -1;
   private long nextGridTick;
   private boolean stopped;
@@ -66,56 +66,64 @@ final class SampleRecorder {
     nextGridTick = grid + STEP_TICKS * (1 + (tick - grid) / STEP_TICKS);
   }
 
-  SampleFacts result() {
+  /**
+   * The samples with game times taken from the tick where the clock actually started, so a pre-game
+   * phase of another length shifts nothing.
+   */
+  SampleFacts result(long clockStartTick) {
     List<SampleFacts.PlayerSeries> all = new ArrayList<>();
     series.forEach((id, s) -> all.add(s.freeze(id)));
-    return new SampleFacts(-PRE_GAME_SECONDS, STEP_SECONDS, all, List.copyOf(minutes));
+    int startSeconds = -(int) Math.round((clockStartTick - anchorTick) / (double) TICKS_PER_SECOND);
+    List<SampleFacts.MinuteSnapshot> minutes =
+        snapshots.stream()
+            .map(
+                raw ->
+                    new SampleFacts.MinuteSnapshot(
+                        raw.playerId(),
+                        (int) Math.round((raw.gridTick() - clockStartTick) / (double) MINUTE_TICKS),
+                        raw.values()))
+            .filter(snapshot -> snapshot.gameMinute() >= -1)
+            .toList();
+    return new SampleFacts(startSeconds, STEP_SECONDS, all, minutes);
   }
 
   private void sample(long grid) {
     List<Controllers.View> players = Controllers.read(entities);
-    Entity resource = first("CDOTA_PlayerResource");
-    Entity radiant = first("CDOTA_DataRadiant");
-    Entity dire = first("CDOTA_DataDire");
     boolean minuteBoundary = (grid - anchorTick - MINUTE_OFFSET_TICKS) % MINUTE_TICKS == 0;
-    int minute = (int) ((grid - anchorTick - MINUTE_OFFSET_TICKS) / MINUTE_TICKS) - 1;
+    Entity resource = minuteBoundary ? first("CDOTA_PlayerResource") : null;
+    Entity radiant = minuteBoundary ? first("CDOTA_DataRadiant") : null;
+    Entity dire = minuteBoundary ? first("CDOTA_DataDire") : null;
     int size = series.isEmpty() ? 0 : series.values().iterator().next().size();
     for (Controllers.View player : players) {
       Series s = series.computeIfAbsent(player.playerId(), id -> new Series());
       s.padTo(size);
       s.add(player.hero());
-      if (minuteBoundary && minute >= -1) {
+      if (minuteBoundary) {
         Entity teamData = player.team() == 2 ? radiant : dire;
-        minutes.add(snapshot(player, minute, resource, teamData));
+        snapshots.add(
+            new RawSnapshot(player.playerId(), grid, counters(player, resource, teamData)));
       }
     }
     int count = size + 1;
     series.values().forEach(s -> s.padTo(count));
   }
 
-  private SampleFacts.MinuteSnapshot snapshot(
-      Controllers.View player, int minute, Entity resource, Entity teamData) {
+  private long[] counters(Controllers.View player, Entity resource, Entity teamData) {
     int index = player.playerId() / 2;
     long[] values = new long[MinuteStat.values().length];
     for (MinuteStat stat : MinuteStat.values()) {
-      Entity source = stat.source() == MinuteStat.Source.TEAM_DATA ? teamData : resource;
-      int position =
-          stat.source() == MinuteStat.Source.TEAM_DATA ? index % PLAYERS_PER_TEAM : index;
-      values[stat.ordinal()] = read(source, position, stat.property());
+      boolean team = stat.source() == MinuteStat.Source.TEAM_DATA;
+      values[stat.ordinal()] =
+          read(team ? teamData : resource, stat, team ? index % PLAYERS_PER_TEAM : index);
     }
-    return new SampleFacts.MinuteSnapshot(player.playerId(), minute, values);
+    return values;
   }
 
-  private static long read(Entity source, int position, String property) {
+  private static long read(Entity source, MinuteStat stat, int position) {
     if (source == null) {
       return MinuteStat.MISSING;
     }
-    String path =
-        (source.getDtClass().getDtName().equals("CDOTA_PlayerResource")
-                ? "m_vecPlayerTeamData."
-                : "m_vecDataTeam.")
-            + String.format("%04d.", position)
-            + property;
+    String path = stat.source().arrayPrefix() + String.format("%04d.", position) + stat.property();
     return source.hasProperty(path) && source.getProperty(path) instanceof Number n
         ? n.longValue()
         : MinuteStat.MISSING;
@@ -124,6 +132,9 @@ final class SampleRecorder {
   private Entity first(String dtName) {
     return entities.stream().filter(Entities.byDtName(dtName)).findFirst().orElse(null);
   }
+
+  /** Counters as read at a sample tick, labelled with a game minute once the clock is known. */
+  private record RawSnapshot(int playerId, long gridTick, long[] values) {}
 
   /** Growable columns of one player's samples. */
   private static final class Series {

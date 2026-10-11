@@ -5,8 +5,6 @@ import com.ako.dbuff.dao.model.ReplayPlayerMinuteDomain;
 import com.ako.dbuff.dao.repo.ReplayPlayerMinuteRepo;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,9 +28,7 @@ public class ReplayMinuteExtractor implements ReplayExtractor {
     if (samples == null) {
       return;
     }
-    Map<Integer, ReplayPlayerFact> players =
-        facts.players().stream()
-            .collect(Collectors.toMap(ReplayPlayerFact::replayPlayerId, Function.identity()));
+    Map<Integer, ReplayPlayerFact> players = facts.playersById();
     List<ReplayPlayerMinuteDomain> rows =
         samples.minutes().stream()
             .filter(snapshot -> players.containsKey(snapshot.replayPlayerId()))

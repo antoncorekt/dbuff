@@ -37,12 +37,23 @@ public enum MinuteStat {
 
   /** Where the counter lives: the per-team data entity or the shared player resource. */
   public enum Source {
-    TEAM_DATA,
-    PLAYER_TEAM_DATA
+    TEAM_DATA("m_vecDataTeam."),
+    PLAYER_TEAM_DATA("m_vecPlayerTeamData.");
+
+    private final String arrayPrefix;
+
+    Source(String arrayPrefix) {
+      this.arrayPrefix = arrayPrefix;
+    }
+
+    /** Where the per-player array starts on the entity. */
+    public String arrayPrefix() {
+      return arrayPrefix;
+    }
   }
 
-  /** Value stored when the replay has no such field. */
-  public static final long MISSING = -1;
+  /** Value stored when the replay has no such field; no real counter takes this value. */
+  public static final long MISSING = Long.MIN_VALUE;
 
   private final Source source;
   private final String property;

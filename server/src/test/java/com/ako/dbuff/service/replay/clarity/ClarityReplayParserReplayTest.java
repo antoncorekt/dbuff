@@ -124,6 +124,33 @@ class ClarityReplayParserReplayTest {
   }
 
   @Test
+  void parse_keepsWhatItReadWhenTheReplayIsCutShort(@org.junit.jupiter.api.io.TempDir Path dir)
+      throws Exception {
+    Path cut = dir.resolve("cut.dem");
+    long keep = Files.size(replay(MATCH)) * 3 / 4;
+    try (var in = Files.newInputStream(replay(MATCH));
+        var out = Files.newOutputStream(cut)) {
+      in.readNBytes((int) keep);
+      try (var again = Files.newInputStream(replay(MATCH))) {
+        out.write(again.readNBytes((int) keep));
+      }
+    }
+
+    ReplayFacts facts = parser.parse(cut, () -> false);
+
+    assertThat(facts.players()).hasSize(10);
+    assertThat(facts.draft().picks()).hasSize(40);
+    assertThat(facts.samples().series().getFirst().x().length).isGreaterThan(100);
+  }
+
+  @Test
+  void parse_startsTheSamplesAtTheRealClockStart() {
+    SampleFacts samples = parser.parse(replay(MATCH), () -> false).samples();
+
+    assertThat(samples.startSeconds()).isEqualTo(-90);
+  }
+
+  @Test
   void parse_stopsWhenCancelled() {
     assertThatThrownBy(() -> parser.parse(replay(MATCH), () -> true))
         .isInstanceOfSatisfying(
