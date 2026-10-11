@@ -1,6 +1,9 @@
 package com.ako.dbuff.service.replay.clarity;
 
 import com.ako.dbuff.dao.model.ReplayStatus;
+import com.ako.dbuff.service.replay.CombatEvent;
+import com.ako.dbuff.service.replay.CombatEventKind;
+import com.ako.dbuff.service.replay.CombatLogCodec;
 import com.ako.dbuff.service.replay.DraftFacts;
 import com.ako.dbuff.service.replay.DraftPick;
 import com.ako.dbuff.service.replay.MinuteStat;
@@ -147,6 +150,32 @@ class ClarityReplayParserReplayTest {
   }
 
   @Test
+  void parse_keepsTheHeroCombatLogThatAgreesWithOpenDota() {
+    var events = parser.parse(replay(MATCH), () -> false).combatLog().events();
+
+    long phantomDamage = heroDamage(events, "npc_dota_hero_phantom_assassin");
+    long furionDamage = heroDamage(events, "npc_dota_hero_furion");
+    assertThat(phantomDamage).as("OpenDota hero_damage 30805").isEqualTo(30805);
+    assertThat(furionDamage).as("OpenDota hero_damage 20104").isEqualTo(20104);
+    assertThat(uses(events, CombatEventKind.ABILITY, "npc_dota_hero_sniper", "sniper_take_aim"))
+        .isEqualTo(11);
+    assertThat(
+            uses(events, CombatEventKind.ABILITY, "npc_dota_hero_sniper", "furion_teleportation"))
+        .isEqualTo(37);
+    assertThat(uses(events, CombatEventKind.ITEM, "npc_dota_hero_sniper", "item_tpscroll"))
+        .isEqualTo(9);
+    var deaths =
+        events.stream()
+            .filter(e -> e.kind() == CombatEventKind.DEATH && e.targetIsRealHero())
+            .toList();
+    assertThat(deaths).as("OpenDota counts 94; the 95th is the Aegis of the Immortal").hasSize(95);
+    assertThat(deaths.getFirst().gameSecond()).isBetween(3.0, 4.5);
+    assertThat(events.stream().filter(e -> e.kind() == CombatEventKind.BUILDING_KILL)).hasSize(22);
+    assertThat(events.size()).as("a fraction of the 57 thousand entries").isLessThan(45_000);
+    assertThat(CombatLogCodec.encode(events).length).isLessThan(1_000_000);
+  }
+
+  @Test
   void parse_stopsWhenCancelled() {
     assertThatThrownBy(() -> parser.parse(replay(MATCH), () -> true))
         .isInstanceOfSatisfying(
@@ -168,5 +197,30 @@ class ClarityReplayParserReplayTest {
 
   private static Path replay(String name) {
     return Path.of(System.getenv("REPLAY_FIXTURE_DIR")).resolve(name);
+  }
+
+  private static long heroDamage(java.util.List<CombatEvent> events, String hero) {
+    return events.stream()
+        .filter(
+            e ->
+                e.kind() == CombatEventKind.DAMAGE
+                    && e.gameSecond() > 0
+                    && e.attackerIsRealHero()
+                    && e.targetIsRealHero()
+                    && e.attacker().equals(hero))
+        .mapToLong(CombatEvent::value)
+        .sum();
+  }
+
+  private static long uses(
+      java.util.List<CombatEvent> events, CombatEventKind kind, String hero, String inflictor) {
+    return events.stream()
+        .filter(
+            e ->
+                e.kind() == kind
+                    && e.gameSecond() > 0
+                    && e.attacker().equals(hero)
+                    && e.inflictor().equals(inflictor))
+        .count();
   }
 }
