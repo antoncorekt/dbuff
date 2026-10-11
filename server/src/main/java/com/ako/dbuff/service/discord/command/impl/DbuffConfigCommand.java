@@ -115,6 +115,11 @@ public class DbuffConfigCommand implements DbuffCommand {
                     new OptionData(
                         OptionType.BOOLEAN, "ai_summary", "Post the AI match summary", false),
                     new OptionData(
+                        OptionType.BOOLEAN,
+                        "replay_report",
+                        "Post the replay analysis in the match thread",
+                        false),
+                    new OptionData(
                             OptionType.STRING,
                             "detail",
                             "How much each match report includes",
@@ -407,10 +412,20 @@ public class DbuffConfigCommand implements DbuffCommand {
       return;
     }
 
+    Boolean replayReport = parseSwitch(context.getOption("replay_report"));
+    if (context.getOption("replay_report") != null && replayReport == null) {
+      context.replyEphemeral(
+          "❌ Could not read `replay_report` value `"
+              + context.getOption("replay_report")
+              + "`. Use true or false.");
+      return;
+    }
+
     List<String> modes = context.getOptionAsList("game_mode");
     UpdateInstanceRequest request =
         UpdateInstanceRequest.builder()
             .aiSummaryEnabled(aiSummary)
+            .replayReportEnabled(replayReport)
             .reportDetail(context.getOption("detail"))
             .quietHours(context.getOption("quiet_hours"))
             .timezone(context.getOption("timezone"))
@@ -469,6 +484,8 @@ public class DbuffConfigCommand implements DbuffCommand {
                 .collect(Collectors.joining(", "));
     return "**AI summary:** "
         + (settings.isAiSummaryEnabled() ? "on" : "off")
+        + "\n**Replay analysis:** "
+        + (settings.isReplayReportEnabled() ? "on" : "off")
         + "\n**Report detail:** "
         + settings.getReportDetail().toLowerCase()
         + "\n**Quiet hours:** "
@@ -557,6 +574,8 @@ public class DbuffConfigCommand implements DbuffCommand {
             "• `/dbuff add` — add the rest of the group\n"
                 + "• `/dbuff link` — connect players to Discord accounts\n"
                 + "• `/stats` — see how the group is doing\n"
+                + "• Replay analysis follows each report into its thread; turn it off with"
+                + " `/dbuff settings replay_report:false`\n"
                 + "Past matches are imported quietly; reports start with your next game.",
             false)
         .build();

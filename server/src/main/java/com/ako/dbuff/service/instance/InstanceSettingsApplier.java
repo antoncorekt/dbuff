@@ -41,6 +41,9 @@ public class InstanceSettingsApplier {
     if (request.getAiSummaryEnabled() != null) {
       target.setAiSummaryEnabled(request.getAiSummaryEnabled());
     }
+    if (request.getReplayReportEnabled() != null) {
+      target.setReplayReportEnabled(request.getReplayReportEnabled());
+    }
     if (request.getReportDetail() != null) {
       target.setReportDetail(parseDetail(request.getReportDetail()));
     }

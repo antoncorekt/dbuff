@@ -10,6 +10,7 @@ class InstanceSettingsTest {
   @Test
   void anUntouchedChannel_behavesAsBefore() {
     InstanceSettings settings = new InstanceSettings();
+    assertThat(settings.isReplayReportOn()).as("unset means on").isTrue();
 
     assertThat(settings.isAiSummaryOn()).isTrue();
     assertThat(settings.detail()).isEqualTo(ReportDetail.FULL);
