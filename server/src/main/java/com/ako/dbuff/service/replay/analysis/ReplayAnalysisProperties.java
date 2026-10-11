@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.analysis;
 import com.ako.dbuff.service.replay.analysis.activity.ActivityTuning;
 import com.ako.dbuff.service.replay.analysis.death.DeathAssessor;
 import com.ako.dbuff.service.replay.analysis.fight.FightDetector;
+import com.ako.dbuff.service.replay.analysis.team.TeamStateSegmenter;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -61,6 +62,20 @@ public class ReplayAnalysisProperties {
 
   /** A hero this many places further forward than his attack range suggests was out of position. */
   private int deathOutOfPositionRanks = 2;
+
+  /** A team is ahead from this share of both teams' net worth together, in percent. */
+  private int teamAheadPercent = 5;
+
+  /** A lead must hold this long before the team counts as ahead or behind. */
+  private int teamStateEnterSeconds = 120;
+
+  /** A lead must have faded this long before the team counts as even again. */
+  private int teamStateLeaveSeconds = 60;
+
+  public TeamStateSegmenter.Tuning teamStateTuning() {
+    return new TeamStateSegmenter.Tuning(
+        teamAheadPercent / 100.0, teamStateEnterSeconds, teamStateLeaveSeconds);
+  }
 
   public FightDetector.Tuning fightTuning() {
     return new FightDetector.Tuning(
