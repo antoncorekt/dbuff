@@ -84,10 +84,11 @@ public class ReplayRunService {
       return finish(run, skip.get().getStatus(), skip.get().getMessage());
     }
     boolean acquired = false;
+    List<String> failedExtractors;
     try {
       parseSemaphore.acquire();
       acquired = true;
-      return parse(match, run);
+      failedExtractors = readAndExtract(match, run);
     } catch (ReplayException e) {
       return fail(run, e.getStatus(), e.getMessage());
     } catch (InterruptedException e) {
@@ -109,15 +110,24 @@ public class ReplayRunService {
         parseSemaphore.release();
       }
     }
+    return conclude(match, run, failedExtractors);
   }
 
-  private ReplayStatus parse(MatchDomain match, ReplayParseRunDomain run) {
-    List<String> failed = readAndExtract(match, run);
-    failed.addAll(analysis.analyze(match.getId()));
-    if (failed.isEmpty()) {
+  /** The analyzers read stored data only, so they run after the parse permit is given back. */
+  private ReplayStatus conclude(
+      MatchDomain match, ReplayParseRunDomain run, List<String> failedExtractors) {
+    List<String> failedAnalyzers = analysis.analyze(match.getId(), failedExtractors);
+    if (failedExtractors.isEmpty() && failedAnalyzers.isEmpty()) {
       return finish(run, ReplayStatus.DONE, null);
     }
-    return fail(run, ReplayStatus.PARTIAL, "Failed: " + String.join(", ", failed));
+    List<String> parts = new java.util.ArrayList<>();
+    if (!failedExtractors.isEmpty()) {
+      parts.add("Failed extractors: " + String.join(", ", failedExtractors));
+    }
+    if (!failedAnalyzers.isEmpty()) {
+      parts.add("Failed analyzers: " + String.join(", ", failedAnalyzers));
+    }
+    return fail(run, ReplayStatus.PARTIAL, String.join("; ", parts));
   }
 
   /**

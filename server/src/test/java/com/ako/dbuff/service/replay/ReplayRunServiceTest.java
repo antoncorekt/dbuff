@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -62,7 +63,7 @@ class ReplayRunServiceTest {
               return run;
             });
     when(statRepo.findAllByMatchId(anyLong())).thenReturn(List.<PlayerMatchStatisticDomain>of());
-    when(analysis.analyze(anyLong())).thenAnswer(i -> new java.util.ArrayList<String>());
+    when(analysis.analyze(anyLong(), any())).thenAnswer(i -> new java.util.ArrayList<String>());
     when(goodExtractor.name()).thenReturn("good");
     when(brokenExtractor.name()).thenReturn("broken");
     when(parser.version()).thenReturn("5.0.1");
@@ -112,14 +113,29 @@ class ReplayRunServiceTest {
 
   @Test
   void process_marksTheRunPartialWhenAnAnalyzerFails_andRunsTheAnalyzersOnlyAfterTheExtractors() {
-    when(analysis.analyze(1L)).thenReturn(new java.util.ArrayList<>(List.of("activity")));
+    when(analysis.analyze(eq(1L), any()))
+        .thenReturn(new java.util.ArrayList<>(List.of("activity")));
 
     assertThat(service.process(match())).isEqualTo(ReplayStatus.PARTIAL);
 
     assertThat(runs.get(1L).getError()).contains("activity");
     org.mockito.InOrder order = org.mockito.Mockito.inOrder(goodExtractor, analysis);
     order.verify(goodExtractor).extract(any(), any());
-    order.verify(analysis).analyze(1L);
+    order.verify(analysis).analyze(eq(1L), any());
+  }
+
+  @Test
+  void process_givesTheParsePermitBackBeforeTheAnalyzersRun() {
+    when(analysis.analyze(anyLong(), any()))
+        .thenAnswer(
+            invocation -> {
+              assertThat(semaphore.availablePermits()).isEqualTo(1);
+              return new java.util.ArrayList<String>();
+            });
+
+    assertThat(service.process(match())).isEqualTo(ReplayStatus.DONE);
+
+    verify(analysis).analyze(eq(1L), any());
   }
 
   @Test

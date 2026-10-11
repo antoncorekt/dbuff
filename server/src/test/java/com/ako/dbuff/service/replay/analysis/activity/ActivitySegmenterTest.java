@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.analysis.activity;
 
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
+import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.map.MapLayout;
 import com.ako.dbuff.service.replay.map.MapLayouts;
 import com.ako.dbuff.service.replay.map.Zone;
@@ -21,7 +22,8 @@ class ActivitySegmenterTest {
 
   private final MapLayouts layouts = new MapLayouts(new ObjectMapper());
   private final MapLayout layout = layouts.forVersion(layouts.frozenVersion()).orElseThrow();
-  private final ActivitySegmenter segmenter = new ActivitySegmenter(ActivityTuning.defaults());
+  private final ActivitySegmenter segmenter =
+      new ActivitySegmenter(new ReplayAnalysisProperties().activityTuning());
 
   @Test
   void segment_labelsASampleBySomethingThatExplainsIt_deadBeforeAnythingElse() {
@@ -38,12 +40,35 @@ class ActivitySegmenterTest {
   void segment_countsAHeroWithACreepLastHitNearbyAsFarming_neutralsAsJungleAndLaneCreepsAsLane() {
     var track = track(5, new int[][] {{-2000, -4000, 5, 1}, {BOT_LANE_X, BOT_LANE_Y, 5, 1}});
     List<CombatEvent> events =
-        List.of(kill(0, "npc_dota_neutral_centaur_khan"), kill(5, "npc_dota_creep_goodguys_melee"));
+        List.of(kill(0, "npc_dota_neutral_centaur_khan"), kill(5, "npc_dota_creep_badguys_melee"));
 
     List<ActivitySegment> segments = segmenter.segment(track, HERO, events, layout);
 
     assertThat(segments).extracting(ActivitySegment::activity).contains(Activity.JUNGLE_FARM);
     assertThat(segments.getFirst().zone()).isEqualTo(Zone.Kind.JUNGLE);
+  }
+
+  @Test
+  void segment_doesNotCountADenyOrALastHitThatComesAfterTheSample() {
+    var track =
+        track(5, new int[][] {{BOT_LANE_X, BOT_LANE_Y, 5, 1}, {BOT_LANE_X, BOT_LANE_Y, 5, 1}});
+    List<CombatEvent> events =
+        List.of(
+            kill(-30, "npc_dota_creep_goodguys_melee"), kill(5, "npc_dota_creep_badguys_melee"));
+
+    List<ActivitySegment> segments = segmenter.segment(track, HERO, events, layout);
+
+    assertThat(segments.getFirst().activity()).isEqualTo(Activity.POSITIONED);
+    assertThat(segments.get(segments.size() - 1).activity()).isEqualTo(Activity.LANE_FARM);
+  }
+
+  @Test
+  void segment_doesNotCallATeleportOrRespawnJumpTraveling() {
+    var track = track(5, new int[][] {{BASE_X, BASE_Y, 1, 1}, {BOT_LANE_X, BOT_LANE_Y, 1, 1}});
+
+    List<ActivitySegment> segments = segmenter.segment(track, HERO, List.of(), layout);
+
+    assertThat(segments.get(segments.size() - 1).activity()).isEqualTo(Activity.POSITIONED);
   }
 
   @Test

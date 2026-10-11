@@ -122,9 +122,9 @@ class ActivityAnalyzerTest {
         List.of(
             new CombatEvent(
                 CombatEventKind.DEATH,
-                -75,
+                -82,
                 "npc_dota_hero_sniper",
-                "npc_dota_creep_goodguys_melee",
+                "npc_dota_creep_badguys_melee",
                 "",
                 CombatEvent.ATTACKER_HERO,
                 0,

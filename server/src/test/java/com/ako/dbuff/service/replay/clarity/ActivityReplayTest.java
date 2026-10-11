@@ -5,10 +5,10 @@ import com.ako.dbuff.service.replay.HeroNames;
 import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.ReplayPlayerFact;
 import com.ako.dbuff.service.replay.SampleFacts;
+import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.activity.Activity;
 import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
 import com.ako.dbuff.service.replay.analysis.activity.ActivitySegmenter;
-import com.ako.dbuff.service.replay.analysis.activity.ActivityTuning;
 import com.ako.dbuff.service.replay.map.MapLayout;
 import com.ako.dbuff.service.replay.map.MapLayouts;
 import com.ako.dbuff.service.replay.map.Zone;
@@ -29,7 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ActivityReplayTest {
 
   private final MapLayouts layouts = new MapLayouts(new ObjectMapper());
-  private final ActivitySegmenter segmenter = new ActivitySegmenter(ActivityTuning.defaults());
+  private final ActivitySegmenter segmenter =
+      new ActivitySegmenter(new ReplayAnalysisProperties().activityTuning());
 
   @Test
   void deadTimeAndJunglingAgreeWithOpenDota() {

@@ -55,23 +55,33 @@ public class ActivityAnalyzer implements ReplayAnalyzer {
   }
 
   @Override
+  public Set<String> requires() {
+    return Set.of("players", "tracks", "combat-log");
+  }
+
+  @Override
   @Transactional
   public void analyze(long matchId) {
     deleteByMatchId(matchId);
     MapLayout layout = layout(matchId);
     if (layout == null) {
+      log.info("Match {} was not played on the frozen map layout, no activity stored", matchId);
       return;
     }
     List<CombatEvent> events = combatLog.events(matchId);
+    if (events.isEmpty()) {
+      log.info("Match {} has no stored combat log, no activity stored", matchId);
+      return;
+    }
     Set<String> heroNames = heroNames(events);
     Map<Long, ReplayPlayerDomain> players =
         playerRepo.findByMatchId(matchId).stream()
-            .collect(Collectors.toMap(ReplayPlayerDomain::getPlayerSlot, Function.identity()));
-    ActivitySegmenter segmenter =
-        new ActivitySegmenter(
-            new ActivityTuning(
-                analysis.getActivityFarmWindowSeconds(),
-                analysis.getActivityTravelUnitsPerSecond()));
+            .collect(
+                Collectors.toMap(
+                    ReplayPlayerDomain::getPlayerSlot,
+                    Function.identity(),
+                    (first, second) -> first));
+    ActivitySegmenter segmenter = new ActivitySegmenter(analysis.activityTuning());
     for (ReplayPlayerTrackDomain track : trackRepo.findByMatchId(matchId)) {
       ReplayPlayerDomain player = players.get(track.getPlayerSlot());
       String hero = player == null ? null : heroName(player, heroNames);

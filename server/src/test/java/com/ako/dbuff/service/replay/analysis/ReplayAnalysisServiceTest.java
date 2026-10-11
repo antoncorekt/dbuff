@@ -20,10 +20,20 @@ class ReplayAnalysisServiceTest {
     when(broken.name()).thenReturn("broken");
     doThrow(new IllegalStateException("boom")).when(broken).analyze(5L);
 
-    List<String> failed = service.analyze(5L);
+    List<String> failed = service.analyze(5L, List.of());
 
     assertThat(failed).containsExactly("broken");
     verify(good).analyze(5L);
+  }
+
+  @Test
+  void analyze_skipsAnAnalyzerWhoseInputExtractorFailed_soItsEarlierRowsSurvive() {
+    when(good.requires()).thenReturn(java.util.Set.of("tracks"));
+
+    List<String> failed = service.analyze(5L, List.of("tracks"));
+
+    assertThat(failed).doesNotContain("good");
+    org.mockito.Mockito.verify(good, org.mockito.Mockito.never()).analyze(5L);
   }
 
   @Test

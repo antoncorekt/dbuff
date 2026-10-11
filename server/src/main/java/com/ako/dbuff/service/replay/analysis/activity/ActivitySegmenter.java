@@ -42,8 +42,8 @@ public final class ActivitySegmenter {
 
   public List<ActivitySegment> segment(
       Track track, String heroName, List<CombatEvent> events, MapLayout layout) {
-    List<double[]> farm = farmHits(heroName, events);
-    List<double[]> teleports = teleportWindows(heroName, events);
+    List<FarmHit> farm = farmHits(heroName, track.ownHalf(), events);
+    List<TeleportWindow> teleports = teleportWindows(heroName, events);
     List<ActivitySegment> segments = new ArrayList<>();
     ActivitySegment open = null;
     for (int i = 0; i < track.x().length; i++) {
@@ -75,8 +75,8 @@ public final class ActivitySegmenter {
       Track track,
       int i,
       int time,
-      List<double[]> farm,
-      List<double[]> teleports,
+      List<FarmHit> farm,
+      List<TeleportWindow> teleports,
       MapLayout layout) {
     Zone zone = layout.zone(track.x()[i], track.y()[i]);
     Zone.Lane lane = zone.kind() == Zone.Kind.LANE ? zone.lane() : null;
@@ -91,19 +91,20 @@ public final class ActivitySegmenter {
       int time,
       Zone zone,
       ActivitySegment.Side side,
-      List<double[]> farm,
-      List<double[]> teleports) {
+      List<FarmHit> farm,
+      List<TeleportWindow> teleports) {
     if ((track.flags()[i] & 1) == 0) {
       return Activity.DEAD;
     }
-    if (teleports.stream().anyMatch(w -> time >= w[0] && time <= w[1])) {
+    if (teleports.stream().anyMatch(w -> time >= w.start() && time <= w.end())) {
       return Activity.TELEPORTING;
     }
     int neutral = 0;
     int lane = 0;
-    for (double[] hit : farm) {
-      if (Math.abs(hit[0] - time) <= tuning.farmWindowSeconds()) {
-        if (hit[1] > 0) {
+    for (FarmHit hit : farm) {
+      if (hit.second() >= time - tuning.farmLookbackSeconds()
+          && hit.second() < time + track.stepSeconds()) {
+        if (hit.neutral()) {
           neutral++;
         } else {
           lane++;
@@ -122,10 +123,15 @@ public final class ActivitySegmenter {
     if (zone.kind() == Zone.Kind.LANE && side == ActivitySegment.Side.ENEMY) {
       return Activity.PUSHING;
     }
-    if (i > 0 && track.level()[i - 1] > 0 && speed(track, i) >= tuning.travelUnitsPerSecond()) {
+    if (i > 0 && track.level()[i - 1] > 0 && onFoot(speed(track, i))) {
       return Activity.TRAVELING;
     }
     return Activity.POSITIONED;
+  }
+
+  /** Fast enough to be walking somewhere, not so fast that it was a teleport or a respawn. */
+  private boolean onFoot(double speed) {
+    return speed >= tuning.travelUnitsPerSecond() && speed <= tuning.jumpUnitsPerSecond();
   }
 
   private static double speed(Track track, int i) {
@@ -140,9 +146,14 @@ public final class ActivitySegmenter {
     return zone.half() == ownHalf ? ActivitySegment.Side.OWN : ActivitySegment.Side.ENEMY;
   }
 
-  /** Creep last hits by the hero: second, and 1 for a neutral, 0 for a lane creep. */
-  private static List<double[]> farmHits(String hero, List<CombatEvent> events) {
-    List<double[]> hits = new ArrayList<>();
+  private record FarmHit(double second, boolean neutral) {}
+
+  private record TeleportWindow(double start, double end) {}
+
+  /** Last hits on neutrals and on the enemy's lane creeps; an own creep is a deny, not farm. */
+  private static List<FarmHit> farmHits(String hero, Zone.Half ownHalf, List<CombatEvent> events) {
+    String enemyCreeps = ownHalf == Zone.Half.RADIANT ? "badguys" : "goodguys";
+    List<FarmHit> hits = new ArrayList<>();
     for (CombatEvent e : events) {
       if (e.kind() != CombatEventKind.DEATH
           || !e.attackerIsRealHero()
@@ -151,17 +162,17 @@ public final class ActivitySegmenter {
         continue;
       }
       if (e.target().startsWith(NEUTRAL)) {
-        hits.add(new double[] {e.gameSecond(), 1});
-      } else if (e.target().startsWith(LANE_CREEP)) {
-        hits.add(new double[] {e.gameSecond(), 0});
+        hits.add(new FarmHit(e.gameSecond(), true));
+      } else if (e.target().startsWith(LANE_CREEP) && e.target().contains(enemyCreeps)) {
+        hits.add(new FarmHit(e.gameSecond(), false));
       }
     }
     return hits;
   }
 
   /** From each teleport modifier added on the hero to the one removed after it. */
-  private static List<double[]> teleportWindows(String hero, List<CombatEvent> events) {
-    List<double[]> windows = new ArrayList<>();
+  private static List<TeleportWindow> teleportWindows(String hero, List<CombatEvent> events) {
+    List<TeleportWindow> windows = new ArrayList<>();
     double start = Double.NaN;
     for (CombatEvent e : events) {
       if (!TELEPORTING.equals(e.inflictor()) || !Objects.equals(e.target(), hero)) {
@@ -170,7 +181,7 @@ public final class ActivitySegmenter {
       if (e.kind() == CombatEventKind.MODIFIER_ADD) {
         start = e.gameSecond();
       } else if (e.kind() == CombatEventKind.MODIFIER_REMOVE && !Double.isNaN(start)) {
-        windows.add(new double[] {start, e.gameSecond()});
+        windows.add(new TeleportWindow(start, e.gameSecond()));
         start = Double.NaN;
       }
     }
