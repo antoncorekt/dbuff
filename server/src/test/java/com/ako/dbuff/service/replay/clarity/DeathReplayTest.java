@@ -73,9 +73,14 @@ class DeathReplayTest {
             assertThat(a.bkbOwned()).as("death at %.0f", second).isTrue();
           }
         });
-    assertThat(byTime.values().stream().filter(a -> a.reason() == DeathReason.DIED_IMMUNE).count())
-        .as("one death while immune")
-        .isEqualTo(1);
+    var immune =
+        byTime.values().stream()
+            .filter(
+                a -> a.reason() == DeathReason.DIED_IMMUNE || a.reason() == DeathReason.BKB_PIERCED)
+            .toList();
+    assertThat(immune).as("one death while immune").hasSize(1);
+    assertThat(immune.getFirst().reason()).isEqualTo(DeathReason.BKB_PIERCED);
+    assertThat(immune.getFirst().immunityPiercedBy()).isEqualTo("modifier_stunned");
   }
 
   private Map<Integer, Map<Double, DeathAssessor.Assessment>> assess() {

@@ -109,6 +109,48 @@ class DeathAssessorTest {
     assertThat(positioned(-3, List.of(damage(199, 1600)))).isEqualTo(DeathReason.BURST);
   }
 
+  @Test
+  void assess_namesTheDisablesThatWentThroughSpellImmunity() {
+    CombatEvent pierce =
+        new CombatEvent(
+            CombatEventKind.MODIFIER_ADD,
+            192,
+            "",
+            "npc_dota_hero_victim",
+            "modifier_enigma_black_hole_pull",
+            CombatEvent.TARGET_HERO,
+            0,
+            0,
+            300,
+            0,
+            0,
+            0,
+            0);
+
+    var a =
+        assessor.assess(
+            death(CombatEvent.ATTACKER_HERO),
+            traces(0),
+            timeline(BKB),
+            List.of(immuneAdd(190, 60), pierce),
+            null);
+
+    assertThat(a.reason()).isEqualTo(DeathReason.BKB_PIERCED);
+    assertThat(a.immunityPiercedBy()).isEqualTo("modifier_enigma_black_hole_pull");
+    assertThat(reason(timeline(BKB), List.of(immuneAdd(190, 60))))
+        .isEqualTo(DeathReason.DIED_IMMUNE);
+  }
+
+  @Test
+  void assess_countsADisableOnlyUntilItWasRemoved() {
+    List<CombatEvent> events =
+        List.of(
+            stun(195, 800),
+            modifier(CombatEventKind.MODIFIER_REMOVE, 196, "modifier_stunned", 0, 0));
+
+    assertThat(reason(new HeroStateTimeline(), events)).isEqualTo(DeathReason.NO_BKB);
+  }
+
   private DeathReason positioned(Integer delta, List<CombatEvent> events) {
     return assessor
         .assess(

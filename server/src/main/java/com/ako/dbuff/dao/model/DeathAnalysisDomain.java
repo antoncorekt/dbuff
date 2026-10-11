@@ -65,6 +65,9 @@ public class DeathAnalysisDomain {
    */
   private Integer frontlineDelta;
 
+  /** The disables that took hold while spell immunity was on, comma separated; null if none. */
+  private String immunityPiercedBy;
+
   private Boolean reincarnated;
   private Boolean bkbOwned;
 

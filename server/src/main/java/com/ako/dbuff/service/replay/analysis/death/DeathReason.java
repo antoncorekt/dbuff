@@ -6,6 +6,8 @@ public enum DeathReason {
   REINCARNATED,
   /** Spell immunity was on and the hero died anyway. */
   DIED_IMMUNE,
+  /** Spell immunity was on, but a disable that goes through it took hold, and he died. */
+  BKB_PIERCED,
   /** Spell immunity ended just before the death. */
   BKB_EXPIRED,
   /** BKB was owned and ready but not used in the seconds before. */

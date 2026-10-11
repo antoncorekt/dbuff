@@ -61,7 +61,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 2;
+    return 3;
   }
 
   @Override
@@ -186,6 +186,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
         .saveItemsOwned(a.saveItemsOwned())
         .teleportReady(a.teleportReady())
         .frontlineDelta(a.frontlineDelta())
+        .immunityPiercedBy(a.immunityPiercedBy())
         .reason(a.reason().name())
         .analysisVersion(version())
         .build();

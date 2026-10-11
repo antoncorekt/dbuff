@@ -92,7 +92,8 @@ public final class DeathAssessor {
       String saveItemsOwned,
       boolean teleportReady,
       DeathReason reason,
-      Integer frontlineDelta) {}
+      Integer frontlineDelta,
+      String immunityPiercedBy) {}
 
   private static final Pattern BUILDING_NAME =
       Pattern.compile("^npc_dota_(goodguys|badguys)_(tower|fort|.*rax)");
@@ -146,6 +147,7 @@ public final class DeathAssessor {
     boolean usedInLookback =
         immunity.stream().anyMatch(w -> w[1] >= from && w[0] <= death.second());
     double disabled = disabledSeconds(victimEvents, from, death.second());
+    String pierced = piercedBy(victimEvents, immunity);
     List<CombatEvent> hits = damage(victimEvents, from, death.second());
     long lookbackDamage = hits.stream().mapToLong(CombatEvent::value).sum();
     long lastThree =
@@ -166,6 +168,7 @@ public final class DeathAssessor {
             ownedThroughout,
             ready,
             active,
+            !pierced.isEmpty(),
             expired,
             usedInLookback,
             disabled,
@@ -190,7 +193,8 @@ public final class DeathAssessor {
         String.join(",", saves),
         teleport,
         reason,
-        frontlineDelta);
+        frontlineDelta,
+        pierced.isEmpty() ? null : pierced);
   }
 
   private DeathReason reason(
@@ -200,6 +204,7 @@ public final class DeathAssessor {
       boolean ownedThroughout,
       boolean ready,
       boolean active,
+      boolean pierced,
       boolean expired,
       boolean usedInLookback,
       double disabled,
@@ -210,7 +215,7 @@ public final class DeathAssessor {
       return DeathReason.REINCARNATED;
     }
     if (active) {
-      return DeathReason.DIED_IMMUNE;
+      return pierced ? DeathReason.BKB_PIERCED : DeathReason.DIED_IMMUNE;
     }
     if (expired) {
       return DeathReason.BKB_EXPIRED;
@@ -321,22 +326,20 @@ public final class DeathAssessor {
     return windows;
   }
 
-  /** The time the hero spent disabled in {@code [from, to]}, overlapping disables counted once. */
+  /**
+   * The time the hero spent disabled in {@code [from, to]}, overlapping disables counted once. A
+   * disable that was removed early, by a dispel or by BKB, counts only until it was removed.
+   */
   private static double disabledSeconds(List<CombatEvent> events, double from, double to) {
     List<double[]> intervals = new ArrayList<>();
     for (CombatEvent e : events) {
-      if (e.kind() != CombatEventKind.MODIFIER_ADD) {
+      double length = disableLength(e);
+      if (length <= 0) {
         continue;
       }
-      double length = 0;
-      if (e.aux() > 0) {
-        length = e.aux() / (double) CENTISECONDS;
-      } else if (DISABLES.contains(e.inflictor()) && e.aux2() > 0) {
-        length = e.aux2() / (double) CENTISECONDS;
-      }
-      if (length > 0 && e.gameSecond() <= to && e.gameSecond() + length >= from) {
-        intervals.add(
-            new double[] {Math.max(from, e.gameSecond()), Math.min(to, e.gameSecond() + length)});
+      double end = Math.min(e.gameSecond() + length, removedAt(events, e));
+      if (e.gameSecond() <= to && end >= from) {
+        intervals.add(new double[] {Math.max(from, e.gameSecond()), Math.min(to, end)});
       }
     }
     intervals.sort(Comparator.comparingDouble(i -> i[0]));
@@ -350,6 +353,44 @@ public final class DeathAssessor {
       end = Math.max(end, i[1]);
     }
     return total;
+  }
+
+  /** How long the modifier disables, 0 when it is not a disable. */
+  private static double disableLength(CombatEvent e) {
+    if (e.kind() != CombatEventKind.MODIFIER_ADD) {
+      return 0;
+    }
+    if (e.aux() > 0) {
+      return e.aux() / (double) CENTISECONDS;
+    }
+    return DISABLES.contains(e.inflictor()) && e.aux2() > 0 ? e.aux2() / (double) CENTISECONDS : 0;
+  }
+
+  /** When the same modifier was next taken off the hero, or never. */
+  private static double removedAt(List<CombatEvent> events, CombatEvent added) {
+    return events.stream()
+        .filter(
+            r ->
+                r.kind() == CombatEventKind.MODIFIER_REMOVE
+                    && r.inflictor().equals(added.inflictor())
+                    && r.gameSecond() >= added.gameSecond())
+        .mapToDouble(CombatEvent::gameSecond)
+        .min()
+        .orElse(Double.POSITIVE_INFINITY);
+  }
+
+  /** The disables that took hold while spell immunity was on, so went through it. */
+  private static String piercedBy(List<CombatEvent> events, List<double[]> immunity) {
+    return events.stream()
+        .filter(
+            e ->
+                disableLength(e) > 0
+                    && immunity.stream()
+                        .anyMatch(w -> e.gameSecond() > w[0] && e.gameSecond() <= w[1]))
+        .map(CombatEvent::inflictor)
+        .distinct()
+        .sorted()
+        .collect(Collectors.joining(","));
   }
 
   private static List<CombatEvent> damage(List<CombatEvent> events, double from, double to) {
