@@ -13,8 +13,9 @@ import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
+import com.ako.dbuff.service.replay.CombatHeroes;
 import com.ako.dbuff.service.replay.CombatLogReader;
-import com.ako.dbuff.service.replay.HeroNames;
+import com.ako.dbuff.service.replay.PlayerSlots;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
@@ -40,9 +41,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class FightAnalyzer implements ReplayAnalyzer {
-  private static final int DIRE_FIRST_SLOT = 128;
-  private static final int TEAM_SIZE = 5;
-
   private final ReplayPlayerTrackRepo trackRepo;
   private final ReplayPlayerRepo playerRepo;
   private final ReplayParseRunRepo runRepo;
@@ -75,7 +73,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
     deleteByMatchId(matchId);
     List<CombatEvent> events = combatLog.events(matchId);
     List<ReplayPlayerDomain> roster = playerRepo.findByMatchId(matchId);
-    Map<String, Integer> playerOf = playerIndexByHero(events, roster);
+    Map<String, Integer> playerOf = CombatHeroes.playerIndexByHero(events, roster);
     if (events.isEmpty() || playerOf.isEmpty()) {
       log.info("Match {} has no combat log or heroes to find fights in", matchId);
       return;
@@ -103,32 +101,14 @@ public class FightAnalyzer implements ReplayAnalyzer {
     fightPlayerRepo.deleteByMatchId(matchId);
   }
 
-  private static Map<String, Integer> playerIndexByHero(
-      List<CombatEvent> events, List<ReplayPlayerDomain> roster) {
-    Set<String> heroNames = new java.util.HashSet<>();
-    for (CombatEvent e : events) {
-      if ((e.flags() & CombatEvent.ATTACKER_HERO) != 0) {
-        heroNames.add(e.attacker());
-      }
-      if ((e.flags() & CombatEvent.TARGET_HERO) != 0) {
-        heroNames.add(e.target());
-      }
-    }
-    Map<String, Integer> playerOf = new HashMap<>();
-    for (ReplayPlayerDomain player : roster) {
-      heroNames.stream()
-          .filter(name -> HeroNames.matches(player.getHeroEntityName(), name))
-          .findFirst()
-          .ifPresent(name -> playerOf.put(name, player.getReplayPlayerId() / 2));
-    }
-    return playerOf;
-  }
-
   private Map<Integer, FightAssessor.Trace> traces(long matchId) {
     Map<Integer, FightAssessor.Trace> traces = new HashMap<>();
     for (ReplayPlayerTrackDomain t : trackRepo.findByMatchId(matchId)) {
+      if (t.getSampleCount() == null || t.getSampleCount() == 0 || t.getX().length == 0) {
+        continue;
+      }
       traces.put(
-          playerIndex(t.getPlayerSlot()),
+          PlayerSlots.index(t.getPlayerSlot()),
           new FightAssessor.Trace(
               t.getStartSeconds(),
               t.getStepSeconds(),
@@ -144,7 +124,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
     Map<Integer, List<ActivitySegment>> bySlot = new HashMap<>();
     for (PlayerActivitySegmentDomain s : segmentRepo.findByMatchId(matchId)) {
       bySlot
-          .computeIfAbsent(playerIndex(s.getPlayerSlot()), k -> new ArrayList<>())
+          .computeIfAbsent(PlayerSlots.index(s.getPlayerSlot()), k -> new ArrayList<>())
           .add(
               new ActivitySegment(
                   s.getStartSeconds(),
@@ -163,15 +143,6 @@ public class FightAnalyzer implements ReplayAnalyzer {
         .map(ReplayParseRunDomain::getMapVersion)
         .flatMap(mapLayouts::forVersion)
         .orElse(null);
-  }
-
-  /** The player index 0-9 of an OpenDota slot: 0-4 Radiant, 128-132 Dire. */
-  private static int playerIndex(long slot) {
-    return slot >= DIRE_FIRST_SLOT ? (int) (slot - DIRE_FIRST_SLOT) + TEAM_SIZE : (int) slot;
-  }
-
-  private static long slot(int playerIndex) {
-    return playerIndex < TEAM_SIZE ? playerIndex : DIRE_FIRST_SLOT + playerIndex - TEAM_SIZE;
   }
 
   private FightDomain fightRow(
@@ -212,7 +183,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
                 FightPlayerDomain.builder()
                     .matchId(matchId)
                     .fightIndex(index)
-                    .playerSlot(slot(p.player()))
+                    .playerSlot(PlayerSlots.slot(p.player()))
                     .presence(p.presence().name())
                     .damageDealt(p.damageDealt())
                     .damageTaken(p.damageTaken())

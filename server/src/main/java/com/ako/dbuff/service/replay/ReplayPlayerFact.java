@@ -13,7 +13,7 @@ public record ReplayPlayerFact(
 
   /** Radiant 0-4, Dire 128-132, as OpenDota numbers slots. */
   public long playerSlot() {
-    return index() < 5 ? index() : 128L + index() - 5;
+    return PlayerSlots.slot(index());
   }
 
   /** Null for an anonymous player. */

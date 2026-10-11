@@ -139,6 +139,22 @@ class ReplayRunServiceTest {
   }
 
   @Test
+  void process_marksAReplayThatEndedWithAnErrorPartial_soTheCutShortDataIsNotTakenForWhole() {
+    when(parser.parse(any(), any()))
+        .thenReturn(
+            ReplayFacts.builder()
+                .clockStartTick(17136)
+                .gameStartTime(596.5)
+                .players(List.of())
+                .cutShort(true)
+                .build());
+
+    assertThat(service.process(match())).isEqualTo(ReplayStatus.PARTIAL);
+
+    assertThat(runs.get(1L).getError()).contains("complete-replay");
+  }
+
+  @Test
   void process_skipsAnIneligibleMatchWithoutTouchingTheNetwork() {
     MatchDomain noLocation = match();
     noLocation.setReplaySalt(null);

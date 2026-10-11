@@ -70,6 +70,25 @@ class FightAnalyzerTest {
   }
 
   @Test
+  void analyze_copesWithAPlayerWhoseTrackHasNoSamples() {
+    stored();
+    ReplayPlayerTrackDomain empty = trackRepo.findAll().getFirst();
+    empty.setSampleCount(0);
+    empty.setX(new int[0]);
+    empty.setY(new int[0]);
+    empty.setHpPercent(new int[0]);
+    empty.setManaPercent(new int[0]);
+    empty.setLevel(new int[0]);
+    empty.setFlags(new int[0]);
+    trackRepo.saveAndFlush(empty);
+
+    analyzer.analyze(MATCH);
+
+    assertThat(fightRepo.findAll()).hasSize(1);
+    assertThat(fightPlayerRepo.findAll()).hasSize(10);
+  }
+
+  @Test
   void deleteByMatchId_removesFightsAndTheirPlayers() {
     stored();
     analyzer.analyze(MATCH);

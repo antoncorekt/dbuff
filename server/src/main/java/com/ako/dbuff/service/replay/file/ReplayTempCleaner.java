@@ -4,6 +4,8 @@ import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.Semaphore;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +26,10 @@ public class ReplayTempCleaner {
     this.parseSemaphore = parseSemaphore;
   }
 
-  /** Deletes every file in the temp directory, but only while no parse is using it. */
+  /**
+   * Deletes the files in the temp directory that are older than any download and parse can last,
+   * and only while no parse is using it, so a file in use is never taken.
+   */
   public void sweep() {
     if (parseSemaphore.availablePermits() < properties.getMaxConcurrent()) {
       return;
@@ -34,9 +39,27 @@ public class ReplayTempCleaner {
       return;
     }
     try (Stream<Path> files = Files.list(dir)) {
-      files.filter(Files::isRegularFile).forEach(ReplayTempCleaner::delete);
+      Instant oldest = Instant.now().minus(maxAge());
+      files
+          .filter(Files::isRegularFile)
+          .filter(f -> isOlderThan(f, oldest))
+          .forEach(ReplayTempCleaner::delete);
     } catch (IOException e) {
       log.warn("Could not sweep replay temp directory {}: {}", dir, e.getMessage());
+    }
+  }
+
+  private Duration maxAge() {
+    return Duration.ofSeconds(
+            (long) properties.getMaxDownloadSeconds() + properties.getMaxParseSeconds())
+        .plusMinutes(10);
+  }
+
+  private static boolean isOlderThan(Path file, Instant limit) {
+    try {
+      return Files.getLastModifiedTime(file).toInstant().isBefore(limit);
+    } catch (IOException e) {
+      return false;
     }
   }
 

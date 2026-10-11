@@ -58,13 +58,14 @@ public class HttpReplayDownloader implements ReplayDownloader {
       target = Files.createTempFile(targetDir, source.matchId() + "-", ".replay");
       HttpResponse<InputStream> response =
           client.send(request, HttpResponse.BodyHandlers.ofInputStream());
-      try (InputStream body = response.body();
-          Watchdog watchdog = new Watchdog(body, properties.getMaxDownloadSeconds())) {
+      try (InputStream body = response.body()) {
         checkStatus(response.statusCode(), source);
         checkDeclaredSize(response, source);
-        copyLimited(body, target, source);
-        if (!watchdog.finishedInTime()) {
-          throw new IOException("Download exceeded " + properties.getMaxDownloadSeconds() + " s");
+        try (Watchdog watchdog = new Watchdog(body, properties.getMaxDownloadSeconds())) {
+          copyLimited(body, target, source);
+          if (!watchdog.finishedInTime()) {
+            throw new IOException("Download exceeded " + properties.getMaxDownloadSeconds() + " s");
+          }
         }
       }
       return target;

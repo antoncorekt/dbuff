@@ -137,9 +137,15 @@ class ClarityReplayParserReplayTest {
 
     ReplayFacts facts = parser.parse(cut, () -> false);
 
+    assertThat(facts.cutShort()).isTrue();
     assertThat(facts.players()).hasSize(10);
     assertThat(facts.draft().picks()).hasSize(40);
     assertThat(facts.samples().series().getFirst().x().length).isGreaterThan(100);
+  }
+
+  @Test
+  void parse_doesNotMarkAWholeReplayAsCutShort() {
+    assertThat(parser.parse(replay(MATCH), () -> false).cutShort()).isFalse();
   }
 
   @Test

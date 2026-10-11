@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 public class ReplayRunService {
   private static final long NANOS_PER_SECOND = 1_000_000_000L;
   private static final int MESSAGE_LIMIT = 1000;
+  private static final String INCOMPLETE_REPLAY = "complete-replay";
 
   private final ReplayParseRunRepo runRepo;
   private final PlayerGameStatisticRepo playerStatRepo;
@@ -143,6 +144,9 @@ public class ReplayRunService {
       rosterVerifier.verify(
           match.getId(), facts.players(), playerStatRepo.findAllByMatchId(match.getId()));
       List<String> failed = runExtractors(facts, match);
+      if (facts.cutShort()) {
+        failed.add(INCOMPLETE_REPLAY);
+      }
       run.setReplayBytes(file.compressedBytes());
       run.setClockStartTick(facts.clockStartTick());
       run.setClarityVersion(parser.version());
