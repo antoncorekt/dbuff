@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.analysis;
 
 import com.ako.dbuff.service.replay.analysis.activity.ActivityTuning;
+import com.ako.dbuff.service.replay.analysis.death.DeathAssessor;
 import com.ako.dbuff.service.replay.analysis.fight.FightDetector;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -40,6 +41,21 @@ public class ReplayAnalysisProperties {
   /** The share of the total, of level or damage, by which one side must lead to win a fight. */
   private int fightWinMarginPercent = 10;
 
+  /** How far before a death damage, disables and BKB use are looked at. */
+  private int deathLookbackSeconds = 8;
+
+  /** Damage in the last three seconds from which a death is called a burst. */
+  private int deathBurstDamage = 1500;
+
+  /** A hero with no ally and at least two enemies this close was caught out. */
+  private int deathIsolationRadius = 1500;
+
+  /** Seconds of disables in the lookback from which a death is called a disable chain. */
+  private int deathDisableSeconds = 2;
+
+  /** A hero alive this long after dying came back by Aegis or reincarnation. */
+  private int deathReincarnationSeconds = 5;
+
   public FightDetector.Tuning fightTuning() {
     return new FightDetector.Tuning(
         fightMergeGapSeconds,
@@ -47,6 +63,15 @@ public class ReplayAnalysisProperties {
         fightMinHeroesPerSide,
         fightIntensityWindowSeconds,
         fightIntensityMinDamage);
+  }
+
+  public DeathAssessor.Tuning deathTuning() {
+    return new DeathAssessor.Tuning(
+        deathLookbackSeconds,
+        deathBurstDamage,
+        deathIsolationRadius,
+        deathDisableSeconds,
+        deathReincarnationSeconds);
   }
 
   public ActivityTuning activityTuning() {

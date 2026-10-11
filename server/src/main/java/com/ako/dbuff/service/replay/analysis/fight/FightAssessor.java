@@ -28,7 +28,7 @@ public final class FightAssessor {
   public record Trace(
       int startSeconds, int stepSeconds, int[] x, int[] y, int[] level, int[] flags) {
 
-    int indexAt(double second) {
+    public int indexAt(double second) {
       int i = (int) Math.round((second - startSeconds) / stepSeconds);
       return Math.max(0, Math.min(x.length - 1, i));
     }
