@@ -65,6 +65,7 @@ Optional:
   AWS_REGION          AWS region (default: eu-north-1)
   INSTANCE_TYPE       EC2 instance type, arm64 only (default: t4g.small)
   ALLOWED_SSH_CIDR    SSH CIDR (default: 0.0.0.0/0 - narrow this to your own IP)
+  ALLOWED_API_CIDR    REST API (port 8080) CIDR (default: 0.0.0.0/0 - the bot does not need it)
 EOF
   exit 1
 }
@@ -97,6 +98,7 @@ cmd_deploy() {
 
   INSTANCE_TYPE="${INSTANCE_TYPE:-t4g.small}"
   ALLOWED_SSH_CIDR="${ALLOWED_SSH_CIDR:-0.0.0.0/0}"
+  ALLOWED_API_CIDR="${ALLOWED_API_CIDR:-0.0.0.0/0}"
 
   # Optionally base64-encode the Google Vision service-account key so it can be passed
   # through CloudFormation/SSM (the JSON contains newlines). Resolved relative to the repo root.
@@ -139,6 +141,7 @@ cmd_deploy() {
       ParameterKey=GoogleVisionCredentialsB64,ParameterValue="$GOOGLE_VISION_CREDENTIALS_B64" \
       ParameterKey=InstanceType,ParameterValue="$INSTANCE_TYPE" \
       ParameterKey=AllowedSshCidr,ParameterValue="$ALLOWED_SSH_CIDR" \
+      ParameterKey=AllowedApiCidr,ParameterValue="$ALLOWED_API_CIDR" \
     --capabilities CAPABILITY_NAMED_IAM
 
   echo "==> Waiting for stack to complete..."

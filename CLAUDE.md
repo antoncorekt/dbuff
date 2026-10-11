@@ -84,10 +84,19 @@ Commands do not touch JDA. Each implements `DbuffCommand` (name, JDA definition,
 - **A mode filter excludes matches with no recorded mode.** `MatchDomain.gameModeId` is null when the scraper could not map a mode name, and an `IN` predicate drops those rows. That is deliberate — an unknown mode is not Ability Draft — but it means the default filter hides such matches from `/stats` and `/hero`.
 - **`trace_matches:` lists the games behind the numbers.** `MatchTraceReporter` posts `matchId - date` per player as a plain message after that player's embed, capped at `MAX_TRACED_MATCHES` with the overflow stated rather than elided. It goes through `PlayerStatisticRepository.findPlayerMatches`, which shares `buildMatchPredicates` with the aggregations on purpose — a trace built from a different predicate set would list games the numbers did not come from, which is worse than no trace. The combo subcommands pass their own `matchIds` instead, since those queries already know which games satisfied the conjunction. A trace failure is posted into the thread but never rethrown: the statistics are already out, and losing the trace must not lose them too.
 
+### REST API access
+
+`ApiKeyFilter` requires `X-Api-Key` on everything except `/actuator/health` (exempt because the CI health gate and rollback poll it). The exemption is judged on the container-normalised servlet path, not `getRequestURI()`, which still carries `/../`. `app.api.required` is false locally, so an empty `DBUFF_API_KEY` runs open; the `prod` profile sets it true, so a missing key **closes** the API (every request 401) rather than opening it. The bot never calls the REST API, so closing it does not affect Discord features.
+
+The key reaches the running host through `scripts/set-api-key.sh`, which stores it as an SSM SecureString and has the instance write a root-only systemd drop-in (`/etc/systemd/system/dbuff.service.d/api-key.conf`) — it survives JAR deploys. It is deliberately **not** added to the instance `UserData` in `template.yaml`: `UserData` only runs on first boot, so it would not reach the live server, and editing it makes the next `deploy.sh deploy` stop/start the instance. After a rebuild, run the script again. `scripts/lib/ssm.sh` holds `run_ssm`, shared by it and `deploy-release.sh`.
+
+Port 8080 can be narrowed with `ALLOWED_API_CIDR` (`deploy.sh deploy`, an in-place security-group change); the bot needs no inbound access.
+
 ### Environment Variables
 
 Configured via `.env` file (loaded by spring-dotenv). See `.env.example` for required keys:
 - `DOTA_API_KEY`, `SCRAPPER_API_KEY`, `OPENAI_API_KEY`, `DISCORD_BOT_TOKEN`
+- `DBUFF_API_KEY`: REST API key (empty is open locally, closed in production)
 
 ### Dependencies & Infrastructure
 
