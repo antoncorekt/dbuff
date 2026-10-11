@@ -367,7 +367,7 @@ net-worth rank within the team at minute 10 and lane assignment (4.5); store it,
 
 ### 4.3 `ReplaySampler` (the L1 time series)
 Every 30 ticks (1 s) keep a `Frame` per player: x, y, health, maxHealth, mana, maxMana, level, alive, respawn time,
-plus team data counters and net worth. Persist at **5 s resolution** for the whole game (from -90 s) as arrays
+plus team data counters and net worth. Persist at **5 s resolution** for the whole game (from -90 s; WP2a keeps the 5 s samples only and reads no 1 s frames yet) as arrays
 (`ReplayPlayerTrack`), and at **1 minute** resolution as rows (`ReplayPlayerMinute`). Keep 1 s frames in memory
 for the analysis passes of one game (10 players x 3600 s x ~60 B = ~2 MB), then drop them.
 Also sampled at 1 s in memory (not persisted raw): inventory (item names + cooldowns), the hero ability list

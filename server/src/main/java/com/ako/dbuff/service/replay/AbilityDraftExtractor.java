@@ -53,8 +53,7 @@ public class AbilityDraftExtractor implements ReplayExtractor {
           PICKS);
       return;
     }
-    Map<Integer, ReplayPlayerFact> players = new HashMap<>();
-    facts.players().forEach(p -> players.put(p.replayPlayerId(), p));
+    Map<Integer, ReplayPlayerFact> players = facts.playersById();
     List<AbilityDraftPickDomain> picks = pickRows(match.getId(), draft, players);
     pickRepo.saveAll(picks);
     poolRepo.saveAll(poolRows(match.getId(), draft, picks));

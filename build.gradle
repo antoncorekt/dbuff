@@ -123,6 +123,8 @@ project('server') {
         testClassesDirs = sourceSets.test.output.classesDirs
         classpath = sourceSets.test.runtimeClasspath
         useJUnitPlatform { includeTags 'replay' }
+        // The production JVM runs with -Xmx512m; a parse that fits here fits there.
+        maxHeapSize = '512m'
     }
     
     dependencies {
