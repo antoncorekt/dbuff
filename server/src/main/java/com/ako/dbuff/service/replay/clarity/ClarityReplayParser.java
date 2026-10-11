@@ -225,7 +225,9 @@ public class ClarityReplayParser implements ReplayParser {
         int player = ((Number) rules.getPropertyForFieldPath(paths[i])).intValue();
         if (player != NOT_PICKED && !picked.get(poolIndex)) {
           picked.set(poolIndex);
-          picks.add(new DraftPick(picks.size() + 1, poolIndex, player, ctx.getTick()));
+          picks.add(
+              new DraftPick(
+                  picks.size() + 1, poolIndex, player, (int) clock.gameTick(ctx.getTick())));
         }
       }
     }

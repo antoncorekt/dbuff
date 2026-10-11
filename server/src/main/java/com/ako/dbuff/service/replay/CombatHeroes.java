@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay;
 
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -45,5 +46,19 @@ public final class CombatHeroes {
       }
     }
     return playerOf;
+  }
+
+  /** When each player's hero died, in time order, by player index; Aegis uses are included. */
+  public static Map<Integer, List<Double>> deathTimes(
+      List<CombatEvent> events, Map<String, Integer> playerOf) {
+    Map<Integer, List<Double>> times = new HashMap<>();
+    for (CombatEvent e : events) {
+      if (e.kind() == CombatEventKind.DEATH
+          && e.targetIsRealHero()
+          && playerOf.containsKey(e.target())) {
+        times.computeIfAbsent(playerOf.get(e.target()), k -> new ArrayList<>()).add(e.gameSecond());
+      }
+    }
+    return times;
   }
 }

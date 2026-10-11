@@ -7,14 +7,12 @@ import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.service.replay.Buybacks;
 import com.ako.dbuff.service.replay.CombatEvent;
-import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.CombatHeroes;
 import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.PlayerSlots;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.fight.FightDetector;
-import java.util.ArrayList;
-import java.util.HashMap;
+import com.ako.dbuff.service.replay.analysis.fight.FightLookup;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,8 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class BuybackAnalyzer implements ReplayAnalyzer {
-  private static final double FIGHT_SLACK_SECONDS = 1;
-
   private final ReplayPlayerRepo playerRepo;
   private final FightRepo fightRepo;
   private final BuybackEventRepo buybackRepo;
@@ -61,7 +57,7 @@ public class BuybackAnalyzer implements ReplayAnalyzer {
     }
     Map<String, Integer> playerOf =
         CombatHeroes.playerIndexByHero(events, playerRepo.findByMatchId(matchId));
-    Map<Integer, List<Double>> deaths = deaths(events, playerOf);
+    Map<Integer, List<Double>> deaths = CombatHeroes.deathTimes(events, playerOf);
     List<FightDomain> fights = fightRepo.findByMatchId(matchId);
     buybackRepo.saveAll(
         buybacks.stream().map(b -> row(matchId, b, deaths.get(b.player()), fights)).toList());
@@ -76,7 +72,7 @@ public class BuybackAnalyzer implements ReplayAnalyzer {
   private BuybackEventDomain row(
       long matchId, Buybacks.Buyback buyback, List<Double> deaths, List<FightDomain> fights) {
     Double death = lastDeathBefore(deaths, buyback.second());
-    FightDomain fight = death == null ? null : fightAt(fights, death);
+    FightDomain fight = death == null ? null : FightLookup.at(fights, death);
     return BuybackEventDomain.builder()
         .matchId(matchId)
         .playerSlot(PlayerSlots.slot(buyback.player()))
@@ -89,19 +85,6 @@ public class BuybackAnalyzer implements ReplayAnalyzer {
         .build();
   }
 
-  private static Map<Integer, List<Double>> deaths(
-      List<CombatEvent> events, Map<String, Integer> playerOf) {
-    Map<Integer, List<Double>> deaths = new HashMap<>();
-    for (CombatEvent e : events) {
-      if (e.kind() == CombatEventKind.DEATH
-          && e.targetIsRealHero()
-          && playerOf.containsKey(e.target())) {
-        deaths.computeIfAbsent(playerOf.get(e.target()), k -> new ArrayList<>()).add(e.gameSecond());
-      }
-    }
-    return deaths;
-  }
-
   /** The death the buyback paid for, if it came no longer after it than a respawn takes. */
   private static Double lastDeathBefore(List<Double> deaths, double buyback) {
     if (deaths == null) {
@@ -110,16 +93,6 @@ public class BuybackAnalyzer implements ReplayAnalyzer {
     return deaths.stream()
         .filter(d -> d <= buyback && buyback - d <= Buybacks.LONGEST_AFTER_DEATH_SECONDS)
         .max(Double::compare)
-        .orElse(null);
-  }
-
-  private static FightDomain fightAt(List<FightDomain> fights, double second) {
-    return fights.stream()
-        .filter(
-            f ->
-                second >= f.getStartSeconds() - FIGHT_SLACK_SECONDS
-                    && second <= f.getEndSeconds() + FIGHT_SLACK_SECONDS)
-        .findFirst()
         .orElse(null);
   }
 

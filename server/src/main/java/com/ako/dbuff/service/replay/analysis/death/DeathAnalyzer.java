@@ -20,6 +20,7 @@ import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.fight.FightAssessor;
+import com.ako.dbuff.service.replay.analysis.fight.FightLookup;
 import com.ako.dbuff.service.replay.analysis.fight.PlayerTraces;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
@@ -29,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -91,7 +93,7 @@ public class DeathAnalyzer implements ReplayAnalyzer {
     Map<String, List<CombatEvent>> byTarget =
         events.stream().collect(Collectors.groupingBy(CombatEvent::target));
     List<DeathAnalysisDomain> rows = new ArrayList<>();
-    Map<Integer, List<Double>> deathTimes = deathTimes(events, playerOf);
+    Map<Integer, List<Double>> deathTimes = CombatHeroes.deathTimes(events, playerOf);
     List<Buybacks.Buyback> buybacks = Buybacks.of(events);
     for (CombatEvent e : events) {
       if (e.kind() != CombatEventKind.DEATH
@@ -100,7 +102,10 @@ public class DeathAnalyzer implements ReplayAnalyzer {
         continue;
       }
       int victim = playerOf.get(e.target());
-      Integer fightIndex = fightIndex(fights, e.gameSecond());
+      Integer fightIndex =
+          Optional.ofNullable(FightLookup.at(fights, e.gameSecond()))
+              .map(FightDomain::getFightIndex)
+              .orElse(null);
       DeathAssessor.Death death =
           new DeathAssessor.Death(
               e.gameSecond(),
@@ -139,19 +144,6 @@ public class DeathAnalyzer implements ReplayAnalyzer {
         .orElse(null);
   }
 
-  private static Map<Integer, List<Double>> deathTimes(
-      List<CombatEvent> events, Map<String, Integer> playerOf) {
-    Map<Integer, List<Double>> times = new HashMap<>();
-    for (CombatEvent e : events) {
-      if (e.kind() == CombatEventKind.DEATH
-          && e.targetIsRealHero()
-          && playerOf.containsKey(e.target())) {
-        times.computeIfAbsent(playerOf.get(e.target()), k -> new ArrayList<>()).add(e.gameSecond());
-      }
-    }
-    return times;
-  }
-
   /** Whether the hero paid for a buyback after this death and before he died again. */
   private static boolean boughtBack(
       List<Buybacks.Buyback> buybacks, int victim, double death, List<Double> victimDeaths) {
@@ -180,14 +172,6 @@ public class DeathAnalyzer implements ReplayAnalyzer {
 
   private static String fightKey(Integer fightIndex, int player) {
     return fightIndex + ":" + player;
-  }
-
-  private static Integer fightIndex(List<FightDomain> fights, double second) {
-    return fights.stream()
-        .filter(f -> second >= f.getStartSeconds() - 1 && second <= f.getEndSeconds() + 1)
-        .map(FightDomain::getFightIndex)
-        .findFirst()
-        .orElse(null);
   }
 
   private DeathAnalysisDomain row(
