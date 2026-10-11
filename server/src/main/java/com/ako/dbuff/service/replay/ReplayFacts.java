@@ -7,11 +7,21 @@ import java.util.List;
  * parser library.
  *
  * @param draft the Ability Draft, null for a mode that has none
+ * @param samples per-player state over time, null when the replay was not read past the draft
  */
 public record ReplayFacts(
-    int clockStartTick, double gameStartTime, List<ReplayPlayerFact> players, DraftFacts draft) {
+    int clockStartTick,
+    double gameStartTime,
+    List<ReplayPlayerFact> players,
+    DraftFacts draft,
+    SampleFacts samples) {
 
   public ReplayFacts(int clockStartTick, double gameStartTime, List<ReplayPlayerFact> players) {
-    this(clockStartTick, gameStartTime, players, null);
+    this(clockStartTick, gameStartTime, players, null, null);
+  }
+
+  public ReplayFacts(
+      int clockStartTick, double gameStartTime, List<ReplayPlayerFact> players, DraftFacts draft) {
+    this(clockStartTick, gameStartTime, players, draft, null);
   }
 }

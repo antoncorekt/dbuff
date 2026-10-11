@@ -49,16 +49,14 @@ public class ClarityReplayParser implements ReplayParser {
       if (hasCause(e, CancelledParsing.class)) {
         throw new ReplayException(ReplayStatus.FAILED_TIMEOUT, "Parse stopped: timed out");
       }
-      if (!hasCause(e, StopParsing.class)) {
-        throw new ReplayException(
-            ReplayStatus.FAILED_PARSER, "Replay could not be parsed: " + e.getMessage(), e);
-      }
+      throw new ReplayException(
+          ReplayStatus.FAILED_PARSER, "Replay could not be parsed: " + e.getMessage(), e);
     }
     if (collector.facts == null) {
       throw new ReplayException(
           ReplayStatus.SKIPPED_NOT_PLAYED, "Replay never reached the playing phase");
     }
-    return collector.facts;
+    return collector.result();
   }
 
   /** The runner may wrap what a handler throws, so the control exceptions are looked up. */
@@ -71,12 +69,6 @@ public class ClarityReplayParser implements ReplayParser {
     return false;
   }
 
-  private static final class StopParsing extends RuntimeException {
-    StopParsing() {
-      super(null, null, false, false);
-    }
-  }
-
   private static final class CancelledParsing extends RuntimeException {
     CancelledParsing() {
       super(null, null, false, false);
@@ -85,7 +77,10 @@ public class ClarityReplayParser implements ReplayParser {
 
   @UsesEntities
   public static class Collector {
+    private static final int PRE_GAME = 4;
     private static final int GAME_IN_PROGRESS = 5;
+    private static final int POST_GAME = 6;
+    private static final int POST_GAME_SCORES = 7;
     private static final int RADIANT = 2;
     private static final int DIRE = 3;
     private static final int CANCEL_CHECK_TICKS = 300;
@@ -100,6 +95,7 @@ public class ClarityReplayParser implements ReplayParser {
 
     private final BooleanSupplier cancelled;
     ReplayFacts facts;
+    private SampleRecorder recorder;
     private final List<DraftPick> picks = new ArrayList<>();
     private final BitSet picked = new BitSet();
     private long ticksSeen;
@@ -110,6 +106,7 @@ public class ClarityReplayParser implements ReplayParser {
 
     @OnTickStart
     public void onTick(Context ctx, boolean synthetic) {
+      recorder().tick(ctx.getTick());
       if (++ticksSeen % CANCEL_CHECK_TICKS == 0 && cancelled.getAsBoolean()) {
         throw new CancelledParsing();
       }
@@ -118,17 +115,38 @@ public class ClarityReplayParser implements ReplayParser {
     @OnEntityUpdated(classPattern = "CDOTAGamerulesProxy")
     public void rulesUpdated(Context ctx, Entity rules, FieldPath[] paths, int count) {
       recordPicks(ctx, rules, paths, count);
-      if (facts != null || !rules.hasProperty(STATE)) {
+      if (!rules.hasProperty(STATE)) {
         return;
       }
       int state = rules.getProperty(STATE);
-      if (state != GAME_IN_PROGRESS) {
-        return;
+      if (state == PRE_GAME) {
+        recorder().preGameStarted(ctx.getTick());
+      } else if (state == POST_GAME || state == POST_GAME_SCORES) {
+        recorder().stop();
+      } else if (state == GAME_IN_PROGRESS && facts == null) {
+        Number startTime = rules.getProperty(START_TIME);
+        facts =
+            new ReplayFacts(
+                ctx.getTick(), startTime.doubleValue(), readPlayers(), readDraft(rules));
+        recorder().gameStarted(ctx.getTick());
       }
-      Number startTime = rules.getProperty(START_TIME);
-      facts =
-          new ReplayFacts(ctx.getTick(), startTime.doubleValue(), readPlayers(), readDraft(rules));
-      throw new StopParsing();
+    }
+
+    private SampleRecorder recorder() {
+      if (recorder == null) {
+        recorder = new SampleRecorder(entities);
+      }
+      return recorder;
+    }
+
+    /** The facts with the samples of the whole game, once the replay has been read to its end. */
+    ReplayFacts result() {
+      return new ReplayFacts(
+          facts.clockStartTick(),
+          facts.gameStartTime(),
+          facts.players(),
+          facts.draft(),
+          recorder().result());
     }
 
     /** A pick is the moment an entry's player id changes from "nobody" to a player. */
@@ -174,27 +192,15 @@ public class ClarityReplayParser implements ReplayParser {
     }
 
     private List<ReplayPlayerFact> readPlayers() {
-      List<ReplayPlayerFact> players = new ArrayList<>();
-      entities.stream()
-          .filter(Entities.byDtName("CDOTAPlayerController"))
-          .forEach(
-              controller -> {
-                int playerId = controller.getProperty("m_nPlayerID");
-                if (playerId < 0) {
-                  return;
-                }
-                int team = controller.getProperty("m_iTeamNum");
-                if (team != RADIANT && team != DIRE) {
-                  return;
-                }
-                long steamId = ((Number) controller.getProperty("m_steamID")).longValue();
-                int heroHandle = controller.getProperty("m_hAssignedHero");
-                Entity hero = entities.getByHandle(heroHandle);
-                String heroName = hero == null ? null : heroName(hero);
-                players.add(new ReplayPlayerFact(playerId, team, steamId, heroName));
-              });
-      players.sort((a, b) -> Integer.compare(a.replayPlayerId(), b.replayPlayerId()));
-      return players;
+      return Controllers.read(entities).stream()
+          .map(
+              c ->
+                  new ReplayPlayerFact(
+                      c.playerId(),
+                      c.team(),
+                      c.steamId(),
+                      c.hero() == null ? null : heroName(c.hero())))
+          .toList();
     }
 
     private static String heroName(Entity hero) {

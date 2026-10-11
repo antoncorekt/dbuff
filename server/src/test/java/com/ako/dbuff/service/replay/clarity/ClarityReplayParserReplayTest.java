@@ -3,11 +3,14 @@ package com.ako.dbuff.service.replay.clarity;
 import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.service.replay.DraftFacts;
 import com.ako.dbuff.service.replay.DraftPick;
+import com.ako.dbuff.service.replay.MinuteStat;
 import com.ako.dbuff.service.replay.ReplayException;
 import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.ReplayPlayerFact;
+import com.ako.dbuff.service.replay.SampleFacts;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -64,6 +67,60 @@ class ClarityReplayParserReplayTest {
     assertThat(draft.pool()).hasSize(48);
     assertThat(draft.picks()).hasSize(40);
     assertThat(draft.pool().stream().filter(entry -> !entry.picked())).hasSize(8);
+  }
+
+  @Test
+  void parse_samplesEveryPlayerThroughTheWholeGame() {
+    SampleFacts samples = parser.parse(replay(MATCH), () -> false).samples();
+
+    assertThat(samples.startSeconds()).isEqualTo(-90);
+    assertThat(samples.stepSeconds()).isEqualTo(5);
+    assertThat(samples.series()).hasSize(10);
+    int count = samples.series().getFirst().x().length;
+    assertThat(count).isBetween(480, 520);
+    for (SampleFacts.PlayerSeries series : samples.series()) {
+      assertThat(series.y()).hasSize(count);
+      assertThat(series.level()).hasSize(count);
+      assertThat(Arrays.stream(series.x())).allMatch(x -> Math.abs(x) <= 9000);
+      assertThat(Arrays.stream(series.y())).allMatch(y -> Math.abs(y) <= 9000);
+      assertThat(Arrays.stream(series.hpPercent())).allMatch(hp -> hp >= 0 && hp <= 100);
+      int[] level = series.level();
+      int known = 0;
+      for (int i = 0; i < count; i++) {
+        if (level[i] > 0) {
+          assertThat(level[i]).as("level never drops").isGreaterThanOrEqualTo(known);
+          known = level[i];
+        }
+      }
+      assertThat(known).as("the heroes are in play to the end").isGreaterThan(10);
+      assertThat(level[18]).as("level at 0:00").isEqualTo(1);
+      assertThat(series.flags()[18]).as("alive at 0:00").isEqualTo(1);
+    }
+  }
+
+  @Test
+  void parse_snapshotsTheCountersOncePerMinuteWithEveryFieldPresent() {
+    SampleFacts samples = parser.parse(replay(MATCH), () -> false).samples();
+
+    var minutes = samples.minutes();
+    assertThat(minutes).hasSize(10 * 40);
+    assertThat(minutes.stream().mapToInt(SampleFacts.MinuteSnapshot::gameMinute).min())
+        .hasValue(-1);
+    assertThat(minutes.stream().mapToInt(SampleFacts.MinuteSnapshot::gameMinute).max())
+        .hasValue(38);
+    assertThat(minutes).allSatisfy(m -> assertThat(m.values()).doesNotContain(MinuteStat.MISSING));
+    var first = minutes.stream().filter(m -> m.replayPlayerId() == 0).toList();
+    for (int i = 1; i < first.size(); i++) {
+      long before = first.get(i - 1).values()[MinuteStat.CREEP_KILL_GOLD.ordinal()];
+      long after = first.get(i).values()[MinuteStat.CREEP_KILL_GOLD.ordinal()];
+      assertThat(after).as("cumulative counters never drop").isGreaterThanOrEqualTo(before);
+    }
+    long teamKills =
+        minutes.stream()
+            .filter(m -> m.gameMinute() == 38 && m.replayPlayerId() < 10)
+            .mapToLong(m -> m.values()[MinuteStat.KILLS.ordinal()])
+            .sum();
+    assertThat(teamKills).isPositive();
   }
 
   @Test
