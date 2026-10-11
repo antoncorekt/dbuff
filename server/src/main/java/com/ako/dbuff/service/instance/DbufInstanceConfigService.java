@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.instance;
 
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
+import com.ako.dbuff.dao.model.InstanceSettings;
 import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.repo.DbufInstanceConfigRepository;
 import com.ako.dbuff.dao.repo.PlayerRepo;
@@ -8,6 +9,7 @@ import com.ako.dbuff.dotapi.api.PlayersApi;
 import com.ako.dbuff.dotapi.invoker.ApiException;
 import com.ako.dbuff.dotapi.model.PlayersResponse;
 import com.ako.dbuff.resources.model.DbufInstanceConfigResponse;
+import com.ako.dbuff.resources.model.InstanceSettingsResponse;
 import com.ako.dbuff.resources.model.PlayerInfo;
 import com.ako.dbuff.resources.model.RegisterInstanceRequest;
 import com.ako.dbuff.resources.model.UpdateInstanceRequest;
@@ -52,6 +54,7 @@ public class DbufInstanceConfigService {
   private final ConstantsManagers constantsManagers;
   private final ObjectMapper objectMapper;
   private final InstanceSchedulerService instanceSchedulerService;
+  private final InstanceSettingsApplier settingsApplier;
 
   /**
    * Registers a new Dbuf instance configuration.
@@ -103,6 +106,9 @@ public class DbufInstanceConfigService {
     domain.setGameModeIds(gameModeIds);
     domain.setExtraConfig(serializeExtraConfig(request.getExtraConfig()));
     domain.setUpdatedAt(now);
+    InstanceSettings settings = domain.effectiveSettings();
+    settingsApplier.seedDefaultModes(settings, request.getGameModes());
+    domain.setSettings(settings);
     domain.setTrackingSince(now);
     domain.getPlayerTrackingSince().clear();
     domain.setActive(true);
@@ -161,6 +167,12 @@ public class DbufInstanceConfigService {
     if (request.getRemoveGameModes() != null && !request.getRemoveGameModes().isEmpty()) {
       Set<Long> removeModeIds = validateAndConvertGameModes(request.getRemoveGameModes());
       domain.getGameModeIds().removeAll(removeModeIds);
+    }
+
+    if (request.hasSettingsChange()) {
+      InstanceSettings settings = domain.effectiveSettings();
+      settingsApplier.apply(settings, request);
+      domain.setSettings(settings);
     }
 
     // Update name if provided
@@ -496,6 +508,7 @@ public class DbufInstanceConfigService {
         .name(domain.getName())
         .players(playerInfos)
         .gameModes(convertGameModeIdsToNames(domain.getGameModeIds()))
+        .settings(InstanceSettingsResponse.from(domain.effectiveSettings()))
         .extraConfig(deserializeExtraConfig(domain.getExtraConfig()))
         .createdAt(domain.getCreatedAt())
         .updatedAt(domain.getUpdatedAt())

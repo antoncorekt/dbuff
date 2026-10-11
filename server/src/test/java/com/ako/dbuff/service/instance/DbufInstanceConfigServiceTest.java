@@ -8,6 +8,7 @@ import com.ako.dbuff.dotapi.api.PlayersApi;
 import com.ako.dbuff.resources.model.RegisterInstanceRequest;
 import com.ako.dbuff.resources.model.UpdateInstanceRequest;
 import com.ako.dbuff.service.constant.ConstantsManagers;
+import com.ako.dbuff.service.constant.GameModeResolver;
 import com.ako.dbuff.service.scheduler.InstanceSchedulerService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
@@ -48,7 +49,8 @@ class DbufInstanceConfigServiceTest {
             playersApi,
             Mockito.mock(ConstantsManagers.class),
             new ObjectMapper(),
-            scheduler);
+            scheduler,
+            new InstanceSettingsApplier(Mockito.mock(GameModeResolver.class)));
   }
 
   private static RegisterInstanceRequest request() {
@@ -250,5 +252,52 @@ class DbufInstanceConfigServiceTest {
     service.update("instance-1", UpdateInstanceRequest.builder().name("Squad").build());
 
     assertThat(instance.getTrackingSince()).isNull();
+  }
+
+  @Test
+  void update_settings_areStoredAndReflectedInTheResponse() {
+    DbufInstanceConfigDomain instance = existing(true);
+    Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(instance));
+
+    var response =
+        service.update(
+            "instance-1",
+            UpdateInstanceRequest.builder()
+                .aiSummaryEnabled(false)
+                .reportDetail("standard")
+                .quietHours("22:00-07:00")
+                .timezone("Europe/Kyiv")
+                .build());
+
+    assertThat(instance.effectiveSettings().isAiSummaryOn()).isFalse();
+    assertThat(response.getSettings().getReportDetail()).isEqualTo("STANDARD");
+    assertThat(response.getSettings().getQuietHours()).isEqualTo("22:00-07:00");
+    assertThat(response.getSettings().getTimezone()).isEqualTo("Europe/Kyiv");
+  }
+
+  @Test
+  void update_invalidSetting_failsAndSavesNothing() {
+    DbufInstanceConfigDomain instance = existing(true);
+    Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(instance));
+
+    assertThatThrownBy(
+            () ->
+                service.update(
+                    "instance-1", UpdateInstanceRequest.builder().reportDetail("loud").build()))
+        .isInstanceOf(IllegalArgumentException.class);
+    Mockito.verify(repository, Mockito.never()).save(Mockito.any());
+  }
+
+  @Test
+  void aChannelThatNeverChoseAnything_reportsTheDefaults() {
+    Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(existing(true)));
+
+    var settings = service.getById("instance-1").orElseThrow().getSettings();
+
+    assertThat(settings.isAiSummaryEnabled()).isTrue();
+    assertThat(settings.getReportDetail()).isEqualTo("FULL");
+    assertThat(settings.getQuietHours()).isEqualTo("server default");
+    assertThat(settings.getTimezone()).isEqualTo("server default");
+    assertThat(settings.getDefaultGameModes()).isEmpty();
   }
 }
