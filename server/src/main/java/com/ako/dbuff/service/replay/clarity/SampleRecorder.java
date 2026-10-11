@@ -31,9 +31,14 @@ final class SampleRecorder {
   private long anchorTick = -1;
   private long nextGridTick;
   private boolean stopped;
+  private final List<SampleObserver> observers = new ArrayList<>();
 
   SampleRecorder(Entities entities) {
     this.entities = entities;
+  }
+
+  void observe(SampleObserver observer) {
+    observers.add(observer);
   }
 
   void preGameStarted(long tick) {
@@ -105,6 +110,7 @@ final class SampleRecorder {
     }
     int count = size + 1;
     series.values().forEach(s -> s.padTo(count));
+    observers.forEach(observer -> observer.sampled(grid, players));
   }
 
   private long[] counters(Controllers.View player, Entity resource, Entity teamData) {
