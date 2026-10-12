@@ -108,6 +108,7 @@ public class DbufInstanceConfigService {
     domain.setUpdatedAt(now);
     InstanceSettings settings = domain.effectiveSettings();
     settingsApplier.seedDefaultModes(settings, request.getGameModes());
+    settings.setReplayReportEnabled(true);
     domain.setSettings(settings);
     domain.setTrackingSince(now);
     domain.getPlayerTrackingSince().clear();
@@ -423,7 +424,8 @@ public class DbufInstanceConfigService {
         throw new IllegalArgumentException(
             "Unknown game mode: "
                 + gameMode
-                + ". Use 'all' for all game modes or specify a valid game mode name/ID. Available game modes: "
+                + ". Use 'all' for all game modes or specify a valid game mode name/ID. Available"
+                + " game modes: "
                 + availableGameModes);
       }
     }

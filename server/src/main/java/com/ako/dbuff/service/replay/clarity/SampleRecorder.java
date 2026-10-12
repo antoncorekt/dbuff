@@ -29,6 +29,10 @@ final class SampleRecorder {
   private final Map<Integer, Series> series = new TreeMap<>();
   private final List<RawSnapshot> snapshots = new ArrayList<>();
   private long anchorTick = -1;
+
+  /** The tick of 0:00 as far as is known: assumed from the pre-game phase, then seen. */
+  private long clockOriginTick;
+
   private long nextGridTick;
   private boolean stopped;
   private final List<SampleObserver> observers = new ArrayList<>();
@@ -44,6 +48,7 @@ final class SampleRecorder {
   void preGameStarted(long tick) {
     if (anchorTick < 0) {
       anchorTick = tick;
+      clockOriginTick = tick + PRE_GAME_TICKS;
       nextGridTick = tick;
     }
   }
@@ -51,9 +56,10 @@ final class SampleRecorder {
   /** A replay without a recorded pre-game phase is sampled from 0:00. */
   void gameStarted(long tick) {
     if (anchorTick < 0) {
-      anchorTick = tick - PRE_GAME_TICKS;
+      anchorTick = tick;
       nextGridTick = tick;
     }
+    clockOriginTick = tick;
   }
 
   /** The game is over; what the entities hold afterwards is not play. */
@@ -93,7 +99,7 @@ final class SampleRecorder {
 
   private void sample(long grid) {
     List<Controllers.View> players = Controllers.read(entities);
-    boolean minuteBoundary = (grid - anchorTick - MINUTE_OFFSET_TICKS) % MINUTE_TICKS == 0;
+    boolean minuteBoundary = Math.floorMod(grid - clockOriginTick, MINUTE_TICKS) == 0;
     Entity resource = minuteBoundary ? first("CDOTA_PlayerResource") : null;
     Entity radiant = minuteBoundary ? first("CDOTA_DataRadiant") : null;
     Entity dire = minuteBoundary ? first("CDOTA_DataDire") : null;
@@ -150,6 +156,8 @@ final class SampleRecorder {
     private int[] y = new int[256];
     private int[] hp = new int[256];
     private int[] mana = new int[256];
+    private int[] manaPoints = new int[256];
+    private int[] attackRange = new int[256];
     private int[] level = new int[256];
     private int[] flags = new int[256];
     private int size;
@@ -172,6 +180,8 @@ final class SampleRecorder {
         y = Arrays.copyOf(y, capacity);
         hp = Arrays.copyOf(hp, capacity);
         mana = Arrays.copyOf(mana, capacity);
+        manaPoints = Arrays.copyOf(manaPoints, capacity);
+        attackRange = Arrays.copyOf(attackRange, capacity);
         level = Arrays.copyOf(level, capacity);
         flags = Arrays.copyOf(flags, capacity);
       }
@@ -180,6 +190,8 @@ final class SampleRecorder {
         y[size] = Positions.y(hero);
         hp[size] = percent(hero, "m_iHealth", "m_iMaxHealth");
         mana[size] = percent(hero, "m_flMana", "m_flMaxMana");
+        manaPoints[size] = (int) Math.round(number(hero, "m_flMana"));
+        attackRange[size] = (int) number(hero, "m_iAttackRange");
         level[size] = (int) number(hero, "m_iCurrentLevel");
         flags[size] = number(hero, "m_lifeState") == 0 ? 1 : 0;
       }
@@ -193,6 +205,8 @@ final class SampleRecorder {
           Arrays.copyOf(y, size),
           Arrays.copyOf(hp, size),
           Arrays.copyOf(mana, size),
+          Arrays.copyOf(manaPoints, size),
+          Arrays.copyOf(attackRange, size),
           Arrays.copyOf(level, size),
           Arrays.copyOf(flags, size));
     }

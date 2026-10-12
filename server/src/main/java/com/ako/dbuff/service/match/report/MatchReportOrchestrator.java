@@ -6,11 +6,13 @@ import com.ako.dbuff.dao.model.InstanceSettings;
 import com.ako.dbuff.dao.model.ItemDomain;
 import com.ako.dbuff.dao.model.KillLogDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
+import com.ako.dbuff.dao.model.MatchReportThreadDomain;
 import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.ItemRepository;
 import com.ako.dbuff.dao.repo.KillLogRepo;
+import com.ako.dbuff.dao.repo.MatchReportThreadRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.service.discord.DiscordMessageService;
 import com.ako.dbuff.service.match.report.analyzer.FullDataAvailable;
@@ -19,6 +21,7 @@ import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.ReportAnalyzer;
 import com.ako.dbuff.service.match.report.formatter.ReportFormatter;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -49,6 +52,7 @@ public class MatchReportOrchestrator {
   private final AbilityRepo abilityRepo;
   private final ItemRepository itemRepository;
   private final KillLogRepo killLogRepo;
+  private final MatchReportThreadRepo threadRepo;
 
   public void processAndReport(
       List<MatchDomain> processedMatches, DbufInstanceConfigDomain config) {
@@ -123,6 +127,7 @@ public class MatchReportOrchestrator {
 
     String threadName = "Match " + match.getId();
     ThreadChannel thread = discordMessageService.createThread(headerMessage, threadName);
+    rememberThread(match, config, thread, headerMessage);
 
     List<Report> partialReports = runAnalyzers(context, partialAnalyzers);
     List<String> formatted =
@@ -245,12 +250,36 @@ public class MatchReportOrchestrator {
 
     String threadName = "Match " + match.getId();
     ThreadChannel thread = discordMessageService.createThread(headerMessage, threadName);
+    rememberThread(match, config, thread, headerMessage);
 
     List<String> formatted = reportFormatter.formatForDiscord(allReports, context.getPlayerNames());
     for (String message : formatted) {
       if (message != null && !message.isEmpty()) {
         discordMessageService.sendThreadMessageBlocking(thread, message);
       }
+    }
+  }
+
+  /** Keeps the thread, so that a replay analysis arriving hours later can find it. */
+  private void rememberThread(
+      MatchDomain match,
+      DbufInstanceConfigDomain config,
+      ThreadChannel thread,
+      Message headerMessage) {
+    try {
+      MatchReportThreadDomain row =
+          threadRepo
+              .findByMatchIdAndInstanceId(match.getId(), config.getId())
+              .orElseGet(MatchReportThreadDomain::new);
+      row.setMatchId(match.getId());
+      row.setInstanceId(config.getId());
+      row.setChannelId(config.getDiscordChannelId());
+      row.setThreadId(thread.getIdLong());
+      row.setHeaderMessageId(headerMessage.getIdLong());
+      row.setCreatedAt(LocalDateTime.now());
+      threadRepo.save(row);
+    } catch (RuntimeException e) {
+      log.warn("Could not remember the thread of match {}", match.getId(), e);
     }
   }
 

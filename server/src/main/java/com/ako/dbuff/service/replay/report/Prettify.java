@@ -1,0 +1,38 @@
+package com.ako.dbuff.service.replay.report;
+
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.stream.Collectors;
+
+/** Turns the game's internal names into something a person would write. */
+final class Prettify {
+  private static final String HERO_PREFIX = "npc_dota_hero_";
+
+  private Prettify() {}
+
+  /** {@code npc_dota_hero_faceless_void} to {@code Faceless Void}; other names get the same. */
+  static String unit(String internal) {
+    if (internal == null || internal.isBlank()) {
+      return "";
+    }
+    String name =
+        internal.startsWith(HERO_PREFIX) ? internal.substring(HERO_PREFIX.length()) : internal;
+    name = name.replaceFirst("^npc_dota_(goodguys_|badguys_)?(creep_)?", "");
+    return words(name);
+  }
+
+  /**
+   * {@code item_black_king_bar} to {@code Black King Bar}, {@code sven_storm_bolt} to {@code Sven
+   * Storm Bolt}.
+   */
+  static String ability(String internal) {
+    return words(internal.startsWith("item_") ? internal.substring("item_".length()) : internal);
+  }
+
+  private static String words(String snake) {
+    return Arrays.stream(snake.split("_"))
+        .filter(w -> !w.isEmpty())
+        .map(w -> w.substring(0, 1).toUpperCase(Locale.ROOT) + w.substring(1))
+        .collect(Collectors.joining(" "));
+  }
+}

@@ -46,9 +46,9 @@ class ReplayWiringTest {
   }
 
   @Test
-  void theFightAnalyzerRunsAfterTheActivityAnalyzerItReadsFrom() {
+  void theAnalyzersRunInTheOrderOfTheDataTheyReadFromEachOther() {
     assertThat(analyzers)
         .extracting(ReplayAnalyzer::name)
-        .containsSubsequence("activity", "fights");
+        .containsSubsequence("activity", "fights", "deaths");
   }
 }

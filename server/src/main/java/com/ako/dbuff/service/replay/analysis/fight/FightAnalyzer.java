@@ -3,26 +3,23 @@ package com.ako.dbuff.service.replay.analysis.fight;
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.PlayerActivitySegmentDomain;
-import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
-import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
-import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
-import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatHeroes;
 import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.PlayerSlots;
-import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.activity.Activity;
 import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
+import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
+import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import com.ako.dbuff.service.replay.map.MapLayout;
-import com.ako.dbuff.service.replay.map.MapLayouts;
+import com.ako.dbuff.service.replay.map.MatchMapLayout;
 import com.ako.dbuff.service.replay.map.Zone;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,15 +38,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class FightAnalyzer implements ReplayAnalyzer {
-  private final ReplayPlayerTrackRepo trackRepo;
+  private final PlayerTraces playerTraces;
   private final ReplayPlayerRepo playerRepo;
-  private final ReplayParseRunRepo runRepo;
   private final PlayerActivitySegmentRepo segmentRepo;
   private final FightRepo fightRepo;
   private final FightPlayerRepo fightPlayerRepo;
+  private final HeroStateTimelines timelines;
+  private final MatchMapLayout matchMapLayout;
   private final CombatLogReader combatLog;
-  private final MapLayouts mapLayouts;
-  private final ReplayProcessingProperties processing;
   private final ReplayAnalysisProperties properties;
 
   @Override
@@ -59,12 +55,12 @@ public class FightAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 1;
+    return 3;
   }
 
   @Override
   public Set<String> requires() {
-    return Set.of("players", "tracks", "combat-log");
+    return Set.of("players", "tracks", "combat-log", "state-changes");
   }
 
   @Override
@@ -78,9 +74,10 @@ public class FightAnalyzer implements ReplayAnalyzer {
       log.info("Match {} has no combat log or heroes to find fights in", matchId);
       return;
     }
-    Map<Integer, FightAssessor.Trace> traces = traces(matchId);
+    Map<Integer, FightAssessor.Trace> traces = playerTraces.load(matchId);
     Map<Integer, List<ActivitySegment>> activities = activities(matchId);
-    MapLayout layout = layout(matchId);
+    Map<Integer, HeroStateTimeline> states = timelines.load(matchId);
+    MapLayout layout = matchMapLayout.of(matchId).orElse(null);
     List<FightDetector.Detected> detected =
         new FightDetector(properties.fightTuning()).detect(events, playerOf);
     FightAssessor assessor =
@@ -88,7 +85,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
             properties.getFightParticipationRadius(), properties.getFightWinMarginPercent());
     for (int index = 0; index < detected.size(); index++) {
       FightDetector.Detected fight = detected.get(index);
-      FightAssessor.Assessment assessment = assessor.assess(fight, traces, activities);
+      FightAssessor.Assessment assessment = assessor.assess(fight, traces, activities, states);
       fightRepo.save(fightRow(matchId, index, fight, assessment, layout));
       fightPlayerRepo.saveAll(playerRows(matchId, index, assessment));
     }
@@ -99,25 +96,6 @@ public class FightAnalyzer implements ReplayAnalyzer {
   public void deleteByMatchId(long matchId) {
     fightRepo.deleteByMatchId(matchId);
     fightPlayerRepo.deleteByMatchId(matchId);
-  }
-
-  private Map<Integer, FightAssessor.Trace> traces(long matchId) {
-    Map<Integer, FightAssessor.Trace> traces = new HashMap<>();
-    for (ReplayPlayerTrackDomain t : trackRepo.findByMatchId(matchId)) {
-      if (t.getSampleCount() == null || t.getSampleCount() == 0 || t.getX().length == 0) {
-        continue;
-      }
-      traces.put(
-          PlayerSlots.index(t.getPlayerSlot()),
-          new FightAssessor.Trace(
-              t.getStartSeconds(),
-              t.getStepSeconds(),
-              t.getX(),
-              t.getY(),
-              t.getLevel(),
-              t.getFlags()));
-    }
-    return traces;
   }
 
   private Map<Integer, List<ActivitySegment>> activities(long matchId) {
@@ -135,14 +113,6 @@ public class FightAnalyzer implements ReplayAnalyzer {
                   s.getSide() == null ? null : ActivitySegment.Side.valueOf(s.getSide())));
     }
     return bySlot;
-  }
-
-  private MapLayout layout(long matchId) {
-    return runRepo
-        .findByMatchIdAndParserVersion(matchId, processing.getParserVersion())
-        .map(ReplayParseRunDomain::getMapVersion)
-        .flatMap(mapLayouts::forVersion)
-        .orElse(null);
   }
 
   private FightDomain fightRow(
@@ -190,6 +160,11 @@ public class FightAnalyzer implements ReplayAnalyzer {
                     .deaths(p.deaths())
                     .distanceToCenter(p.distanceToCenter())
                     .activityAtStart(p.activityAtStart())
+                    .absenceReason(p.absenceReason() == null ? null : p.absenceReason().name())
+                    .teleportCooldownLeft(p.teleportCooldownLeft())
+                    .attackRange(p.attackRange())
+                    .frontlineRank(p.frontlineRank())
+                    .frontlineDelta(p.frontlineDelta())
                     .analysisVersion(version())
                     .build())
         .toList();

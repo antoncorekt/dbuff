@@ -1,7 +1,10 @@
 package com.ako.dbuff.service.replay.analysis;
 
 import com.ako.dbuff.service.replay.analysis.activity.ActivityTuning;
+import com.ako.dbuff.service.replay.analysis.death.DeathAssessor;
 import com.ako.dbuff.service.replay.analysis.fight.FightDetector;
+import com.ako.dbuff.service.replay.analysis.spike.SpikeDetector;
+import com.ako.dbuff.service.replay.analysis.team.TeamStateSegmenter;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -40,6 +43,84 @@ public class ReplayAnalysisProperties {
   /** The share of the total, of level or damage, by which one side must lead to win a fight. */
   private int fightWinMarginPercent = 10;
 
+  /** How far before a death damage, disables and BKB use are looked at. */
+  private int deathLookbackSeconds = 8;
+
+  /** Damage in the last three seconds from which a death is called a burst. */
+  private int deathBurstDamage = 1500;
+
+  /** A hero with no ally and at least two enemies this close was caught out. */
+  private int deathIsolationRadius = 1500;
+
+  /** Seconds of disables in the lookback from which a death is called a disable chain. */
+  private int deathDisableSeconds = 2;
+
+  /** A hero alive this long after dying came back by Aegis or reincarnation. */
+  private int deathReincarnationSeconds = 5;
+
+  /** A hero who dies this soon into a fight is said to have had no time to use what he held. */
+  private int fightEarlyDeathSeconds = 5;
+
+  /** A hero this many places further forward than his attack range suggests was out of position. */
+  private int deathOutOfPositionRanks = 2;
+
+  /** A team is ahead from this share of both teams' net worth together, in percent. */
+  private int teamAheadPercent = 5;
+
+  /** A lead must hold this long before the team counts as ahead or behind. */
+  private int teamStateEnterSeconds = 120;
+
+  /** A lead must have faded this long before the team counts as even again. */
+  private int teamStateLeaveSeconds = 60;
+
+  /** The laning phase ends at this game minute. */
+  private int phaseLaneEndMinutes = 12;
+
+  /** The mid game ends at this game minute; the late game follows. */
+  private int phaseMidEndMinutes = 25;
+
+  /** A swing is at least this much net worth. */
+  private int spikeMinGold = 1500;
+
+  /** A swing is at least this share of both teams' net worth together, in percent. */
+  private int spikeMinPercent = 3;
+
+  /** A swing takes up to this many minutes to start; it goes on while it keeps moving. */
+  private int spikeMaxMinutes = 3;
+
+  /** A lead of this size on both sides of a swing makes it a change of direction. */
+  private int spikeFlipGold = 1000;
+
+  /** A source must make up this share of a swing to be named as its cause, in percent. */
+  private int spikeMinSharePercent = 10;
+
+  /** A player holding more than this share of his team's net worth, in percent, stands out. */
+  private int outlierSharePercent = 35;
+
+  /** ...for at least this many minutes. */
+  private int outlierMinutes = 3;
+
+  /** A player holding less than this share, in percent, and dying a lot, is feeding. */
+  private int feederSharePercent = 10;
+
+  /** ...for at least this many minutes. */
+  private int feederMinutes = 5;
+
+  public SpikeDetector.Tuning spikeTuning() {
+    return new SpikeDetector.Tuning(
+        Math.max(1, spikeMinGold),
+        Math.max(1, spikeMinPercent) / 100.0,
+        Math.max(1, spikeMaxMinutes),
+        spikeFlipGold);
+  }
+
+  public TeamStateSegmenter.Tuning teamStateTuning() {
+    return new TeamStateSegmenter.Tuning(
+        Math.max(1, teamAheadPercent) / 100.0,
+        Math.max(1, teamStateEnterSeconds),
+        Math.max(1, teamStateLeaveSeconds));
+  }
+
   public FightDetector.Tuning fightTuning() {
     return new FightDetector.Tuning(
         fightMergeGapSeconds,
@@ -47,6 +128,16 @@ public class ReplayAnalysisProperties {
         fightMinHeroesPerSide,
         fightIntensityWindowSeconds,
         fightIntensityMinDamage);
+  }
+
+  public DeathAssessor.Tuning deathTuning() {
+    return new DeathAssessor.Tuning(
+        deathLookbackSeconds,
+        deathBurstDamage,
+        deathIsolationRadius,
+        deathDisableSeconds,
+        deathReincarnationSeconds,
+        Math.max(1, deathOutOfPositionRanks));
   }
 
   public ActivityTuning activityTuning() {

@@ -4,6 +4,7 @@ import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.StateChange;
 import com.ako.dbuff.service.replay.StateChangeKind;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,9 @@ class StateReplayTest {
   @Test
   void aCooldownEndsAfterItWasSeenAndNoLaterThanItsLengthWhenTheLengthIsKnown() {
     List<StateChange> cooldowns =
-        changes(StateChangeKind.COOLDOWN).stream().filter(c -> c.gameSecond() > 0).toList();
+        changes(StateChangeKind.COOLDOWN).stream()
+            .filter(c -> c.gameSecond() > 0 && c.cooldownLength() >= 0)
+            .toList();
 
     assertThat(cooldowns).isNotEmpty();
     assertThat(cooldowns)
@@ -73,9 +76,32 @@ class StateReplayTest {
         .containsExactly(1, 2, 3, 4);
   }
 
+  @Test
+  void manaCostsAreRecordedAndMoveWithTheSkillLevel() {
+    assertThat(changes(StateChangeKind.MANA_COST))
+        .filteredOn(c -> c.name().equals("furion_teleportation"))
+        .extracting(StateChange::manaCost)
+        .containsExactly(50, 60, 70, 80);
+    assertThat(changes(StateChangeKind.MANA_COST))
+        .filteredOn(c -> c.name().equals("item_tpscroll"))
+        .extracting(StateChange::manaCost)
+        .containsExactly(75);
+    assertThat(Arrays.stream(facts.samples().series().get(SNIPER).mana()).max().orElse(0))
+        .isGreaterThan(300);
+  }
+
+  @Test
+  void attackRangeIsSampledInWorldUnits() {
+    int[] ranges = facts.samples().series().get(SNIPER).attackRange();
+
+    assertThat(Arrays.stream(ranges).filter(r -> r > 0))
+        .isNotEmpty()
+        .allMatch(r -> r >= 100 && r <= 1500);
+  }
+
   private long cooldowns(String name) {
     return changes(StateChangeKind.COOLDOWN).stream()
-        .filter(c -> c.name().equals(name) && c.gameSecond() > 0)
+        .filter(c -> c.name().equals(name) && c.gameSecond() > 0 && c.cooldownLength() >= 0)
         .count();
   }
 

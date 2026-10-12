@@ -40,6 +40,9 @@ public class UpdateInstanceRequest {
   /** Turn the OpenAI match summary on or off (optional) */
   private Boolean aiSummaryEnabled;
 
+  /** Turn the replay analysis in the match thread on or off (optional) */
+  private Boolean replayReportEnabled;
+
   /** Quiet hours as {@code HH:mm-HH:mm}, {@code off}, or {@code default} (optional) */
   private String quietHours;
 
@@ -55,6 +58,7 @@ public class UpdateInstanceRequest {
   /** Whether any per-channel setting is being changed. */
   public boolean hasSettingsChange() {
     return aiSummaryEnabled != null
+        || replayReportEnabled != null
         || quietHours != null
         || timezone != null
         || defaultGameModes != null

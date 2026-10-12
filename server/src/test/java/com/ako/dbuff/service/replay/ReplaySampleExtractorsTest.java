@@ -48,6 +48,8 @@ class ReplaySampleExtractorsTest {
     assertThat(dire.getStepSeconds()).isEqualTo(5);
     assertThat(dire.getSampleCount()).isEqualTo(3);
     assertThat(dire.getX()).containsExactly(-7000, 100, 6500);
+    assertThat(dire.getMana()).containsExactly(0, 400, 240);
+    assertThat(dire.getAttackRange()).containsExactly(0, 600, 600);
     assertThat(dire.getLevel()).containsExactly(0, 1, 2);
     assertThat(dire.getFlags()).containsExactly(0, 1, 1);
   }
@@ -102,6 +104,8 @@ class ReplaySampleExtractorsTest {
                     new int[] {-6500, 0, 5000},
                     new int[] {0, 100, 80},
                     new int[] {0, 100, 70},
+                    new int[] {0, 300, 210},
+                    new int[] {0, 150, 150},
                     new int[] {0, 1, 2},
                     new int[] {0, 1, 1}),
                 new SampleFacts.PlayerSeries(
@@ -110,6 +114,8 @@ class ReplaySampleExtractorsTest {
                     new int[] {7000, 100, 6000},
                     new int[] {0, 100, 90},
                     new int[] {0, 100, 60},
+                    new int[] {0, 400, 240},
+                    new int[] {0, 600, 600},
                     new int[] {0, 1, 2},
                     new int[] {0, 1, 1})),
             List.of(minute(0, 5, 3, 900), minute(10, 5, 1, 0)));

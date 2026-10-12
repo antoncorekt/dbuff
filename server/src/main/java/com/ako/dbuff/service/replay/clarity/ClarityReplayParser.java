@@ -116,6 +116,7 @@ public class ClarityReplayParser implements ReplayParser {
         Pattern.compile("^m_pGameRules\\.m_AbilityDraftAbilities\\.(\\d+)\\.m_unPlayerID$");
     private static final String STATE = "m_pGameRules.m_nGameState";
     private static final String START_TIME = "m_pGameRules.m_flGameStartTime";
+    private static final String PAUSED = "m_pGameRules.m_bGamePaused";
 
     @Insert Entities entities;
     @Insert StringTables stringTables;
@@ -131,6 +132,7 @@ public class ClarityReplayParser implements ReplayParser {
     private final BitSet picked = new BitSet();
     private long ticksSeen;
     private long gameOverTick = -1;
+    private final GameClock clock = new GameClock();
 
     Collector(BooleanSupplier cancelled) {
       this.cancelled = cancelled;
@@ -138,7 +140,7 @@ public class ClarityReplayParser implements ReplayParser {
 
     @OnTickStart
     public void onTick(Context ctx, boolean synthetic) {
-      recorder().tick(ctx.getTick());
+      recorder().tick(clock.gameTick(ctx.getTick()));
       if (gameOverTick >= 0 && ctx.getTick() - gameOverTick > AFTER_GAME_TICKS) {
         throw new GameOver();
       }
@@ -155,27 +157,33 @@ public class ClarityReplayParser implements ReplayParser {
     @OnEntityUpdated(classPattern = "CDOTAGamerulesProxy")
     public void rulesUpdated(Context ctx, Entity rules, FieldPath[] paths, int count) {
       recordPicks(ctx, rules, paths, count);
+      if (rules.hasProperty(PAUSED) && rules.getProperty(PAUSED) instanceof Boolean paused) {
+        clock.paused(paused, ctx.getTick());
+      }
       if (!rules.hasProperty(STATE)) {
         return;
       }
       int state = rules.getProperty(STATE);
       if (state == PRE_GAME) {
-        recorder().preGameStarted(ctx.getTick());
+        recorder().preGameStarted(clock.gameTick(ctx.getTick()));
       } else if (state == POST_GAME || state == POST_GAME_SCORES) {
         recorder().stop();
         if (facts != null && gameOverTick < 0) {
           gameOverTick = ctx.getTick();
         }
       } else if (state == GAME_IN_PROGRESS && facts == null) {
+        if (!rules.hasProperty(START_TIME) || !(rules.getProperty(START_TIME) instanceof Number)) {
+          return;
+        }
         Number startTime = rules.getProperty(START_TIME);
         facts =
             ReplayFacts.builder()
-                .clockStartTick(ctx.getTick())
+                .clockStartTick((int) clock.gameTick(ctx.getTick()))
                 .gameStartTime(startTime.doubleValue())
                 .players(readPlayers())
                 .draft(readDraft(rules))
                 .build();
-        recorder().gameStarted(ctx.getTick());
+        recorder().gameStarted(clock.gameTick(ctx.getTick()));
         map = MapReader.read(entities, stringTables.forName("EntityNames"), rules);
       }
     }
@@ -220,7 +228,9 @@ public class ClarityReplayParser implements ReplayParser {
         int player = ((Number) rules.getPropertyForFieldPath(paths[i])).intValue();
         if (player != NOT_PICKED && !picked.get(poolIndex)) {
           picked.set(poolIndex);
-          picks.add(new DraftPick(picks.size() + 1, poolIndex, player, ctx.getTick()));
+          picks.add(
+              new DraftPick(
+                  picks.size() + 1, poolIndex, player, (int) clock.gameTick(ctx.getTick())));
         }
       }
     }

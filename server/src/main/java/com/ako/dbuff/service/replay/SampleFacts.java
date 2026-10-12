@@ -17,6 +17,8 @@ public record SampleFacts(
    * <p>A sample where the hero entity does not exist (before it spawns, or when the game ends) is
    * all zeros, so a level of 0 means "no data".
    *
+   * @param mana the mana points, as against {@code manaPercent}
+   * @param attackRange the hero's attack range in world units, as the game reports it
    * @param flags bit 0 is set while the hero is alive
    */
   public record PlayerSeries(
@@ -25,6 +27,8 @@ public record SampleFacts(
       int[] y,
       int[] hpPercent,
       int[] manaPercent,
+      int[] mana,
+      int[] attackRange,
       int[] level,
       int[] flags) {}
 

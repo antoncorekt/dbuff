@@ -2,9 +2,13 @@ package com.ako.dbuff.service.replay.analysis.fight;
 
 import com.ako.dbuff.service.replay.analysis.activity.Activity;
 import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
+import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Says where a detected fight was, who won it and how each player took part, from the players'
@@ -15,6 +19,14 @@ public final class FightAssessor {
   private static final String RADIANT = "RADIANT";
   private static final String DIRE = "DIRE";
   private static final String DRAW = "DRAW";
+  private static final List<String> TELEPORTS =
+      List.of("item_tpscroll", "item_travel_boots", "item_travel_boots_2");
+  private static final Set<Presence> AWAY_BUT_ALIVE =
+      EnumSet.of(
+          Presence.ABSENT_FAR,
+          Presence.ABSENT_FARMING,
+          Presence.ABSENT_BASE,
+          Presence.ABSENT_PUSHING);
 
   private final int participationRadius;
   private final int winMarginPercent;
@@ -26,9 +38,35 @@ public final class FightAssessor {
 
   /** One player's samples; level 0 means no data, flag bit 0 means alive. */
   public record Trace(
-      int startSeconds, int stepSeconds, int[] x, int[] y, int[] level, int[] flags) {
+      int startSeconds,
+      int stepSeconds,
+      int[] x,
+      int[] y,
+      int[] level,
+      int[] flags,
+      int[] attackRange) {
 
-    int indexAt(double second) {
+    /** A trace of a track that has no attack range. */
+    public Trace(int startSeconds, int stepSeconds, int[] x, int[] y, int[] level, int[] flags) {
+      this(startSeconds, stepSeconds, x, y, level, flags, null);
+    }
+
+    /** Null when the track has no attack range or the hero did not exist at the time. */
+    public Integer attackRangeAt(double second) {
+      if (attackRange == null || attackRange.length != x.length) {
+        return null;
+      }
+      int i = indexAt(second);
+      return level[i] == 0 || attackRange[i] <= 0 ? null : attackRange[i];
+    }
+
+    /** The first sample at or after the time, so a sample cannot fall before an event of it. */
+    public int indexAtOrAfter(double second) {
+      int i = (int) Math.ceil((second - startSeconds) / stepSeconds);
+      return Math.max(0, Math.min(x.length - 1, i));
+    }
+
+    public int indexAt(double second) {
       int i = (int) Math.round((second - startSeconds) / stepSeconds);
       return Math.max(0, Math.min(x.length - 1, i));
     }
@@ -44,7 +82,29 @@ public final class FightAssessor {
       long damageTaken,
       int deaths,
       Integer distanceToCenter,
-      String activityAtStart) {}
+      String activityAtStart,
+      AbsenceReason absenceReason,
+      Integer teleportCooldownLeft,
+      Integer attackRange,
+      Integer frontlineRank,
+      Integer frontlineDelta) {
+
+    PlayerPart inLine(FrontlineRanker.Position position) {
+      return new PlayerPart(
+          player,
+          presence,
+          damageDealt,
+          damageTaken,
+          deaths,
+          distanceToCenter,
+          activityAtStart,
+          absenceReason,
+          teleportCooldownLeft,
+          attackRange,
+          position.rank(),
+          position.delta());
+    }
+  }
 
   /**
    * @param centerX null when no participant had a position
@@ -64,7 +124,8 @@ public final class FightAssessor {
   public Assessment assess(
       FightDetector.Detected fight,
       Map<Integer, Trace> traces,
-      Map<Integer, List<ActivitySegment>> activities) {
+      Map<Integer, List<ActivitySegment>> activities,
+      Map<Integer, HeroStateTimeline> states) {
     double middle = (fight.start() + fight.end()) / 2;
     int[] center = center(fight, traces, middle);
     int radiantDeaths = 0;
@@ -92,8 +153,10 @@ public final class FightAssessor {
               fight,
               traces.get(player),
               activities.getOrDefault(player, List.of()),
+              states.get(player),
               center));
     }
+    parts = withFrontline(fight, traces, parts);
     return new Assessment(
         center == null ? null : center[0],
         center == null ? null : center[1],
@@ -105,6 +168,32 @@ public final class FightAssessor {
         radiantDamage,
         direDamage,
         parts);
+  }
+
+  /** Ranks the heroes who took part by how far forward they stood when the fight began. */
+  private List<PlayerPart> withFrontline(
+      FightDetector.Detected fight, Map<Integer, Trace> traces, List<PlayerPart> parts) {
+    Map<Integer, int[]> positions = new HashMap<>();
+    Map<Integer, Integer> ranges = new HashMap<>();
+    for (PlayerPart part : parts) {
+      Trace trace = traces.get(part.player());
+      boolean tookPart =
+          part.presence() == Presence.ACTIVE || part.presence() == Presence.PRESENT_PASSIVE;
+      if (!tookPart || trace == null) {
+        continue;
+      }
+      int i = trace.indexAt(fight.start());
+      if (trace.level()[i] > 0 && (trace.flags()[i] & 1) == 1) {
+        positions.put(part.player(), new int[] {trace.x()[i], trace.y()[i]});
+        if (part.attackRange() != null) {
+          ranges.put(part.player(), part.attackRange());
+        }
+      }
+    }
+    Map<Integer, FrontlineRanker.Position> ranked = new FrontlineRanker().rank(positions, ranges);
+    return parts.stream()
+        .map(p -> ranked.containsKey(p.player()) ? p.inLine(ranked.get(p.player())) : p)
+        .toList();
   }
 
   private static int[] center(
@@ -161,6 +250,7 @@ public final class FightAssessor {
       FightDetector.Detected fight,
       Trace trace,
       List<ActivitySegment> segments,
+      HeroStateTimeline state,
       int[] center) {
     long dealt = fight.damageDealt().getOrDefault(player, 0L);
     long taken = fight.damageTaken().getOrDefault(player, 0L);
@@ -168,14 +258,38 @@ public final class FightAssessor {
     Integer distance = distanceAtStart(trace, fight.start(), center);
     ActivitySegment atStart = segmentAt(segments, fight.start());
     String activity = atStart == null ? null : atStart.activity().name();
+    Presence presence = presence(player, fight, trace, atStart, center);
+    boolean couldHaveTeleported = state != null && AWAY_BUT_ALIVE.contains(presence);
+    Integer cooldownLeft = couldHaveTeleported ? teleportCooldownLeft(state, fight.start()) : null;
     return new PlayerPart(
         player,
-        presence(player, fight, trace, atStart, center),
+        presence,
         dealt,
         taken,
         deaths,
         distance,
-        activity);
+        activity,
+        couldHaveTeleported ? absenceReason(cooldownLeft) : null,
+        cooldownLeft,
+        trace == null ? null : trace.attackRangeAt(fight.start()),
+        null,
+        null);
+  }
+
+  private static AbsenceReason absenceReason(Integer cooldownLeft) {
+    if (cooldownLeft == null) {
+      return AbsenceReason.NO_TP;
+    }
+    return cooldownLeft > 0 ? AbsenceReason.TP_ON_COOLDOWN : AbsenceReason.HAD_TP_NOT_USED;
+  }
+
+  /** The shortest wait among the teleports the hero held, null when he held none. */
+  private static Integer teleportCooldownLeft(HeroStateTimeline state, double second) {
+    return TELEPORTS.stream()
+        .filter(t -> state.owns(t, second))
+        .map(t -> (int) Math.ceil(state.cooldownLeft(t, second)))
+        .min(Integer::compare)
+        .orElse(null);
   }
 
   private Presence presence(

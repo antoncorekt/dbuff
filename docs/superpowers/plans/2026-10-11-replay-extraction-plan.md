@@ -436,6 +436,8 @@ end of the game, so they must be captured while the draft runs) and store the he
 OpenDota hero constants minus nothing (the pool is the whole roster; store bans/picks and the pick timestamps).
 Spike S9 verifies this on an All Pick replay before any AP work.
 
+> **Spike S9 result (2026-10-12, All Pick matches 9040892342 and 9040889566):** the replay holds no pick stream. Recording starts after the draft; the only draft state on the game rules entity is one snapshot at the first tick (`m_vecNewBannedHeroes`, 17 entries) and `m_flHeroPickStateTransitionTime`. There is no pick order or timing to capture, and OpenDota's `picks_bans` already carry the bans, so no All Pick extractor is built.
+
 ### 5.2 Tables (L1)
 - `AbilityDraftPickDomain` (40 rows): `matchId, pickOrder (1..40), playerSlot, replayPlayerId, team,
   teamPickIndex (1..20), pickTick, secondsIntoDraft, secondsSincePrevPick, abilityId (OpenDota id), abilityName,
@@ -690,6 +692,8 @@ lone farmer is flagged).
 Config `endGameStartSec` default: the later of 30:00 and the first time either team attacked a barracks/high ground;
 all analyses below apply to all deaths, and the report prioritises those in the end game window and in fights tagged
 `HIGHGROUND` or with `winnerTeam` deciding the game.
+
+> **Implemented (first version):** `DeathAnalyzer` / `DeathAssessor` in `service/replay/analysis/death/`, rules version 1, stored as `DeathAnalysisDomain` (killer kind and name, assists, position, zone and lane, the fight it belongs to, isolated, BKB owned / ready eight seconds before / active / expired just before, seconds disabled, damage in the lookback and the last three seconds, top damage sources, escape items held, whether a TP was ready, and a reason). The reason is the first that matches: REINCARNATED, DIED_IMMUNE, BKB_EXPIRED, BKB_READY_UNUSED, BKB_ON_COOLDOWN, DISABLE_CHAIN, CAUGHT_OUT, TOWER, BURST, NO_BKB (a hero kill with no BKB owned, only as the last resort, because otherwise it explains every support's death), OTHER. Checked on match 9038725154: the deaths that are not reincarnations equal OpenDota's per player for all ten players (9, 7, 10, 7, 6, 12, 11, 10, 11, 11); the one extra death in the combat log is a Phantom Assassin Aegis use at 1969, flagged REINCARNATED; the same hero's BKB is not owned at the deaths before the 1359 s purchase OpenDota records and owned at the ones after. Not yet: out-of-position (needs the front-line check), the pierce table for disables that go through BKB, buyback availability, and the end-game rows.
 
 ### 9.2 Death analysis (L1+L2): `DeathAnalysisDomain` (1:1 extension of `DeathEventDomain`, see 3a.3)
 One row per hero death (about 50 per game): `matchId, deathIndex, deathSec, victimSlot, killerSlot, killerKind

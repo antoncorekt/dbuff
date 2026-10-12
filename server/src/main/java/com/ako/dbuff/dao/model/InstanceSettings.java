@@ -32,6 +32,14 @@ public class InstanceSettings {
   private Boolean aiSummaryEnabled;
 
   /**
+   * Whether the replay analysis follows the match report into its thread. Null means on, so a
+   * channel set up before the feature existed gets it; a newly registered channel stores an
+   * explicit value.
+   */
+  @Column(name = "replay_report_enabled")
+  private Boolean replayReportEnabled;
+
+  /**
    * Null follows the server-wide quiet hours, false turns them off for this channel, true uses
    * {@link #quietStart} and {@link #quietEnd}.
    */
@@ -58,6 +66,10 @@ public class InstanceSettings {
 
   public boolean isAiSummaryOn() {
     return aiSummaryEnabled == null || aiSummaryEnabled;
+  }
+
+  public boolean isReplayReportOn() {
+    return replayReportEnabled == null || replayReportEnabled;
   }
 
   public ReportDetail detail() {

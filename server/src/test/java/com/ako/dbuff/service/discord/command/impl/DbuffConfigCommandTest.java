@@ -237,6 +237,7 @@ class DbuffConfigCommandTest {
     FakeCommandContext context =
         FakeCommandContext.builder()
             .option("ai_summary", "false")
+            .option("replay_report", "off")
             .option("detail", "minimal")
             .option("quiet_hours", "22:00-07:00")
             .option("timezone", "Europe/Kyiv")
@@ -250,6 +251,7 @@ class DbuffConfigCommandTest {
     Mockito.verify(instanceConfigService).update(Mockito.eq("instance-1"), captor.capture());
     UpdateInstanceRequest request = captor.getValue();
     assertThat(request.getAiSummaryEnabled()).isFalse();
+    assertThat(request.getReplayReportEnabled()).isFalse();
     assertThat(request.getReportDetail()).isEqualTo("minimal");
     assertThat(request.getQuietHours()).isEqualTo("22:00-07:00");
     assertThat(request.getTimezone()).isEqualTo("Europe/Kyiv");

@@ -115,6 +115,11 @@ public class DbuffConfigCommand implements DbuffCommand {
                     new OptionData(
                         OptionType.BOOLEAN, "ai_summary", "Post the AI match summary", false),
                     new OptionData(
+                        OptionType.BOOLEAN,
+                        "replay_report",
+                        "Post the replay analysis in the match thread",
+                        false),
+                    new OptionData(
                             OptionType.STRING,
                             "detail",
                             "How much each match report includes",
@@ -399,11 +404,9 @@ public class DbuffConfigCommand implements DbuffCommand {
     }
 
     Boolean aiSummary = parseSwitch(context.getOption("ai_summary"));
-    if (context.getOption("ai_summary") != null && aiSummary == null) {
-      context.replyEphemeral(
-          "❌ Could not read `ai_summary` value `"
-              + context.getOption("ai_summary")
-              + "`. Use true or false.");
+    Boolean replayReport = parseSwitch(context.getOption("replay_report"));
+    if (unreadableSwitch(context, "ai_summary", aiSummary)
+        || unreadableSwitch(context, "replay_report", replayReport)) {
       return;
     }
 
@@ -411,6 +414,7 @@ public class DbuffConfigCommand implements DbuffCommand {
     UpdateInstanceRequest request =
         UpdateInstanceRequest.builder()
             .aiSummaryEnabled(aiSummary)
+            .replayReportEnabled(replayReport)
             .reportDetail(context.getOption("detail"))
             .quietHours(context.getOption("quiet_hours"))
             .timezone(context.getOption("timezone"))
@@ -445,6 +449,20 @@ public class DbuffConfigCommand implements DbuffCommand {
             .build());
   }
 
+  /** Tells the user an option they gave is not a switch; true when it was refused. */
+  private static boolean unreadableSwitch(CommandContext context, String option, Boolean parsed) {
+    if (context.getOption(option) == null || parsed != null) {
+      return false;
+    }
+    context.replyEphemeral(
+        "❌ Could not read `"
+            + option
+            + "` value `"
+            + context.getOption(option)
+            + "`. Use true or false.");
+    return true;
+  }
+
   /** True/on/yes/1 and false/off/no/0, since the text surface passes the raw word through. */
   private static Boolean parseSwitch(String raw) {
     if (raw == null) {
@@ -469,6 +487,8 @@ public class DbuffConfigCommand implements DbuffCommand {
                 .collect(Collectors.joining(", "));
     return "**AI summary:** "
         + (settings.isAiSummaryEnabled() ? "on" : "off")
+        + "\n**Replay analysis:** "
+        + (settings.isReplayReportEnabled() ? "on" : "off")
         + "\n**Report detail:** "
         + settings.getReportDetail().toLowerCase()
         + "\n**Quiet hours:** "
@@ -557,6 +577,8 @@ public class DbuffConfigCommand implements DbuffCommand {
             "• `/dbuff add` — add the rest of the group\n"
                 + "• `/dbuff link` — connect players to Discord accounts\n"
                 + "• `/stats` — see how the group is doing\n"
+                + "• Replay analysis follows each report into its thread; turn it off with"
+                + " `/dbuff settings replay_report:false`\n"
                 + "Past matches are imported quietly; reports start with your next game.",
             false)
         .build();

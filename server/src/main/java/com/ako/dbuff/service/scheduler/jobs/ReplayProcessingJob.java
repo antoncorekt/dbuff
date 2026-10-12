@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.scheduler.jobs;
 
 import com.ako.dbuff.service.replay.ReplayBatchService;
+import com.ako.dbuff.service.replay.report.ReplayReportService;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.DisallowConcurrentExecution;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component;
 public class ReplayProcessingJob implements Job {
   @Autowired private ReplayBatchService batchService;
   @Autowired private QuietHoursGuard quietHoursGuard;
+  @Autowired private ReplayReportService reportService;
 
   @Override
   public void execute(JobExecutionContext context) {
@@ -26,6 +28,11 @@ public class ReplayProcessingJob implements Job {
       batchService.runBatch();
     } catch (Exception e) {
       log.error("Replay processing failed: {}", e.getMessage(), e);
+    }
+    try {
+      reportService.deliverPending();
+    } catch (Exception e) {
+      log.error("Replay report delivery failed: {}", e.getMessage(), e);
     }
   }
 }

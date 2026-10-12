@@ -88,6 +88,16 @@ class InstanceSettingsApplierTest {
   }
 
   @Test
+  void replayReport_isStoredAsChosen() {
+    apply(UpdateInstanceRequest.builder().replayReportEnabled(false));
+    assertThat(settings.getReplayReportEnabled()).isFalse();
+    assertThat(settings.isReplayReportOn()).isFalse();
+
+    apply(UpdateInstanceRequest.builder().replayReportEnabled(true));
+    assertThat(settings.isReplayReportOn()).isTrue();
+  }
+
+  @Test
   void quietHours_offAndDefault() {
     apply(UpdateInstanceRequest.builder().quietHours("22:00-07:00"));
 
