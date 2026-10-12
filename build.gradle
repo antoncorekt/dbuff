@@ -128,24 +128,24 @@ project('server') {
         maxHeapSize = '512m'
     }
 
-    tasks.register('reviewLoop', Test) {
-        description = 'One round of a review loop against the local PostgreSQL; set REPLAY_FIXTURE_DIR (and -Ploop.topic, ROUND, SMOKE_PG_URL) first.'
-        group = 'verification'
-        testClassesDirs = sourceSets.test.output.classesDirs
-        classpath = sourceSets.test.runtimeClasspath
-        useJUnitPlatform { includeTags 'reviewloop' }
-        maxHeapSize = '512m'
-        environment 'LOOP_TOPIC', findProperty('loop.topic') ?: 'roles'
-        // The inputs are the database and the environment, which Gradle does not track.
-        outputs.upToDateWhen { false }
-        testLogging { showStandardStreams = true }
+    def registerLoopTask = { String taskName, String taskDescription, Closure<String> topic ->
+        tasks.register(taskName, Test) {
+            description = taskDescription
+            group = 'verification'
+            testClassesDirs = sourceSets.test.output.classesDirs
+            classpath = sourceSets.test.runtimeClasspath
+            useJUnitPlatform { includeTags 'reviewloop' }
+            maxHeapSize = '512m'
+            environment 'LOOP_TOPIC', topic()
+            // The inputs are the database and the environment, which Gradle does not track.
+            outputs.upToDateWhen { false }
+            testLogging { showStandardStreams = true }
+        }
     }
-
-    tasks.register('roleLoop') {
-        description = 'Alias of reviewLoop for the roles topic.'
-        group = 'verification'
-        dependsOn 'reviewLoop'
-    }
+    registerLoopTask('reviewLoop',
+            'One round of a review loop against the local PostgreSQL; set REPLAY_FIXTURE_DIR (and -Ploop.topic, ROUND, SMOKE_PG_URL) first.',
+            { findProperty('loop.topic') ?: 'roles' })
+    registerLoopTask('roleLoop', 'Alias of reviewLoop fixed to the roles topic.', { 'roles' })
 
     dependencies {
 

@@ -19,8 +19,11 @@ import org.springframework.stereotype.Component;
 /** The role learning loop: the stored roles, verdicts and compositions of each listed match. */
 @Component
 class RoleLoopTopic implements ReviewLoopTopic {
-  private static final int ROLE_KEY_COLUMNS = 1;
-  private static final int VERDICT_KEY_COLUMNS = 2;
+  static final Path MATCH_LIST = Path.of("src/test/resources/replay/role-loop/matches.txt");
+  static final List<Section> SECTIONS =
+      List.of(
+          new Section(RoleLoopReport.ROLES, "slot", 1),
+          new Section(RoleLoopReport.VERDICTS, "", 2));
 
   private final StoredMatchModes matchModes;
   private final MatchRepo matchRepo;
@@ -57,7 +60,7 @@ class RoleLoopTopic implements ReviewLoopTopic {
 
   @Override
   public Path matchList() {
-    return Path.of("src/test/resources/replay/role-loop/matches.txt");
+    return MATCH_LIST;
   }
 
   @Override
@@ -67,9 +70,7 @@ class RoleLoopTopic implements ReviewLoopTopic {
 
   @Override
   public List<Section> sections() {
-    return List.of(
-        new Section(RoleLoopReport.ROLES, "slot", ROLE_KEY_COLUMNS),
-        new Section(RoleLoopReport.VERDICTS, "", VERDICT_KEY_COLUMNS));
+    return SECTIONS;
   }
 
   @Override

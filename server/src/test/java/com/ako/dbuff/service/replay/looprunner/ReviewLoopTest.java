@@ -47,6 +47,7 @@ class ReviewLoopTest extends ReplayPipelineFixture {
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   void writesTheReviewReportsOfOneRound() {
     ReviewLoopTopic topic = selectedTopic();
+    List<Long> matches = ReviewLoopMatchList.read(topic.matchList());
     ReviewLoopRound round =
         ReviewLoopRound.open(
             topic.outputDir(),
@@ -55,7 +56,7 @@ class ReviewLoopTest extends ReplayPipelineFixture {
     List<String> summary = new ArrayList<>();
     summary.add("# Round %02d".formatted(round.number()));
     try {
-      for (long id : ReviewLoopMatchList.read(topic.matchList())) {
+      for (long id : matches) {
         summarise(topic, round, id, summary);
       }
     } finally {

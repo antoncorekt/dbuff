@@ -4,6 +4,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ReviewLoopDiffTest {
   private static final List<ReviewLoopDiff.Section> SECTIONS =
@@ -108,5 +109,16 @@ class ReviewLoopDiffTest {
             .replace("| 5 | Axe | 3 | 3 |", "| 5 | Axe | 3 | 3 | 3(2.00) |");
 
     assertThat(changes(report("1", "A"), after)).containsExactly("slot 0, final: 1 -> 2");
+  }
+
+  @Test
+  void aMissingSectionIsAnErrorNamingTheHeading() {
+    String noVerdicts = report("1", "A").replace("## Verdicts", "## Other");
+
+    assertThatThrownBy(() -> changes(report("1", "A"), noVerdicts))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("## Verdicts");
+    assertThatThrownBy(() -> changes(noVerdicts, report("1", "A")))
+        .hasMessageContaining("## Verdicts");
   }
 }

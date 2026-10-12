@@ -7,6 +7,7 @@ import com.ako.dbuff.dao.model.PlayerRoleDomain;
 import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.model.TeamCompositionDomain;
+import com.ako.dbuff.service.replay.looprunner.ReviewLoopDiff;
 import com.ako.dbuff.service.replay.roleloop.RoleLoopReport.MatchData;
 import java.util.ArrayList;
 import java.util.List;
@@ -252,5 +253,17 @@ class RoleLoopReportTest {
     String report = RoleLoopReport.render(noStats);
 
     assertThat(report).contains("**No player statistics stored.**").doesNotContain("## Roles");
+  }
+
+  @Test
+  void theTopicSectionsAreFoundInARealReport() {
+    String before =
+        RoleLoopReport.render(
+            data(List.of(), List.of(profile(0, "FINAL", 1, 0.5)), List.of(), List.of()));
+    String after = before.replace("| 0 | Sniper | n/a | 1 |", "| 0 | Sniper | n/a | 2 |");
+
+    assertThat(ReviewLoopDiff.changes(before, before, RoleLoopTopic.SECTIONS)).isEmpty();
+    assertThat(ReviewLoopDiff.changes(before, after, RoleLoopTopic.SECTIONS))
+        .containsExactly("slot 0, final: 1 -> 2");
   }
 }

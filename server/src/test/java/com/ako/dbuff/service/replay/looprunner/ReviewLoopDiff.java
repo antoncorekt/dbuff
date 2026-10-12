@@ -7,7 +7,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** What changed between two reports of one match, read from the tables a topic names. */
+/**
+ * What changed between two reports of one match, read from the tables a topic names. A named table
+ * missing from a report that was produced is an error, not an empty table.
+ */
 public final class ReviewLoopDiff {
   /**
    * A table compared between rounds.
@@ -30,7 +33,9 @@ public final class ReviewLoopDiff {
           compare(
               s.heading(),
               s.keyLabel(),
-              table(previous, s.heading(), s.keyColumns()),
+              ReviewLoopReport.isUnavailable(previous)
+                  ? new Table(List.of(), Map.of(), s.keyColumns())
+                  : table(previous, s.heading(), s.keyColumns()),
               table(current, s.heading(), s.keyColumns())));
     }
     return out;
@@ -85,10 +90,12 @@ public final class ReviewLoopDiff {
     List<String> header = List.of();
     boolean inSection = false;
     boolean seenHeader = false;
+    boolean found = false;
     for (String raw : report.split("\\R")) {
       String line = raw.strip();
       if (line.startsWith("## ")) {
         inSection = line.substring(3).strip().equals(heading);
+        found |= inSection;
         continue;
       }
       if (!inSection || !line.startsWith("|") || line.startsWith("|---")) {
@@ -101,6 +108,9 @@ public final class ReviewLoopDiff {
       } else if (cells.size() >= keyColumns) {
         rows.put(String.join(" ", cells.subList(0, keyColumns)), cells);
       }
+    }
+    if (!found) {
+      throw new IllegalStateException("the report has no '## " + heading + "' section");
     }
     return new Table(header, rows, keyColumns);
   }
