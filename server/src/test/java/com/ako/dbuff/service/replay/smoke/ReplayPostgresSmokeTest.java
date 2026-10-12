@@ -5,6 +5,8 @@ import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
+import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
+import com.ako.dbuff.dao.repo.AbilityDraftPoolRepo;
 import com.ako.dbuff.dao.repo.BuybackEventRepo;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
@@ -152,6 +154,8 @@ class ReplayPostgresSmokeTest {
     }
   }
 
+  @Autowired private AbilityDraftPickRepo draftPickRepo;
+  @Autowired private AbilityDraftPoolRepo draftPoolRepo;
   @Autowired private ReplayRunService runService;
   @Autowired private ReplayDataService dataService;
   @Autowired private PlayerGameStatisticRepo playerStatRepo;
@@ -192,6 +196,9 @@ class ReplayPostgresSmokeTest {
           runRepo.findByMatchIdAndParserVersion(match.getId(), 1).orElseThrow();
       assertThat(status).as("%s: %s", id, run.getError()).isEqualTo(ReplayStatus.DONE);
       assertThat(playerRepo.findByMatchId(match.getId())).hasSize(10);
+      assertThat(draftPickRepo.findByMatchId(match.getId())).as("%s has no draft", id).isEmpty();
+      assertThat(draftPoolRepo.findAll().stream().filter(d -> d.getMatchId().equals(match.getId())))
+          .isEmpty();
       assertThat(trackRepo.findByMatchId(match.getId())).hasSize(10);
       assertThat(trackRepo.findByMatchId(match.getId()).getFirst().getMana()).isNotEmpty();
       assertThat(minuteRepo.findByMatchId(match.getId())).isNotEmpty();

@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay;
 
 import com.ako.dbuff.dao.model.MatchDomain;
+import com.ako.dbuff.service.replay.mode.TestModes;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,8 @@ class ReplayRequestAnnouncerTest {
   private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
   private final ReplayProcessingProperties properties = new ReplayProcessingProperties();
   private final ReplayRequestAnnouncer announcer =
-      new ReplayRequestAnnouncer(publisher, new ReplayEligibility(properties), properties);
+      new ReplayRequestAnnouncer(
+          publisher, new ReplayEligibility(properties), TestModes.registry(properties), properties);
 
   @Test
   void announce_publishesForAFreshEligibleMatch() {

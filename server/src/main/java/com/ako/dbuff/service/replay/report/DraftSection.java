@@ -3,6 +3,8 @@ package com.ako.dbuff.service.replay.report;
 import com.ako.dbuff.dao.model.AbilityDraftPickDomain;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
+import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
+import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -16,6 +18,12 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class DraftSection implements ReplayReportSection {
   private final AbilityDraftPickRepo pickRepo;
+  private final AbilityDraftProfile profile;
+
+  @Override
+  public boolean supports(GameModeProfile mode) {
+    return mode.gameModeId() == profile.gameModeId();
+  }
 
   @Override
   public int order() {

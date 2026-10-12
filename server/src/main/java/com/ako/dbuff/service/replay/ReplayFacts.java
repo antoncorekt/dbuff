@@ -10,7 +10,7 @@ import lombok.Builder;
  * What one parse of a replay produced. Extractors read narrow views of it and never touch the
  * parser library.
  *
- * @param draft the Ability Draft, null for a mode that has none
+ * @param draft the Ability Draft, null for a mode that has none or a replay with no pool
  * @param samples per-player state over time, null when the replay was not read past the draft
  * @param combatLog the hero-relevant combat-log entries, null when none were read
  * @param map the buildings and jungle camps of the map the game was played on
@@ -23,7 +23,7 @@ public record ReplayFacts(
     int clockStartTick,
     double gameStartTime,
     List<ReplayPlayerFact> players,
-    DraftFacts draft,
+    AbilityDraftFacts draft,
     SampleFacts samples,
     CombatLogFacts combatLog,
     MapFacts map,

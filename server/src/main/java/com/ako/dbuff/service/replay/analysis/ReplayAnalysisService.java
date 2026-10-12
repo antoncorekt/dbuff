@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis;
 
+import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -18,12 +19,17 @@ public class ReplayAnalysisService {
    * An analyzer whose input extractor failed is skipped, so that rows from an earlier run are kept
    * rather than replaced by conclusions drawn from missing or stale data.
    *
+   * @param mode analyzers that do not apply to it are left out
    * @param failedExtractors the extractors that failed in this run
    * @return the names of the analyzers that failed
    */
-  public List<String> analyze(long matchId, Collection<String> failedExtractors) {
+  public List<String> analyze(
+      long matchId, GameModeProfile mode, Collection<String> failedExtractors) {
     List<String> failed = new ArrayList<>();
     for (ReplayAnalyzer analyzer : analyzers) {
+      if (!analyzer.supports(mode)) {
+        continue;
+      }
       if (analyzer.requires().stream().anyMatch(failedExtractors::contains)) {
         log.info(
             "Skipping analyzer {} for match {}: an input extractor failed",

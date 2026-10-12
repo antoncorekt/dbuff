@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.clarity;
 import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.StateChange;
 import com.ako.dbuff.service.replay.StateChangeKind;
+import com.ako.dbuff.service.replay.mode.TestModes;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -20,8 +21,11 @@ class StateReplayTest {
   private static final int SNIPER = 0;
 
   private final ReplayFacts facts =
-      new ClarityReplayParser()
-          .parse(Path.of(System.getenv("REPLAY_FIXTURE_DIR"), "9038725154.dem"), () -> false);
+      Parsers.standard()
+          .parse(
+              Path.of(System.getenv("REPLAY_FIXTURE_DIR"), "9038725154.dem"),
+              TestModes.ABILITY_DRAFT,
+              () -> false);
 
   @Test
   void aCooldownIsRecordedForEveryUseOpenDotaCounts() {

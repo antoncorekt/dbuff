@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.AbilityDraftPickDomain;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
+import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -14,7 +15,7 @@ import static org.mockito.Mockito.when;
 class DraftSectionTest {
 
   private final AbilityDraftPickRepo repo = mock(AbilityDraftPickRepo.class);
-  private final DraftSection section = new DraftSection(repo);
+  private final DraftSection section = new DraftSection(repo, new AbilityDraftProfile());
 
   private AbilityDraftPickDomain pick(int order, long slot, String ability) {
     return AbilityDraftPickDomain.builder()

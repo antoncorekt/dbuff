@@ -9,9 +9,12 @@ import com.ako.dbuff.service.replay.analysis.ReplayAnalysisService;
 import com.ako.dbuff.service.replay.file.ReplayFile;
 import com.ako.dbuff.service.replay.file.ReplayFileProvider;
 import com.ako.dbuff.service.replay.map.MapLayouts;
+import com.ako.dbuff.service.replay.mode.GameModeProfile;
+import com.ako.dbuff.service.replay.mode.GameModeRegistry;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Semaphore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -40,6 +43,7 @@ public class ReplayRunService {
   private final Semaphore parseSemaphore;
   private final MapLayouts mapLayouts;
   private final ReplayAnalysisService analysis;
+  private final GameModeRegistry modes;
 
   public ReplayRunService(
       ReplayParseRunRepo runRepo,
@@ -52,7 +56,8 @@ public class ReplayRunService {
       ReplayProcessingProperties properties,
       @Qualifier("replayParseSemaphore") Semaphore parseSemaphore,
       MapLayouts mapLayouts,
-      ReplayAnalysisService analysis) {
+      ReplayAnalysisService analysis,
+      GameModeRegistry modes) {
     this.runRepo = runRepo;
     this.playerStatRepo = playerStatRepo;
     this.eligibility = eligibility;
@@ -64,6 +69,7 @@ public class ReplayRunService {
     this.parseSemaphore = parseSemaphore;
     this.mapLayouts = mapLayouts;
     this.analysis = analysis;
+    this.modes = modes;
   }
 
   /**
@@ -80,16 +86,18 @@ public class ReplayRunService {
 
   private ReplayStatus run(MatchDomain match) {
     ReplayParseRunDomain run = start(match);
-    var skip = eligibility.skipReason(match);
+    Optional<GameModeProfile> activeMode = modes.activeFor(match.getGameModeId());
+    var skip = eligibility.skipReason(match, activeMode);
     if (skip.isPresent()) {
       return finish(run, skip.get().getStatus(), skip.get().getMessage());
     }
+    GameModeProfile mode = activeMode.get();
     boolean acquired = false;
     List<String> failedExtractors;
     try {
       parseSemaphore.acquire();
       acquired = true;
-      failedExtractors = readAndExtract(match, run);
+      failedExtractors = readAndExtract(match, mode, run);
     } catch (ReplayException e) {
       return fail(run, e.getStatus(), e.getMessage());
     } catch (InterruptedException e) {
@@ -111,13 +119,16 @@ public class ReplayRunService {
         parseSemaphore.release();
       }
     }
-    return conclude(match, run, failedExtractors);
+    return conclude(match, mode, run, failedExtractors);
   }
 
   /** The analyzers read stored data only, so they run after the parse permit is given back. */
   private ReplayStatus conclude(
-      MatchDomain match, ReplayParseRunDomain run, List<String> failedExtractors) {
-    List<String> failedAnalyzers = analysis.analyze(match.getId(), failedExtractors);
+      MatchDomain match,
+      GameModeProfile mode,
+      ReplayParseRunDomain run,
+      List<String> failedExtractors) {
+    List<String> failedAnalyzers = analysis.analyze(match.getId(), mode, failedExtractors);
     if (failedExtractors.isEmpty() && failedAnalyzers.isEmpty()) {
       return finish(run, ReplayStatus.DONE, null);
     }
@@ -134,16 +145,17 @@ public class ReplayRunService {
   /**
    * Everything that needs the replay itself, so that its facts are out of reach once it returns.
    */
-  private List<String> readAndExtract(MatchDomain match, ReplayParseRunDomain run) {
+  private List<String> readAndExtract(
+      MatchDomain match, GameModeProfile mode, ReplayParseRunDomain run) {
     ReplaySource source =
         new ReplaySource(match.getId(), match.getReplayCluster(), match.getReplaySalt());
     try (ReplayFile file = fileProvider.open(source)) {
       long started = System.nanoTime();
       long deadline = started + properties.getMaxParseSeconds() * NANOS_PER_SECOND;
-      ReplayFacts facts = parser.parse(file.path(), () -> System.nanoTime() > deadline);
+      ReplayFacts facts = parser.parse(file.path(), mode, () -> System.nanoTime() > deadline);
       rosterVerifier.verify(
           match.getId(), facts.players(), playerStatRepo.findAllByMatchId(match.getId()));
-      List<String> failed = runExtractors(facts, match);
+      List<String> failed = runExtractors(facts, match, mode);
       if (facts.cutShort()) {
         failed.add(INCOMPLETE_REPLAY);
       }
@@ -172,9 +184,12 @@ public class ReplayRunService {
   }
 
   /** One extractor failing must not stop the others. */
-  private List<String> runExtractors(ReplayFacts facts, MatchDomain match) {
+  private List<String> runExtractors(ReplayFacts facts, MatchDomain match, GameModeProfile mode) {
     List<String> failed = new ArrayList<>();
     for (ReplayExtractor extractor : extractors) {
+      if (!extractor.supports(mode)) {
+        continue;
+      }
       try {
         extractor.extract(facts, match);
       } catch (RuntimeException e) {

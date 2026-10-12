@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.AbilityDraftPoolDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.dao.repo.AbilityDraftPoolRepo;
+import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -22,7 +23,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @ActiveProfiles("test")
-@Import({AbilityDraftExtractor.class, AbilityDraftExtractorTest.Names.class})
+@Import({
+  AbilityDraftExtractor.class,
+  AbilityDraftProfile.class,
+  AbilityDraftExtractorTest.Names.class
+})
 class AbilityDraftExtractorTest {
 
   private static final MatchDomain MATCH = match();
@@ -85,9 +90,9 @@ class AbilityDraftExtractorTest {
     assertThat(pickRepo.findAll()).isEmpty();
     assertThat(poolRepo.findAll()).isEmpty();
 
-    DraftFacts shortDraft = fullDraft();
+    AbilityDraftFacts shortDraft = fullDraft();
     extractor.extract(
-        facts(new DraftFacts(shortDraft.pool(), shortDraft.picks().subList(0, 39))), MATCH);
+        facts(new AbilityDraftFacts(shortDraft.pool(), shortDraft.picks().subList(0, 39))), MATCH);
     assertThat(pickRepo.findAll()).isEmpty();
     assertThat(poolRepo.findAll()).isEmpty();
   }
@@ -101,7 +106,7 @@ class AbilityDraftExtractorTest {
     assertThat(poolRepo.findAll()).hasSize(48);
   }
 
-  private ReplayFacts facts(DraftFacts draft) {
+  private ReplayFacts facts(AbilityDraftFacts draft) {
     return ReplayFacts.builder()
         .clockStartTick(17136)
         .gameStartTime(596.5)
@@ -111,7 +116,7 @@ class AbilityDraftExtractorTest {
   }
 
   /** Pool entry i is ability 100+i; the first 40 are picked, alternating Radiant and Dire. */
-  private static DraftFacts fullDraft() {
+  private static AbilityDraftFacts fullDraft() {
     List<DraftPoolEntry> pool = new ArrayList<>();
     List<DraftPick> picks = new ArrayList<>();
     for (int i = 0; i < 48; i++) {
@@ -122,7 +127,7 @@ class AbilityDraftExtractorTest {
         picks.add(new DraftPick(i + 1, i, playerIndex * 2, 2000 + i * 210));
       }
     }
-    return new DraftFacts(pool, picks);
+    return new AbilityDraftFacts(pool, picks);
   }
 
   private static MatchDomain match() {

@@ -10,6 +10,7 @@ import com.ako.dbuff.service.replay.analysis.death.DeathReason;
 import com.ako.dbuff.service.replay.analysis.fight.FightAssessor;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import com.ako.dbuff.service.replay.map.MapLayouts;
+import com.ako.dbuff.service.replay.mode.TestModes;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -88,8 +89,11 @@ class DeathReplayTest {
       return assessments;
     }
     ReplayFacts facts =
-        new ClarityReplayParser()
-            .parse(Path.of(System.getenv("REPLAY_FIXTURE_DIR"), "9038725154.dem"), () -> false);
+        Parsers.standard()
+            .parse(
+                Path.of(System.getenv("REPLAY_FIXTURE_DIR"), "9038725154.dem"),
+                TestModes.ABILITY_DRAFT,
+                () -> false);
     List<CombatEvent> events = facts.combatLog().events();
     Map<String, Integer> playerOf = new HashMap<>();
     var heroNames = CombatHeroes.names(events);

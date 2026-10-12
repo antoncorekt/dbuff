@@ -12,6 +12,7 @@ import com.ako.dbuff.service.replay.analysis.activity.ActivitySegmenter;
 import com.ako.dbuff.service.replay.map.MapLayout;
 import com.ako.dbuff.service.replay.map.MapLayouts;
 import com.ako.dbuff.service.replay.map.Zone;
+import com.ako.dbuff.service.replay.mode.TestModes;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
 import java.util.EnumMap;
@@ -35,8 +36,11 @@ class ActivityReplayTest {
   @Test
   void deadTimeAndJunglingAgreeWithOpenDota() {
     ReplayFacts facts =
-        new ClarityReplayParser()
-            .parse(Path.of(System.getenv("REPLAY_FIXTURE_DIR"), "9038725154.dem"), () -> false);
+        Parsers.standard()
+            .parse(
+                Path.of(System.getenv("REPLAY_FIXTURE_DIR"), "9038725154.dem"),
+                TestModes.ABILITY_DRAFT,
+                () -> false);
     MapLayout layout = layouts.forVersion(facts.map().version()).orElseThrow();
     List<CombatEvent> events = facts.combatLog().events();
 

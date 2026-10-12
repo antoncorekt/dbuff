@@ -1,22 +1,18 @@
 package com.ako.dbuff.service.replay.clarity;
 
 import com.ako.dbuff.dao.model.ReplayStatus;
-import com.ako.dbuff.service.replay.DraftFacts;
-import com.ako.dbuff.service.replay.DraftPick;
-import com.ako.dbuff.service.replay.DraftPoolEntry;
 import com.ako.dbuff.service.replay.MapFacts;
 import com.ako.dbuff.service.replay.ReplayException;
 import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.ReplayParser;
 import com.ako.dbuff.service.replay.ReplayPlayerFact;
+import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
 import java.util.function.BooleanSupplier;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import skadistats.clarity.event.Insert;
@@ -43,14 +39,24 @@ import skadistats.clarity.source.MappedFileSource;
 public class ClarityReplayParser implements ReplayParser {
   static final String CLARITY_VERSION = "5.0.1";
 
+  private final Map<Long, DraftReaderFactory> draftReaders;
+
+  public ClarityReplayParser(List<DraftReaderFactory> draftReaders) {
+    this.draftReaders =
+        draftReaders.stream()
+            .collect(Collectors.toMap(DraftReaderFactory::gameModeId, Function.identity()));
+  }
+
   @Override
   public String version() {
     return CLARITY_VERSION;
   }
 
   @Override
-  public ReplayFacts parse(Path demoFile, BooleanSupplier cancelled) {
-    Collector collector = new Collector(cancelled);
+  public ReplayFacts parse(Path demoFile, GameModeProfile mode, BooleanSupplier cancelled) {
+    DraftReaderFactory factory = draftReaders.get(mode.gameModeId());
+    DraftReader draftReader = factory == null ? new NoDraftReader() : factory.create();
+    Collector collector = new Collector(cancelled, draftReader);
     try {
       new SimpleRunner(new MappedFileSource(demoFile.toString())).runWith(collector);
     } catch (Exception e) {
@@ -110,10 +116,6 @@ public class ClarityReplayParser implements ReplayParser {
     private static final int RADIANT = 2;
     private static final int DIRE = 3;
     private static final int CANCEL_CHECK_TICKS = 300;
-    private static final int NOT_PICKED = 20;
-    private static final String DRAFT = "m_pGameRules.m_AbilityDraftAbilities.";
-    private static final Pattern PICK_FIELD =
-        Pattern.compile("^m_pGameRules\\.m_AbilityDraftAbilities\\.(\\d+)\\.m_unPlayerID$");
     private static final String STATE = "m_pGameRules.m_nGameState";
     private static final String START_TIME = "m_pGameRules.m_flGameStartTime";
     private static final String PAUSED = "m_pGameRules.m_bGamePaused";
@@ -128,14 +130,14 @@ public class ClarityReplayParser implements ReplayParser {
     private final CombatLogRecorder combatLog = new CombatLogRecorder();
     private MapFacts map;
     private StateRecorder stateRecorder;
-    private final List<DraftPick> picks = new ArrayList<>();
-    private final BitSet picked = new BitSet();
+    private final DraftReader draftReader;
     private long ticksSeen;
     private long gameOverTick = -1;
     private final GameClock clock = new GameClock();
 
-    Collector(BooleanSupplier cancelled) {
+    Collector(BooleanSupplier cancelled, DraftReader draftReader) {
       this.cancelled = cancelled;
+      this.draftReader = draftReader;
     }
 
     @OnTickStart
@@ -156,7 +158,7 @@ public class ClarityReplayParser implements ReplayParser {
 
     @OnEntityUpdated(classPattern = "CDOTAGamerulesProxy")
     public void rulesUpdated(Context ctx, Entity rules, FieldPath[] paths, int count) {
-      recordPicks(ctx, rules, paths, count);
+      draftReader.observe(rules, paths, count, () -> (int) clock.gameTick(ctx.getTick()));
       if (rules.hasProperty(PAUSED) && rules.getProperty(PAUSED) instanceof Boolean paused) {
         clock.paused(paused, ctx.getTick());
       }
@@ -181,7 +183,7 @@ public class ClarityReplayParser implements ReplayParser {
                 .clockStartTick((int) clock.gameTick(ctx.getTick()))
                 .gameStartTime(startTime.doubleValue())
                 .players(readPlayers())
-                .draft(readDraft(rules))
+                .draft(draftReader.read(rules))
                 .build();
         recorder().gameStarted(clock.gameTick(ctx.getTick()));
         map = MapReader.read(entities, stringTables.forName("EntityNames"), rules);
@@ -215,50 +217,6 @@ public class ClarityReplayParser implements ReplayParser {
           .stateChanges(stateRecorder().result(facts.clockStartTick()))
           .cutShort(cutShort)
           .build();
-    }
-
-    /** A pick is the moment an entry's player id changes from "nobody" to a player. */
-    private void recordPicks(Context ctx, Entity rules, FieldPath[] paths, int count) {
-      for (int i = 0; i < count; i++) {
-        Matcher match = PICK_FIELD.matcher(rules.getNameForFieldPath(paths[i]));
-        if (!match.matches()) {
-          continue;
-        }
-        int poolIndex = Integer.parseInt(match.group(1));
-        int player = ((Number) rules.getPropertyForFieldPath(paths[i])).intValue();
-        if (player != NOT_PICKED && !picked.get(poolIndex)) {
-          picked.set(poolIndex);
-          picks.add(
-              new DraftPick(
-                  picks.size() + 1, poolIndex, player, (int) clock.gameTick(ctx.getTick())));
-        }
-      }
-    }
-
-    /** The final pool, read when the game starts so that moved skills show their final slot. */
-    private DraftFacts readDraft(Entity rules) {
-      List<DraftPoolEntry> pool = new ArrayList<>();
-      for (int index = 0; ; index++) {
-        String prefix = DRAFT + String.format(Locale.ROOT, "%04d", index) + ".";
-        Number ability = number(rules, prefix + "m_nAbilityID");
-        Number player = number(rules, prefix + "m_unPlayerID");
-        Number slot = number(rules, prefix + "m_unAbilityPlayerSlot");
-        if (ability == null || ability.intValue() == 0 || player == null || slot == null) {
-          break;
-        }
-        pool.add(
-            new DraftPoolEntry(
-                index,
-                ability.intValue() / 2,
-                player.intValue() == NOT_PICKED ? -1 : player.intValue(),
-                slot.intValue()));
-      }
-      return pool.isEmpty() ? null : new DraftFacts(pool, List.copyOf(picks));
-    }
-
-    /** The array has room past its last entry, where the property exists but holds nothing. */
-    private static Number number(Entity rules, String property) {
-      return rules.hasProperty(property) ? (Number) rules.getProperty(property) : null;
     }
 
     private List<ReplayPlayerFact> readPlayers() {
