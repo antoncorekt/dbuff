@@ -20,4 +20,11 @@ class PrettifyTest {
     assertThat(Prettify.ability("item_black_king_bar")).isEqualTo("Black King Bar");
     assertThat(Prettify.ability("stunned")).isEqualTo("Stunned");
   }
+
+  @Test
+  void entity_splitsACamelCaseName() {
+    assertThat(Prettify.entity("PhantomAssassin")).isEqualTo("Phantom Assassin");
+    assertThat(Prettify.entity("Sniper")).isEqualTo("Sniper");
+    assertThat(Prettify.entity(null)).isEmpty();
+  }
 }

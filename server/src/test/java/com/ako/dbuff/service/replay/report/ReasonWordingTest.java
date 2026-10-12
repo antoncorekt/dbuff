@@ -1,0 +1,64 @@
+package com.ako.dbuff.service.replay.report;
+
+import com.ako.dbuff.dao.model.FightReasonDomain;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class ReasonWordingTest {
+
+  private static FightReasonDomain player(String code, String evidence) {
+    return FightReasonDomain.builder().scope("PLAYER").code(code).evidence(evidence).build();
+  }
+
+  private static FightReasonDomain team(String code) {
+    return FightReasonDomain.builder()
+        .scope("TEAM")
+        .code(code)
+        .evidence("Radiant, the losing team: x")
+        .build();
+  }
+
+  @Test
+  void phrase_startsAPlayerReasonWithTheHero() {
+    assertThat(ReasonWording.phrase(player("NO_TP", "ABSENT_ALIVE"), "Venomancer"))
+        .isEqualTo("Venomancer had no teleport");
+    assertThat(ReasonWording.phrase(player("DIED_FIRST", "died at 23:10 to x"), "Sven"))
+        .isEqualTo("Sven died first");
+  }
+
+  @Test
+  void phrase_takesWhatTheFarmingEvidenceSays() {
+    String evidence = "carry was farming a lane when the fight began and stayed out of it";
+
+    assertThat(ReasonWording.phrase(player("CARRY_FARMING_ELSEWHERE", evidence), "Terrorblade"))
+        .isEqualTo("Terrorblade was farming a lane");
+    assertThat(ReasonWording.phrase(player("CARRY_FARMING_ELSEWHERE", "odd"), "Terrorblade"))
+        .isEqualTo("Terrorblade was farming elsewhere");
+  }
+
+  @Test
+  void phrase_namesTheAbilitiesFromTheEvidence() {
+    assertThat(
+            ReasonWording.phrase(
+                player("ITEM_ON_COOLDOWN", " item_black_king_bar, item_blink "), "Axe"))
+        .isEqualTo("Axe had Black King Bar and Blink on cooldown");
+  }
+
+  @Test
+  void phrase_wordsATeamReasonFromItsToken() {
+    assertThat(ReasonWording.phrase(team("NO_DISABLE"), "ignored"))
+        .isEqualTo("the team had no disable");
+    assertThat(ReasonWording.phrase(team("CARRIES_2"), "ignored"))
+        .isEqualTo("the team had 2 carries");
+    assertThat(ReasonWording.phrase(team("TOP_HEAVY"), "ignored"))
+        .isEqualTo("the team: everyone wants the farm");
+  }
+
+  @Test
+  void phrase_fallsBackToTheTrimmedEvidenceForAnUnknownCode() {
+    assertThat(ReasonWording.phrase(player("NEW_CODE", "  something odd "), "Sven"))
+        .isEqualTo("Sven: something odd");
+    assertThat(ReasonWording.phrase(player("NEW_CODE", null), "Sven")).isEqualTo("Sven new code");
+  }
+}

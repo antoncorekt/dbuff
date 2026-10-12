@@ -262,6 +262,12 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     FightExplanationReader.MatchExplanation read = explanationReader.read(matchId, 3, 2);
     assertThat(read.swings()).hasSameSizeAs(spikeRepo.findByMatchId(matchId));
     assertThat(read.swings()).allSatisfy(s -> assertThat(s.fights()).hasSizeLessThanOrEqualTo(2));
+    List<String> swingLines =
+        swingSection.lines(new ReplayReportInput(matchId, null, Set.of(), Map.of(), 3));
+    System.out.println("SWINGS " + id + "\n" + String.join("\n", swingLines));
+    assertThat(String.join("\n", swingLines))
+        .as("%s: swings fit a message", id)
+        .hasSizeLessThan(2000);
     System.out.println(
         "FIGHT LOSS "
             + id
