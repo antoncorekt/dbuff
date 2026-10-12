@@ -31,9 +31,14 @@ import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.ReplayDataService;
 import com.ako.dbuff.service.replay.ReplayRunService;
+import com.ako.dbuff.service.replay.analysis.activity.Activity;
+import com.ako.dbuff.service.replay.analysis.composition.CompositionStage;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
+import com.ako.dbuff.service.replay.analysis.reason.Enums;
+import com.ako.dbuff.service.replay.analysis.reason.ReasonScope;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
+import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.report.CompositionSection;
 import com.ako.dbuff.service.replay.report.DeathSection;
 import com.ako.dbuff.service.replay.report.DraftSection;
@@ -222,17 +227,16 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     roleRepo.findByMatchId(matchId).forEach(r -> roles.put(r.getPlayerSlot(), r.getRole()));
     Set<String> expected = new TreeSet<>();
     for (FightPlayerDomain p : fightPlayerRepo.findByMatchId(matchId)) {
-      Presence presence = Presence.valueOf(p.getPresence());
+      Presence presence = Enums.find(Presence.class, p.getPresence());
+      Activity activity = Enums.find(Activity.class, p.getActivityAtStart());
       Integer role = roles.get(p.getPlayerSlot());
-      if (!presence.isAbsent() || role == null) {
+      if (presence == null || !presence.isAbsentAlive() || role == null) {
         continue;
       }
-      if (role >= 4 && presence != Presence.ABSENT_DEAD) {
+      if (role >= 4) {
         expected.add(p.getFightIndex() + "/" + p.getPlayerSlot() + "/SUPPORT_ABSENT");
       }
-      if (role <= 2
-          && ("JUNGLE_FARM".equals(p.getActivityAtStart())
-              || "LANE_FARM".equals(p.getActivityAtStart()))) {
+      if (role <= 2 && (activity == Activity.JUNGLE_FARM || activity == Activity.LANE_FARM)) {
         expected.add(p.getFightIndex() + "/" + p.getPlayerSlot() + "/CARRY_FARMING_ELSEWHERE");
       }
     }
@@ -251,14 +255,15 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
 
     Map<String, String> finalTokens = new TreeMap<>();
     compositionRepo.findByMatchId(matchId).stream()
-        .filter(c -> c.getStage().equals("FINAL"))
+        .filter(c -> c.getStage().equals(CompositionStage.FINAL.name()))
         .forEach(c -> finalTokens.put(c.getTeam(), c.getTokens()));
     Set<String> expectedGaps = new TreeSet<>();
     for (FightDomain fight : fightRepo.findByMatchId(matchId)) {
-      if (!"RADIANT".equals(fight.getWinner()) && !"DIRE".equals(fight.getWinner())) {
+      TeamSide winner = Enums.find(TeamSide.class, fight.getWinner());
+      if (winner == null) {
         continue;
       }
-      String loser = "RADIANT".equals(fight.getWinner()) ? "DIRE" : "RADIANT";
+      String loser = (winner == TeamSide.RADIANT ? TeamSide.DIRE : TeamSide.RADIANT).name();
       for (String token : finalTokens.getOrDefault(loser, "").split(",")) {
         Arrays.stream(CompositionToken.values())
             .filter(known -> known.name().equals(token.trim()) && known.function() != null)
@@ -267,20 +272,12 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     }
     Set<String> storedGaps =
         stored.stream()
-            .filter(r -> r.getScope().equals("TEAM"))
+            .filter(r -> r.getScope().equals(ReasonScope.TEAM.name()))
             .map(r -> r.getFightIndex() + "/" + r.getTeam() + "/" + r.getCode())
             .collect(Collectors.toCollection(TreeSet::new));
     assertThat(storedGaps)
         .as("%s: team gaps are the losing team's final function tokens", id)
         .isEqualTo(expectedGaps);
-    System.out.println(
-        "AD ROLE REASONS %s: %d fights, %d player rows, %d team rows, final tokens %s"
-            .formatted(
-                id,
-                fightRepo.findByMatchId(matchId).size(),
-                expected.size(),
-                expectedGaps.size(),
-                finalTokens));
   }
 
   private void printAbilityDraft(String id, long matchId, List<PlayerRoleProfileDomain> profiles) {

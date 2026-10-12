@@ -46,7 +46,7 @@ class RoleGapContributorTest {
             tuple("NO_INITIATOR", ReasonScope.TEAM, TeamSide.RADIANT, 0.5),
             tuple("NO_VISION_DUTY", ReasonScope.TEAM, TeamSide.RADIANT, 0.2));
     assertThat(reasons.get(0).subjectSlot()).isNull();
-    assertThat(reasons.get(0).evidence()).isEqualTo("RADIANT, the losing team: no initiator");
+    assertThat(reasons.get(0).evidence()).isEqualTo("Radiant, the losing team: no initiator");
   }
 
   @Test

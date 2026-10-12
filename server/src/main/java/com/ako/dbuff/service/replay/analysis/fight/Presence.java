@@ -14,8 +14,8 @@ public enum Presence {
   /** Alive and elsewhere, with nothing the classifier can name. */
   ABSENT_FAR;
 
-  /** Alive or dead, the hero was not in the fight. */
-  public boolean isAbsent() {
-    return this != ACTIVE && this != PRESENT_PASSIVE;
+  /** Alive and not in the fight. */
+  public boolean isAbsentAlive() {
+    return this != ACTIVE && this != PRESENT_PASSIVE && this != ABSENT_DEAD;
   }
 }

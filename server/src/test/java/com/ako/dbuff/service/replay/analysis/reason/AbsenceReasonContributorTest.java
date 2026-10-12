@@ -34,6 +34,8 @@ class AbsenceReasonContributorTest {
                 player(128, "HAD_TP_NOT_USED", 0),
                 player(2, null, null)),
             List.of(),
+            List.of(),
+            List.of(),
             List.of());
 
     List<Reason> reasons = contributor.contribute(context);
@@ -67,6 +69,8 @@ class AbsenceReasonContributorTest {
             TestModes.ALL_PICK,
             null,
             List.of(noPresence, noSlot, player(2, "TELEPORT_NEW", null), player(3, "NO_TP", null)),
+            List.of(),
+            List.of(),
             List.of(),
             List.of());
 

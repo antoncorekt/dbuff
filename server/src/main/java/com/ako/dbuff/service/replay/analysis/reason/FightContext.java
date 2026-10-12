@@ -27,16 +27,6 @@ public record FightContext(
     List<PlayerRoleDomain> roles,
     List<TeamCompositionDomain> compositions) {
 
-  public FightContext(
-      long matchId,
-      GameModeProfile mode,
-      FightDomain fight,
-      List<FightPlayerDomain> players,
-      List<FightAbilityUseDomain> abilityUses,
-      List<DeathAnalysisDomain> deaths) {
-    this(matchId, mode, fight, players, abilityUses, deaths, List.of(), List.of());
-  }
-
   /** Empty when the player has no row in this fight. */
   public Optional<FightPlayerDomain> player(long playerSlot) {
     return players.stream()

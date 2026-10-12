@@ -14,6 +14,8 @@ import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
+import com.ako.dbuff.service.replay.analysis.composition.TeamCompositionAnalyzer;
+import com.ako.dbuff.service.replay.analysis.role.PlayerRoleAnalyzer;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.AllPickProfile;
@@ -28,6 +30,8 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.annotation.AnnotationUtils;
+import org.springframework.core.annotation.Order;
 import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -98,6 +102,17 @@ class FightReasonAnalyzerTest {
               assertThat(r.getScope()).isEqualTo("TEAM");
               assertThat(r.getEvidence()).hasSize(1000).endsWith("...");
             });
+  }
+
+  @Test
+  void runsAfterTheRoleAndCompositionAnalyzers() {
+    int reasons = AnnotationUtils.findAnnotation(FightReasonAnalyzer.class, Order.class).value();
+
+    assertThat(reasons)
+        .isGreaterThan(
+            AnnotationUtils.findAnnotation(PlayerRoleAnalyzer.class, Order.class).value())
+        .isGreaterThan(
+            AnnotationUtils.findAnnotation(TeamCompositionAnalyzer.class, Order.class).value());
   }
 
   @Autowired private FightReasonAnalyzer analyzer;

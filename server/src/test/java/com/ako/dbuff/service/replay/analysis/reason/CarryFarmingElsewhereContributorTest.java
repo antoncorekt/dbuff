@@ -60,7 +60,8 @@ class CarryFarmingElsewhereContributorTest {
             row(0, "ACTIVE", "JUNGLE_FARM"),
             row(1, "ABSENT_FAR", "POSITIONED"),
             row(2, "ABSENT_FARMING", "JUNGLE_FARM"),
-            row(3, "ABSENT_FAR", null));
+            row(3, "ABSENT_FAR", null),
+            row(4, "ABSENT_DEAD", "JUNGLE_FARM"));
 
     assertThat(contributor.contribute(context)).isEmpty();
   }

@@ -25,7 +25,14 @@ class DeathReasonContributorTest {
 
   private static FightContext context(DeathAnalysisDomain... deaths) {
     return new FightContext(
-        1, TestModes.ABILITY_DRAFT, null, List.of(), List.of(), List.of(deaths));
+        1,
+        TestModes.ABILITY_DRAFT,
+        null,
+        List.of(),
+        List.of(),
+        List.of(deaths),
+        List.of(),
+        List.of());
   }
 
   @Test

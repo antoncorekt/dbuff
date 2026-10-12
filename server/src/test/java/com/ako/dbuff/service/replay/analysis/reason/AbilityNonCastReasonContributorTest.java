@@ -29,6 +29,8 @@ class AbilityNonCastReasonContributorTest {
         null,
         List.of(FightPlayerDomain.builder().playerSlot(0L).presence(presence).build()),
         List.of(uses),
+        List.of(),
+        List.of(),
         List.of());
   }
 

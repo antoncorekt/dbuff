@@ -7,6 +7,7 @@ import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -51,6 +52,10 @@ public class RoleGapContributor implements ReasonContributor {
         token.name(),
         team,
         properties.severity(token),
-        "%s, the losing team: %s".formatted(team, CompositionToken.words(token.name())));
+        "%s, the losing team: %s".formatted(readable(team), CompositionToken.words(token.name())));
+  }
+
+  private static String readable(TeamSide team) {
+    return team.name().charAt(0) + team.name().substring(1).toLowerCase(Locale.ROOT);
   }
 }
