@@ -6,7 +6,9 @@ import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.MatchReportThreadDomain;
 import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
+import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayReportPostedDomain;
+import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.DbufInstanceConfigRepository;
 import com.ako.dbuff.dao.repo.MatchRepo;
@@ -20,6 +22,7 @@ import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -59,6 +62,8 @@ class ReplayReportServiceTest {
         .build();
   }
 
+  private final ReplayParseRunRepo runRepo = mock(ReplayParseRunRepo.class);
+
   @BeforeEach
   void setUp() {
     properties.setEnabled(true);
@@ -67,7 +72,7 @@ class ReplayReportServiceTest {
         new ReplayReportService(
             properties,
             new ReplayProcessingProperties(),
-            mock(ReplayParseRunRepo.class),
+            runRepo,
             matchRepo,
             statRepo,
             instanceRepo,
@@ -179,6 +184,53 @@ class ReplayReportServiceTest {
     public boolean supports(GameModeProfile mode) {
       return mode.gameModeId() == 18L;
     }
+  }
+
+  @Test
+  void deliverFinished_postsForADoneRun() {
+    when(runRepo.findByMatchIdAndParserVersion(1L, 1))
+        .thenReturn(Optional.of(run(ReplayStatus.DONE, null)));
+
+    service.deliverFinished(1L);
+
+    verify(postedRepo).save(any());
+  }
+
+  @Test
+  void deliverFinished_postsForAPartialRunOnlyWhenNoRetryIsLeft() {
+    when(runRepo.findByMatchIdAndParserVersion(1L, 1))
+        .thenReturn(Optional.of(run(ReplayStatus.PARTIAL, LocalDateTime.now().plusHours(1))));
+
+    service.deliverFinished(1L);
+
+    verify(postedRepo, never()).save(any());
+
+    when(runRepo.findByMatchIdAndParserVersion(1L, 1))
+        .thenReturn(Optional.of(run(ReplayStatus.PARTIAL, null)));
+
+    service.deliverFinished(1L);
+
+    verify(postedRepo).save(any());
+  }
+
+  @Test
+  void deliverFinished_doesNothingForAFailedRunOrNoRun() {
+    when(runRepo.findByMatchIdAndParserVersion(1L, 1))
+        .thenReturn(Optional.of(run(ReplayStatus.FAILED_DOWNLOAD, null)));
+
+    service.deliverFinished(1L);
+    service.deliverFinished(2L);
+
+    verify(postedRepo, never()).save(any());
+  }
+
+  private static ReplayParseRunDomain run(ReplayStatus status, LocalDateTime nextAttemptAt) {
+    return ReplayParseRunDomain.builder()
+        .matchId(1L)
+        .parserVersion(1)
+        .status(status)
+        .nextAttemptAt(nextAttemptAt)
+        .build();
   }
 
   @Test

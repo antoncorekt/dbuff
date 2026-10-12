@@ -6,6 +6,7 @@ import com.ako.dbuff.dotapi.invoker.ApiException;
 import com.ako.dbuff.dotapi.model.MatchResponse;
 import com.ako.dbuff.service.match.DotaApiMatchDetailsService;
 import com.ako.dbuff.service.match.data.MatchDetailService;
+import com.ako.dbuff.service.replay.ReplayRequestAnnouncer;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -33,6 +34,7 @@ public class MatchDetailBackfillService {
   private final DotaApiMatchDetailsService dotaApiMatchDetailsService;
   private final MatchDetailService matchDetailService;
   private final MatchDetailBackfillProperties properties;
+  private final ReplayRequestAnnouncer replayAnnouncer;
 
   /**
    * @return number of matches whose detail rows were stored in this run
@@ -80,6 +82,7 @@ public class MatchDetailBackfillService {
       persistState(match);
       if (match.getDetailsMappedAt() != null) {
         stored++;
+        replayAnnouncer.announce(match);
       }
     }
     if (!pending.isEmpty()) {
