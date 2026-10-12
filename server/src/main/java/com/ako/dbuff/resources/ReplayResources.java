@@ -28,8 +28,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/replay")
 public class ReplayResources {
-  private static final List<ReplayStatus> ANALYSED =
-      List.of(ReplayStatus.DONE, ReplayStatus.PARTIAL);
+  /**
+   * A partial run is left out: which extractors failed is not kept, so its analyzers cannot be
+   * chosen.
+   */
+  private static final List<ReplayStatus> ANALYSED = List.of(ReplayStatus.DONE);
+
+  private static final int MAX_LIMIT = 500;
+
+  private final AtomicBoolean reanalysing = new AtomicBoolean();
 
   private final ReplayParseRunRepo runRepo;
   private final ReplayAnalysisService analysis;
