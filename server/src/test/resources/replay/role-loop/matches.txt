@@ -1,0 +1,11 @@
+# The matches the role learning loop reviews: match ids only, one per line.
+# A match is stored once from its replay (REPLAY_FIXTURE_DIR); after that the loop re-analyses it
+# from the stored data. See docs/replay-role-loop/README.md.
+
+# Ability Draft
+9038725154
+9037038717
+
+# After Ability Draft (All Pick)
+9040892342
+9040889566

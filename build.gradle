@@ -65,8 +65,9 @@ subprojects {
         }
     }
     test {
-        // Tests tagged 'replay' need a real replay file and run through :server:replayTest only.
-        useJUnitPlatform { excludeTags 'replay' }
+        // Tests tagged 'replay' need a real replay file and run through :server:replayTest only;
+        // 'roleloop' is the local review round, run through :server:roleLoop.
+        useJUnitPlatform { excludeTags 'replay', 'roleloop' }
     }
     tasks.withType(Test) { task ->
         maxHeapSize '1024m'
@@ -125,6 +126,18 @@ project('server') {
         useJUnitPlatform { includeTags 'replay' }
         // The production JVM runs with -Xmx512m; a parse that fits here fits there.
         maxHeapSize = '512m'
+    }
+
+    tasks.register('roleLoop', Test) {
+        description = 'One round of the role learning loop against the local PostgreSQL; set REPLAY_FIXTURE_DIR (and ROUND, SMOKE_PG_URL) first.'
+        group = 'verification'
+        testClassesDirs = sourceSets.test.output.classesDirs
+        classpath = sourceSets.test.runtimeClasspath
+        useJUnitPlatform { includeTags 'roleloop' }
+        maxHeapSize = '512m'
+        // The inputs are the database and the environment, which Gradle does not track.
+        outputs.upToDateWhen { false }
+        testLogging { showStandardStreams = true }
     }
     
     dependencies {
