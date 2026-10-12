@@ -106,15 +106,24 @@ public class RoleOverrideFile implements RoleOverrides {
           new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
       Map<String, Map<String, Map<String, Double>>> root =
           mapper.readValue(in, new TypeReference<>() {});
+      if (root == null) {
+        throw invalid(source, "is empty");
+      }
       for (String section : root.keySet()) {
         if (!section.equals("abilities") && !section.equals("heroes")) {
           throw invalid(source, "unknown section '" + section + "'");
         }
       }
+      for (Map.Entry<String, Map<String, Map<String, Double>>> section : root.entrySet()) {
+        if (section.getValue() == null) {
+          throw invalid(source, "section '" + section.getKey() + "' is null");
+        }
+      }
       return new Content(
           root.getOrDefault("abilities", Map.of()), root.getOrDefault("heroes", Map.of()));
     } catch (IOException e) {
-      throw new IllegalStateException("Cannot read the role override file " + source, e);
+      throw new IllegalStateException(
+          "Role override file " + source + ": cannot be read: " + e.getMessage(), e);
     }
   }
 
@@ -122,7 +131,7 @@ public class RoleOverrideFile implements RoleOverrides {
     try {
       return new ClassPathResource(resource).getInputStream();
     } catch (IOException e) {
-      throw new IllegalStateException("Cannot open the role override file " + resource, e);
+      throw new IllegalStateException("Role override file " + resource + ": cannot be opened", e);
     }
   }
 

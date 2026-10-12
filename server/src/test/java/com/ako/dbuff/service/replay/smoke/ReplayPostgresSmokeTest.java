@@ -243,10 +243,7 @@ class ReplayPostgresSmokeTest {
   @Commit
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   void aRealReplayGoesThroughEveryStageAndLandsInPostgres() throws Exception {
-    Assumptions.assumeTrue(
-        System.getenv("SMOKE_PG_URL").contains("localhost")
-            || System.getenv("SMOKE_PG_URL").contains("127.0.0.1"),
-        "The smoke test changes the schema and commits data, so it only runs against localhost");
+    assumeLocalDatabase();
     for (String id : MATCHES) {
       MatchDomain match = match(id);
 
@@ -321,10 +318,7 @@ class ReplayPostgresSmokeTest {
   @Commit
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   void anAbilityDraftReplayGetsIntentAndFinalRolesAndAPickAndAFinalVerdict() throws Exception {
-    Assumptions.assumeTrue(
-        System.getenv("SMOKE_PG_URL").contains("localhost")
-            || System.getenv("SMOKE_PG_URL").contains("127.0.0.1"),
-        "The smoke test changes the schema and commits data, so it only runs against localhost");
+    assumeLocalDatabase();
     for (String id : ABILITY_DRAFT_MATCHES) {
       Path fixture = Path.of(System.getenv("REPLAY_FIXTURE_DIR"), id + ".dem.zst");
       Assumptions.assumeTrue(Files.exists(fixture), id + " is not in the fixture directory");
@@ -422,6 +416,16 @@ class ReplayPostgresSmokeTest {
 
   private static String fmt(Double value) {
     return value == null ? "-" : String.format("%.2f", value);
+  }
+
+  private static void assumeLocalDatabase() {
+    String url = System.getenv("SMOKE_PG_URL");
+    Assumptions.assumeTrue(
+        url != null
+            && System.getenv("REPLAY_FIXTURE_DIR") != null
+            && (url.contains("localhost") || url.contains("127.0.0.1")),
+        "The smoke test needs SMOKE_PG_URL and REPLAY_FIXTURE_DIR, and changes the schema and"
+            + " commits data, so it only runs against localhost");
   }
 
   private MatchDomain match(String id) throws IOException {

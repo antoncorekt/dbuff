@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AbilityDraftRoleResolver implements RoleResolver {
   private static final int EVIDENCE_ROLES = 3;
+  private static final int TEAM_SIZE = 5;
 
   private final StageProfilers profilers;
   private final RoleFitter fitter;
@@ -45,12 +46,21 @@ public class AbilityDraftRoleResolver implements RoleResolver {
 
   @Override
   public List<RoleAssignment> resolve(RoleContext context) {
-    List<FunctionProfile> profiles = profilers.of(context.stage()).profile(context.team());
+    List<FunctionProfile> profiles = context.profiles(profilers.of(context.stage()));
     if (profiles.stream().allMatch(FunctionProfile.UNKNOWN::equals)) {
       log.info("Nothing known of the {} of slots {}, no roles", context.stage(), slots(context));
       return List.of();
     }
     List<RoleFitter.RoleFit> fits = fitter.fit(profiles);
+    if (context.team().size() != TEAM_SIZE || fits.size() != context.team().size()) {
+      log.info(
+          "The {} of slots {} gave {} fits for {} players, no roles",
+          context.stage(),
+          slots(context),
+          fits.size(),
+          context.team().size());
+      return List.of();
+    }
     List<RoleAssignment> result = new ArrayList<>();
     for (int i = 0; i < fits.size(); i++) {
       RoleFitter.RoleFit fit = fits.get(i);

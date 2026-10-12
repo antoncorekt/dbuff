@@ -88,7 +88,7 @@ class IntentProfileOverridesTest {
 
     assertThat(
             calculator(any)
-                .profile(HERO, List.of(new HeldAbility(new AbilityConstant(), false)))
+                .profile(HERO, List.of(new HeldAbility(null, new AbilityConstant(), false)))
                 .disable())
         .isZero();
   }

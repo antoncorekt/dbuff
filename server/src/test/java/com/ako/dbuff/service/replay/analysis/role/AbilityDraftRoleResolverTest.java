@@ -16,6 +16,9 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class AbilityDraftRoleResolverTest {
 
@@ -160,6 +163,16 @@ class AbilityDraftRoleResolverTest {
       noKnowledge.add(new RolePlayer(i, null, null, null, List.of()));
     }
     assertThat(resolver.resolve(new RoleContext(RoleStage.INTENT, noKnowledge))).isEmpty();
+  }
+
+  @Test
+  void aFitterThatReturnsTooFewFitsGivesNoRolesInsteadOfAMisalignedOnes() {
+    RoleFitter shortFitter = mock(RoleFitter.class);
+    when(shortFitter.fit(anyList())).thenReturn(List.of());
+    AbilityDraftRoleResolver broken =
+        new AbilityDraftRoleResolver(new StageProfilers(List.of(intent, observed)), shortFitter);
+
+    assertThat(broken.resolve(new RoleContext(RoleStage.INTENT, team(true)))).isEmpty();
   }
 
   @Test

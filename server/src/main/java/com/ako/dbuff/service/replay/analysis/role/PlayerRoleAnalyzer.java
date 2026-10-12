@@ -128,7 +128,14 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
         continue;
       }
       for (RoleStage stage : resolver.stages().stream().sorted().toList()) {
-        List<RoleAssignment> assignments = resolver.resolve(new RoleContext(stage, team));
+        RoleContext context = RoleContext.profiledBy(stage, team, profilers.of(stage));
+        List<RoleAssignment> assignments;
+        try {
+          assignments = resolver.resolve(context);
+        } catch (RuntimeException e) {
+          log.warn("Match {}: the {} roles failed, the other stages are kept", matchId, stage, e);
+          continue;
+        }
         if (assignments.isEmpty()) {
           continue;
         }
@@ -136,7 +143,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
           assignments.forEach(a -> rows.add(row(matchId, a)));
         }
         try {
-          profiles.addAll(profileRows(matchId, stage, team, assignments));
+          profiles.addAll(profileRows(matchId, stage, team, assignments, context));
         } catch (RuntimeException e) {
           log.warn("Match {}: no {} profiles, the roles are kept", matchId, stage, e);
         }
@@ -158,11 +165,15 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
   }
 
   private List<PlayerRoleProfileDomain> profileRows(
-      long matchId, RoleStage stage, List<RolePlayer> team, List<RoleAssignment> assignments) {
+      long matchId,
+      RoleStage stage,
+      List<RolePlayer> team,
+      List<RoleAssignment> assignments,
+      RoleContext context) {
     StageProfiler profiler = profilers.of(stage);
     Map<Long, RoleAssignment> bySlot = new HashMap<>();
     assignments.forEach(a -> bySlot.put(a.slot(), a));
-    List<FunctionProfile> profiles = profiler.profile(team);
+    List<FunctionProfile> profiles = context.profiles(profiler);
     List<Long> slots = team.stream().map(RolePlayer::slot).toList();
     List<Long> uncovered = slots.stream().filter(s -> !bySlot.containsKey(s)).toList();
     List<Long> foreign = bySlot.keySet().stream().filter(s -> !slots.contains(s)).sorted().toList();

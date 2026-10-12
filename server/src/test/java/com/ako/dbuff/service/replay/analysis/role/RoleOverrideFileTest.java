@@ -23,6 +23,8 @@ class RoleOverrideFileTest {
         .containsEntry(RoleFunction.INITIATION, 0.6);
     assertThat(file.forAbility("furion_teleportation")).containsKey(RoleFunction.ROAMING);
     assertThat(file.forAbility("dazzle_shallow_grave")).containsKey(RoleFunction.SAVE_HEAL);
+    assertThat(file.forAbility("nevermore_shadowraze3"))
+        .isEqualTo(file.forAbility("nevermore_shadowraze1"));
     assertThat(file.forAbility("sandking_epicenter")).containsKey(RoleFunction.DAMAGE);
     assertThat(file.forAbility("not_in_the_file")).isEmpty();
   }
@@ -94,8 +96,20 @@ class RoleOverrideFileTest {
   }
 
   @Test
+  void anEmptyFileANullRootAndANullSectionAreRejectedLikeTheOtherErrors() {
+    for (String json :
+        new String[] {"", "null", "{\"abilities\": null}", "{\"heroes\": null}", "[]"}) {
+      assertThatThrownBy(() -> parse(json))
+          .as(json)
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageStartingWith("Role override file test.json: ");
+    }
+  }
+
+  @Test
   void aMissingFileStopsTheStartup() {
     assertThatThrownBy(() -> new RoleOverrideFile("replay/none.json"))
-        .isInstanceOf(IllegalStateException.class);
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageStartingWith("Role override file replay/none.json: ");
   }
 }

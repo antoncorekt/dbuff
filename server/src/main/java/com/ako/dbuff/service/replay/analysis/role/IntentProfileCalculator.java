@@ -38,11 +38,7 @@ public class IntentProfileCalculator {
    *
    * @param name the skill's name, which the overrides are looked up by; null when unknown
    */
-  public record HeldAbility(String name, AbilityConstant constant, boolean ultimate) {
-    public HeldAbility(AbilityConstant constant, boolean ultimate) {
-      this(null, constant, ultimate);
-    }
-  }
+  public record HeldAbility(String name, AbilityConstant constant, boolean ultimate) {}
 
   /**
    * @param hero null when the hero is not in the constants

@@ -16,6 +16,8 @@
     "winter_wyvern_cold_embrace": {"SAVE_HEAL": 0.5},
     "sandking_epicenter": {"DAMAGE": 0.4, "FARM_PRIORITY": 0.4},
     "nevermore_shadowraze1": {"DAMAGE": 0.3, "FARM_PRIORITY": 0.3},
+    "nevermore_shadowraze2": {"DAMAGE": 0.3, "FARM_PRIORITY": 0.3},
+    "nevermore_shadowraze3": {"DAMAGE": 0.3, "FARM_PRIORITY": 0.3},
     "juggernaut_blade_fury": {"FARM_PRIORITY": 0.3, "DURABILITY": 0.1}
   },
   "heroes": {}
