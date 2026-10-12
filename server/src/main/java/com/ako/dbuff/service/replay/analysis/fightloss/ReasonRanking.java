@@ -12,9 +12,10 @@ import java.util.stream.Collectors;
 /**
  * The order in which the reasons of one fight are told, computed on read so a change of rule needs
  * no re-analysis. By severity, which weighs role and presence only (never hero gold); team reasons
- * come after the player reasons unless no player reason is severe enough to stand on its own. The
- * absence reasons of one hero are one entry, draft-level reasons come after every other, and the
- * cooldown reasons of an early fight are not ranked at all.
+ * come after the player reasons unless no player reason is severe enough to stand on its own; that
+ * decision looks at the ranked entries only, so an unranked early cooldown reason never makes a
+ * player lead. The absence reasons of one hero are one entry, draft-level reasons come after every
+ * other, and the cooldown reasons of an early fight are not ranked at all.
  */
 public final class ReasonRanking {
   /** Why one hero was away from a fight; of these, one entry per hero is ranked. */
@@ -45,6 +46,20 @@ public final class ReasonRanking {
    */
   public record Ranking(List<Entry> ranked, List<FightReasonDomain> notRanked) {}
 
+  /** Total, so equal reasons never fall back on the order the repository returned them in. */
+  private static final Comparator<FightReasonDomain> STRONGEST_FIRST =
+      Comparator.comparingDouble(ReasonRanking::severity)
+          .reversed()
+          .thenComparing(
+              FightReasonDomain::getScope, Comparator.nullsLast(Comparator.naturalOrder()))
+          .thenComparing(
+              FightReasonDomain::getSubjectSlot, Comparator.nullsLast(Comparator.naturalOrder()))
+          .thenComparing(
+              FightReasonDomain::getCode, Comparator.nullsLast(Comparator.naturalOrder()))
+          .thenComparing(
+              FightReasonDomain::getEvidence, Comparator.nullsLast(Comparator.naturalOrder()))
+          .thenComparing(FightReasonDomain::getId, Comparator.nullsLast(Comparator.naturalOrder()));
+
   private ReasonRanking() {}
 
   /**
@@ -54,10 +69,11 @@ public final class ReasonRanking {
       List<FightReasonDomain> reasons, Double fightStartSeconds, FightLossProperties properties) {
     boolean early =
         fightStartSeconds != null && fightStartSeconds < properties.getEarlyFightSeconds();
-    List<FightReasonDomain> notRanked =
-        early ? reasons.stream().filter(r -> COOLDOWN.contains(r.getCode())).toList() : List.of();
-    List<Entry> entries =
-        collapseAbsence(reasons.stream().filter(r -> !notRanked.contains(r)).toList());
+    Map<Boolean, List<FightReasonDomain>> byRanked =
+        reasons.stream()
+            .collect(Collectors.partitioningBy(r -> !(early && COOLDOWN.contains(r.getCode()))));
+    List<FightReasonDomain> notRanked = byRanked.get(false);
+    List<Entry> entries = collapseAbsence(byRanked.get(true));
     boolean playerLeads =
         entries.stream()
             .anyMatch(
@@ -65,15 +81,7 @@ public final class ReasonRanking {
                     !isDraft(e)
                         && isPlayer(e.reason())
                         && severity(e.reason()) >= properties.getMinPlayerSeverity());
-    Comparator<Entry> bySeverity =
-        Comparator.comparingDouble((Entry e) -> severity(e.reason()))
-            .reversed()
-            .thenComparing(
-                e ->
-                    e.reason().getSubjectSlot() == null
-                        ? Long.MAX_VALUE
-                        : e.reason().getSubjectSlot())
-            .thenComparing(e -> e.reason().getCode());
+    Comparator<Entry> bySeverity = Comparator.comparing(Entry::reason, STRONGEST_FIRST);
     Comparator<Entry> byScope =
         playerLeads
             ? Comparator.comparing((Entry e) -> isPlayer(e.reason()) ? 0 : 1)
@@ -85,14 +93,10 @@ public final class ReasonRanking {
   }
 
   private static List<Entry> collapseAbsence(List<FightReasonDomain> reasons) {
-    Comparator<FightReasonDomain> strongestFirst =
-        Comparator.comparingDouble(ReasonRanking::severity)
-            .reversed()
-            .thenComparing(FightReasonDomain::getCode);
     Map<Long, List<FightReasonDomain>> absences =
         reasons.stream()
             .filter(ReasonRanking::isAbsence)
-            .sorted(strongestFirst)
+            .sorted(STRONGEST_FIRST)
             .collect(Collectors.groupingBy(FightReasonDomain::getSubjectSlot));
     List<Entry> entries = new ArrayList<>();
     for (FightReasonDomain r : reasons) {

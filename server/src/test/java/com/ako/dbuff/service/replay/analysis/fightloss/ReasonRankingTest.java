@@ -140,4 +140,38 @@ class ReasonRankingTest {
         .extracting(FightReasonDomain::getCode)
         .containsExactly("ABILITY_ON_COOLDOWN");
   }
+
+  @Test
+  void equalReasonsAreOrderedTheSameWhateverTheInputOrder() {
+    List<FightReasonDomain> reasons =
+        new java.util.ArrayList<>(
+            List.of(
+                reason("NO_DISABLE", "TEAM", null, 0.5),
+                reason("NO_INITIATOR", "TEAM", null, 0.5),
+                reason("NO_SAVE", "TEAM", null, 0.5),
+                reason("NO_DISABLE", "TEAM", null, 0.5)));
+    List<String> first = rank(reasons, ONE_HOUR).stream().map(FightReasonDomain::getCode).toList();
+
+    for (int i = 0; i < 5; i++) {
+      java.util.Collections.shuffle(reasons, new java.util.Random(i));
+      assertThat(rank(reasons, ONE_HOUR).stream().map(FightReasonDomain::getCode).toList())
+          .isEqualTo(first);
+    }
+    assertThat(first).containsExactly("NO_DISABLE", "NO_DISABLE", "NO_INITIATOR", "NO_SAVE");
+  }
+
+  @Test
+  void anUnrankedEarlyCooldownDoesNotMakeAPlayerLead() {
+    Ranking ranking =
+        ranking(
+            List.of(
+                reason("ABILITY_ON_COOLDOWN", "PLAYER", 1L, 0.9),
+                reason("NO_INITIATOR", "TEAM", null, 0.8),
+                reason("TOWER", "PLAYER", 2L, 0.1)),
+            100);
+
+    assertThat(ranking.ranked())
+        .extracting(e -> e.reason().getCode())
+        .containsExactly("NO_INITIATOR", "TOWER");
+  }
 }

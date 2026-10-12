@@ -44,14 +44,15 @@ public class FightExplanationReader {
    *
    * @param also the codes of the same hero's other absence reasons this entry stands for
    * @param ranked false for a stored reason left out of the ranking (rank 0), kept so a reviewer
-   *     still sees it
+   *     still sees it; a reader that tells the ranking must filter on this
    */
   public record RankedReason(
       int rank, FightReasonDomain reason, List<String> also, boolean ranked) {}
 
   /**
    * @param reasons the top ranked reasons, then every reason that is not ranked
-   * @param totalReasons the reasons stored for the losing team, whatever {@code topReasons} kept
+   * @param totalReasons all reasons stored for the losing team, not ranked entries: absence reasons
+   *     collapsed into an entry, unranked reasons and those cut by {@code topReasons} all count
    */
   public record LostFight(
       FightDomain fight,
