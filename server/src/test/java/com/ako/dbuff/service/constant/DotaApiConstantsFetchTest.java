@@ -10,6 +10,7 @@ import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.constant.data.PatchConstant;
 import com.google.common.util.concurrent.RateLimiter;
 import com.sun.net.httpserver.HttpServer;
+import jakarta.ws.rs.ProcessingException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
@@ -48,11 +50,16 @@ class DotaApiConstantsFetchTest {
         "{\"npc_dota_hero_axe\":{\"abilities\":[\"axe_berserkers_call\"]}}");
     serve("/constants/items", "{\"blink\":{\"id\":1,\"dname\":\"Blink Dagger\",\"cost\":2250}}");
     serve("/constants/game_mode", "{\"1\":{\"id\":1,\"name\":\"game_mode_all_pick\"}}");
+    serve("/constants/bad", "[{\"id\":1},\"x\"]");
     server.start();
 
+    fetcher = new ConstantFetcherService(new ConstantsApi(client()), RateLimiter.create(1000));
+  }
+
+  private ApiClient client() {
     ApiClient apiClient = new DotaApiConfig(new DotaApiConfigurationProperties()).getApiClient();
     apiClient.setBasePath("http://127.0.0.1:" + server.getAddress().getPort());
-    fetcher = new ConstantFetcherService(new ConstantsApi(apiClient), RateLimiter.create(1000));
+    return apiClient;
   }
 
   @AfterEach
@@ -78,16 +85,44 @@ class DotaApiConstantsFetchTest {
   }
 
   @Test
-  void everyConstantType_isFetched() {
-    for (DotaApiConstant constant : DotaApiConstant.values()) {
-      assertTrue(fetcher.fetch(constant) != null, constant.name());
-    }
+  void everyConstantType_isFetchedAsTheRightVariantWithItsContent() {
+    assertEquals(
+        "game_mode_all_pick",
+        mapOf(DotaApiConstant.GAME_MODE).get("1") instanceof Map<?, ?> m ? m.get("name") : null);
+    assertTrue(mapOf(DotaApiConstant.HERO_ABILITIES).containsKey("npc_dota_hero_axe"));
+    assertEquals("antimage_mana_break", mapOf(DotaApiConstant.ABILITIES_IDS).get("5003"));
+    assertEquals(6, mapOf(DotaApiConstant.ABILITIES).size());
+    assertEquals(3, mapOf(DotaApiConstant.HERO).size());
     assertEquals(
         "Blink Dagger",
         new ItemConstantService(mock(ConstantDomainRepo.class), fetcher)
             .getConstantMap()
             .get("blink")
             .getDname());
+    assertEquals(
+        2,
+        fetcher
+            .fetch(DotaApiConstant.PATCH)
+            .getListGetConstantsByResource200ResponseOneOfInner()
+            .size());
+  }
+
+  @Test
+  void arrayElementOfAnotherShape_failsWithItsIndex() {
+    ConstantsApi api = new ConstantsApi(client());
+
+    ProcessingException e =
+        assertThrows(ProcessingException.class, () -> api.getConstantsByResource("bad"));
+
+    Throwable cause = e;
+    while (cause.getCause() != null) {
+      cause = cause.getCause();
+    }
+    assertTrue(cause.getMessage().contains("element 1"), cause.getMessage());
+  }
+
+  private Map<String, Object> mapOf(DotaApiConstant constant) {
+    return fetcher.fetch(constant).getMapStringObject();
   }
 
   private void serve(String path, String body) {

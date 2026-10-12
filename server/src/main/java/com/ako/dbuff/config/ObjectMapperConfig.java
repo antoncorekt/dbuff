@@ -18,9 +18,10 @@ public class ObjectMapperConfig {
    * Creates the default ObjectMapper with common configurations.
    *
    * <p>- ALLOW_COERCION_OF_SCALARS - enables coercion of scalar values (e.g., String to Number)
-   * which the constants conversion relies on. - JavaTimeModule - enables support for Java 8
-   * date/time types (LocalDateTime, etc.) - WRITE_DATES_AS_TIMESTAMPS disabled - writes dates as
-   * ISO-8601 strings instead of arrays
+   * which no code or test in this repository currently needs: the suite passes with it disabled,
+   * and the generated OpenDota client does not use this mapper. - JavaTimeModule - enables support
+   * for Java 8 date/time types (LocalDateTime, etc.) - WRITE_DATES_AS_TIMESTAMPS disabled - writes
+   * dates as ISO-8601 strings instead of arrays
    */
   @Bean
   @Primary
