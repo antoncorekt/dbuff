@@ -25,12 +25,14 @@ import com.ako.dbuff.dao.repo.ReplayPlayerMinuteRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
+import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.replay.AbilityNames;
 import com.ako.dbuff.service.replay.ReplayDataService;
 import com.ako.dbuff.service.replay.ReplayRunService;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
+import com.ako.dbuff.service.replay.report.CompositionSection;
 import com.ako.dbuff.service.replay.report.DeathSection;
 import com.ako.dbuff.service.replay.report.DraftSection;
 import com.ako.dbuff.service.replay.report.FightSection;
@@ -103,7 +105,8 @@ import static org.assertj.core.api.Assertions.assertThat;
   DeathSection.class,
   FightSection.class,
   MovementSection.class,
-  DraftSection.class
+  DraftSection.class,
+  CompositionSection.class
 })
 @TestPropertySource(properties = "replay.processing.enabled=true")
 class ReplayPostgresSmokeTest {
@@ -196,12 +199,14 @@ class ReplayPostgresSmokeTest {
   @Autowired private PlayerTimelineRepo timelineRepo;
   @Autowired private PlayerRoleRepo roleRepo;
   @Autowired private PlayerRoleProfileRepo roleProfileRepo;
+  @Autowired private TeamCompositionRepo compositionRepo;
   @Autowired private MatchRepo matchRepo;
   @Autowired private SwingSection swingSection;
   @Autowired private DeathSection deathSection;
   @Autowired private FightSection fightSection;
   @Autowired private MovementSection movementSection;
   @Autowired private DraftSection draftSection;
+  @Autowired private CompositionSection compositionSection;
 
   @Test
   @Commit
@@ -242,6 +247,31 @@ class ReplayPostgresSmokeTest {
           .as("%s: one final profile per player", id)
           .hasSize(10)
           .allSatisfy(p -> assertThat(p.getStage()).isEqualTo("FINAL"));
+      assertThat(compositionRepo.findByMatchId(match.getId()))
+          .as("%s: one final composition per team", id)
+          .hasSize(2)
+          .allSatisfy(
+              c -> {
+                assertThat(c.getStage()).isEqualTo("FINAL");
+                assertThat(c.getSummary()).isNotBlank();
+              })
+          .extracting(c -> c.getTeam())
+          .containsExactlyInAnyOrder("RADIANT", "DIRE");
+      compositionRepo
+          .findByMatchId(match.getId())
+          .forEach(
+              c ->
+                  System.out.println(
+                      "COMPOSITION "
+                          + id
+                          + " "
+                          + c.getTeam()
+                          + " "
+                          + c.getStage()
+                          + " ["
+                          + c.getTokens()
+                          + "] "
+                          + c.getSummary()));
       assertThat(buybackRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(spikeRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(stateSegmentRepo.findByMatchId(match.getId())).isNotEmpty();
@@ -260,6 +290,7 @@ class ReplayPostgresSmokeTest {
       report.addAll(fightSection.lines(input));
       report.addAll(movementSection.lines(input));
       report.addAll(draftSection.lines(input));
+      report.addAll(compositionSection.lines(input));
       System.out.println("REPORT " + id + "\n" + String.join("\n", report));
       assertThat(report).isNotEmpty();
     }
