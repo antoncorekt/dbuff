@@ -105,6 +105,32 @@ class FightExplanationReaderTest {
   }
 
   @Test
+  void anEarlyFightKeepsItsCooldownReasonsUnrankedAfterTheRankedOnes_andCollapsesAbsence() {
+    fightRepo.save(FightDomain.builder().matchId(MATCH).fightIndex(7).startSeconds(120.0).build());
+    explanationRepo.save(
+        FightExplanationDomain.builder()
+            .matchId(MATCH)
+            .fightIndex(7)
+            .losingTeam("DIRE")
+            .reasonCount(4)
+            .build());
+    reason(7, "DIRE", 128L, "ABILITY_ON_COOLDOWN", 0.9);
+    reason(7, "DIRE", 129L, "NO_TP", 0.4);
+    reason(7, "DIRE", 129L, "SUPPORT_ABSENT", 0.6);
+    reason(7, "DIRE", 130L, "INTENT_NOT_PLAYED", 0.8);
+
+    var fight = reader.read(MATCH, 5, 5).otherFights().get(0);
+
+    assertThat(fight.reasons())
+        .extracting(r -> r.rank() + " " + r.reason().getCode() + " " + r.also() + " " + r.ranked())
+        .containsExactly(
+            "1 SUPPORT_ABSENT [NO_TP] true",
+            "2 INTENT_NOT_PLAYED [] true",
+            "0 ABILITY_ON_COOLDOWN [] false");
+    assertThat(fight.totalReasons()).isEqualTo(4);
+  }
+
+  @Test
   void nothingIsCappedWhenTheLimitsAreUnbounded() {
     stored();
 

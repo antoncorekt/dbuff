@@ -15,6 +15,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,10 +39,18 @@ public class FightExplanationReader {
   private final FightReasonRepo reasonRepo;
   private final FightLossProperties properties;
 
-  /** A reason in its rank order, 1 being the one to tell first. */
-  public record RankedReason(int rank, FightReasonDomain reason) {}
+  /**
+   * A reason in its rank order, 1 being the one to tell first.
+   *
+   * @param also the codes of the same hero's other absence reasons this entry stands for
+   * @param ranked false for a stored reason left out of the ranking (rank 0), kept so a reviewer
+   *     still sees it
+   */
+  public record RankedReason(
+      int rank, FightReasonDomain reason, List<String> also, boolean ranked) {}
 
   /**
+   * @param reasons the top ranked reasons, then every reason that is not ranked
    * @param totalReasons the reasons stored for the losing team, whatever {@code topReasons} kept
    */
   public record LostFight(
@@ -115,11 +124,22 @@ public class FightExplanationReader {
         reasons.getOrDefault(explanation.getFightIndex(), List.of()).stream()
             .filter(r -> explanation.getLosingTeam().equals(r.getTeam()))
             .toList();
-    List<FightReasonDomain> ranked = ReasonRanking.rank(ofLoser, properties.getMinPlayerSeverity());
+    ReasonRanking.Ranking ranking =
+        ReasonRanking.rank(ofLoser, fight.getStartSeconds(), properties);
+    int kept = Math.min(Math.max(0, topReasons), ranking.ranked().size());
     List<RankedReason> top =
-        IntStream.range(0, Math.min(topReasons, ranked.size()))
-            .mapToObj(i -> new RankedReason(i + 1, ranked.get(i)))
+        IntStream.range(0, kept)
+            .mapToObj(
+                i ->
+                    new RankedReason(
+                        i + 1,
+                        ranking.ranked().get(i).reason(),
+                        ranking.ranked().get(i).also(),
+                        true))
             .toList();
-    return new LostFight(fight, explanation, top, ranked.size());
+    List<RankedReason> left =
+        ranking.notRanked().stream().map(r -> new RankedReason(0, r, List.of(), false)).toList();
+    return new LostFight(
+        fight, explanation, Stream.concat(top.stream(), left.stream()).toList(), ofLoser.size());
   }
 }
