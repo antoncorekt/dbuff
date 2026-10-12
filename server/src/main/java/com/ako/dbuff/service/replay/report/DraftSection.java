@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** What each tracked player drafted in an Ability Draft and where in the order he took it. */
+/** What each tracked player drafted in an Ability Draft and where in his team's order. */
 @Component
 @RequiredArgsConstructor
 public class DraftSection implements ReplayReportSection {
@@ -34,11 +34,17 @@ public class DraftSection implements ReplayReportSection {
     for (Map.Entry<Long, String> player : input.namesBySlot().entrySet()) {
       String chosen =
           picks.stream()
-              .filter(p -> player.getKey().equals(p.getPlayerSlot()))
+              .filter(p -> player.getKey().equals(p.getPlayerSlot()) && p.getAbilityName() != null)
               .sorted(Comparator.comparingInt(AbilityDraftPickDomain::getPickOrder))
               .map(
                   p ->
-                      Prettify.ability(p.getAbilityName()) + " (" + ordinal(p.getPickOrder()) + ")")
+                      Prettify.ability(p.getAbilityName())
+                          + " ("
+                          + ordinal(
+                              p.getTeamPickIndex() == null
+                                  ? p.getPickOrder()
+                                  : p.getTeamPickIndex())
+                          + ")")
               .collect(Collectors.joining(", "));
       if (!chosen.isEmpty()) {
         lines.add(player.getValue() + " drafted " + chosen);

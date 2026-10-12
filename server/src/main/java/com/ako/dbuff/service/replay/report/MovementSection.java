@@ -52,7 +52,7 @@ public class MovementSection implements ReplayReportSection {
   }
 
   private static String line(String name, PlayerPhaseSummaryDomain r) {
-    int length = r.getEndSeconds() - r.getStartSeconds();
+    int length = Math.max(1, r.getEndSeconds() - r.getStartSeconds());
     Map<String, Integer> seconds = new LinkedHashMap<>();
     seconds.put("dead", r.getDeadSeconds());
     seconds.put("teleporting", r.getTeleportingSeconds());
@@ -61,6 +61,7 @@ public class MovementSection implements ReplayReportSection {
     seconds.put("farming a lane", r.getLaneFarmSeconds());
     seconds.put("pushing", r.getPushingSeconds());
     seconds.put("travelling", r.getTravelingSeconds());
+    seconds.put("positioned", r.getPositionedSeconds());
     String where =
         seconds.entrySet().stream()
             .filter(e -> e.getValue() > 0)
