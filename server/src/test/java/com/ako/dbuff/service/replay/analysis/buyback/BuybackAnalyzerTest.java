@@ -111,7 +111,13 @@ class BuybackAnalyzerTest {
                 "npc_dota_hero_hero5",
                 "",
                 CombatEvent.ATTACKER_HERO | CombatEvent.TARGET_HERO,
-                0, 0, 0, 0, 0, 0, 1),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1),
             new CombatEvent(
                 CombatEventKind.BUYBACK, buybackAt, "", "", "", 0, 5, 0, 0, 0, 0, 0, 0));
     combatLogRepo.saveAndFlush(
