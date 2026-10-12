@@ -48,6 +48,12 @@ public class AllPickRoleResolver implements RoleResolver {
   }
 
   /** All Pick is read from the match, so it has final roles only. */
+  /** Its stored profiles and scores were calibrated with the plain weights; keep them. */
+  @Override
+  public RoleStage scoredAs(RoleStage stage) {
+    return RoleStage.INTENT;
+  }
+
   @Override
   public Set<RoleStage> stages() {
     return Set.of(RoleStage.FINAL);

@@ -75,11 +75,6 @@ public class AbilityDraftRoleResolver implements RoleResolver {
     return result;
   }
 
-  @Override
-  public RoleStage scoredAs(RoleStage stage) {
-    return stage;
-  }
-
   private static List<Long> slots(RoleContext context) {
     return context.team().stream().map(RolePlayer::slot).toList();
   }

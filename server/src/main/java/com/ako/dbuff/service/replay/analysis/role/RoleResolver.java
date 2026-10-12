@@ -17,11 +17,11 @@ public interface RoleResolver {
   }
 
   /**
-   * The stage whose weights score a profile stored next to the roles of {@code stage}: the plain
-   * ones unless a resolver fits that stage with its own.
+   * The stage whose weights score a profile stored next to the roles of {@code stage}: that stage
+   * itself unless a resolver says otherwise.
    */
   default RoleStage scoredAs(RoleStage stage) {
-    return RoleStage.INTENT;
+    return stage;
   }
 
   /**

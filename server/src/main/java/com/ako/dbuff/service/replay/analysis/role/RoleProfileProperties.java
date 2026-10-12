@@ -24,6 +24,14 @@ public class RoleProfileProperties {
   /** Fails at startup, with the missing entry named, when an override left a hole in the tables. */
   @PostConstruct
   public void validate() {
+    for (double unknown : new double[] {fit.getUnknownValue(), fit.getFinalUnknownValue()}) {
+      if (unknown < 0 || unknown > 1) {
+        throw new IllegalStateException(
+            "replay.analysis.role-profile.fit unknown-value and final-unknown-value must be in"
+                + " 0 to 1, got "
+                + unknown);
+      }
+    }
     for (int role = 1; role <= RoleFitter.ROLES; role++) {
       Map<RoleFunction, Double> weights = fit.getWeights().get(role);
       for (RoleFunction function : RoleFunction.values()) {
@@ -167,7 +175,7 @@ public class RoleProfileProperties {
 
     /**
      * Attribute keys that mark a skill as healing, shielding or reducing damage for an ally. The
-     * skill must target a friendly unit or, to count a heal over an area, have no target.
+     * skill must target a friendly unit; the constants say nothing about a skill with no target.
      */
     private List<String> saveKeys =
         List.of(
@@ -187,6 +195,13 @@ public class RoleProfileProperties {
             "damage_absorb",
             "shield_amount");
 
+    /**
+     * Keys of a no-target skill that heals the allies around it. Block and barrier keys are not
+     * here: on a no-target skill they are as likely to protect only the caster.
+     */
+    private List<String> areaSaveKeys =
+        List.of("heal", "heal_amount", "heal_pct", "base_heal", "hp_heal", "heal_per_second");
+
     /** Ally-target save skills, summed, that make a 1. */
     private double saveFull = 1.5;
 
@@ -196,6 +211,7 @@ public class RoleProfileProperties {
     private List<String> scalingKeys =
         List.of(
             "crit_chance",
+            "crit_multiplier",
             "crit_bonus",
             "lifesteal",
             "lifesteal_percent",

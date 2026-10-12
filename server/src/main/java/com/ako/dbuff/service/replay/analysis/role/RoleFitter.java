@@ -25,10 +25,6 @@ public class RoleFitter {
    */
   public record RoleFit(int role, double confidence, double[] scores) {}
 
-  public double[] scores(FunctionProfile profile) {
-    return scores(profile, RoleStage.INTENT);
-  }
-
   /** The scores of a profile read for a stage: the FINAL stage weighs the lane less. */
   public double[] scores(FunctionProfile profile, RoleStage stage) {
     RoleProfileProperties.Fit fit = properties.getFit();
@@ -64,11 +60,9 @@ public class RoleFitter {
    * @param team the profiles of one team
    * @return one fit per profile in the same order; empty unless the team has one profile per role
    */
-  public List<RoleFit> fit(List<FunctionProfile> team) {
-    return fit(team, RoleStage.INTENT);
-  }
-
-  /** As {@link #fit(List)}, scoring the profiles the way the stage reads them. */
+  /**
+   * @param stage how the profiles are scored: the FINAL stage weighs the lane less
+   */
   public List<RoleFit> fit(List<FunctionProfile> team, RoleStage stage) {
     if (team.size() != ROLES) {
       return List.of();

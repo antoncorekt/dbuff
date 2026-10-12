@@ -225,8 +225,8 @@ public class IntentProfileCalculator {
           && cooldown <= r.getCheapMaxCooldown()) {
         cheap += r.getSkillWeight();
       }
-      if ((has(a.getTarget_team(), FRIENDLY) || has(a.getBehavior(), NO_TARGET))
-          && hasKey(a, r.getSaveKeys())) {
+      if ((has(a.getTarget_team(), FRIENDLY) && hasKey(a, r.getSaveKeys()))
+          || (has(a.getBehavior(), NO_TARGET) && hasKey(a, r.getAreaSaveKeys()))) {
         save += weight;
       }
       scaling += hasKey(a, r.getScalingKeys()) ? weight : 0;

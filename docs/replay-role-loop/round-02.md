@@ -5,7 +5,7 @@
 - Matches: 9038725154 and 9037038717 (Ability Draft). The two All Pick matches were stored and re-analysed again; their roles and verdicts did not change, and they are not reviewed until Ability Draft is accepted.
 - Changes since the previous round (weights, rules, tags; one line each):
   - Skills, damage and farm: attribute keys of attack speed and attack damage (`attack-damage-keys`), an `Attack Modifier` behaviour and a passive that deals damage count as an attack skill; each adds `attack-skill-damage` (0.2) to damage and `attack-skill-farm` (0.15) to farm priority. Overrides only for `kez_falcon_rush_ad` and `kez_talon_toss_ad`, which have no attributes in the constants.
-  - Heal and protection: more keys in `save-keys` (`heal_per_second`, `damage_block_base`, `damage_block`, `damage_absorb`, `shield_amount`), and a no-target skill with such a key counts as a save, not only a skill that targets a friendly unit (Nature's Attendants, Living Armor come from the rules). Override only for `largo_amphibian_rhapsody` (armor aura, no key).
+  - Heal and protection: more keys in `save-keys` (`heal_per_second`, `damage_block_base`, `damage_block`, `damage_absorb`, `shield_amount`), and a no-target skill counts as a save when it has a heal key (`area-save-keys`), since the constants give no target team for it and a no-target block or barrier may protect only the caster (Nature's Attendants and Living Armor come from the rules). Override only for `largo_amphibian_rhapsody` (armor aura, no key).
   - Initiation: a stun, hex, root, sleep, fear, taunt or silence of at least 1 s on a skill with cast range 400 or more, or in an area, adds 0.5 to initiation whatever its cooldown (Ice Path, Storm Bolt, Snowball, Cold Feet, Shackleshot); `max_travel_distance` and `leap_distance` are gap-closer keys (Astral Step, Leap). Overrides for `doom_bringer_doom` and `rattletrap_power_cogs`, whose control is not in a stun key.
   - Final stage, Ability Draft only (All Pick scores and profiles are unchanged): the lane bonus is multiplied by `fit.final-lane-factor` (0.5), and a function the FINAL stage does not know counts `fit.final-unknown-value` (0) instead of 0.5, because with 0.5 the unknown initiation and durability gave roles 3 and 4 a constant lead over 1 and 5 and every player fitted 3 best.
   - Report: the `Roles` table has `intent fit` and `final fit` columns (the three best roles by score); the diff compares the columns both reports share.
@@ -13,6 +13,13 @@
 - Status: assistant reviewed
 
 `assistant` and `owner` are `OK` or `REJECT`. `expected` is filled for a reject: the role (1 to 5) the reviewer says the player filled (final) or was meant to fill (intent, named in the comment). `intent` is `n/a` for a mode without intent rows (All Pick). Read the roles from `server/build/role-loop/round-02/<matchId>.md`.
+
+## Known hypotheses to review
+
+- Initiation is counted per skill independently of the control branch that feeds disable.
+- A passive that deals damage counts as an attack skill.
+- The additive attack terms can saturate damage and farm priority at 1.
+- The generic gap-closer keys `max_travel_distance` and `leap_distance`.
 
 ## Reading of the round
 
@@ -40,7 +47,7 @@
 | 9037038717 | 2 | Windrunner | 4 | 2 | 2 | REJECT | | intent was 2 and accepted; Infernal Blade, Ice Blast, Leap, Warcry now fits 3(2.07) 4(1.81) 2(1.63), 4 is the leftover: regression, expected 2 (3 tolerated). Final 2 OK |
 | 9037038717 | 3 | Brewmaster | 3 | 3 | 1 | REJECT | | final unchanged: 30.6k, farm 0.88, jungle 1.00, best fit 1(2.05) over 3(1.94) but Void Spirit needs the 1; intent 3 OK |
 | 9037038717 | 4 | Ancient Apparition | 2 | 4 | 4 | REJECT | | intent 2, was 1; Storm Bolt, Powershot, Shapeshift, Talon Toss: expected 3 or 4, 2 is adjacent; best fits 3(2.54) 2(2.20). Final 4 OK |
-| 9037038717 | 128 | Tusk | 2 | 1 | 3 | REJECT | | intent was 3 and accepted; Walrus Punch, Windrun, Scorched Earth are now attack skills (damage 0.95), 2 is adjacent. Final 1 OK |
+| 9037038717 | 128 | Tusk | 2 | 1 | 3 | REJECT | | intent was 3 and accepted; Walrus Punch, Windrun, Scorched Earth are now attack skills (damage 0.95, farm 0.83 with the crit multiplier counted as scaling), best fits 2(2.83) 1(2.35) 3(1.74), 2 is adjacent. Final 1 OK |
 | 9037038717 | 129 | Lycan | 4 | 3 | | OK | | |
 | 9037038717 | 130 | Mirana | 1 | 2 | | OK | | |
 | 9037038717 | 131 | Doom | 3 | 5 | | OK | | intent 3, was 5: Snowball, Ice Shards and Doom give initiation 1.00; confidence now readable. Final 5 OK |

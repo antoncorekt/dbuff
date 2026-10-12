@@ -286,9 +286,34 @@ class IntentProfileCalculatorTest {
             {"behavior":"Passive","attrib":[{"key":"bonus_hp_regen","value":["7"]}]}\
             """);
 
+    FunctionProfile selfBlock =
+        holding(
+            """
+            {"behavior":["No Target","Instant Cast"],"cd":[30],
+             "attrib":[{"key":"damage_block_base","value":["60"]},
+                       {"key":"bonus_armor","value":["8"]}]}\
+            """);
+    FunctionProfile attendants =
+        holding(
+            """
+            {"behavior":"No Target","target_team":"None","cd":35,
+             "attrib":[{"key":"heal_duration","value":["7","9"]},
+                       {"key":"heal","value":["4","8","12","16"]}]}\
+            """);
+    FunctionProfile livingArmor =
+        holding(
+            """
+            {"behavior":["Unit Target","Point Target"],"target_team":"Friendly","cd":["24","21"],
+             "attrib":[{"key":"heal_per_second","value":["4","7"]},
+                       {"key":"damage_block_base","value":["60","80"]}]}\
+            """);
+
     assertThat(area.saveHeal()).isGreaterThanOrEqualTo(0.3);
     assertThat(block.saveHeal()).isGreaterThanOrEqualTo(0.3);
+    assertThat(attendants.saveHeal()).isGreaterThanOrEqualTo(0.3);
+    assertThat(livingArmor.saveHeal()).isGreaterThanOrEqualTo(0.3);
     assertThat(passive.saveHeal()).isZero();
+    assertThat(selfBlock.saveHeal()).isZero();
   }
 
   @Test

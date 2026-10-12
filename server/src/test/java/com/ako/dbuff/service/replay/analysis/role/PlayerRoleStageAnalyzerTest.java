@@ -114,7 +114,8 @@ class PlayerRoleStageAnalyzerTest {
                   .filter(p -> p.stage() == context.stage())
                   .findFirst()
                   .orElseThrow();
-          List<RoleFitter.RoleFit> fits = fitter.fit(profiler.profile(context.team()));
+          List<RoleFitter.RoleFit> fits =
+              fitter.fit(profiler.profile(context.team()), context.stage());
           List<RoleAssignment> result = new ArrayList<>();
           for (int i = 0; i < fits.size(); i++) {
             result.add(
