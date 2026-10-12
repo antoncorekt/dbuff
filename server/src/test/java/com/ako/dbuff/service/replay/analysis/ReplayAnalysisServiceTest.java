@@ -58,6 +58,27 @@ class ReplayAnalysisServiceTest {
   }
 
   @Test
+  void analyze_skipsAnAnalyzerWhoseInputAnalyzerWasItselfSkipped() {
+    ReplayAnalyzer first = mock(ReplayAnalyzer.class);
+    ReplayAnalyzer second = mock(ReplayAnalyzer.class);
+    for (ReplayAnalyzer analyzer : List.of(first, second)) {
+      when(analyzer.supports(any())).thenReturn(true);
+    }
+    when(first.name()).thenReturn("first");
+    when(first.requires(any())).thenReturn(java.util.Set.of("tracks"));
+    when(second.name()).thenReturn("second");
+    when(second.requires(any())).thenReturn(java.util.Set.of("first"));
+    ReplayAnalysisService chain = new ReplayAnalysisService(List.of(first, second));
+
+    List<String> failed = chain.analyze(5L, TestModes.ABILITY_DRAFT, List.of("tracks"));
+
+    assertThat(failed).isEmpty();
+    verify(first, org.mockito.Mockito.never()).analyze(5L);
+    verify(second, org.mockito.Mockito.never()).analyze(5L);
+    verify(second, org.mockito.Mockito.never()).deleteByMatchId(5L);
+  }
+
+  @Test
   void analyze_leavesOutAnAnalyzerThatDoesNotApplyToTheMode() {
     when(broken.supports(TestModes.ALL_PICK)).thenReturn(false);
 

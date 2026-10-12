@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 final class ReasonWording {
   private static final String TEAM = "the team";
   private static final String TEAM_REASON = "TEAM";
+  private static final Pattern ABOUT_A_TEAM = Pattern.compile("^(Radiant|Dire) ");
   private static final Pattern FARMING = Pattern.compile("was (farming [a-z ]+?) when");
 
   private static final Map<String, Function<String, String>> PLAYER_PHRASES =
@@ -47,7 +48,7 @@ final class ReasonWording {
 
   static String phrase(FightReasonDomain reason, String hero) {
     if (TEAM_REASON.equals(reason.getScope())) {
-      return TEAM + teamGap(reason.getCode());
+      return teamPhrase(reason.getCode(), reason.getEvidence());
     }
     String evidence = reason.getEvidence() == null ? "" : reason.getEvidence().trim();
     Function<String, String> known = PLAYER_PHRASES.get(reason.getCode());
@@ -61,13 +62,17 @@ final class ReasonWording {
     return evidence.startsWith(hero) ? evidence : hero + ": " + evidence;
   }
 
-  private static String teamGap(String code) {
-    String words = code == null ? "" : CompositionToken.words(code);
-    if (words.isBlank()) {
-      return " had a gap";
+  private static String teamPhrase(String code, String evidence) {
+    if (!CompositionToken.isToken(code)) {
+      String note = evidence == null ? "" : evidence.trim();
+      if (note.isEmpty()) {
+        return TEAM + " had a gap";
+      }
+      return ABOUT_A_TEAM.matcher(note).find() ? note : TEAM + ": " + note;
     }
+    String words = CompositionToken.words(code);
     boolean has = words.startsWith("no ") || Character.isDigit(words.charAt(0));
-    return has ? " had " + words : ": " + words;
+    return TEAM + (has ? " had " : ": ") + words;
   }
 
   private static String outOfMana(String evidence) {

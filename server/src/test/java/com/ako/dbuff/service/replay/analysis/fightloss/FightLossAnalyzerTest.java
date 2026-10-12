@@ -201,6 +201,12 @@ class FightLossAnalyzerTest {
   }
 
   @Test
+  void requiresEveryAnalyzerItReads_soASkippedOneKeepsTheOldRows() {
+    assertThat(analyzer.requires())
+        .containsExactlyInAnyOrder("fights", "fight-reasons", "deaths", "spikes");
+  }
+
+  @Test
   void aMatchWithoutFightsGetsNoRows() {
     analyzer.analyze(MATCH);
 

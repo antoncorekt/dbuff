@@ -55,6 +55,17 @@ class DeathReasonContributorTest {
   }
 
   @Test
+  void evidenceOmitsTheKillerWhenNeitherNameNorKindIsKnown() {
+    DeathAnalysisDomain unknown = death(0, 750, "BURST");
+    unknown.setKillerName(null);
+    unknown.setKillerKind(null);
+
+    List<Reason> reasons = contributor.contribute(context(unknown));
+
+    assertThat(reasons).extracting(Reason::evidence).containsOnly("died at 12:30");
+  }
+
+  @Test
   void aReasonThatExplainsNothingIsLeftOut_andALoneDeathIsNotFirstOfAnything() {
     List<Reason> reasons = contributor.contribute(context(death(0, 100, "OTHER")));
 
