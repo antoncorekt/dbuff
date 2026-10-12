@@ -55,7 +55,7 @@ DBuff is a Dota 2 match analytics backend built with Spring Boot 3.5, Java 21, a
 - **Virtual Threads (Java 21)**: Used throughout for high concurrency. HikariCP pool is 50 for local dev; the `prod` profile lowers it to 10 because Postgres is co-located on the same 2 GiB instance.
 - **Semaphore-based concurrency control**: `ConcurrencyConfig` limits parallel match fetches (20) and page scrapes (5) to prevent resource exhaustion.
 - **Rate limiting**: Guava `RateLimiter` on OpenDota API (60 req/min) and ScraperAPI calls.
-- **Caching**: Caffeine + Spring Cache for hero/item/ability constants.
+- **Caching**: Caffeine + Spring Cache for hero/item/ability constants. Stored constants carry a schema version (`BaseApiConstantService.schemaVersion()`) and are refetched from OpenDota when the stored one is lower, keeping the old row if the fetch fails; `position_est` is stored only for matches mapped after it was added.
 - **Schema management**: Hibernate `ddl-auto=update` owns the schema. There are SQL scripts in `server/src/main/resources/db/migration/`, but **Flyway is not on the classpath** — it was never added as a dependency, so those scripts have never run. Treat a `pg_dump` as the only authoritative schema, and do not assume a migration has been applied because a file exists. Indexes are declared with `@Index` on the entities so Hibernate owns them too; `V2__item_ranking_indexes.sql` is retained only as documentation of the `INCLUDE`/partial variants JPA cannot express.
 - **Preview features are enabled**: `--enable-preview` is passed at compile time, to the test JVM, and in production (`template.yaml`). All three must agree — a class that actually uses a preview feature is marked in its class file and will not load on a JVM without the flag.
 

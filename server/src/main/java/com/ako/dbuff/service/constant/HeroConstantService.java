@@ -17,4 +17,9 @@ public class HeroConstantService extends BaseApiConstantService<HeroConstant> {
   public DotaApiConstant getConstantId() {
     return DotaApiConstant.HERO;
   }
+
+  @Override
+  protected int schemaVersion() {
+    return 1;
+  }
 }

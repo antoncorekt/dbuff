@@ -31,4 +31,7 @@ public class ConstantDomain {
   @Column(name = "constant_value", columnDefinition = "jsonb")
   @Convert(converter = ConstantConverter.class)
   private Map<String, Object> constantValue;
+
+  /** Shape version of the stored value; null for rows stored before versioning. */
+  private Integer schemaVersion;
 }
