@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis.role;
 
+import com.ako.dbuff.service.constant.data.AbilityAttribute;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.replay.analysis.role.IntentProfileCalculator.HeldAbility;
@@ -174,5 +175,40 @@ class IntentProfileCalculatorTest {
     assertThat(calculator.profile(null, skills).disable()).isPositive();
     assertThat(calculator.profile(null, skills).jungle()).isNull();
     assertThat(calculator.profile(null, List.of())).isEqualTo(FunctionProfile.UNKNOWN);
+  }
+
+  @Test
+  void aSelfChannelIsNotControlButAChannelOnAnEnemyIs() {
+    AbilityConstant teleport =
+        AbilityConstant.builder()
+            .behavior(List.of("Point Target", "Channeled"))
+            .cd(List.of(60.0))
+            .attrib(List.of(new AbilityAttribute("channel_time", List.of("3"))))
+            .build();
+
+    FunctionProfile profile =
+        calculator.profile(HEROES.get("1"), List.of(new HeldAbility(teleport, false)));
+
+    assertThat(profile.disable()).isZero();
+    assertThat(
+            calculator
+                .profile(
+                    HEROES.get("27"),
+                    List.of(new HeldAbility(ABILITIES.get("shadow_shaman_shackles"), false)))
+                .disable())
+        .isPositive();
+  }
+
+  @Test
+  void initiationAndDisableHaveTheirOwnScales() {
+    RoleProfileProperties properties = new RoleProfileProperties();
+    properties.getIntent().setInitiationFull(0.1);
+    List<HeldAbility> bolt = List.of(new HeldAbility(ABILITIES.get("sven_storm_bolt"), false));
+
+    FunctionProfile tuned = new IntentProfileCalculator(properties).profile(HEROES.get("18"), bolt);
+    FunctionProfile normal = calculator.profile(HEROES.get("18"), bolt);
+
+    assertThat(tuned.initiation()).isGreaterThan(normal.initiation());
+    assertThat(tuned.disable()).isEqualTo(normal.disable());
   }
 }

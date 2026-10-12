@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis.role;
 
+import jakarta.annotation.PostConstruct;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,33 @@ public class RoleProfileProperties {
   private Observed observed = new Observed();
   private Fit fit = new Fit();
 
+  /** Fails at startup, with the missing entry named, when an override left a hole in the tables. */
+  @PostConstruct
+  public void validate() {
+    for (int role = 1; role <= RoleFitter.ROLES; role++) {
+      Map<RoleFunction, Double> weights = fit.getWeights().get(role);
+      for (RoleFunction function : RoleFunction.values()) {
+        if (weights == null || weights.get(function) == null) {
+          throw new IllegalStateException(
+              "replay.analysis.role-profile.fit.weights has no value for role "
+                  + role
+                  + " and function "
+                  + function);
+        }
+      }
+      Map<LanePosition, Double> lanes = fit.getLaneBonus().get(role);
+      for (LanePosition lane : LanePosition.values()) {
+        if (lanes == null || lanes.get(lane) == null) {
+          throw new IllegalStateException(
+              "replay.analysis.role-profile.fit.lane-bonus has no value for role "
+                  + role
+                  + " and lane "
+                  + lane);
+        }
+      }
+    }
+  }
+
   /** How the hero and his skills become a profile; a sum over skills is cut at 1. */
   @Data
   public static class Intent {
@@ -31,7 +59,10 @@ public class RoleProfileProperties {
     /** A cooldown shorter than this counts as this, so a near-free skill does not dominate. */
     private double cooldownFloorSeconds = 5;
 
-    /** Attribute keys, by their ending, that hold seconds of control on an enemy. */
+    /**
+     * Attribute keys, by their ending, that hold seconds of control on an enemy. A plain {@code
+     * channel_time} is not here: a self-channel such as Teleport is not control.
+     */
     private List<String> disableKeySuffixes =
         List.of(
             "stun_duration",
@@ -40,11 +71,13 @@ public class RoleProfileProperties {
             "sleep_duration",
             "hex_duration",
             "fear_duration",
-            "taunt_duration",
-            "channel_time");
+            "taunt_duration");
 
-    /** Keys that hold seconds of control only on a skill that targets one enemy unit. */
-    private List<String> enemyUnitDisableKeys = List.of("duration");
+    /**
+     * Keys that hold seconds of control only on a skill that targets one enemy unit; a channel on
+     * an enemy holds him, a channel on oneself does not.
+     */
+    private List<String> enemyUnitDisableKeys = List.of("duration", "channel_time");
 
     /** ...and a longer plain duration is a debuff, not a lockdown, and does not count. */
     private double enemyUnitDisableMaxSeconds = 6;
@@ -54,6 +87,9 @@ public class RoleProfileProperties {
 
     /** Seconds of control per second of cooldown, summed over the skills, that make a 1. */
     private double disableFull = 1.0;
+
+    /** Area or no-target control per second of cooldown, summed, that makes an initiation of 1. */
+    private double initiationFull = 1.0;
 
     /** An area or no-target disable counts for initiation with this share of its disable value. */
     private double initiationDisableShare = 1.0;

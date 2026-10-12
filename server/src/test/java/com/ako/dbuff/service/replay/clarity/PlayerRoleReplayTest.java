@@ -5,7 +5,9 @@ import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
 import com.ako.dbuff.service.replay.analysis.role.AllPickRoleResolver;
 import com.ako.dbuff.service.replay.analysis.role.RoleAssignment;
+import com.ako.dbuff.service.replay.analysis.role.RoleContext;
 import com.ako.dbuff.service.replay.analysis.role.RolePlayer;
+import com.ako.dbuff.service.replay.analysis.role.RoleStage;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -54,7 +56,7 @@ class PlayerRoleReplayTest {
                 .sorted()
                 .map(slot -> rolePlayer(openDota.get(slot), activity.get(slot)))
                 .toList();
-        List<RoleAssignment> result = resolver.resolve(team);
+        List<RoleAssignment> result = resolver.resolve(new RoleContext(RoleStage.FINAL, team));
 
         assertThat(result)
             .extracting(RoleAssignment::role)

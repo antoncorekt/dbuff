@@ -132,7 +132,11 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
         if (stage == RoleStage.FINAL) {
           assignments.forEach(a -> rows.add(row(matchId, a)));
         }
-        profiles.addAll(profileRows(matchId, stage, team, assignments));
+        try {
+          profiles.addAll(profileRows(matchId, stage, team, assignments));
+        } catch (RuntimeException e) {
+          log.warn("Match {}: no {} profiles, the roles are kept", matchId, stage, e);
+        }
       }
     }
     roleRepo.saveAll(rows);
@@ -156,10 +160,26 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
     Map<Long, RoleAssignment> bySlot = new HashMap<>();
     assignments.forEach(a -> bySlot.put(a.slot(), a));
     List<FunctionProfile> profiles = profiler.profile(team);
+    List<Long> slots = team.stream().map(RolePlayer::slot).toList();
+    List<Long> uncovered = slots.stream().filter(s -> !bySlot.containsKey(s)).toList();
+    List<Long> foreign = bySlot.keySet().stream().filter(s -> !slots.contains(s)).sorted().toList();
+    if (!uncovered.isEmpty() || !foreign.isEmpty()) {
+      log.info(
+          "Match {}, {}: the resolver gave no role for slots {} and roles for unknown slots {};"
+              + " those have no profile row",
+          matchId,
+          stage,
+          uncovered,
+          foreign);
+    }
     List<PlayerRoleProfileDomain> rows = new ArrayList<>();
     for (int i = 0; i < team.size(); i++) {
       RoleAssignment assignment = bySlot.get(team.get(i).slot());
+      if (assignment == null) {
+        continue;
+      }
       FunctionProfile p = profiles.get(i);
+      double[] scores = fitter.scores(p);
       rows.add(
           PlayerRoleProfileDomain.builder()
               .matchId(matchId)
@@ -177,7 +197,8 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
               .saveHeal(p.saveHeal())
               .damage(p.damage())
               .durability(p.durability())
-              .roleScores(scoreText(fitter.scores(p)))
+              .fitRole(RoleFitter.bestRole(scores))
+              .roleScores(scoreText(scores))
               .evidence(assignment.evidence())
               .analysisVersion(version())
               .build());

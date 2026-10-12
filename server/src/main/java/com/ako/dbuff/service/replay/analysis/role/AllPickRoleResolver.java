@@ -58,7 +58,7 @@ public class AllPickRoleResolver implements RoleResolver {
     return context.stage() == RoleStage.FINAL ? resolve(context.team()) : List.of();
   }
 
-  public List<RoleAssignment> resolve(List<RolePlayer> team) {
+  List<RoleAssignment> resolve(List<RolePlayer> team) {
     if (team.size() != TEAM_SIZE) {
       return List.of();
     }

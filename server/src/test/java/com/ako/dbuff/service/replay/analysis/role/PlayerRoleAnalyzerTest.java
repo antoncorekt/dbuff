@@ -150,6 +150,11 @@ class PlayerRoleAnalyzerTest {
       assertThat(profile.getLane()).isNotNull();
       assertThat(profile.getVisionDuty()).isNull();
       assertThat(profile.getRoleScores().split(",")).hasSize(5);
+      double[] scores =
+          java.util.Arrays.stream(profile.getRoleScores().split(","))
+              .mapToDouble(Double::parseDouble)
+              .toArray();
+      assertThat(profile.getFitRole()).isEqualTo(RoleFitter.bestRole(scores));
     }
   }
 

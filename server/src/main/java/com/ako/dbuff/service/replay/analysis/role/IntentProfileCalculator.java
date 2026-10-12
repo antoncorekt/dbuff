@@ -48,11 +48,11 @@ public class IntentProfileCalculator {
     return new FunctionProfile(
         null,
         farmPriority(hero, sums, rules),
-        hero == null ? null : tag(hero, rules.getJunglerTagName()) * rules.getJunglerTag(),
+        hero == null ? null : clamp(tag(hero, rules.getJunglerTagName()) * rules.getJunglerTag()),
         roaming(hero, sums, rules),
         null,
         clamp(
-            sums.areaControl / rules.getDisableFull()
+            sums.areaControl / rules.getInitiationFull()
                 + sums.gapClosers * rules.getGapCloserInitiation()),
         clamp(sums.disable / rules.getDisableFull()),
         clamp(sums.save / rules.getSaveFull()),

@@ -47,6 +47,12 @@ public class PlayerRoleProfileDomain {
   /** 1 carry, 2 mid, 3 offlane, 4 roaming or jungle support, 5 hard support. */
   private Integer role;
 
+  /**
+   * The best role by {@code roleScores} alone, which may differ from {@code role} (the resolver's),
+   * and is null when not worked out.
+   */
+  private Integer fitRole;
+
   /** 0 to 1, as in {@link PlayerRoleDomain}. */
   private Double confidence;
 

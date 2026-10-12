@@ -44,6 +44,17 @@ public class RoleFitter {
     return scores;
   }
 
+  /** The role with the highest score, the first in order on a tie. */
+  public static int bestRole(double[] scores) {
+    int best = 0;
+    for (int i = 1; i < scores.length; i++) {
+      if (scores[i] > scores[best]) {
+        best = i;
+      }
+    }
+    return best + 1;
+  }
+
   /**
    * @param team the profiles of one team
    * @return one fit per profile in the same order; empty unless the team has one profile per role
