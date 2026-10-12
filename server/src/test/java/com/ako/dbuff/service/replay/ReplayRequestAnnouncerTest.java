@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay;
 
 import com.ako.dbuff.dao.model.MatchDomain;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
@@ -13,13 +14,13 @@ import static org.mockito.Mockito.verify;
 class ReplayRequestAnnouncerTest {
 
   private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
-  private final ReplayRequestAnnouncer announcer = new ReplayRequestAnnouncer(publisher);
+  private final ReplayProcessingProperties properties = new ReplayProcessingProperties();
+  private final ReplayRequestAnnouncer announcer =
+      new ReplayRequestAnnouncer(publisher, new ReplayEligibility(properties), properties);
 
   @Test
-  void announce_publishesWhenDetailsAreMappedAndTheReplayLocationIsKnown() {
-    MatchDomain match = mapped();
-
-    announcer.announce(match);
+  void announce_publishesForAFreshEligibleMatch() {
+    announcer.announce(mapped());
 
     verify(publisher).publishEvent(new ReplayRequested(7L));
   }
@@ -44,12 +45,38 @@ class ReplayRequestAnnouncerTest {
     verify(publisher, never()).publishEvent(any(Object.class));
   }
 
+  @Test
+  void announce_staysSilentForAMatchThatStartedLongAgo() {
+    MatchDomain match = mapped();
+    match.setStartTime(Instant.now().minusSeconds(7 * 3600).getEpochSecond());
+
+    announcer.announce(match);
+
+    verify(publisher, never()).publishEvent(any(Object.class));
+  }
+
+  @Test
+  void announce_staysSilentForAnUnsupportedModeOrNoDuration() {
+    MatchDomain otherMode = mapped();
+    otherMode.setGameModeId(3L);
+    MatchDomain notPlayed = mapped();
+    notPlayed.setDuration(0L);
+
+    announcer.announce(otherMode);
+    announcer.announce(notPlayed);
+
+    verify(publisher, never()).publishEvent(any(Object.class));
+  }
+
   private static MatchDomain mapped() {
     MatchDomain match = new MatchDomain();
     match.setId(7L);
     match.setDetailsMappedAt(LocalDateTime.now());
+    match.setStartTime(Instant.now().minusSeconds(3600).getEpochSecond());
     match.setReplayCluster(1L);
     match.setReplaySalt(2L);
+    match.setGameModeId(18L);
+    match.setDuration(2400L);
     return match;
   }
 }

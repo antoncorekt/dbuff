@@ -14,6 +14,9 @@ import org.springframework.stereotype.Component;
 @Component
 @DisallowConcurrentExecution
 public class ReplayProcessingJob implements Job {
+  /** Set on runs started by a new replay: they leave the backlog to the cron-fired runs. */
+  public static final String NO_BACKLOG = "noBacklog";
+
   @Autowired private ReplayBatchService batchService;
   @Autowired private QuietHoursGuard quietHoursGuard;
   @Autowired private ReplayReportService reportService;
@@ -25,7 +28,7 @@ public class ReplayProcessingJob implements Job {
       return;
     }
     try {
-      batchService.runBatch();
+      batchService.runBatch(!context.getMergedJobDataMap().containsKey(NO_BACKLOG));
     } catch (Exception e) {
       log.error("Replay processing failed: {}", e.getMessage(), e);
     }

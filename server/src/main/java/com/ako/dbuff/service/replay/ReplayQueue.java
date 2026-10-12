@@ -7,9 +7,11 @@ import com.ako.dbuff.service.replay.QueuedMatch.Lane;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -18,15 +20,17 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 /**
- * Hands out the match the replay job takes next. Lanes, in order: matches whose details were mapped
- * lately (new ones and their due retries, newest first), young retries with few attempts, other new
- * matches mapped within the retry priority window, and last, only when enabled, old retries and the
- * backlog of matches mapped earlier than that.
+ * Hands out the match the replay job takes next. Lanes, in order: matches that started and were
+ * mapped lately (new ones and their due retries, newest first), young retries with few attempts,
+ * other new matches mapped within the retry priority window, and last, only when enabled, old
+ * retries and the backlog of matches mapped earlier than that.
  */
 @Component
 @RequiredArgsConstructor
 public class ReplayQueue {
   private static final Pageable ONE = PageRequest.of(0, 1);
+  private static final Collection<Long> NONE = Set.of(-1L);
+  private static final LocalDateTime FOREVER = LocalDateTime.of(9999, 12, 31, 0, 0);
   private static final LocalDateTime LONG_AGO = LocalDateTime.of(1970, 1, 1, 0, 0);
 
   private final MatchRepo matchRepo;
@@ -35,27 +39,37 @@ public class ReplayQueue {
 
   /**
    * @param backlogRoom how many backlog matches this job run may still take
+   * @param attempted matches this run already took; never handed out again
    */
-  public Optional<QueuedMatch> next(int backlogRoom) {
+  public Optional<QueuedMatch> next(int backlogRoom, Collection<Long> attempted) {
+    Collection<Long> excluded = attempted.isEmpty() ? NONE : attempted;
     LocalDateTime now = LocalDateTime.now();
-    LocalDateTime freshAfter = now.minusHours(properties.getFreshWindowHours());
-    LocalDateTime youngAfter = now.minusHours(properties.getRetryPriorityHours());
-    Window window = new Window(now, freshAfter, youngAfter);
+    Window window =
+        new Window(
+            now,
+            now.minusHours(properties.getFreshWindowHours()),
+            now.minusHours(properties.getRetryPriorityHours()),
+            excluded);
     Optional<QueuedMatch> next =
         firstOf(
             () -> fresh(window),
             () -> tag(Lane.YOUNG_RETRY, youngRetry(window)),
-            () -> tag(Lane.NEW, newMatch(youngAfter, freshAfter)));
+            () -> tag(Lane.NEW, newMatch(window, window.youngAfter(), FOREVER, maxAgeLimit())));
     if (next.isEmpty() && properties.getBacklog().isEnabled() && backlogRoom > 0) {
       next =
           firstOf(
               () -> tag(Lane.BACKLOG, oldRetry(window)),
-              () -> tag(Lane.BACKLOG, newMatch(LONG_AGO, youngAfter)));
+              () ->
+                  tag(
+                      Lane.BACKLOG,
+                      newMatch(window, LONG_AGO, window.youngAfter(), maxAgeLimit())));
     }
     return next;
   }
 
   private Optional<QueuedMatch> fresh(Window window) {
+    long startedAfter =
+        Instant.now().minus(properties.getFreshWindowHours(), ChronoUnit.HOURS).getEpochSecond();
     Optional<MatchDomain> retry =
         first(
             runRepo.findDueFreshRetries(
@@ -63,8 +77,10 @@ public class ReplayQueue {
                 window.now(),
                 properties.getMaxAttempts(),
                 window.freshAfter(),
+                startedAfter,
+                window.excluded(),
                 ONE));
-    Optional<MatchDomain> unseen = newMatch(window.freshAfter(), window.now().plusYears(1));
+    Optional<MatchDomain> unseen = newMatch(window, window.freshAfter(), FOREVER, startedAfter);
     return Stream.of(retry, unseen)
         .flatMap(Optional::stream)
         .max(Comparator.comparing(MatchDomain::getStartTime))
@@ -77,9 +93,9 @@ public class ReplayQueue {
             properties.getParserVersion(),
             window.now(),
             properties.getMaxAttempts(),
-            window.freshAfter(),
             window.youngAfter(),
             properties.getRetryPriorityAttempts(),
+            window.excluded(),
             ONE));
   }
 
@@ -89,23 +105,27 @@ public class ReplayQueue {
             properties.getParserVersion(),
             window.now(),
             properties.getMaxAttempts(),
-            window.freshAfter(),
             window.youngAfter(),
             properties.getRetryPriorityAttempts(),
+            window.excluded(),
             ONE));
   }
 
-  private Optional<MatchDomain> newMatch(LocalDateTime mappedFrom, LocalDateTime mappedBefore) {
-    long recentAfter =
-        Instant.now().minus(properties.getMaxAgeDays(), ChronoUnit.DAYS).getEpochSecond();
+  private Optional<MatchDomain> newMatch(
+      Window window, LocalDateTime mappedFrom, LocalDateTime mappedBefore, long startedAfter) {
     return first(
         matchRepo.findMatchesWithoutReplayRun(
             properties.getParserVersion(),
-            recentAfter,
+            startedAfter,
             properties.getSupportedModes(),
             mappedFrom,
             mappedBefore,
+            window.excluded(),
             ONE));
+  }
+
+  private long maxAgeLimit() {
+    return Instant.now().minus(properties.getMaxAgeDays(), ChronoUnit.DAYS).getEpochSecond();
   }
 
   @SafeVarargs
@@ -127,5 +147,9 @@ public class ReplayQueue {
     return list.stream().findFirst();
   }
 
-  private record Window(LocalDateTime now, LocalDateTime freshAfter, LocalDateTime youngAfter) {}
+  private record Window(
+      LocalDateTime now,
+      LocalDateTime freshAfter,
+      LocalDateTime youngAfter,
+      Collection<Long> excluded) {}
 }

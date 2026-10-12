@@ -57,6 +57,7 @@ public interface MatchRepo extends JpaRepository<MatchDomain, Long> {
         and m.replaySalt is not null
         and m.duration > 0
         and m.gameModeId in :modes
+        and m.id not in :excluded
         and not exists (
           select 1 from ReplayParseRunDomain r
           where r.matchId = m.id and r.parserVersion = :version)
@@ -68,6 +69,7 @@ public interface MatchRepo extends JpaRepository<MatchDomain, Long> {
       @Param("modes") Collection<Long> modes,
       @Param("mappedFrom") LocalDateTime mappedFrom,
       @Param("mappedBefore") LocalDateTime mappedBefore,
+      @Param("excluded") Collection<Long> excluded,
       Pageable pageable);
 
   /** Writes only the detail bookkeeping columns, leaving fields other jobs own untouched. */

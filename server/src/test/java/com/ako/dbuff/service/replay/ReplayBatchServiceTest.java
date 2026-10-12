@@ -6,9 +6,11 @@ import com.ako.dbuff.service.replay.QueuedMatch.Lane;
 import com.ako.dbuff.service.replay.file.ReplayTempCleaner;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.LongStream;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
@@ -17,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -46,7 +49,7 @@ class ReplayBatchServiceTest {
             ReplayStatus.PARTIAL,
             ReplayStatus.SKIPPED_NOT_SUPPORTED);
 
-    assertThat(batch.runBatch()).isEqualTo(2);
+    assertThat(batch.runBatch(true)).isEqualTo(2);
 
     verify(runService, times(4)).process(any());
   }
@@ -56,7 +59,7 @@ class ReplayBatchServiceTest {
     queueOf(5);
     when(runService.process(any())).thenReturn(ReplayStatus.FAILED_DOWNLOAD);
 
-    batch.runBatch();
+    batch.runBatch(true);
 
     verify(runService, times(3)).process(any());
   }
@@ -72,7 +75,7 @@ class ReplayBatchServiceTest {
             ReplayStatus.FAILED_DOWNLOAD,
             ReplayStatus.FAILED_DOWNLOAD);
 
-    batch.runBatch();
+    batch.runBatch(true);
 
     verify(runService, times(5)).process(any());
   }
@@ -82,7 +85,7 @@ class ReplayBatchServiceTest {
     queueOf(3);
     when(runService.process(any())).thenReturn(ReplayStatus.FAILED_TIMEOUT);
 
-    batch.runBatch();
+    batch.runBatch(true);
 
     verify(tempCleaner).sweep();
     verify(janitor).closeAbandoned();
@@ -94,7 +97,7 @@ class ReplayBatchServiceTest {
     queueOf(5);
     when(runService.process(any())).thenReturn(ReplayStatus.FAILED_RESOURCE);
 
-    batch.runBatch();
+    batch.runBatch(true);
 
     verify(runService, times(1)).process(any());
   }
@@ -116,9 +119,9 @@ class ReplayBatchServiceTest {
               return null;
             })
         .when(reportService)
-        .deliver(anyLong());
+        .deliverFinished(anyLong());
 
-    batch.runBatch();
+    batch.runBatch(true);
 
     assertThat(events).containsExactly("run1", "report1", "run2", "run3", "report3");
   }
@@ -127,9 +130,11 @@ class ReplayBatchServiceTest {
   void runBatch_keepsGoingWhenAReportCannotBeDelivered() {
     queueOf(2);
     when(runService.process(any())).thenReturn(ReplayStatus.DONE);
-    doThrow(new IllegalStateException("discord down")).when(reportService).deliver(anyLong());
+    doThrow(new IllegalStateException("discord down"))
+        .when(reportService)
+        .deliverFinished(anyLong());
 
-    assertThat(batch.runBatch()).isEqualTo(2);
+    assertThat(batch.runBatch(true)).isEqualTo(2);
 
     verify(runService, times(2)).process(any());
   }
@@ -138,28 +143,29 @@ class ReplayBatchServiceTest {
   void runBatch_asksForTheNextMatchOnlyAfterTheLastOneFinished() {
     MatchDomain first = match(1);
     MatchDomain arrived = match(9);
-    when(queue.next(anyInt()))
+    when(queue.next(anyInt(), any()))
         .thenReturn(Optional.of(new QueuedMatch(first, Lane.NEW)))
         .thenReturn(Optional.of(new QueuedMatch(arrived, Lane.FRESH)))
         .thenReturn(Optional.empty());
     when(runService.process(any())).thenReturn(ReplayStatus.DONE);
 
-    batch.runBatch();
+    batch.runBatch(true);
 
     InOrder order = inOrder(queue, runService);
-    order.verify(queue).next(anyInt());
+    order.verify(queue).next(anyInt(), any());
     order.verify(runService).process(first);
-    order.verify(queue).next(anyInt());
+    order.verify(queue).next(anyInt(), any());
     order.verify(runService).process(arrived);
   }
 
   @Test
   void runBatch_stopsAtBatchSize() {
     properties.setBatchSize(2);
-    when(queue.next(anyInt())).thenAnswer(call -> Optional.of(new QueuedMatch(match(1), Lane.NEW)));
+    when(queue.next(anyInt(), any()))
+        .thenAnswer(call -> Optional.of(new QueuedMatch(match(1), Lane.NEW)));
     when(runService.process(any())).thenReturn(ReplayStatus.DONE);
 
-    batch.runBatch();
+    batch.runBatch(true);
 
     verify(runService, times(2)).process(any());
   }
@@ -167,14 +173,42 @@ class ReplayBatchServiceTest {
   @Test
   void runBatch_countsBacklogMatchesAgainstTheBacklogBatchSize() {
     properties.getBacklog().setBatchSize(2);
-    when(queue.next(anyInt()))
+    when(queue.next(anyInt(), any()))
         .thenAnswer(call -> Optional.of(new QueuedMatch(match(1), Lane.BACKLOG)));
     when(runService.process(any())).thenReturn(ReplayStatus.DONE);
 
-    batch.runBatch();
+    batch.runBatch(true);
 
-    verify(queue).next(2);
-    verify(queue).next(1);
+    verify(queue).next(eq(2), any());
+    verify(queue).next(eq(1), any());
+  }
+
+  @Test
+  void runBatch_neverOffersABacklogMatchWhenTheRunIsATriggeredOne() {
+    when(queue.next(anyInt(), any())).thenReturn(Optional.empty());
+
+    batch.runBatch(false);
+
+    verify(queue).next(eq(0), any());
+  }
+
+  @Test
+  void runBatch_excludesMatchesItAlreadyTookFromLaterQueueCalls() {
+    List<Set<Long>> seen = new ArrayList<>();
+    when(queue.next(anyInt(), any()))
+        .thenAnswer(
+            call -> {
+              Set<Long> attempted = new HashSet<>(call.<Set<Long>>getArgument(1));
+              seen.add(attempted);
+              return attempted.size() < 2
+                  ? Optional.of(new QueuedMatch(match(attempted.size() + 1), Lane.NEW))
+                  : Optional.empty();
+            });
+    when(runService.process(any())).thenReturn(ReplayStatus.FAILED_TIMEOUT);
+
+    batch.runBatch(true);
+
+    assertThat(seen).containsExactly(Set.of(), Set.of(1L), Set.of(1L, 2L));
   }
 
   private void queueOf(int count) {
@@ -182,7 +216,7 @@ class ReplayBatchServiceTest {
         LongStream.rangeClosed(1, count)
             .mapToObj(id -> new QueuedMatch(match(id), Lane.NEW))
             .iterator();
-    when(queue.next(anyInt()))
+    when(queue.next(anyInt(), any()))
         .thenAnswer(call -> iterator.hasNext() ? Optional.of(iterator.next()) : Optional.empty());
   }
 

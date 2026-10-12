@@ -5,7 +5,9 @@ import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.service.replay.QueuedMatch.Lane;
 import com.ako.dbuff.service.replay.file.ReplayTempCleaner;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,24 +28,28 @@ public class ReplayBatchService {
 
   /**
    * Takes one match at a time from the queue, so a match that turns fresh meanwhile goes next, and
-   * posts each match's report as soon as its run ends.
+   * posts each match's report as soon as its run ends. A match is taken at most once per run.
    *
+   * @param backlogAllowed whether this run may take backlog matches; a run triggered by a new
+   *     replay must not
    * @return number of matches whose run ended DONE or PARTIAL
    */
-  public int runBatch() {
+  public int runBatch(boolean backlogAllowed) {
     tempCleaner.sweep();
     janitor.closeAbandoned();
-    int backlogRoom = properties.getBacklog().getBatchSize();
+    int backlogRoom = backlogAllowed ? properties.getBacklog().getBatchSize() : 0;
+    Set<Long> attempted = new HashSet<>();
     int taken = 0;
     int stored = 0;
     int downloadFailures = 0;
     while (taken < properties.getBatchSize()) {
-      Optional<QueuedMatch> next = queue.next(backlogRoom);
+      Optional<QueuedMatch> next = queue.next(backlogRoom, attempted);
       if (next.isEmpty()) {
         break;
       }
       taken++;
       MatchDomain match = next.get().match();
+      attempted.add(match.getId());
       if (next.get().lane() == Lane.BACKLOG) {
         backlogRoom--;
       }
@@ -67,7 +73,7 @@ public class ReplayBatchService {
 
   private void deliverReport(long matchId) {
     try {
-      reportService.deliver(matchId);
+      reportService.deliverFinished(matchId);
     } catch (RuntimeException e) {
       log.error("Replay report delivery for match {} failed: {}", matchId, e.getMessage(), e);
     }

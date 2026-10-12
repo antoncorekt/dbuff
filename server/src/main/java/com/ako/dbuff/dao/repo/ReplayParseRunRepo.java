@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -20,12 +21,15 @@ public interface ReplayParseRunRepo extends JpaRepository<ReplayParseRunDomain, 
   List<ReplayParseRunDomain> findByParserVersionAndStatusInOrderByMatchId(
       Integer parserVersion, java.util.Collection<ReplayStatus> statuses);
 
-  /** Runs of this parser version that finished with analysis stored since the given time. */
+  /**
+   * Runs of this parser version that finished with analysis stored since the given time: DONE, and
+   * PARTIAL only once no retry is left, so a report is not posted from data a retry may complete.
+   */
   @Query(
       """
       select r from ReplayParseRunDomain r
       where r.parserVersion = :version
-        and r.status in ('DONE', 'PARTIAL')
+        and (r.status = 'DONE' or (r.status = 'PARTIAL' and r.nextAttemptAt is null))
         and r.finishedAt >= :since
       order by r.finishedAt
       """)
@@ -42,50 +46,51 @@ public interface ReplayParseRunRepo extends JpaRepository<ReplayParseRunDomain, 
              or (r.status = 'RUNNING' and r.leaseUntil < :now and r.attempts < :maxAttempts))
       """;
 
-  String NEWEST_FIRST = " order by m.startTime desc";
+  String NEWEST_FIRST = " and m.id not in :excluded order by m.startTime desc";
 
   /**
-   * Matches whose run may be tried again (due retries, abandoned leases) mapped within the fresh
-   * window.
+   * Due retries of matches mapped within the fresh window that also started after {@code
+   * startedAfter}; abandoned leases count as due.
    */
-  @Query(DUE_RETRY + " and m.detailsMappedAt >= :freshAfter" + NEWEST_FIRST)
+  @Query(
+      DUE_RETRY
+          + " and m.detailsMappedAt >= :freshAfter and m.startTime > :startedAfter"
+          + NEWEST_FIRST)
   List<MatchDomain> findDueFreshRetries(
       @Param("version") Integer version,
       @Param("now") LocalDateTime now,
       @Param("maxAttempts") Integer maxAttempts,
       @Param("freshAfter") LocalDateTime freshAfter,
+      @Param("startedAfter") Long startedAfter,
+      @Param("excluded") Collection<Long> excluded,
       Pageable pageable);
 
-  /** Due retries past the fresh window that are still young and have few attempts. */
+  /** Due retries of matches mapped within the young window that have few attempts. */
   @Query(
       DUE_RETRY
-          + " and m.detailsMappedAt < :freshAfter and m.detailsMappedAt >= :youngAfter"
-          + " and r.attempts <= :youngAttempts"
+          + " and m.detailsMappedAt >= :youngAfter and r.attempts <= :youngAttempts"
           + NEWEST_FIRST)
   List<MatchDomain> findDueYoungRetries(
       @Param("version") Integer version,
       @Param("now") LocalDateTime now,
       @Param("maxAttempts") Integer maxAttempts,
-      @Param("freshAfter") LocalDateTime freshAfter,
       @Param("youngAfter") LocalDateTime youngAfter,
       @Param("youngAttempts") Integer youngAttempts,
+      @Param("excluded") Collection<Long> excluded,
       Pageable pageable);
 
-  /**
-   * Due retries past the fresh window that are older than the young limit or have many attempts.
-   */
+  /** Due retries older than the young window or with many attempts. */
   @Query(
       DUE_RETRY
-          + " and m.detailsMappedAt < :freshAfter"
           + " and (m.detailsMappedAt < :youngAfter or r.attempts > :youngAttempts)"
           + NEWEST_FIRST)
   List<MatchDomain> findDueOldRetries(
       @Param("version") Integer version,
       @Param("now") LocalDateTime now,
       @Param("maxAttempts") Integer maxAttempts,
-      @Param("freshAfter") LocalDateTime freshAfter,
       @Param("youngAfter") LocalDateTime youngAfter,
       @Param("youngAttempts") Integer youngAttempts,
+      @Param("excluded") Collection<Long> excluded,
       Pageable pageable);
 
   @Query(

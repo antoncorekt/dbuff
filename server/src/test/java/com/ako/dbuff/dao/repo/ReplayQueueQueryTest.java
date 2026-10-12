@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -47,6 +48,7 @@ class ReplayQueueQueryTest {
                 List.of(18L, 22L),
                 NOW.minusDays(1),
                 NOW.plusDays(1),
+                Set.of(-1L),
                 PageRequest.of(0, 10))
             .stream()
             .map(MatchDomain::getId)
@@ -69,6 +71,7 @@ class ReplayQueueQueryTest {
   @Test
   void dueRetryQueries_splitRetriesByMatchAgeAndAttempts() {
     LocalDateTime freshAfter = NOW.minusHours(6);
+    Set<Long> none = Set.of(-1L);
     LocalDateTime youngAfter = NOW.minusHours(24);
     retry(1L, 1_100L, NOW.minusHours(1), 4);
     retry(2L, 1_200L, NOW.minusHours(10), 2);
@@ -77,18 +80,31 @@ class ReplayQueueQueryTest {
     retry(5L, 1_500L, NOW.minusHours(12), 1);
     retry(6L, 1_600L, NOW.minusHours(2), 1);
 
-    assertThat(ids(runRepo.findDueFreshRetries(VERSION, NOW, 5, freshAfter, PageRequest.of(0, 10))))
+    assertThat(
+            ids(
+                runRepo.findDueFreshRetries(
+                    VERSION, NOW, 5, freshAfter, 0L, none, PageRequest.of(0, 10))))
         .containsExactly(6L, 1L);
     assertThat(
             ids(
+                runRepo.findDueFreshRetries(
+                    VERSION, NOW, 5, freshAfter, 1_450L, none, PageRequest.of(0, 10))))
+        .containsExactly(6L);
+    assertThat(
+            ids(
+                runRepo.findDueFreshRetries(
+                    VERSION, NOW, 5, freshAfter, 0L, Set.of(6L), PageRequest.of(0, 10))))
+        .containsExactly(1L);
+    assertThat(
+            ids(
                 runRepo.findDueYoungRetries(
-                    VERSION, NOW, 5, freshAfter, youngAfter, 2, PageRequest.of(0, 10))))
-        .containsExactly(5L, 2L);
+                    VERSION, NOW, 5, youngAfter, 2, none, PageRequest.of(0, 10))))
+        .containsExactly(6L, 5L, 2L);
     assertThat(
             ids(
                 runRepo.findDueOldRetries(
-                    VERSION, NOW, 5, freshAfter, youngAfter, 2, PageRequest.of(0, 10))))
-        .containsExactly(4L, 3L);
+                    VERSION, NOW, 5, youngAfter, 2, none, PageRequest.of(0, 10))))
+        .containsExactly(4L, 3L, 1L);
   }
 
   @Test
@@ -115,7 +131,9 @@ class ReplayQueueQueryTest {
     run(7L, VERSION + 1, ReplayStatus.FAILED_RESOURCE, NOW.minusMinutes(1), null);
 
     List<Long> ids =
-        ids(runRepo.findDueFreshRetries(VERSION, NOW, 5, NOW.minusHours(6), PageRequest.of(0, 10)));
+        ids(
+            runRepo.findDueFreshRetries(
+                VERSION, NOW, 5, NOW.minusHours(6), 0L, Set.of(-1L), PageRequest.of(0, 10)));
 
     assertThat(ids).containsExactly(9L, 8L, 4L, 1L);
   }
@@ -123,7 +141,7 @@ class ReplayQueueQueryTest {
   private List<Long> newIds(LocalDateTime from, LocalDateTime before) {
     return matchRepo
         .findMatchesWithoutReplayRun(
-            VERSION, 1_000L, List.of(18L, 22L), from, before, PageRequest.of(0, 10))
+            VERSION, 1_000L, List.of(18L, 22L), from, before, Set.of(-1L), PageRequest.of(0, 10))
         .stream()
         .map(MatchDomain::getId)
         .toList();

@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -79,7 +80,7 @@ class ReplayQueueTest {
     match(1L, 12, 12);
     retry(1L, 1, LocalDateTime.now().plusHours(1));
 
-    assertThat(queue.next(0)).isEmpty();
+    assertThat(queue.next(0, Set.of())).isEmpty();
   }
 
   @Test
@@ -90,7 +91,8 @@ class ReplayQueueTest {
 
     assertThat(drain(5)).containsExactly(2L);
     properties.getBacklog().setEnabled(true);
-    assertThat(queue.next(1).map(QueuedMatch::match).map(MatchDomain::getId)).contains(1L);
+    assertThat(queue.next(1, Set.of()).map(QueuedMatch::match).map(MatchDomain::getId))
+        .contains(1L);
   }
 
   @Test
@@ -99,7 +101,7 @@ class ReplayQueueTest {
     match(2L, 40, 40);
     retry(2L, 1);
 
-    assertThat(queue.next(5)).isEmpty();
+    assertThat(queue.next(5, Set.of())).isEmpty();
   }
 
   @Test
@@ -124,7 +126,7 @@ class ReplayQueueTest {
     properties.getBacklog().setEnabled(true);
     match(1L, 30, 30);
 
-    assertThat(queue.next(0)).isEmpty();
+    assertThat(queue.next(0, Set.of())).isEmpty();
   }
 
   @Test
@@ -132,9 +134,9 @@ class ReplayQueueTest {
     match(1L, 12, 12);
     match(2L, 14, 14);
 
-    assertThat(queue.next(0).orElseThrow().match().getId()).isEqualTo(1L);
+    assertThat(queue.next(0, Set.of()).orElseThrow().match().getId()).isEqualTo(1L);
     match(3L, 0, 0);
-    assertThat(queue.next(0).orElseThrow().match().getId()).isEqualTo(3L);
+    assertThat(queue.next(0, Set.of()).orElseThrow().match().getId()).isEqualTo(3L);
   }
 
   @Test
@@ -148,7 +150,32 @@ class ReplayQueueTest {
             .attempts(1)
             .build());
 
-    assertThat(queue.next(0)).isEmpty();
+    assertThat(queue.next(0, Set.of())).isEmpty();
+  }
+
+  @Test
+  void next_neverHandsOutAnExcludedMatch() {
+    match(1L, 1, 1);
+    match(2L, 2, 2);
+
+    assertThat(queue.next(0, Set.of(1L)).orElseThrow().match().getId()).isEqualTo(2L);
+    assertThat(queue.next(0, Set.of(1L, 2L))).isEmpty();
+  }
+
+  @Test
+  void next_leavesFreshLaneToMatchesThatStartedRecentlyEvenWhenMappedLately() {
+    match(1L, 30, 1);
+    match(2L, 12, 12);
+
+    assertThat(lanes(2)).containsExactly(entry(2L, Lane.NEW), entry(1L, Lane.NEW));
+  }
+
+  @Test
+  void next_keepsARetryOfAnOldMatchMappedLatelyOutOfTheFreshLane() {
+    match(1L, 30, 1);
+    retry(1L, 1);
+
+    assertThat(lanes(1)).containsExactly(entry(1L, Lane.YOUNG_RETRY));
   }
 
   private List<Long> drain(int max) {
@@ -158,7 +185,7 @@ class ReplayQueueTest {
   private List<Entry> lanes(int max) {
     List<Entry> taken = new ArrayList<>();
     for (int i = 0; i < max; i++) {
-      Optional<QueuedMatch> next = queue.next(max);
+      Optional<QueuedMatch> next = queue.next(max, Set.of());
       if (next.isEmpty()) {
         break;
       }
