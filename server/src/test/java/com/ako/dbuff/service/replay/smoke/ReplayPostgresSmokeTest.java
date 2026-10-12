@@ -9,6 +9,7 @@ import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.dao.repo.AbilityDraftPoolRepo;
 import com.ako.dbuff.dao.repo.BuybackEventRepo;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
+import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
 import com.ako.dbuff.dao.repo.GameStateSegmentRepo;
@@ -80,6 +81,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private PlayerActivitySegmentRepo activityRepo;
   @Autowired private FightRepo fightRepo;
   @Autowired private DeathAnalysisRepo deathRepo;
+  @Autowired private FightReasonRepo reasonRepo;
   @Autowired private BuybackEventRepo buybackRepo;
   @Autowired private PlayerPhaseSummaryRepo phaseRepo;
   @Autowired private GameSpikeRepo spikeRepo;
@@ -121,6 +123,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertThat(activityRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(fightRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(deathRepo.findByMatchId(match.getId())).hasSizeGreaterThan(40);
+      assertThat(reasonRepo.findByMatchId(match.getId())).as("%s: fight reasons", id).isNotEmpty();
       assertThat(phaseRepo.findByMatchId(match.getId())).hasSizeGreaterThanOrEqualTo(20);
       assertThat(roleRepo.findByMatchId(match.getId()))
           .as("%s: each team has each role once", id)
@@ -168,6 +171,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(deathRepo.findByMatchId(Long.parseLong(MATCHES[0]))).hasSizeGreaterThan(40);
     dataService.deleteByMatchId(Long.parseLong(MATCHES[0]));
     assertThat(deathRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
+    assertThat(reasonRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
   }
 
   @Test
@@ -191,6 +195,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .containsExactlyInAnyOrder(1, 2, 3, 4, 5, 11, 12, 13, 14, 15);
       List<PlayerRoleProfileDomain> profiles = roleProfileRepo.findByMatchId(match.getId());
       assertThat(profiles).as("%s: intent and final profiles", id).hasSize(20);
+      assertThat(reasonRepo.findByMatchId(match.getId())).as("%s: fight reasons", id).isNotEmpty();
       assertThat(compositionRepo.findByMatchId(match.getId()))
           .as("%s: a pick and a final verdict per team", id)
           .extracting(c -> c.getTeam() + " " + c.getStage())

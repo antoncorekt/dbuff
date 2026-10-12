@@ -1,0 +1,191 @@
+package com.ako.dbuff.service.replay.analysis.reason;
+
+import com.ako.dbuff.dao.model.DeathAnalysisDomain;
+import com.ako.dbuff.dao.model.FightAbilityUseDomain;
+import com.ako.dbuff.dao.model.FightDomain;
+import com.ako.dbuff.dao.model.FightPlayerDomain;
+import com.ako.dbuff.dao.model.FightReasonDomain;
+import com.ako.dbuff.dao.model.MatchDomain;
+import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
+import com.ako.dbuff.dao.repo.FightAbilityUseRepo;
+import com.ako.dbuff.dao.repo.FightPlayerRepo;
+import com.ako.dbuff.dao.repo.FightReasonRepo;
+import com.ako.dbuff.dao.repo.FightRepo;
+import com.ako.dbuff.service.replay.ReplayProcessingProperties;
+import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
+import com.ako.dbuff.service.replay.mode.AllPickProfile;
+import com.ako.dbuff.service.replay.mode.GameModeProfile;
+import com.ako.dbuff.service.replay.mode.GameModeRegistry;
+import com.ako.dbuff.service.replay.mode.StoredMatchModes;
+import jakarta.persistence.EntityManager;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@DataJpaTest
+@ActiveProfiles("test")
+@Import({
+  FightReasonAnalyzer.class,
+  AbsenceReasonContributor.class,
+  AbilityNonCastReasonContributor.class,
+  DeathReasonContributor.class,
+  ReasonProperties.class,
+  StoredMatchModes.class,
+  GameModeRegistry.class,
+  ReplayProcessingProperties.class,
+  AllPickProfile.class,
+  AbilityDraftProfile.class,
+  FightReasonAnalyzerTest.DraftOnly.class
+})
+class FightReasonAnalyzerTest {
+  private static final long ALL_PICK_MATCH = 51L;
+  private static final long DRAFT_MATCH = 52L;
+  private static final long UNKNOWN_MODE_MATCH = 53L;
+
+  @TestConfiguration
+  static class DraftOnly {
+    @Bean
+    ReasonContributor draftOnly() {
+      return new ReasonContributor() {
+        @Override
+        public boolean supports(GameModeProfile mode) {
+          return mode.gameModeId() == AbilityDraftProfile.MODE_ID;
+        }
+
+        @Override
+        public List<Reason> contribute(FightContext context) {
+          return List.of(Reason.player("ABILITY_DRAFT", "WEAK_COMBINATION", 0, 0.6, "test"));
+        }
+      };
+    }
+  }
+
+  @Autowired private FightReasonAnalyzer analyzer;
+  @Autowired private FightReasonRepo reasonRepo;
+  @Autowired private FightRepo fightRepo;
+  @Autowired private FightPlayerRepo fightPlayerRepo;
+  @Autowired private FightAbilityUseRepo useRepo;
+  @Autowired private DeathAnalysisRepo deathRepo;
+  @Autowired private EntityManager entityManager;
+
+  private void stored(long matchId, long mode) {
+    entityManager.persist(MatchDomain.builder().id(matchId).gameModeId(mode).build());
+    fightRepo.save(FightDomain.builder().matchId(matchId).fightIndex(0).build());
+    fightRepo.save(FightDomain.builder().matchId(matchId).fightIndex(1).build());
+    fightPlayerRepo.save(
+        FightPlayerDomain.builder()
+            .matchId(matchId)
+            .fightIndex(0)
+            .playerSlot(0L)
+            .presence("ABSENT_FAR")
+            .absenceReason("NO_TP")
+            .build());
+    fightPlayerRepo.save(
+        FightPlayerDomain.builder()
+            .matchId(matchId)
+            .fightIndex(1)
+            .playerSlot(128L)
+            .presence("ACTIVE")
+            .build());
+    useRepo.save(
+        FightAbilityUseDomain.builder()
+            .matchId(matchId)
+            .fightIndex(1)
+            .playerSlot(128L)
+            .abilityName("item_blink")
+            .kind("ITEM")
+            .nonCastReason("ON_COOLDOWN")
+            .build());
+    deathRepo.save(
+        DeathAnalysisDomain.builder()
+            .matchId(matchId)
+            .playerSlot(128L)
+            .deathIndex(0)
+            .deathSeconds(300.0)
+            .killerKind("HERO")
+            .fightIndex(1)
+            .reason("TOWER")
+            .reincarnated(false)
+            .build());
+    deathRepo.save(
+        DeathAnalysisDomain.builder()
+            .matchId(matchId)
+            .playerSlot(129L)
+            .deathIndex(0)
+            .deathSeconds(100.0)
+            .killerKind("TOWER")
+            .reason("TOWER")
+            .reincarnated(false)
+            .build());
+    entityManager.flush();
+  }
+
+  @Test
+  void everyFightGetsTheReasonsOfItsOwnRows_andASecondRunReplacesTheFirst() {
+    stored(ALL_PICK_MATCH, 22);
+
+    analyzer.analyze(ALL_PICK_MATCH);
+    analyzer.analyze(ALL_PICK_MATCH);
+
+    List<FightReasonDomain> rows = reasonRepo.findByMatchId(ALL_PICK_MATCH);
+    assertThat(rows)
+        .extracting(r -> r.getFightIndex() + "/" + r.getSubjectSlot() + "/" + r.getCode())
+        .containsExactlyInAnyOrder("0/0/NO_TP", "1/128/ITEM_ON_COOLDOWN", "1/128/TOWER");
+    assertThat(rows)
+        .allSatisfy(
+            r -> {
+              assertThat(r.getScope()).isEqualTo("PLAYER");
+              assertThat(r.getSource()).isEqualTo("COMMON");
+              assertThat(r.getAnalysisVersion()).isEqualTo(1);
+            });
+    assertThat(rows)
+        .filteredOn(r -> r.getSubjectSlot() == 128L)
+        .allSatisfy(r -> assertThat(r.getTeam()).isEqualTo("DIRE"));
+  }
+
+  @Test
+  void aContributorOfAnotherModeIsLeftOut_andOneOfTheModeRunsWithoutChangingTheAnalyzer() {
+    stored(ALL_PICK_MATCH, 22);
+    stored(DRAFT_MATCH, 18);
+
+    analyzer.analyze(ALL_PICK_MATCH);
+    analyzer.analyze(DRAFT_MATCH);
+
+    assertThat(reasonRepo.findByMatchId(ALL_PICK_MATCH))
+        .extracting(FightReasonDomain::getCode)
+        .doesNotContain("WEAK_COMBINATION");
+    assertThat(reasonRepo.findByMatchId(DRAFT_MATCH))
+        .filteredOn(r -> r.getCode().equals("WEAK_COMBINATION"))
+        .hasSize(2)
+        .allSatisfy(r -> assertThat(r.getSource()).isEqualTo("ABILITY_DRAFT"));
+  }
+
+  @Test
+  void aMatchWithoutAnActiveModeGetsNothing() {
+    stored(UNKNOWN_MODE_MATCH, 99);
+
+    analyzer.analyze(UNKNOWN_MODE_MATCH);
+
+    assertThat(reasonRepo.findByMatchId(UNKNOWN_MODE_MATCH)).isEmpty();
+  }
+
+  @Test
+  void deleteRemovesOnlyThatMatch() {
+    stored(ALL_PICK_MATCH, 22);
+    stored(DRAFT_MATCH, 18);
+    analyzer.analyze(ALL_PICK_MATCH);
+    analyzer.analyze(DRAFT_MATCH);
+
+    analyzer.deleteByMatchId(ALL_PICK_MATCH);
+
+    assertThat(reasonRepo.findByMatchId(ALL_PICK_MATCH)).isEmpty();
+    assertThat(reasonRepo.findByMatchId(DRAFT_MATCH)).isNotEmpty();
+  }
+}
