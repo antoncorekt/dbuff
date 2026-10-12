@@ -69,18 +69,27 @@ public class ReplayResources {
     if (run == null || !ANALYSED.contains(run.getStatus())) {
       return ResponseEntity.notFound().build();
     }
-    List<String> failed = analysis.analyze(matchId, List.of());
-    log.info("Re-analysed replay of match {}, failed analyzers: {}", matchId, failed);
-    return ResponseEntity.ok(Map.of("matchId", matchId, "failedAnalyzers", failed));
+    if (!reanalysing.compareAndSet(false, true)) {
+      return ResponseEntity.status(HttpStatus.CONFLICT)
+          .body(Map.of("error", "A re-analysis is already running"));
+    }
+    try {
+      List<String> failed = analysis.analyze(matchId, List.of());
+      log.info("Re-analysed replay of match {}, failed analyzers: {}", matchId, failed);
+      return ResponseEntity.ok(Map.of("matchId", matchId, "failedAnalyzers", failed));
+    } finally {
+      reanalysing.set(false);
+    }
   }
 
   /**
-   * Runs every analyzer again for the finished runs, up to {@code limit} (1 to 500), oldest match
-   * first. One call at a time.
+   * Runs every analyzer again for the finished runs of matches after {@code after}, up to {@code
+   * limit} (1 to 500), oldest match first, and says the last match id it reached so the next call
+   * can continue from there. One re-analysis at a time, bulk or single.
    */
   @PostMapping("/reanalyze")
   public ResponseEntity<Map<String, Object>> reanalyzeAll(
-      @RequestParam(defaultValue = "100") int limit) {
+      @RequestParam(defaultValue = "100") int limit, @RequestParam(defaultValue = "0") long after) {
     if (limit < 1 || limit > MAX_LIMIT) {
       return ResponseEntity.badRequest().body(Map.of("error", "limit must be 1 to " + MAX_LIMIT));
     }
@@ -94,8 +103,11 @@ public class ReplayResources {
               properties.getParserVersion(), ANALYSED);
       int done = 0;
       int withFailures = 0;
-      for (ReplayParseRunDomain run : runs.stream().limit(limit).toList()) {
+      long last = after;
+      for (ReplayParseRunDomain run :
+          runs.stream().filter(r -> r.getMatchId() > after).limit(limit).toList()) {
         done++;
+        last = run.getMatchId();
         if (failed(run.getMatchId())) {
           withFailures++;
         }
@@ -103,7 +115,11 @@ public class ReplayResources {
       log.info(
           "Re-analysed {} of {} replay runs, {} with failures", done, runs.size(), withFailures);
       return ResponseEntity.ok(
-          Map.of("analysed", done, "available", runs.size(), "withFailures", withFailures));
+          Map.of(
+              "analysed", done,
+              "available", runs.size(),
+              "withFailures", withFailures,
+              "lastMatchId", last));
     } finally {
       reanalysing.set(false);
     }

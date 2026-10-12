@@ -184,12 +184,12 @@ class ReplayReportServiceTest {
   }
 
   @Test
-  void deliver_recordsAThatIsGoneWithoutPosting() {
+  void deliver_triesAgainLaterWhenTheThreadCannotBeFoundNow() {
     when(discord.getThreadById(9L)).thenReturn(null);
 
     service.deliver(1L);
 
     verify(discord, never()).sendThreadMessageBlocking(any(), any());
-    verify(postedRepo).save(any());
+    verify(postedRepo, never()).save(any());
   }
 }

@@ -126,10 +126,16 @@ public class ReplayReportService {
       return;
     }
     List<String> messages = messages(match, stats, instance, settings);
-    ThreadChannel channel = messages.isEmpty() ? null : discord.getThreadById(thread.getThreadId());
-    if (!messages.isEmpty() && channel == null) {
-      log.warn("Discord thread {} of match {} is gone", thread.getThreadId(), match.getId());
-      messages = List.of();
+    if (messages.isEmpty()) {
+      return;
+    }
+    ThreadChannel channel = discord.getThreadById(thread.getThreadId());
+    if (channel == null) {
+      log.debug(
+          "Discord thread {} of match {} not found, will try again",
+          thread.getThreadId(),
+          match.getId());
+      return;
     }
     postedRepo.save(
         ReplayReportPostedDomain.builder()
