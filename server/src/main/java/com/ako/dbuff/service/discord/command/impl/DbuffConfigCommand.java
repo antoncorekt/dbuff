@@ -404,20 +404,9 @@ public class DbuffConfigCommand implements DbuffCommand {
     }
 
     Boolean aiSummary = parseSwitch(context.getOption("ai_summary"));
-    if (context.getOption("ai_summary") != null && aiSummary == null) {
-      context.replyEphemeral(
-          "❌ Could not read `ai_summary` value `"
-              + context.getOption("ai_summary")
-              + "`. Use true or false.");
-      return;
-    }
-
     Boolean replayReport = parseSwitch(context.getOption("replay_report"));
-    if (context.getOption("replay_report") != null && replayReport == null) {
-      context.replyEphemeral(
-          "❌ Could not read `replay_report` value `"
-              + context.getOption("replay_report")
-              + "`. Use true or false.");
+    if (unreadableSwitch(context, "ai_summary", aiSummary)
+        || unreadableSwitch(context, "replay_report", replayReport)) {
       return;
     }
 
@@ -458,6 +447,20 @@ public class DbuffConfigCommand implements DbuffCommand {
             .setDescription(describeSettings(current.getSettings()))
             .setColor(EMBED_COLOR)
             .build());
+  }
+
+  /** Tells the user an option they gave is not a switch; true when it was refused. */
+  private static boolean unreadableSwitch(CommandContext context, String option, Boolean parsed) {
+    if (context.getOption(option) == null || parsed != null) {
+      return false;
+    }
+    context.replyEphemeral(
+        "❌ Could not read `"
+            + option
+            + "` value `"
+            + context.getOption(option)
+            + "`. Use true or false.");
+    return true;
   }
 
   /** True/on/yes/1 and false/off/no/0, since the text surface passes the raw word through. */

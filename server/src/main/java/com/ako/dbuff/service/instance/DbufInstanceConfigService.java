@@ -108,9 +108,7 @@ public class DbufInstanceConfigService {
     domain.setUpdatedAt(now);
     InstanceSettings settings = domain.effectiveSettings();
     settingsApplier.seedDefaultModes(settings, request.getGameModes());
-    if (settings.getReplayReportEnabled() == null) {
-      settings.setReplayReportEnabled(true);
-    }
+    settings.setReplayReportEnabled(true);
     domain.setSettings(settings);
     domain.setTrackingSince(now);
     domain.getPlayerTrackingSince().clear();
