@@ -15,6 +15,8 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -189,6 +191,38 @@ class ReplayQueueTest {
   }
 
   @Test
+  void next_handsOutTheRetryOfAnActiveModeMatchInEachRetryLane() {
+    properties.getBacklog().setEnabled(true);
+    properties.setSupportedModes(List.of(18L, 23L));
+    match(1L, 1, 1, 18L);
+    retry(1L, 1);
+    match(2L, 30, 1, 18L);
+    retry(2L, 1);
+    match(3L, 40, 40, 18L);
+    retry(3L, 1);
+
+    assertThat(lanes(3))
+        .containsExactly(
+            entry(1L, Lane.FRESH), entry(2L, Lane.YOUNG_RETRY), entry(3L, Lane.BACKLOG));
+  }
+
+  @ParameterizedTest
+  @CsvSource({"1,1", "30,1", "40,40"})
+  void next_leavesOutTheRetryOfAnInactiveOrUnsetModeMatchInEveryRetryLane(
+      int startedHoursAgo, int mappedHoursAgo) {
+    properties.getBacklog().setEnabled(true);
+    properties.setSupportedModes(List.of(18L, 23L));
+    match(1L, startedHoursAgo, mappedHoursAgo, 22L);
+    retry(1L, 1);
+    match(2L, startedHoursAgo, mappedHoursAgo, null);
+    retry(2L, 1);
+    match(3L, startedHoursAgo, mappedHoursAgo, 23L);
+    retry(3L, 1);
+
+    assertThat(queue.next(5, Set.of())).isEmpty();
+  }
+
+  @Test
   void next_hasNothingWhenNoModeIsActive() {
     properties.setSupportedModes(List.of(23L));
     match(1L, 1, 1);
@@ -241,7 +275,7 @@ class ReplayQueueTest {
     match(id, startedHoursAgo, mappedHoursAgo, 18L);
   }
 
-  private void match(long id, int startedHoursAgo, int mappedHoursAgo, long gameModeId) {
+  private void match(long id, int startedHoursAgo, int mappedHoursAgo, Long gameModeId) {
     MatchDomain match = new MatchDomain();
     match.setId(id);
     match.setStartTime(nowSeconds - startedHoursAgo * HOUR);

@@ -85,6 +85,7 @@ public class ReplayQueue {
                 properties.getMaxAttempts(),
                 window.freshAfter(),
                 startedAfter,
+                window.modes(),
                 window.excluded(),
                 ONE));
     Optional<MatchDomain> unseen = newMatch(window, window.freshAfter(), FOREVER, startedAfter);
@@ -102,6 +103,7 @@ public class ReplayQueue {
             properties.getMaxAttempts(),
             window.youngAfter(),
             properties.getRetryPriorityAttempts(),
+            window.modes(),
             window.excluded(),
             ONE));
   }
@@ -114,6 +116,7 @@ public class ReplayQueue {
             properties.getMaxAttempts(),
             window.youngAfter(),
             properties.getRetryPriorityAttempts(),
+            window.modes(),
             window.excluded(),
             ONE));
   }
