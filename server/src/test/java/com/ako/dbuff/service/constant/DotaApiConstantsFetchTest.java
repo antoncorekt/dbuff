@@ -1,7 +1,7 @@
 package com.ako.dbuff.service.constant;
 
-import com.ako.dbuff.config.DotaApiConfig.DotaApiConfigurationProperties;
 import com.ako.dbuff.config.DotaApiConfig;
+import com.ako.dbuff.config.DotaApiConfig.DotaApiConfigurationProperties;
 import com.ako.dbuff.config.DotaApiConstant;
 import com.ako.dbuff.dao.repo.ConstantDomainRepo;
 import com.ako.dbuff.dotapi.api.ConstantsApi;
