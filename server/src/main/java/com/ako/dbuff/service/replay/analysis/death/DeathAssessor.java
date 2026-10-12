@@ -62,6 +62,8 @@ public final class DeathAssessor {
    * @param reincarnationSeconds alive this long after dying means Aegis or reincarnation
    * @param outOfPositionRanks standing this many places further forward than his attack range
    *     suggests, in the fight he died in, is being out of position
+   * @param noBkbMinSeconds before this game second a missing BKB is no explanation: nobody can have
+   *     afforded one
    */
   public record Tuning(
       int lookbackSeconds,
@@ -69,7 +71,8 @@ public final class DeathAssessor {
       int isolationRadius,
       int disableSeconds,
       int reincarnationSeconds,
-      int outOfPositionRanks) {}
+      int outOfPositionRanks,
+      int noBkbMinSeconds) {}
 
   /** A hero death from the combat log. {@code killerFlags} are the CombatEvent flag bits. */
   public record Death(
@@ -196,7 +199,8 @@ public final class DeathAssessor {
             disabled,
             isolated,
             frontlineDelta != null && frontlineDelta <= -tuning.outOfPositionRanks(),
-            lastThree);
+            lastThree,
+            death.second() >= tuning.noBkbMinSeconds());
     return new Assessment(
         kind,
         position == null ? null : position[0],
@@ -233,7 +237,8 @@ public final class DeathAssessor {
       double disabled,
       boolean isolated,
       boolean outOfPosition,
-      long lastThree) {
+      long lastThree,
+      boolean bkbAffordable) {
     if (reincarnated) {
       return DeathReason.REINCARNATED;
     }
@@ -264,7 +269,9 @@ public final class DeathAssessor {
     if (outOfPosition) {
       return DeathReason.OUT_OF_POSITION;
     }
-    return !owned && kind == KillerKind.HERO ? DeathReason.NO_BKB : DeathReason.OTHER;
+    return !owned && bkbAffordable && kind == KillerKind.HERO
+        ? DeathReason.NO_BKB
+        : DeathReason.OTHER;
   }
 
   private static KillerKind kind(Death death) {

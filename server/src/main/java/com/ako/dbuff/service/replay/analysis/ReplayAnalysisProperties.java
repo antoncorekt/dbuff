@@ -64,6 +64,9 @@ public class ReplayAnalysisProperties {
   /** A hero this many places further forward than his attack range suggests was out of position. */
   private int deathOutOfPositionRanks = 2;
 
+  /** Before this game second a death with no BKB is not blamed on it; BKB costs 4050 gold. */
+  private int deathNoBkbMinSeconds = 720;
+
   /** A team is ahead from this share of both teams' net worth together, in percent. */
   private int teamAheadPercent = 5;
 
@@ -137,7 +140,8 @@ public class ReplayAnalysisProperties {
         deathIsolationRadius,
         deathDisableSeconds,
         deathReincarnationSeconds,
-        Math.max(1, deathOutOfPositionRanks));
+        Math.max(1, deathOutOfPositionRanks),
+        deathNoBkbMinSeconds);
   }
 
   public ActivityTuning activityTuning() {

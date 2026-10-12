@@ -20,8 +20,31 @@ class DeathAssessorTest {
   private static final double DEATH = 200;
   private static final String BKB = "item_black_king_bar";
 
-  private final DeathAssessor assessor =
+  private final DeathAssessor assessor = new DeathAssessor(tuning(0));
+  private final DeathAssessor defaultAssessor =
       new DeathAssessor(new ReplayAnalysisProperties().deathTuning());
+
+  @Test
+  void assess_withTheDefaultTuning_callsAnEarlyUnexplainedDeathOther() {
+    var death =
+        new DeathAssessor.Death(96, VICTIM, "npc_dota_hero_x", CombatEvent.ATTACKER_HERO, 0);
+
+    var a =
+        new DeathAssessor(new ReplayAnalysisProperties().deathTuning())
+            .assess(death, traces(0), new HeroStateTimeline(), List.of(), null);
+
+    assertThat(a.reason()).isEqualTo(DeathReason.OTHER);
+  }
+
+  @Test
+  void assess_doesNotBlameAMissingBkbOnADeathBeforeOneWasAffordable() {
+    ReplayAnalysisProperties defaults = new ReplayAnalysisProperties();
+    assertThat(defaults.getDeathNoBkbMinSeconds()).isEqualTo(720);
+    assertThat(noBkbAt(96)).isEqualTo(DeathReason.OTHER);
+    assertThat(noBkbAt(719)).isEqualTo(DeathReason.OTHER);
+    assertThat(noBkbAt(720)).isEqualTo(DeathReason.NO_BKB);
+    assertThat(noBkbAt(2000)).isEqualTo(DeathReason.NO_BKB);
+  }
 
   @Test
   void assess_explainsADeathByWhatBkbWasDoing_mostSpecificFirst() {
@@ -168,6 +191,26 @@ class DeathAssessorTest {
             modifier(CombatEventKind.MODIFIER_REMOVE, 196, "modifier_stunned", 0, 0));
 
     assertThat(reason(new HeroStateTimeline(), events)).isEqualTo(DeathReason.NO_BKB);
+  }
+
+  private static DeathAssessor.Tuning tuning(int noBkbMinSeconds) {
+    DeathAssessor.Tuning t = new ReplayAnalysisProperties().deathTuning();
+    return new DeathAssessor.Tuning(
+        t.lookbackSeconds(),
+        t.burstDamage(),
+        t.isolationRadius(),
+        t.disableSeconds(),
+        t.reincarnationSeconds(),
+        t.outOfPositionRanks(),
+        noBkbMinSeconds);
+  }
+
+  private DeathReason noBkbAt(double second) {
+    var death =
+        new DeathAssessor.Death(second, VICTIM, "npc_dota_hero_x", CombatEvent.ATTACKER_HERO, 0);
+    return defaultAssessor
+        .assess(death, traces(0), new HeroStateTimeline(), List.of(), null)
+        .reason();
   }
 
   private DeathReason positioned(Integer delta, List<CombatEvent> events) {
