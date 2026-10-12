@@ -25,6 +25,18 @@ class DeathAssessorTest {
       new DeathAssessor(new ReplayAnalysisProperties().deathTuning());
 
   @Test
+  void assess_withTheDefaultTuning_callsAnEarlyUnexplainedDeathOther() {
+    var death =
+        new DeathAssessor.Death(96, VICTIM, "npc_dota_hero_x", CombatEvent.ATTACKER_HERO, 0);
+
+    var a =
+        new DeathAssessor(new ReplayAnalysisProperties().deathTuning())
+            .assess(death, traces(0), new HeroStateTimeline(), List.of(), null);
+
+    assertThat(a.reason()).isEqualTo(DeathReason.OTHER);
+  }
+
+  @Test
   void assess_doesNotBlameAMissingBkbOnADeathBeforeOneWasAffordable() {
     ReplayAnalysisProperties defaults = new ReplayAnalysisProperties();
     assertThat(defaults.getDeathNoBkbMinSeconds()).isEqualTo(720);
