@@ -7,6 +7,8 @@ import com.ako.dbuff.dotapi.api.PublicMatchesApi;
 import com.ako.dbuff.dotapi.api.RequestApi;
 import com.ako.dbuff.dotapi.api.SearchApi;
 import com.ako.dbuff.dotapi.invoker.ApiClient;
+import com.ako.dbuff.dotapi.model.GetConstantsByResource200Response;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.util.concurrent.RateLimiter;
 import jakarta.ws.rs.client.ClientRequestFilter;
 import java.net.URI;
@@ -43,6 +45,10 @@ public class DotaApiConfig {
   public ApiClient getApiClient() {
     ApiClient apiClient = new ApiClient();
     apiClient.setDebugging(dotaApiConfigurationProperties.getIsDebugEnabled());
+    apiClient
+        .getJSON()
+        .getMapper()
+        .addMixIn(GetConstantsByResource200Response.class, ConstantsResponseMixin.class);
 
     // Only add API key filter if API key is provided
     if (StringUtils.hasLength(dotaApiConfigurationProperties.getApiKey())) {
@@ -60,6 +66,9 @@ public class DotaApiConfig {
 
     return apiClient;
   }
+
+  @JsonDeserialize(using = ConstantsResponseDeserializer.class)
+  private interface ConstantsResponseMixin {}
 
   private URI buildUriWithApiKey(URI uri, String apiKey) {
     return URI.create(uri.toString() + "?api_key=" + apiKey);
