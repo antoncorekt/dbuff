@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.smoke;
 
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
+import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
@@ -39,6 +40,7 @@ import com.ako.dbuff.service.replay.report.FightSection;
 import com.ako.dbuff.service.replay.report.MovementSection;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.SwingSection;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -46,6 +48,10 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
@@ -115,6 +121,7 @@ class ReplayPostgresSmokeTest {
   private static final long STARTING_WORTH = 4000;
 
   private static final String[] MATCHES = {"9040889566", "9040892342"};
+  private static final String[] ABILITY_DRAFT_MATCHES = {"9038725154", "9037038717"};
   private static HttpServer server;
 
   @DynamicPropertySource
@@ -158,23 +165,46 @@ class ReplayPostgresSmokeTest {
     }
 
     @Bean
-    AbilityNames abilityNames() {
-      return id -> Optional.of("ability_" + id);
+    AbilityNames abilityNames() throws IOException {
+      Map<String, String> names = new HashMap<>();
+      JsonNode ids = fixture("constants-ability-ids.json");
+      if (ids != null) {
+        ids.fields()
+            .forEachRemaining(
+                e -> {
+                  for (String id : e.getKey().split(",")) {
+                    names.put(id.trim(), e.getValue().asText());
+                  }
+                });
+      }
+      return id ->
+          Optional.ofNullable(names.get(String.valueOf(id))).or(() -> Optional.of("ability_" + id));
     }
 
     @Bean
-    HeroKits heroKits() {
+    HeroKits heroKits() throws IOException {
+      ObjectMapper lenient =
+          new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+      JsonNode heroes = fixture("constants-heroes.json");
+      JsonNode abilities = fixture("constants-abilities.json");
       return new HeroKits() {
         @Override
         public Optional<HeroConstant> hero(long heroId) {
-          return Optional.empty();
+          return Optional.ofNullable(heroes == null ? null : heroes.get(String.valueOf(heroId)))
+              .map(n -> lenient.convertValue(n, HeroConstant.class));
         }
 
         @Override
         public Optional<AbilityConstant> ability(String name) {
-          return Optional.empty();
+          return Optional.ofNullable(abilities == null ? null : abilities.get(name))
+              .map(n -> lenient.convertValue(n, AbilityConstant.class));
         }
       };
+    }
+
+    private static JsonNode fixture(String file) throws IOException {
+      Path path = Path.of(System.getenv("REPLAY_FIXTURE_DIR"), file);
+      return Files.exists(path) ? new ObjectMapper().readTree(path.toFile()) : null;
     }
   }
 
@@ -207,6 +237,7 @@ class ReplayPostgresSmokeTest {
   @Autowired private MovementSection movementSection;
   @Autowired private DraftSection draftSection;
   @Autowired private CompositionSection compositionSection;
+  @Autowired private HeroKits heroKits;
 
   @Test
   @Commit
@@ -286,6 +317,113 @@ class ReplayPostgresSmokeTest {
     assertThat(deathRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
   }
 
+  @Test
+  @Commit
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void anAbilityDraftReplayGetsIntentAndFinalRolesAndAPickAndAFinalVerdict() throws Exception {
+    Assumptions.assumeTrue(
+        System.getenv("SMOKE_PG_URL").contains("localhost")
+            || System.getenv("SMOKE_PG_URL").contains("127.0.0.1"),
+        "The smoke test changes the schema and commits data, so it only runs against localhost");
+    for (String id : ABILITY_DRAFT_MATCHES) {
+      Path fixture = Path.of(System.getenv("REPLAY_FIXTURE_DIR"), id + ".dem.zst");
+      Assumptions.assumeTrue(Files.exists(fixture), id + " is not in the fixture directory");
+      MatchDomain match = match(id);
+
+      ReplayStatus status = runService.process(match);
+
+      ReplayParseRunDomain run =
+          runRepo.findByMatchIdAndParserVersion(match.getId(), 1).orElseThrow();
+      assertThat(status).as("%s: %s", id, run.getError()).isEqualTo(ReplayStatus.DONE);
+      assertThat(draftPickRepo.findByMatchId(match.getId())).as("%s draft", id).hasSize(40);
+      assertThat(roleRepo.findByMatchId(match.getId()))
+          .as("%s: each team has each role once", id)
+          .hasSize(10)
+          .extracting(r -> r.getRole() + (r.getPlayerSlot() >= 128 ? 10 : 0))
+          .containsExactlyInAnyOrder(1, 2, 3, 4, 5, 11, 12, 13, 14, 15);
+      List<PlayerRoleProfileDomain> profiles = roleProfileRepo.findByMatchId(match.getId());
+      assertThat(profiles).as("%s: intent and final profiles", id).hasSize(20);
+      assertThat(compositionRepo.findByMatchId(match.getId()))
+          .as("%s: a pick and a final verdict per team", id)
+          .extracting(c -> c.getTeam() + " " + c.getStage())
+          .containsExactlyInAnyOrder("RADIANT PICK", "RADIANT FINAL", "DIRE PICK", "DIRE FINAL");
+      printAbilityDraft(id, match.getId(), profiles);
+    }
+  }
+
+  private void printAbilityDraft(String id, long matchId, List<PlayerRoleProfileDomain> profiles) {
+    Map<Long, List<String>> held = new java.util.TreeMap<>();
+    draftPickRepo.findByMatchId(matchId).stream()
+        .sorted(java.util.Comparator.comparing(p -> p.getPickOrder()))
+        .forEach(
+            p ->
+                held.computeIfAbsent(p.getPlayerSlot(), s -> new ArrayList<>())
+                    .add(p.getAbilityName()));
+    StringBuilder out = new StringBuilder("AD ROLES " + id + "\n");
+    for (PlayerMatchStatisticDomain stat :
+        playerStatRepo.findAllByMatchId(matchId).stream()
+            .sorted(java.util.Comparator.comparing(PlayerMatchStatisticDomain::getPlayerSlot))
+            .toList()) {
+      long slot = stat.getPlayerSlot();
+      PlayerRoleProfileDomain intent = stageRow(profiles, slot, "INTENT");
+      PlayerRoleProfileDomain fin = stageRow(profiles, slot, "FINAL");
+      out.append(
+          String.format(
+              "  slot %3d %-18s nw %6d lane_role %d intent %s (%.2f) final %s (%.2f) | %s%n"
+                  + "      skills %s%n      intent %s%n      final  %s%n",
+              slot,
+              heroKits
+                  .hero(stat.getHeroId())
+                  .map(h -> h.getLocalized_name())
+                  .orElse("hero " + stat.getHeroId()),
+              stat.getNetWorth(),
+              stat.getLaneRole(),
+              intent == null ? "-" : intent.getRole(),
+              intent == null ? 0.0 : intent.getConfidence(),
+              fin == null ? "-" : fin.getRole(),
+              fin == null ? 0.0 : fin.getConfidence(),
+              fin == null ? "" : fin.getEvidence(),
+              held.getOrDefault(slot, List.of()),
+              intent == null ? "" : functions(intent),
+              fin == null ? "" : functions(fin)));
+    }
+    compositionRepo.findByMatchId(matchId).stream()
+        .sorted(java.util.Comparator.comparing(c -> c.getTeam() + c.getStage()))
+        .forEach(
+            c ->
+                out.append(
+                    String.format(
+                        "  %s %s: [%s] %s%n",
+                        c.getTeam(), c.getStage(), c.getTokens(), c.getSummary())));
+    System.out.println(out);
+  }
+
+  private static PlayerRoleProfileDomain stageRow(
+      List<PlayerRoleProfileDomain> profiles, long slot, String stage) {
+    return profiles.stream()
+        .filter(p -> p.getPlayerSlot() == slot && p.getStage().equals(stage))
+        .findFirst()
+        .orElse(null);
+  }
+
+  private static String functions(PlayerRoleProfileDomain p) {
+    return String.format(
+        "scores %s farm %s jungle %s roam %s init %s disable %s save %s dmg %s dur %s",
+        p.getRoleScores(),
+        fmt(p.getFarmPriority()),
+        fmt(p.getJungle()),
+        fmt(p.getRoaming()),
+        fmt(p.getInitiation()),
+        fmt(p.getDisable()),
+        fmt(p.getSaveHeal()),
+        fmt(p.getDamage()),
+        fmt(p.getDurability()));
+  }
+
+  private static String fmt(Double value) {
+    return value == null ? "-" : String.format("%.2f", value);
+  }
+
   private MatchDomain match(String id) throws IOException {
     JsonNode json =
         new ObjectMapper()
@@ -318,6 +456,7 @@ class ReplayPostgresSmokeTest {
       stat.setMatchId(match.getId());
       stat.setPlayerSlot(p.get("player_slot").asLong());
       stat.setPlayerId(p.get("account_id").asLong());
+      stat.setHeroId(p.get("hero_id").asLong());
       stat.setLaneRole(p.get("lane_role").asLong());
       stat.setNetWorth(p.get("net_worth").asLong());
       playerStatRepo.save(stat);

@@ -37,7 +37,7 @@ class ReplayAnalysisServiceTest {
 
   @Test
   void analyze_skipsAnAnalyzerWhoseInputExtractorFailed_soItsEarlierRowsSurvive() {
-    when(good.requires()).thenReturn(java.util.Set.of("tracks"));
+    when(good.requires(any())).thenReturn(java.util.Set.of("tracks"));
 
     List<String> failed = service.analyze(5L, TestModes.ABILITY_DRAFT, List.of("tracks"));
 
@@ -49,7 +49,7 @@ class ReplayAnalysisServiceTest {
   void analyze_skipsAnAnalyzerThatNamesAnAnalyzerThatFailed() {
     when(broken.name()).thenReturn("broken");
     doThrow(new IllegalStateException("boom")).when(broken).analyze(5L);
-    when(good.requires()).thenReturn(java.util.Set.of("broken"));
+    when(good.requires(any())).thenReturn(java.util.Set.of("broken"));
 
     List<String> failed = service.analyze(5L, TestModes.ABILITY_DRAFT, List.of());
 

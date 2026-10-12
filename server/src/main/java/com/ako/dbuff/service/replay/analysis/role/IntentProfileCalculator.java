@@ -3,7 +3,9 @@ package com.ako.dbuff.service.replay.analysis.role;
 import com.ako.dbuff.service.constant.data.AbilityAttribute;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalDouble;
 import java.util.function.BiPredicate;
@@ -15,7 +17,8 @@ import org.springframework.stereotype.Component;
  * rules are guesses of what a skill is for (see {@link RoleProfileProperties.Intent}); the
  * constants have no disable, blink or ultimate flag, so those come from attribute keys and from the
  * slot the skill was drafted into. The lane and the vision duty cannot be told from a kit and stay
- * unknown.
+ * unknown. What the constants cannot say comes from {@link RoleOverrides}, added to the function
+ * values before they are cut at 1.
  */
 @Component
 @RequiredArgsConstructor
@@ -28,9 +31,18 @@ public class IntentProfileCalculator {
   private static final String BKB_PIERCE = "Yes";
 
   private final RoleProfileProperties properties;
+  private final RoleOverrides overrides;
 
-  /** A skill of the kit; the ultimate counts more than a regular one. */
-  public record HeldAbility(AbilityConstant constant, boolean ultimate) {}
+  /**
+   * A skill of the kit; the ultimate counts more than a regular one.
+   *
+   * @param name the skill's name, which the overrides are looked up by; null when unknown
+   */
+  public record HeldAbility(String name, AbilityConstant constant, boolean ultimate) {
+    public HeldAbility(AbilityConstant constant, boolean ultimate) {
+      this(null, constant, ultimate);
+    }
+  }
 
   /**
    * @param hero null when the hero is not in the constants
@@ -45,19 +57,56 @@ public class IntentProfileCalculator {
     for (HeldAbility held : abilities) {
       sums.add(held, rules);
     }
+    Map<RoleFunction, Double> extra = extra(hero, abilities, rules);
     return new FunctionProfile(
         null,
-        farmPriority(hero, sums, rules),
-        hero == null ? null : clamp(tag(hero, rules.getJunglerTagName()) * rules.getJunglerTag()),
-        roaming(hero, sums, rules),
-        null,
-        clamp(
-            sums.areaControl / rules.getInitiationFull()
-                + sums.gapClosers * rules.getGapCloserInitiation()),
-        clamp(sums.disable / rules.getDisableFull()),
-        clamp(sums.save / rules.getSaveFull()),
-        damage(hero, sums, rules),
-        durability(hero, sums, rules));
+        plus(farmPriority(hero, sums, rules), RoleFunction.FARM_PRIORITY, extra),
+        plus(
+            hero == null
+                ? null
+                : clamp(tag(hero, rules.getJunglerTagName()) * rules.getJunglerTag()),
+            RoleFunction.JUNGLE,
+            extra),
+        plus(roaming(hero, sums, rules), RoleFunction.ROAMING, extra),
+        plus(null, RoleFunction.VISION_DUTY, extra),
+        plus(
+            clamp(
+                sums.areaControl / rules.getInitiationFull()
+                    + sums.gapClosers * rules.getGapCloserInitiation()),
+            RoleFunction.INITIATION,
+            extra),
+        plus(clamp(sums.disable / rules.getDisableFull()), RoleFunction.DISABLE, extra),
+        plus(clamp(sums.save / rules.getSaveFull()), RoleFunction.SAVE_HEAL, extra),
+        plus(damage(hero, sums, rules), RoleFunction.DAMAGE, extra),
+        plus(durability(hero, sums, rules), RoleFunction.DURABILITY, extra));
+  }
+
+  /** The override values of the hero and of each held skill, a skill counted with its weight. */
+  private Map<RoleFunction, Double> extra(
+      HeroConstant hero, List<HeldAbility> abilities, RoleProfileProperties.Intent rules) {
+    Map<RoleFunction, Double> extra = new EnumMap<>(RoleFunction.class);
+    if (hero != null && hero.getId() != null) {
+      overrides
+          .forHero(Long.parseLong(hero.getId()))
+          .forEach((f, v) -> extra.merge(f, v, Double::sum));
+    }
+    for (HeldAbility held : abilities) {
+      if (held.name() != null) {
+        double weight = held.ultimate() ? rules.getUltimateWeight() : rules.getSkillWeight();
+        overrides
+            .forAbility(held.name())
+            .forEach((f, v) -> extra.merge(f, v * weight, Double::sum));
+      }
+    }
+    return extra;
+  }
+
+  private static Double plus(Double base, RoleFunction function, Map<RoleFunction, Double> extra) {
+    Double added = extra.get(function);
+    if (added == null) {
+      return base;
+    }
+    return clamp((base == null ? 0 : base) + added);
   }
 
   private static Double farmPriority(HeroConstant hero, Sums sums, RoleProfileProperties.Intent r) {

@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
@@ -54,7 +55,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
   private final PlayerRoleRepo roleRepo;
   private final PlayerRoleProfileRepo profileRepo;
   private final AbilityDraftPickRepo draftPickRepo;
-  private final List<StageProfiler> profilers;
+  private final StageProfilers profilers;
   private final RoleFitter fitter;
 
   @Override
@@ -74,8 +75,14 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
 
   @Override
   public Set<String> requires() {
-    Set<String> required = new HashSet<>(Set.of("activity"));
-    resolvers.forEach(r -> required.addAll(r.requires()));
+    return Set.of("activity");
+  }
+
+  /** The extractors of the resolver of that mode only, so another mode's inputs do not count. */
+  @Override
+  public Set<String> requires(GameModeProfile mode) {
+    Set<String> required = new HashSet<>(requires());
+    resolverFor(mode).ifPresent(r -> required.addAll(r.requires()));
     return required;
   }
 
@@ -84,10 +91,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
   public void analyze(long matchId) {
     deleteByMatchId(matchId);
     GameModeProfile mode = modes.activeFor(matchId).orElse(null);
-    RoleResolver resolver =
-        mode == null
-            ? null
-            : resolvers.stream().filter(r -> r.supports(mode)).findFirst().orElse(null);
+    RoleResolver resolver = mode == null ? null : resolverFor(mode).orElse(null);
     if (resolver == null) {
       return;
     }
@@ -142,6 +146,10 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
     profileRepo.saveAll(profiles);
   }
 
+  private Optional<RoleResolver> resolverFor(GameModeProfile mode) {
+    return resolvers.stream().filter(r -> r.supports(mode)).findFirst();
+  }
+
   @Override
   @Transactional
   public void deleteByMatchId(long matchId) {
@@ -151,11 +159,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
 
   private List<PlayerRoleProfileDomain> profileRows(
       long matchId, RoleStage stage, List<RolePlayer> team, List<RoleAssignment> assignments) {
-    StageProfiler profiler =
-        profilers.stream()
-            .filter(p -> p.stage() == stage)
-            .findFirst()
-            .orElseThrow(() -> new IllegalStateException("No profiler for the stage " + stage));
+    StageProfiler profiler = profilers.of(stage);
     Map<Long, RoleAssignment> bySlot = new HashMap<>();
     assignments.forEach(a -> bySlot.put(a.slot(), a));
     List<FunctionProfile> profiles = profiler.profile(team);

@@ -200,7 +200,9 @@ class PlayerRoleStageAnalyzerTest {
 
   @Test
   void theAnalyzerNamesTheDraftExtractorOnlyBecauseTheResolverDoes() {
-    assertThat(analyzer.requires()).containsExactlyInAnyOrder("activity", "ability-draft");
+    assertThat(analyzer.requires(TestModes.ABILITY_DRAFT))
+        .containsExactlyInAnyOrder("activity", "ability-draft");
+    assertThat(analyzer.requires(TestModes.ALL_PICK)).containsExactly("activity");
     assertThat(analyzer.supports(TestModes.ABILITY_DRAFT)).isTrue();
     assertThat(analyzer.supports(TestModes.ALL_PICK)).isFalse();
   }

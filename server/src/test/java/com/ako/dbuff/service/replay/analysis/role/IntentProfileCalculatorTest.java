@@ -26,7 +26,7 @@ class IntentProfileCalculatorTest {
       load("constants_profile_abilities.json", new TypeReference<>() {});
 
   private final IntentProfileCalculator calculator =
-      new IntentProfileCalculator(new RoleProfileProperties());
+      new IntentProfileCalculator(new RoleProfileProperties(), RoleOverrides.NONE);
 
   private static <T> T load(String resource, TypeReference<T> type) {
     try (InputStream in =
@@ -205,7 +205,8 @@ class IntentProfileCalculatorTest {
     properties.getIntent().setInitiationFull(0.1);
     List<HeldAbility> bolt = List.of(new HeldAbility(ABILITIES.get("sven_storm_bolt"), false));
 
-    FunctionProfile tuned = new IntentProfileCalculator(properties).profile(HEROES.get("18"), bolt);
+    FunctionProfile tuned =
+        new IntentProfileCalculator(properties, RoleOverrides.NONE).profile(HEROES.get("18"), bolt);
     FunctionProfile normal = calculator.profile(HEROES.get("18"), bolt);
 
     assertThat(tuned.initiation()).isGreaterThan(normal.initiation());
