@@ -83,27 +83,62 @@ class ReplayQueueQueryTest {
     assertThat(
             ids(
                 runRepo.findDueFreshRetries(
-                    VERSION, NOW, 5, freshAfter, 0L, none, PageRequest.of(0, 10))))
+                    VERSION,
+                    NOW,
+                    5,
+                    freshAfter,
+                    0L,
+                    List.of(18L, 22L),
+                    none,
+                    PageRequest.of(0, 10))))
         .containsExactly(6L, 1L);
     assertThat(
             ids(
                 runRepo.findDueFreshRetries(
-                    VERSION, NOW, 5, freshAfter, 1_450L, none, PageRequest.of(0, 10))))
+                    VERSION,
+                    NOW,
+                    5,
+                    freshAfter,
+                    1_450L,
+                    List.of(18L, 22L),
+                    none,
+                    PageRequest.of(0, 10))))
         .containsExactly(6L);
     assertThat(
             ids(
                 runRepo.findDueFreshRetries(
-                    VERSION, NOW, 5, freshAfter, 0L, Set.of(6L), PageRequest.of(0, 10))))
+                    VERSION,
+                    NOW,
+                    5,
+                    freshAfter,
+                    0L,
+                    List.of(18L, 22L),
+                    Set.of(6L),
+                    PageRequest.of(0, 10))))
         .containsExactly(1L);
     assertThat(
             ids(
                 runRepo.findDueYoungRetries(
-                    VERSION, NOW, 5, youngAfter, 2, none, PageRequest.of(0, 10))))
+                    VERSION,
+                    NOW,
+                    5,
+                    youngAfter,
+                    2,
+                    List.of(18L, 22L),
+                    none,
+                    PageRequest.of(0, 10))))
         .containsExactly(6L, 5L, 2L);
     assertThat(
             ids(
                 runRepo.findDueOldRetries(
-                    VERSION, NOW, 5, youngAfter, 2, none, PageRequest.of(0, 10))))
+                    VERSION,
+                    NOW,
+                    5,
+                    youngAfter,
+                    2,
+                    List.of(18L, 22L),
+                    none,
+                    PageRequest.of(0, 10))))
         .containsExactly(4L, 3L, 1L);
   }
 
@@ -133,7 +168,14 @@ class ReplayQueueQueryTest {
     List<Long> ids =
         ids(
             runRepo.findDueFreshRetries(
-                VERSION, NOW, 5, NOW.minusHours(6), 0L, Set.of(-1L), PageRequest.of(0, 10)));
+                VERSION,
+                NOW,
+                5,
+                NOW.minusHours(6),
+                0L,
+                List.of(18L, 22L),
+                Set.of(-1L),
+                PageRequest.of(0, 10)));
 
     assertThat(ids).containsExactly(9L, 8L, 4L, 1L);
   }

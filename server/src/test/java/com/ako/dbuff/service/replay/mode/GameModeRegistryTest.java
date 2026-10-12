@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.mode;
 
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -49,5 +50,30 @@ class GameModeRegistryTest {
 
     assertThat(registry.activeFor(18L)).isEmpty();
     assertThat(registry.activeFor(22L)).isPresent();
+  }
+
+  @Test
+  void activeModeIds_holdsTheConfiguredModesThatHaveAProfile() {
+    properties.setSupportedModes(List.of(18L, 22L, 23L));
+
+    assertThat(TestModes.registry(properties).activeModeIds()).containsExactlyInAnyOrder(18L, 22L);
+  }
+
+  @Test
+  void activeModeIds_followsTheConfigurationAsItChanges() {
+    GameModeRegistry registry = TestModes.registry(properties);
+    properties.setSupportedModes(List.of(22L));
+
+    assertThat(registry.activeModeIds()).containsExactly(22L);
+  }
+
+  @Test
+  void skipsANullInTheConfiguredModes() {
+    properties.setSupportedModes(Arrays.asList(18L, null));
+
+    GameModeRegistry registry = TestModes.registry(properties);
+
+    assertThat(registry.activeModeIds()).containsExactly(18L);
+    assertThat(registry.activeFor(18L)).isPresent();
   }
 }

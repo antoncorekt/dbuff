@@ -41,6 +41,7 @@ public interface ReplayParseRunRepo extends JpaRepository<ReplayParseRunDomain, 
       select m from ReplayParseRunDomain r, MatchDomain m
       where m.id = r.matchId
         and r.parserVersion = :version
+        and m.gameModeId in :modes
         and ((r.status in ('FAILED_DOWNLOAD', 'FAILED_RESOURCE', 'FAILED_TIMEOUT', 'PARTIAL')
               and r.nextAttemptAt <= :now)
              or (r.status = 'RUNNING' and r.leaseUntil < :now and r.attempts < :maxAttempts))
@@ -50,7 +51,7 @@ public interface ReplayParseRunRepo extends JpaRepository<ReplayParseRunDomain, 
 
   /**
    * Due retries of matches mapped within the fresh window that also started after {@code
-   * startedAfter}; abandoned leases count as due.
+   * startedAfter}; abandoned leases count as due. Only matches of the given modes are listed.
    */
   @Query(
       DUE_RETRY
@@ -62,6 +63,7 @@ public interface ReplayParseRunRepo extends JpaRepository<ReplayParseRunDomain, 
       @Param("maxAttempts") Integer maxAttempts,
       @Param("freshAfter") LocalDateTime freshAfter,
       @Param("startedAfter") Long startedAfter,
+      @Param("modes") Collection<Long> modes,
       @Param("excluded") Collection<Long> excluded,
       Pageable pageable);
 
@@ -76,6 +78,7 @@ public interface ReplayParseRunRepo extends JpaRepository<ReplayParseRunDomain, 
       @Param("maxAttempts") Integer maxAttempts,
       @Param("youngAfter") LocalDateTime youngAfter,
       @Param("youngAttempts") Integer youngAttempts,
+      @Param("modes") Collection<Long> modes,
       @Param("excluded") Collection<Long> excluded,
       Pageable pageable);
 
@@ -90,6 +93,7 @@ public interface ReplayParseRunRepo extends JpaRepository<ReplayParseRunDomain, 
       @Param("maxAttempts") Integer maxAttempts,
       @Param("youngAfter") LocalDateTime youngAfter,
       @Param("youngAttempts") Integer youngAttempts,
+      @Param("modes") Collection<Long> modes,
       @Param("excluded") Collection<Long> excluded,
       Pageable pageable);
 

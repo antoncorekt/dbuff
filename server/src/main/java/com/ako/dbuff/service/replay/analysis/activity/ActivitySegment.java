@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis.activity;
 
+import com.ako.dbuff.dao.model.PlayerActivitySegmentDomain;
 import com.ako.dbuff.service.replay.map.Zone;
 
 /**
@@ -15,6 +16,16 @@ public record ActivitySegment(
     Zone.Kind zone,
     Zone.Lane lane,
     Side side) {
+
+  public static ActivitySegment of(PlayerActivitySegmentDomain row) {
+    return new ActivitySegment(
+        row.getStartSeconds(),
+        row.getEndSeconds(),
+        Activity.valueOf(row.getActivity()),
+        Zone.Kind.valueOf(row.getZone()),
+        row.getLane() == null ? null : Zone.Lane.valueOf(row.getLane()),
+        row.getSide() == null ? null : Side.valueOf(row.getSide()));
+  }
 
   public enum Side {
     OWN,

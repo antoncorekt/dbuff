@@ -46,6 +46,18 @@ class ReplayAnalysisServiceTest {
   }
 
   @Test
+  void analyze_skipsAnAnalyzerThatNamesAnAnalyzerThatFailed() {
+    when(broken.name()).thenReturn("broken");
+    doThrow(new IllegalStateException("boom")).when(broken).analyze(5L);
+    when(good.requires()).thenReturn(java.util.Set.of("broken"));
+
+    List<String> failed = service.analyze(5L, TestModes.ABILITY_DRAFT, List.of());
+
+    assertThat(failed).containsExactly("broken");
+    verify(good, org.mockito.Mockito.never()).analyze(5L);
+  }
+
+  @Test
   void analyze_leavesOutAnAnalyzerThatDoesNotApplyToTheMode() {
     when(broken.supports(TestModes.ALL_PICK)).thenReturn(false);
 
