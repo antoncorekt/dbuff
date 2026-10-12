@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.TeamCompositionDomain;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,7 +27,10 @@ class RoleGapContributorTest {
         List.of(),
         List.of(),
         List.of(),
-        List.of(compositions));
+        List.of(compositions),
+        List.of(),
+        Map.of(),
+        List.of());
   }
 
   @Test

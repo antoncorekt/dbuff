@@ -131,4 +131,27 @@ class RoleFitterTest {
     assertThat(unknownFinal).containsOnly(0.0);
     assertThat(laneFinal[1]).isLessThan(laneIntent[1]).isPositive();
   }
+
+  @Test
+  void theFinalLaneBonusIsAFractionOfTheIntentOne() {
+    double[] intent =
+        fitter.scores(profile(LanePosition.MID, 0, 0, 0, 0, 0, 0, 0, 0, 0), RoleStage.INTENT);
+    double[] fin =
+        fitter.scores(profile(LanePosition.MID, 0, 0, 0, 0, 0, 0, 0, 0, 0), RoleStage.FINAL);
+    double factor = new RoleProfileProperties().getFit().getFinalLaneFactor();
+
+    assertThat(factor).isLessThan(0.5);
+    assertThat(fin[1]).isEqualTo(intent[1] * factor, org.assertj.core.data.Offset.offset(1e-9));
+  }
+
+  @Test
+  void aTeamsRichestPlayerWithTheDataOfACoreTakesRoleOneFromALaneLabelledCarry() {
+    FunctionProfile richOfflaner = profile(LanePosition.OFF, 1, 0, 0, 0, 0, 0, 0, 0.9, 0.6);
+    FunctionProfile safeLaner = profile(LanePosition.SAFE, 0.5, 0, 0, 0, 0, 0, 0, 0.5, 0.2);
+    double[] rich = fitter.scores(richOfflaner, RoleStage.FINAL);
+    double[] safe = fitter.scores(safeLaner, RoleStage.FINAL);
+
+    assertThat(RoleFitter.bestRole(rich)).isEqualTo(1);
+    assertThat(rich[0] - safe[0]).isPositive();
+  }
 }

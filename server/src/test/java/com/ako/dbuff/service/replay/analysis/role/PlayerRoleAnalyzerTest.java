@@ -106,7 +106,7 @@ class PlayerRoleAnalyzerTest {
         .allSatisfy(
             r -> {
               assertThat(r.getSource()).isEqualTo("DERIVED");
-              assertThat(r.getAnalysisVersion()).isEqualTo(3);
+              assertThat(r.getAnalysisVersion()).isEqualTo(analyzer.version());
               assertThat(r.getEvidence()).isNotBlank();
             });
     for (boolean dire : new boolean[] {false, true}) {
@@ -130,6 +130,36 @@ class PlayerRoleAnalyzerTest {
   }
 
   @Test
+  void theStoredDamageHealingWardsAndDamageTakenReachTheFinalProfile() {
+    entityManager.persist(MatchDomain.builder().id(ALL_PICK_MATCH).gameModeId(22L).build());
+    for (int i = 0; i < SLOTS.length; i++) {
+      PlayerMatchStatisticDomain stat = new PlayerMatchStatisticDomain();
+      stat.setMatchId(ALL_PICK_MATCH);
+      stat.setPlayerSlot(SLOTS[i]);
+      stat.setLaneRole(LANE_ROLES[i % 5]);
+      stat.setNetWorth(WORTH[i % 5]);
+      boolean first = i % 5 == 0;
+      stat.setHeroDamage(first ? 100L : 0L);
+      stat.setHeroHealing(first ? 0L : 10L);
+      stat.setDamageTaken(first ? 50L : 0L);
+      stat.setObsPlaced(first ? 0L : 1L);
+      stat.setSenPlaced(first ? 0L : 1L);
+      statisticRepo.save(stat);
+    }
+    entityManager.flush();
+
+    analyzer.analyze(ALL_PICK_MATCH);
+
+    for (PlayerRoleProfileDomain p : profileRepo.findByMatchId(ALL_PICK_MATCH)) {
+      boolean first = p.getPlayerSlot() % 128 == 0;
+      assertThat(p.getDamage()).isEqualTo(first ? 1.0 : 0.0);
+      assertThat(p.getDurability()).isEqualTo(first ? 1.0 : 0.0);
+      assertThat(p.getSaveHeal()).isEqualTo(first ? 0.0 : 0.5);
+      assertThat(p.getVisionDuty()).isEqualTo(first ? 0.0 : 0.5);
+    }
+  }
+
+  @Test
   void allPickStoresFinalProfilesNextToTheRolesAndNoIntentRows() {
     stored(ALL_PICK_MATCH, 22);
 
@@ -149,7 +179,7 @@ class PlayerRoleAnalyzerTest {
       assertThat(profile.getAnalysisVersion()).isEqualTo(analyzer.version());
       assertThat(profile.getFarmPriority()).isBetween(0.0, 1.0);
       assertThat(profile.getLane()).isNotNull();
-      assertThat(profile.getVisionDuty()).isNull();
+      assertThat(profile.getInitiation()).isNull();
       assertThat(profile.getRoleScores().split(",")).hasSize(5);
       double[] scores =
           java.util.Arrays.stream(profile.getRoleScores().split(","))

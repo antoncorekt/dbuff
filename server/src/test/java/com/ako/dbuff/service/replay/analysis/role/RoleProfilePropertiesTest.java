@@ -39,4 +39,12 @@ class RoleProfilePropertiesTest {
     assertThatThrownBy(noLane::validate).hasMessageContaining("role 2 and lane OFF");
     assertThat(noLane.getFit().getLaneBonus()).hasSize(5);
   }
+
+  @Test
+  void aFullShareOfZeroOrLessIsRefused() {
+    RoleProfileProperties properties = new RoleProfileProperties();
+    properties.getObserved().setWardFullShare(0);
+
+    assertThatThrownBy(properties::validate).hasMessageContaining("full shares must be above 0");
+  }
 }

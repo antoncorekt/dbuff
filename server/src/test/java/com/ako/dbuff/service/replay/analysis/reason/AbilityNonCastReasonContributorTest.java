@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.FightAbilityUseDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,6 +32,9 @@ class AbilityNonCastReasonContributorTest {
         List.of(uses),
         List.of(),
         List.of(),
+        List.of(),
+        List.of(),
+        Map.of(),
         List.of());
   }
 
