@@ -20,7 +20,11 @@ public enum DeathReason {
   BURST,
   /** Stood well in front of where his attack range puts him when the fight he died in began. */
   OUT_OF_POSITION,
-  /** Killed by a hero with no BKB owned, and nothing more specific explains it. */
+  /**
+   * Killed by a hero with no BKB owned, after the game second from which one is affordable ({@code
+   * replay.analysis.death-no-bkb-min-seconds}), and nothing more specific explains it. Earlier
+   * deaths are {@link #OTHER}.
+   */
   NO_BKB,
   OTHER
 }
