@@ -25,6 +25,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class CompositionSection implements ReplayReportSection {
+  private static final String ELLIPSIS = "...";
   private static final Map<Integer, String> ROLES =
       Map.of(
           1, "carry",
@@ -37,6 +38,7 @@ public class CompositionSection implements ReplayReportSection {
 
   private final PlayerRoleProfileRepo profileRepo;
   private final TeamCompositionRepo compositionRepo;
+  private final ReplayReportProperties properties;
 
   @Override
   public int order() {
@@ -78,7 +80,9 @@ public class CompositionSection implements ReplayReportSection {
             .findFirst()
             .ifPresent(
                 c ->
-                    lines.add(label(side) + " " + STAGE_LABELS.get(stage) + ": " + c.getSummary()));
+                    lines.add(
+                        capped(
+                            label(side) + " " + STAGE_LABELS.get(stage) + ": " + c.getSummary())));
       }
     }
     if (lines.isEmpty()) {
@@ -86,6 +90,11 @@ public class CompositionSection implements ReplayReportSection {
     }
     lines.addFirst("**Roles and composition**");
     return lines;
+  }
+
+  private String capped(String line) {
+    int max = Math.max(ELLIPSIS.length() + 1, properties.getMaxCompositionLineLength());
+    return line.length() <= max ? line : line.substring(0, max - ELLIPSIS.length()) + ELLIPSIS;
   }
 
   private static String roles(List<PlayerRoleProfileDomain> profiles, long slot) {

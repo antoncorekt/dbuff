@@ -18,7 +18,9 @@ class CompositionSectionTest {
 
   private final PlayerRoleProfileRepo profileRepo = mock(PlayerRoleProfileRepo.class);
   private final TeamCompositionRepo compositionRepo = mock(TeamCompositionRepo.class);
-  private final CompositionSection section = new CompositionSection(profileRepo, compositionRepo);
+  private final ReplayReportProperties properties = new ReplayReportProperties();
+  private final CompositionSection section =
+      new CompositionSection(profileRepo, compositionRepo, properties);
 
   private static PlayerRoleProfileDomain profile(long slot, String stage, int role) {
     return PlayerRoleProfileDomain.builder().playerSlot(slot).stage(stage).role(role).build();
@@ -108,6 +110,19 @@ class CompositionSectionTest {
             "P0 played carry",
             "P1 played mid",
             "and 2 more tracked players");
+  }
+
+  @Test
+  void aLongVerdictLineIsCutToTheConfiguredLength() {
+    properties.setMaxCompositionLineLength(30);
+    when(profileRepo.findByMatchId(1L)).thenReturn(List.of());
+    when(compositionRepo.findByMatchId(1L))
+        .thenReturn(List.of(composition("RADIANT", "FINAL", "x".repeat(100))));
+
+    List<String> lines = section.lines(input(Map.of(0L, "Anton"), 3));
+
+    assertThat(lines).hasSize(2);
+    assertThat(lines.get(1)).hasSize(30).endsWith("...");
   }
 
   @Test

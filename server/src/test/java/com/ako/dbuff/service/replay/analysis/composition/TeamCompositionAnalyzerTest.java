@@ -1,11 +1,9 @@
 package com.ako.dbuff.service.replay.analysis.composition;
 
 import com.ako.dbuff.dao.model.MatchDomain;
-import com.ako.dbuff.dao.model.PlayerRoleDomain;
 import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.dao.model.TeamCompositionDomain;
 import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
-import com.ako.dbuff.dao.repo.PlayerRoleRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
@@ -44,7 +42,6 @@ class TeamCompositionAnalyzerTest {
   @Autowired private TeamCompositionAnalyzer analyzer;
   @Autowired private TeamCompositionRepo compositionRepo;
   @Autowired private PlayerRoleProfileRepo profileRepo;
-  @Autowired private PlayerRoleRepo roleRepo;
   @Autowired private EntityManager entityManager;
 
   private void match(long matchId, long mode) {
@@ -67,20 +64,6 @@ class TeamCompositionAnalyzerTest {
     entityManager.flush();
   }
 
-  private void finalRoles(long matchId) {
-    for (PlayerRoleProfileDomain p : profileRepo.findByMatchId(matchId)) {
-      if ("FINAL".equals(p.getStage())) {
-        roleRepo.save(
-            PlayerRoleDomain.builder()
-                .matchId(matchId)
-                .playerSlot(p.getPlayerSlot())
-                .role(p.getRole())
-                .build());
-      }
-    }
-    entityManager.flush();
-  }
-
   private TeamCompositionDomain row(long matchId, String team, String stage) {
     return compositionRepo.findByMatchId(matchId).stream()
         .filter(c -> c.getTeam().equals(team) && c.getStage().equals(stage))
@@ -93,7 +76,6 @@ class TeamCompositionAnalyzerTest {
     match(ABILITY_DRAFT_MATCH, 18);
     profiles(ABILITY_DRAFT_MATCH, "INTENT", 0.9, 0);
     profiles(ABILITY_DRAFT_MATCH, "FINAL", 0.9, 2);
-    finalRoles(ABILITY_DRAFT_MATCH);
 
     analyzer.analyze(ABILITY_DRAFT_MATCH);
 
@@ -113,7 +95,6 @@ class TeamCompositionAnalyzerTest {
   void aFinalOnlyModeWritesFinalRowsAndNoIntentToken() {
     match(ALL_PICK_MATCH, 22);
     profiles(ALL_PICK_MATCH, "FINAL", 0.9, 0);
-    finalRoles(ALL_PICK_MATCH);
 
     analyzer.analyze(ALL_PICK_MATCH);
 
@@ -125,10 +106,17 @@ class TeamCompositionAnalyzerTest {
   }
 
   @Test
+  void aListIsCutAtATokenAndASentenceGetsAnEllipsis() {
+    assertThat(TeamCompositionAnalyzer.fit("NO_A,NO_B,NO_C", 10, ",")).isEqualTo("NO_A,NO_B");
+    assertThat(TeamCompositionAnalyzer.fit("NO_A,NO_B", 20, ",")).isEqualTo("NO_A,NO_B");
+    assertThat(TeamCompositionAnalyzer.fit("abcdefghij", 8, "")).isEqualTo("abcde...");
+    assertThat(TeamCompositionAnalyzer.fit("abcdefgh", 8, "")).isEqualTo("abcdefgh");
+  }
+
+  @Test
   void aSecondRunReplacesTheFirst() {
     match(ALL_PICK_MATCH, 22);
     profiles(ALL_PICK_MATCH, "FINAL", 0.9, 0);
-    finalRoles(ALL_PICK_MATCH);
 
     analyzer.analyze(ALL_PICK_MATCH);
     analyzer.analyze(ALL_PICK_MATCH);
@@ -140,7 +128,6 @@ class TeamCompositionAnalyzerTest {
   void aRerunAfterTheProfilesChangedStoresTheNewVerdict() {
     match(ALL_PICK_MATCH, 22);
     profiles(ALL_PICK_MATCH, "FINAL", 0.9, 0);
-    finalRoles(ALL_PICK_MATCH);
     analyzer.analyze(ALL_PICK_MATCH);
     assertThat(row(ALL_PICK_MATCH, "RADIANT", "FINAL").getTokens())
         .doesNotContain("NO_FARM_ENGINE");
@@ -185,7 +172,6 @@ class TeamCompositionAnalyzerTest {
   void deleteRemovesTheRowsAndTheAnalyzerWaitsForTheRoles() {
     match(ALL_PICK_MATCH, 22);
     profiles(ALL_PICK_MATCH, "FINAL", 0.9, 0);
-    finalRoles(ALL_PICK_MATCH);
     analyzer.analyze(ALL_PICK_MATCH);
 
     analyzer.deleteByMatchId(ALL_PICK_MATCH);

@@ -25,6 +25,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TeamCompositionDomain {
+  public static final int TOKENS_LENGTH = 300;
+  public static final int SUMMARY_LENGTH = 600;
+
   @Id
   @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "team_composition_seq")
   @SequenceGenerator(
@@ -42,11 +45,11 @@ public class TeamCompositionDomain {
   private String stage;
 
   /** The findings, comma separated, such as {@code CARRIES_3,NO_INITIATOR}; empty for none. */
-  @Column(length = 300)
+  @Column(length = TOKENS_LENGTH)
   private String tokens;
 
   /** The findings in plain words and the functions that could not be judged. */
-  @Column(length = 600)
+  @Column(length = SUMMARY_LENGTH)
   private String summary;
 
   private Integer analysisVersion;

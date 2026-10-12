@@ -43,32 +43,31 @@ public class DefaultCompositionRules implements CompositionRules {
   public CompositionVerdict evaluate(CompositionStage stage, List<TeamMember> team) {
     List<String> tokens = new ArrayList<>();
     Set<RoleFunction> unknown = new LinkedHashSet<>();
-    List<Double> farm = values(team, FunctionProfile::farmPriority);
-    if (hasUnknown(farm)) {
-      unknown.add(RoleFunction.FARM_PRIORITY);
-    } else {
-      counts(farm, tokens);
-    }
-    for (MissingFunction missing : MissingFunction.values()) {
-      if (missing.finalOnly() && stage != CompositionStage.FINAL) {
+    farm(values(team, FunctionProfile::farmPriority), tokens, unknown);
+    for (CompositionToken token : CompositionToken.values()) {
+      if (token.function() == null || (token.finalOnly() && stage != CompositionStage.FINAL)) {
         continue;
       }
-      List<Double> values = values(team, p -> p.of(missing.function()));
-      switch (presence(values, properties.getMinimum().get(missing.function()))) {
-        case ABSENT -> tokens.add(missing.name());
-        case UNKNOWN -> unknown.add(missing.function());
+      List<Double> values = values(team, p -> p.of(token.function()));
+      switch (presence(values, properties.getMinimum().get(token.function()))) {
+        case ABSENT -> tokens.add(token.name());
+        case UNKNOWN -> unknown.add(token.function());
         case PRESENT -> {}
       }
     }
-    balance(farm, tokens, unknown);
     if (stage == CompositionStage.FINAL
         && changedRoles(team) >= properties.getIntentNotPlayedPlayers()) {
-      tokens.add("INTENT_NOT_PLAYED");
+      tokens.add(CompositionToken.INTENT_NOT_PLAYED.name());
     }
     return new CompositionVerdict(List.copyOf(tokens), List.copyOf(unknown));
   }
 
-  private void counts(List<Double> farm, List<String> tokens) {
+  /** Everything judged from farm priority; with any player's value unknown, none of it is. */
+  private void farm(List<Double> farm, List<String> tokens, Set<RoleFunction> unknown) {
+    if (hasUnknown(farm)) {
+      unknown.add(RoleFunction.FARM_PRIORITY);
+      return;
+    }
     long carries = farm.stream().filter(f -> f >= properties.getCarryFarm()).count();
     long supports = farm.stream().filter(f -> f <= properties.getSupportFarm()).count();
     if (carries == 0 || carries >= properties.getCarriesNotedFrom()) {
@@ -77,16 +76,11 @@ public class DefaultCompositionRules implements CompositionRules {
     if (supports == 0 || supports >= properties.getSupportsNotedFrom()) {
       tokens.add("SUPPORTS_" + supports);
     }
-  }
-
-  private void balance(List<Double> farm, List<String> tokens, Set<RoleFunction> unknown) {
-    switch (presence(farm, properties.getFarmEngine())) {
-      case ABSENT -> tokens.add("NO_FARM_ENGINE");
-      case UNKNOWN -> unknown.add(RoleFunction.FARM_PRIORITY);
-      case PRESENT -> {}
+    if (presence(farm, properties.getFarmEngine()) == Presence.ABSENT) {
+      tokens.add(CompositionToken.NO_FARM_ENGINE.name());
     }
-    if (!hasUnknown(farm) && farm.stream().allMatch(f -> f >= properties.getTopHeavyFarm())) {
-      tokens.add("TOP_HEAVY");
+    if (farm.stream().allMatch(f -> f >= properties.getTopHeavyFarm())) {
+      tokens.add(CompositionToken.TOP_HEAVY.name());
     }
   }
 

@@ -1,24 +1,21 @@
 package com.ako.dbuff.service.replay.analysis.composition;
 
-import com.ako.dbuff.dao.model.PlayerRoleDomain;
 import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.dao.model.TeamCompositionDomain;
 import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
-import com.ako.dbuff.dao.repo.PlayerRoleRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.role.FunctionProfile;
-import com.ako.dbuff.service.replay.analysis.role.LanePosition;
 import com.ako.dbuff.service.replay.analysis.role.RoleStage;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.StoredMatchModes;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,11 +35,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class TeamCompositionAnalyzer implements ReplayAnalyzer {
   private static final int TEAM_SIZE = 5;
+  private static final String ELLIPSIS = "...";
 
   private final List<CompositionRules> rules;
   private final StoredMatchModes modes;
   private final PlayerRoleProfileRepo profileRepo;
-  private final PlayerRoleRepo roleRepo;
   private final TeamCompositionRepo compositionRepo;
 
   @Override
@@ -75,16 +72,16 @@ public class TeamCompositionAnalyzer implements ReplayAnalyzer {
     if (modeRules == null) {
       return;
     }
-    Map<Long, Integer> finalRoles =
-        roleRepo.findByMatchId(matchId).stream()
-            .filter(r -> r.getRole() != null)
-            .collect(Collectors.toMap(PlayerRoleDomain::getPlayerSlot, PlayerRoleDomain::getRole));
     List<PlayerRoleProfileDomain> profiles = profileRepo.findByMatchId(matchId);
     List<TeamCompositionDomain> rows = new ArrayList<>();
     for (TeamSide side : TeamSide.values()) {
-      Map<Long, Integer> intentRoles = rolesOf(profiles, side, RoleStage.INTENT);
+      Map<RoleStage, List<PlayerRoleProfileDomain>> byStage = new EnumMap<>(RoleStage.class);
+      for (RoleStage profileStage : RoleStage.values()) {
+        byStage.put(profileStage, teamRows(matchId, profiles, side, profileStage));
+      }
+      Map<Long, Integer> intentRoles = rolesOf(byStage.get(RoleStage.INTENT));
       for (CompositionStage stage : CompositionStage.values()) {
-        List<PlayerRoleProfileDomain> team = teamRows(profiles, side, stage.profileStage());
+        List<PlayerRoleProfileDomain> team = byStage.get(stage.profileStage());
         if (team.isEmpty()) {
           continue;
         }
@@ -99,15 +96,19 @@ public class TeamCompositionAnalyzer implements ReplayAnalyzer {
         }
         boolean withIntent = stage == CompositionStage.FINAL && intentRoles.size() == TEAM_SIZE;
         List<TeamMember> members =
-            team.stream().map(p -> member(p, finalRoles, withIntent ? intentRoles : null)).toList();
+            team.stream().map(p -> member(p, withIntent ? intentRoles : null)).toList();
         CompositionVerdict verdict = modeRules.evaluate(stage, members);
         rows.add(
             TeamCompositionDomain.builder()
                 .matchId(matchId)
                 .team(side.name())
                 .stage(stage.name())
-                .tokens(String.join(",", verdict.tokens()))
-                .summary(verdict.summary())
+                .tokens(
+                    fit(
+                        String.join(",", verdict.tokens()),
+                        TeamCompositionDomain.TOKENS_LENGTH,
+                        ","))
+                .summary(fit(verdict.summary(), TeamCompositionDomain.SUMMARY_LENGTH, ""))
                 .analysisVersion(version())
                 .build());
       }
@@ -121,44 +122,75 @@ public class TeamCompositionAnalyzer implements ReplayAnalyzer {
     compositionRepo.deleteByMatchId(matchId);
   }
 
-  private static TeamMember member(
-      PlayerRoleProfileDomain p, Map<Long, Integer> finalRoles, Map<Long, Integer> intentRoles) {
-    boolean isFinal = RoleStage.FINAL.name().equals(p.getStage());
-    int role = isFinal ? finalRoles.getOrDefault(p.getPlayerSlot(), p.getRole()) : p.getRole();
+  /**
+   * The text cut to {@code max} characters: at the last {@code separator} for a list, so no half
+   * token is stored, or with an ellipsis for a sentence (empty separator).
+   */
+  static String fit(String text, int max, String separator) {
+    if (text.length() <= max) {
+      return text;
+    }
+    if (separator.isEmpty()) {
+      return text.substring(0, max - ELLIPSIS.length()) + ELLIPSIS;
+    }
+    int cut = text.lastIndexOf(separator, max);
+    return text.substring(0, cut < 0 ? max : cut);
+  }
+
+  private static TeamMember member(PlayerRoleProfileDomain p, Map<Long, Integer> intentRoles) {
     return new TeamMember(
         p.getPlayerSlot(),
-        role,
+        p.getRole(),
         intentRoles == null ? null : intentRoles.get(p.getPlayerSlot()),
-        profile(p));
+        new FunctionProfile(
+            null,
+            p.getFarmPriority(),
+            p.getJungle(),
+            p.getRoaming(),
+            p.getVisionDuty(),
+            p.getInitiation(),
+            p.getDisable(),
+            p.getSaveHeal(),
+            p.getDamage(),
+            p.getDurability()));
   }
 
-  private static FunctionProfile profile(PlayerRoleProfileDomain p) {
-    return new FunctionProfile(
-        p.getLane() == null ? null : LanePosition.valueOf(p.getLane()),
-        p.getFarmPriority(),
-        p.getJungle(),
-        p.getRoaming(),
-        p.getVisionDuty(),
-        p.getInitiation(),
-        p.getDisable(),
-        p.getSaveHeal(),
-        p.getDamage(),
-        p.getDurability());
-  }
-
+  /**
+   * The rows of one team and stage, one per slot (the last stored wins); rows without a slot or a
+   * role are left out. One line says what was dropped.
+   */
   private static List<PlayerRoleProfileDomain> teamRows(
-      List<PlayerRoleProfileDomain> profiles, TeamSide side, RoleStage stage) {
-    return profiles.stream()
-        .filter(p -> stage.name().equals(p.getStage()) && p.getRole() != null)
-        .filter(p -> TeamSide.ofSlot(p.getPlayerSlot()) == side)
-        .sorted(Comparator.comparing(PlayerRoleProfileDomain::getPlayerSlot))
-        .toList();
+      long matchId, List<PlayerRoleProfileDomain> profiles, TeamSide side, RoleStage stage) {
+    Map<Long, PlayerRoleProfileDomain> bySlot = new TreeMap<>();
+    int unusable = 0;
+    int repeated = 0;
+    for (PlayerRoleProfileDomain p : profiles) {
+      if (!stage.name().equals(p.getStage())
+          || (p.getPlayerSlot() != null && TeamSide.ofSlot(p.getPlayerSlot()) != side)) {
+        continue;
+      }
+      if (p.getPlayerSlot() == null || p.getRole() == null) {
+        unusable++;
+      } else if (bySlot.put(p.getPlayerSlot(), p) != null) {
+        repeated++;
+      }
+    }
+    if (unusable + repeated > 0) {
+      log.info(
+          "Match {}: {} {} profiles: {} without a slot or role left out, {} repeated slots merged",
+          matchId,
+          side,
+          stage,
+          unusable,
+          repeated);
+    }
+    return List.copyOf(bySlot.values());
   }
 
-  private static Map<Long, Integer> rolesOf(
-      List<PlayerRoleProfileDomain> profiles, TeamSide side, RoleStage stage) {
-    Map<Long, Integer> roles = new HashMap<>();
-    teamRows(profiles, side, stage).forEach(p -> roles.put(p.getPlayerSlot(), p.getRole()));
-    return roles;
+  private static Map<Long, Integer> rolesOf(List<PlayerRoleProfileDomain> rows) {
+    return rows.stream()
+        .collect(
+            Collectors.toMap(
+                PlayerRoleProfileDomain::getPlayerSlot, PlayerRoleProfileDomain::getRole));
   }
 }

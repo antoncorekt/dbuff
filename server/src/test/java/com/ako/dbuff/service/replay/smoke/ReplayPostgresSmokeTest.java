@@ -257,21 +257,6 @@ class ReplayPostgresSmokeTest {
               })
           .extracting(c -> c.getTeam())
           .containsExactlyInAnyOrder("RADIANT", "DIRE");
-      compositionRepo
-          .findByMatchId(match.getId())
-          .forEach(
-              c ->
-                  System.out.println(
-                      "COMPOSITION "
-                          + id
-                          + " "
-                          + c.getTeam()
-                          + " "
-                          + c.getStage()
-                          + " ["
-                          + c.getTokens()
-                          + "] "
-                          + c.getSummary()));
       assertThat(buybackRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(spikeRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(stateSegmentRepo.findByMatchId(match.getId())).isNotEmpty();

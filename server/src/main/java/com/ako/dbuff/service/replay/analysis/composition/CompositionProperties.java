@@ -42,10 +42,10 @@ public class CompositionProperties {
 
   @PostConstruct
   public void validate() {
-    for (MissingFunction missing : MissingFunction.values()) {
-      if (minimum.get(missing.function()) == null) {
+    for (CompositionToken token : CompositionToken.values()) {
+      if (token.function() != null && minimum.get(token.function()) == null) {
         throw new IllegalStateException(
-            "replay.analysis.composition.minimum has no value for " + missing.function());
+            "replay.analysis.composition.minimum has no value for " + token.function());
       }
     }
   }

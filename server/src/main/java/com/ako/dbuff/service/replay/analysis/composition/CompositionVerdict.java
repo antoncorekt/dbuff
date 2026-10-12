@@ -17,12 +17,12 @@ public record CompositionVerdict(List<String> tokens, List<RoleFunction> unknown
     String found =
         tokens.isEmpty()
             ? (unknown.isEmpty() ? "no gaps found" : "nothing found")
-            : tokens.stream().map(CompositionWords::token).collect(Collectors.joining("; "));
+            : tokens.stream().map(CompositionToken::words).collect(Collectors.joining("; "));
     if (unknown.isEmpty()) {
       return found;
     }
     return found
         + ". Unknown: "
-        + unknown.stream().map(CompositionWords::function).collect(Collectors.joining(", "));
+        + unknown.stream().map(RoleFunction::words).collect(Collectors.joining(", "));
   }
 }
