@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class OutlierAnalyzer implements ReplayAnalyzer {
   private static final long FIRST_DIRE_SLOT = 128;
   private static final Set<String> JOINED = Set.of("ACTIVE", "PRESENT_PASSIVE");
+  private static final int TEAM_SIZE = 5;
   private static final int MIN_FEEDER_DEATHS = 5;
   private static final int FEEDER_DEATH_FACTOR = 2;
 
@@ -94,7 +95,7 @@ public class OutlierAnalyzer implements ReplayAnalyzer {
       Map<Long, Integer> deaths,
       boolean dire) {
     List<Long> slots = worth.keySet().stream().filter(s -> (s >= FIRST_DIRE_SLOT) == dire).toList();
-    if (slots.isEmpty()) {
+    if (slots.size() != TEAM_SIZE) {
       return List.of();
     }
     int minutes = worth.get(slots.getFirst()).length;
@@ -112,7 +113,7 @@ public class OutlierAnalyzer implements ReplayAnalyzer {
         ShareRuns.of(
                 share,
                 s -> s > properties.getOutlierSharePercent() / 100.0,
-                properties.getOutlierMinutes(),
+                Math.max(1, properties.getOutlierMinutes()),
                 true)
             .forEach(r -> rows.add(row(matchId, slot, "NW_OUTLIER", r, rank, fights, died)));
       }
@@ -120,7 +121,7 @@ public class OutlierAnalyzer implements ReplayAnalyzer {
         ShareRuns.of(
                 share,
                 s -> s < properties.getFeederSharePercent() / 100.0,
-                properties.getFeederMinutes(),
+                Math.max(1, properties.getFeederMinutes()),
                 false)
             .forEach(r -> rows.add(row(matchId, slot, "FEEDER", r, rank, fights, died)));
       }
