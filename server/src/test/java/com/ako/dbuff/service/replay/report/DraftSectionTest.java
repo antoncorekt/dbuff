@@ -42,7 +42,7 @@ class DraftSectionTest {
         .containsExactly(
             "**Draft**",
             "Anton drafted Faceless Void Chronosphere (2nd), Sven Gods Strength (6th), Sven Storm"
-                + " Bolt (22nd)");
+                + " Bolt (11th)");
   }
 
   @Test
