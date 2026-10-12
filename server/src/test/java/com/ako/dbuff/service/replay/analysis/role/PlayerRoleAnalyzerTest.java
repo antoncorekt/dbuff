@@ -142,8 +142,8 @@ class PlayerRoleAnalyzerTest {
       stat.setHeroDamage(first ? 100L : 0L);
       stat.setHeroHealing(first ? 0L : 10L);
       stat.setDamageTaken(first ? 50L : 0L);
-      stat.setObsPlaced(first ? null : 1L);
-      stat.setSenPlaced(first ? null : 1L);
+      stat.setObsPlaced(first ? 0L : 1L);
+      stat.setSenPlaced(first ? 0L : 1L);
       statisticRepo.save(stat);
     }
     entityManager.flush();
@@ -155,7 +155,7 @@ class PlayerRoleAnalyzerTest {
       assertThat(p.getDamage()).isEqualTo(first ? 1.0 : 0.0);
       assertThat(p.getDurability()).isEqualTo(first ? 1.0 : 0.0);
       assertThat(p.getSaveHeal()).isEqualTo(first ? 0.0 : 0.5);
-      assertThat(p.getVisionDuty()).isEqualTo(first ? null : 0.5);
+      assertThat(p.getVisionDuty()).isEqualTo(first ? 0.0 : 0.5);
     }
   }
 

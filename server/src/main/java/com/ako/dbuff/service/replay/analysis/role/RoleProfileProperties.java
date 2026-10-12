@@ -32,6 +32,19 @@ public class RoleProfileProperties {
                 + unknown);
       }
     }
+    double[] fullShares = {
+      observed.getDamageFullShare(),
+      observed.getHealFullShare(),
+      observed.getDamageTakenFullShare(),
+      observed.getWardFullShare(),
+      observed.getLastHitFullShare()
+    };
+    for (double share : fullShares) {
+      if (!(share > 0)) {
+        throw new IllegalStateException(
+            "replay.analysis.role-profile.observed full shares must be above 0, got " + share);
+      }
+    }
     for (int role = 1; role <= RoleFitter.ROLES; role++) {
       Map<RoleFunction, Double> weights = fit.getWeights().get(role);
       for (RoleFunction function : RoleFunction.values()) {

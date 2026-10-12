@@ -113,7 +113,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
                         activity.getOrDefault(s.getPlayerSlot(), List.of()),
                         s.getHeroId(),
                         drafted.getOrDefault(s.getPlayerSlot(), List.of()),
-                        outputOf(s)))
+                        PlayerOutput.from(s)))
             .toList();
     List<PlayerRoleDomain> rows = new ArrayList<>();
     List<PlayerRoleProfileDomain> profiles = new ArrayList<>();
@@ -152,20 +152,6 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
     }
     roleRepo.saveAll(rows);
     profileRepo.saveAll(profiles);
-  }
-
-  private static PlayerOutput outputOf(PlayerMatchStatisticDomain stat) {
-    Long wards =
-        stat.getObsPlaced() == null && stat.getSenPlaced() == null
-            ? null
-            : (stat.getObsPlaced() == null ? 0 : stat.getObsPlaced())
-                + (stat.getSenPlaced() == null ? 0 : stat.getSenPlaced());
-    return new PlayerOutput(
-        stat.getHeroDamage(),
-        stat.getHeroHealing(),
-        stat.getDamageTaken(),
-        stat.getLastHits(),
-        wards);
   }
 
   private Optional<RoleResolver> resolverFor(GameModeProfile mode) {

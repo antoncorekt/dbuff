@@ -148,7 +148,7 @@ class ObservedProfilerTest {
   }
 
   @Test
-  void aFunctionIsUnknownForAPlayerWithNoStoredValueAndForAllWhenTheTeamTotalIsZero() {
+  void aStatIsUnknownForTheWholeTeamWhenAnyPlayerHasNoStoredValue() {
     List<FunctionProfile> missing =
         profiler.profile(
             team(
@@ -157,19 +157,43 @@ class ObservedProfilerTest {
                 new PlayerOutput(10L, null, null, null, null),
                 new PlayerOutput(10L, null, null, null, null),
                 new PlayerOutput(10L, null, null, null, null)));
-    List<FunctionProfile> silent =
-        profiler.profile(
-            team(
-                new PlayerOutput(0L, 0L, 0L, 0L, 0L),
-                new PlayerOutput(0L, 0L, 0L, 0L, 0L),
-                new PlayerOutput(0L, 0L, 0L, 0L, 0L),
-                new PlayerOutput(0L, 0L, 0L, 0L, 0L),
-                new PlayerOutput(0L, 0L, 0L, 0L, 0L)));
 
-    assertThat(missing.get(1).damage()).isNull();
-    assertThat(missing.get(0).damage()).isNotNull();
-    assertThat(silent).extracting(FunctionProfile::damage).containsOnlyNulls();
-    assertThat(silent).extracting(FunctionProfile::saveHeal).containsOnlyNulls();
+    assertThat(missing).extracting(FunctionProfile::damage).containsOnlyNulls();
+  }
+
+  @Test
+  void aTeamTotalOfZeroGivesEveryoneZero() {
+    PlayerOutput none = new PlayerOutput(0L, 0L, 0L, 0L, 0L);
+    List<FunctionProfile> silent = profiler.profile(team(none, none, none, none, none));
+
+    assertThat(silent).extracting(FunctionProfile::damage).containsOnly(0.0);
+    assertThat(silent).extracting(FunctionProfile::saveHeal).containsOnly(0.0);
+  }
+
+  @Test
+  void farmPriorityKeepsTheLastHitsWhenNoNetWorthIsStored() {
+    PlayerOutput leader = new PlayerOutput(null, null, null, 70L, null);
+    PlayerOutput other = new PlayerOutput(null, null, null, 7L, null);
+    List<RolePlayer> noWorth =
+        java.util.stream.IntStream.range(0, 5)
+            .mapToObj(
+                i ->
+                    new RolePlayer(
+                        i, 1L, null, null, List.of(), null, List.of(), i == 0 ? leader : other))
+            .toList();
+
+    List<FunctionProfile> profiles = profiler.profile(noWorth);
+
+    assertThat(profiles.get(0).farmPriority()).isEqualTo(1.0);
+    assertThat(profiles.get(1).farmPriority()).isBetween(0.0, 1.0);
+  }
+
+  @Test
+  void aTeamOfOneHasNoNetWorthPlaceToCompare() {
+    List<FunctionProfile> profiles =
+        profiler.profile(List.of(new RolePlayer(0, 1L, 9000L, null, List.of())));
+
+    assertThat(profiles.get(0).farmPriority()).isNull();
   }
 
   @Test

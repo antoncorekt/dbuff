@@ -68,29 +68,33 @@ public class ObservedProfiler implements StageProfiler {
 
   private static Double farm(
       double farmRank, int size, Double lastHitShare, RoleProfileProperties.Observed rules) {
-    Double byWorth = Double.isNaN(farmRank) ? null : (size - farmRank) / (size - 1);
-    if (byWorth == null || lastHitShare == null) {
+    Double byWorth = Double.isNaN(farmRank) || size < 2 ? null : (size - farmRank) / (size - 1);
+    if (byWorth == null) {
+      return lastHitShare;
+    }
+    if (lastHitShare == null) {
       return byWorth;
     }
     return (1 - rules.getLastHitFarmShare()) * byWorth + rules.getLastHitFarmShare() * lastHitShare;
   }
 
   /**
-   * The value of each player as his share of the team total over {@code fullShare}, cut at 1; null
-   * for a player with nothing stored, and for all of them when the team total is 0.
+   * The value of each player as his share of the team total over {@code fullShare}, cut at 1. When
+   * any player has no stored amount the team total is incomplete, so all are null; a total of 0
+   * gives 0 to everyone.
    */
   private static List<Double> teamShares(
       List<RolePlayer> team, Function<PlayerOutput, Long> reader, double fullShare) {
     List<Long> amounts = team.stream().map(p -> reader.apply(p.output())).toList();
-    long total = amounts.stream().filter(Objects::nonNull).mapToLong(Long::longValue).sum();
+    if (amounts.stream().anyMatch(Objects::isNull)) {
+      return amounts.stream().map(a -> (Double) null).toList();
+    }
+    long total = amounts.stream().mapToLong(Long::longValue).sum();
     return amounts.stream().map(a -> share(a, total, fullShare)).toList();
   }
 
-  private static Double share(Long amount, long total, double fullShare) {
-    if (amount == null || total <= 0) {
-      return null;
-    }
-    return clamp(amount / (double) total / fullShare);
+  private static Double share(long amount, long total, double fullShare) {
+    return total <= 0 ? Double.valueOf(0) : clamp(amount / (double) total / fullShare);
   }
 
   private static LanePosition lane(
@@ -128,6 +132,6 @@ public class ObservedProfiler implements StageProfiler {
   }
 
   private static double clamp(double value) {
-    return Math.max(0, Math.min(1, value));
+    return Double.isNaN(value) ? 0 : Math.max(0, Math.min(1, value));
   }
 }
