@@ -75,4 +75,13 @@ class ReasonWordingTest {
     assertThat(ReasonWording.phrase(team(null), "x")).isEqualTo("the team had a gap");
     assertThat(ReasonWording.phrase(team(""), "x")).isEqualTo("the team had a gap");
   }
+
+  @Test
+  void phrase_doesNotRepeatTheHeroWhenTheEvidenceStartsWithIt() {
+    assertThat(
+            ReasonWording.phrase(
+                player("INTENT_NOT_PLAYED", "Sven was drafted as offlane and played hard support"),
+                "Sven"))
+        .isEqualTo("Sven was drafted as offlane and played hard support");
+  }
 }

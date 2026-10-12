@@ -55,9 +55,10 @@ final class ReasonWording {
       return hero + " " + known.apply(evidence);
     }
     String code = reason.getCode() == null ? "" : reason.getCode();
-    return evidence.isEmpty()
-        ? hero + " " + code.toLowerCase(Locale.ROOT).replace('_', ' ')
-        : hero + ": " + evidence;
+    if (evidence.isEmpty()) {
+      return hero + " " + code.toLowerCase(Locale.ROOT).replace('_', ' ');
+    }
+    return evidence.startsWith(hero) ? evidence : hero + ": " + evidence;
   }
 
   private static String teamGap(String code) {
