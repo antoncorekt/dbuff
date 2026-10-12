@@ -7,6 +7,7 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.ItemRepository;
 import com.ako.dbuff.dao.repo.KillLogRepo;
+import com.ako.dbuff.dao.repo.MatchReportThreadRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.service.discord.DiscordMessageService;
 import com.ako.dbuff.service.match.report.analyzer.PartialDataAvailable;
@@ -93,7 +94,8 @@ class MatchReportOrchestratorSettingsTest {
             Mockito.mock(PlayerGameStatisticRepo.class),
             Mockito.mock(AbilityRepo.class),
             Mockito.mock(ItemRepository.class),
-            Mockito.mock(KillLogRepo.class));
+            Mockito.mock(KillLogRepo.class),
+            Mockito.mock(MatchReportThreadRepo.class));
   }
 
   private void report(InstanceSettings settings) {

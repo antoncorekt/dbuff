@@ -15,6 +15,18 @@ public interface ReplayParseRunRepo extends JpaRepository<ReplayParseRunDomain, 
 
   Optional<ReplayParseRunDomain> findByMatchIdAndParserVersion(Long matchId, Integer parserVersion);
 
+  /** Runs of this parser version that finished with analysis stored since the given time. */
+  @Query(
+      """
+      select r from ReplayParseRunDomain r
+      where r.parserVersion = :version
+        and r.status in ('DONE', 'PARTIAL')
+        and r.finishedAt >= :since
+      order by r.finishedAt
+      """)
+  List<ReplayParseRunDomain> findFinishedSince(
+      @Param("version") Integer version, @Param("since") LocalDateTime since);
+
   /** Runs of this parser version that may be tried again: due retries and abandoned leases. */
   @Query(
       """

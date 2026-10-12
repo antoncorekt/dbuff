@@ -7,7 +7,9 @@ import com.ako.dbuff.dao.repo.ItemRepository;
 import com.ako.dbuff.dao.repo.KillLogRepo;
 import com.ako.dbuff.dao.repo.MatchAnalysisRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
+import com.ako.dbuff.dao.repo.MatchReportThreadRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
+import com.ako.dbuff.dao.repo.ReplayReportPostedRepo;
 import com.ako.dbuff.service.match.data.MatchDetailService;
 import com.ako.dbuff.service.replay.ReplayDataService;
 import jakarta.persistence.EntityNotFoundException;
@@ -42,6 +44,8 @@ public class MatchDeletionService {
   private final MatchAnalysisRepo matchAnalysisRepo;
   private final MatchDetailService matchDetailService;
   private final ReplayDataService replayDataService;
+  private final MatchReportThreadRepo matchReportThreadRepo;
+  private final ReplayReportPostedRepo replayReportPostedRepo;
 
   /**
    * Deletes a match and all related data.
@@ -74,6 +78,8 @@ public class MatchDeletionService {
     matchDetailService.deleteByMatchId(matchId);
     log.debug("Deleting replay data for match {}", matchId);
     replayDataService.deleteByMatchId(matchId);
+    matchReportThreadRepo.deleteByMatchId(matchId);
+    replayReportPostedRepo.deleteByMatchId(matchId);
 
     // Delete player statistics associated with the match
     log.debug("Deleting player statistics for match {}", matchId);
