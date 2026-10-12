@@ -187,10 +187,30 @@ public abstract class ReplayPipelineFixture {
       stat.setLaneRole(optLong(p, "lane_role"));
       stat.setNetWorth(optLong(p, "net_worth"));
       stat.setPositionEst(optLong(p, "position_est"));
+      stat.setHeroDamage(optLong(p, "hero_damage"));
+      stat.setHeroHealing(optLong(p, "hero_healing"));
+      stat.setDamageTaken(heroDamageTaken(p));
+      stat.setLastHits(optLong(p, "last_hits"));
+      stat.setObsPlaced(optLong(p, "obs_placed"));
+      stat.setSenPlaced(optLong(p, "sen_placed"));
       playerStatRepo.save(stat);
     }
     seedOpenDotaFights(match.getId(), json);
     return match;
+  }
+
+  private static Long heroDamageTaken(JsonNode player) {
+    JsonNode taken = player.get("damage_taken");
+    if (taken == null || !taken.isObject()) {
+      return null;
+    }
+    long total = 0;
+    for (var entry : taken.properties()) {
+      if (entry.getKey().startsWith("npc_dota_hero")) {
+        total += entry.getValue().asLong();
+      }
+    }
+    return total;
   }
 
   /**
