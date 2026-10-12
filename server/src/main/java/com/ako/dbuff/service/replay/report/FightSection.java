@@ -82,9 +82,10 @@ public class FightSection implements ReplayReportSection {
         fight.getWinner() == null || fight.getWinner().equals("DRAW")
             ? "drawn"
             : fight.getWinner().equals(dire ? "DIRE" : "RADIANT") ? "won" : "lost";
-    return "%s teamfight (%s, deaths %d to %d): %s was %s, %s."
+    return "%s %s (%s, deaths %d to %d): %s was %s, %s."
         .formatted(
             GameTime.clock(fight.getStartSeconds()),
+            "TEAMFIGHT".equals(fight.getType()) ? "teamfight" : "fight",
             result,
             own,
             other,
@@ -127,7 +128,7 @@ public class FightSection implements ReplayReportSection {
                         .filter(u -> "READY_NOT_CAST".equals(u.getNonCastReason()))
                         .count()))
         .filter(e -> e.getValue() >= MIN_FIGHTS_FOR_ABILITY_LINE)
-        .max(Map.Entry.comparingByValue())
+        .max(Map.Entry.<String, Long>comparingByValue().thenComparing(Map.Entry.comparingByKey()))
         .map(
             e ->
                 "%s had %s ready and did not cast it in %d of %d fights."

@@ -82,7 +82,7 @@ class FightSectionTest {
             "**Fights**",
             "23:10 teamfight (lost, deaths 1 to 4): Anton was farming away from it, with no"
                 + " teleport.",
-            "Anton had Void Chronosphere ready and did not cast it in 2 of 3 fights.");
+            "Anton had Faceless Void Chronosphere ready and did not cast it in 2 of 3 fights.");
   }
 
   @Test

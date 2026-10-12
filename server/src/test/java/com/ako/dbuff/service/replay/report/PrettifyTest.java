@@ -16,7 +16,7 @@ class PrettifyTest {
 
   @Test
   void ability_leavesTheHeroOutOfAnAbilityAndThePrefixOffAnItem() {
-    assertThat(Prettify.ability("sven_storm_bolt")).isEqualTo("Storm Bolt");
+    assertThat(Prettify.ability("sven_storm_bolt")).isEqualTo("Sven Storm Bolt");
     assertThat(Prettify.ability("item_black_king_bar")).isEqualTo("Black King Bar");
     assertThat(Prettify.ability("stunned")).isEqualTo("Stunned");
   }

@@ -7,7 +7,6 @@ import java.util.stream.Collectors;
 /** Turns the game's internal names into something a person would write. */
 final class Prettify {
   private static final String HERO_PREFIX = "npc_dota_hero_";
-  private static final int ABILITY_PARTS_WITH_HERO = 3;
 
   private Prettify() {}
 
@@ -23,17 +22,11 @@ final class Prettify {
   }
 
   /**
-   * {@code sven_storm_bolt} to {@code Storm Bolt}, {@code item_black_king_bar} to {@code Black King
-   * Bar}: an ability's name starts with its hero, which is left out.
+   * {@code item_black_king_bar} to {@code Black King Bar}, {@code sven_storm_bolt} to {@code Sven
+   * Storm Bolt}.
    */
   static String ability(String internal) {
-    if (internal.startsWith("item_")) {
-      return words(internal.substring("item_".length()));
-    }
-    String[] parts = internal.split("_");
-    return parts.length >= ABILITY_PARTS_WITH_HERO
-        ? words(String.join("_", Arrays.copyOfRange(parts, 1, parts.length)))
-        : words(internal);
+    return words(internal.startsWith("item_") ? internal.substring("item_".length()) : internal);
   }
 
   private static String words(String snake) {

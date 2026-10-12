@@ -43,8 +43,9 @@ public class DeathSection implements ReplayReportSection {
   @Override
   public List<String> lines(ReplayReportInput input) {
     List<String> lines = new ArrayList<>();
+    List<DeathAnalysisDomain> deaths = deathRepo.findByMatchId(input.matchId());
     for (Map.Entry<Long, String> player : input.namesBySlot().entrySet()) {
-      deathRepo.findByMatchId(input.matchId()).stream()
+      deaths.stream()
           .filter(
               d -> d.getPlayerSlot().equals(player.getKey()) && SEVERITY.containsKey(d.getReason()))
           .sorted(
@@ -77,10 +78,7 @@ public class DeathSection implements ReplayReportSection {
       case "BKB_READY_UNUSED" -> "had Black King Bar ready and did not use it";
       case "BKB_ON_COOLDOWN" -> "Black King Bar was on cooldown";
       case "BKB_EXPIRED" -> "Black King Bar had just run out";
-      case "BKB_PIERCED" ->
-          "a disable went through Black King Bar ("
-              + Prettify.ability(String.valueOf(d.getImmunityPiercedBy()).replace("modifier_", ""))
-              + ")";
+      case "BKB_PIERCED" -> "a disable went through Black King Bar";
       case "DISABLE_CHAIN" ->
           String.format(
               Locale.ROOT, "disabled for %.1f s in the last seconds", d.getDisableSeconds());
