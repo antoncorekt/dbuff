@@ -1,6 +1,9 @@
 # Replay extraction and analytics plan (Groups 1-6)
 
-Status: plan, not implemented. Written 2026-10-11 for an executing agent.
+Status: **partly implemented. Start with `2026-10-12-replay-status-and-next-steps.md`**: it lists what is merged
+(PRs #8-#17), how we work, what is not yet verified and the next PRs in order. The sections below are the design
+and keep their numbering; blockquotes marked "Implemented" record what was built and what was found.
+Originally written 2026-10-11 for an executing agent.
 Companion docs (same branch `docs/replay-research`):
 - `docs/superpowers/specs/2026-10-11-replay-parsing-research.md` - why Clarity, replay download, OpenDota gaps.
 - `docs/superpowers/specs/2026-10-11-ability-draft-replay-spike.md` - Ability Draft fields, verified on 2 replays.
@@ -866,7 +869,7 @@ Queries for focus players join `ReplayPlayerDomain` on `accountId`, so the focus
 | WP5 | Group 4: building kills/pressure, phase summaries, state segments, team behaviour | WP2, WP4 | M | section 8.4 |
 | WP6 | Group 5: deaths, BKB logic, buybacks, end game row. Spikes S4, S11 | WP4 | M | section 9.6 |
 | WP7 | Group 6: spikes, factors, outliers. Spike S10 thresholds | WP3-WP6 | M | section 10.6 |
-| WP8 | Reports: analyzers under `service/match/report/analyzer/` (draft, lane, fight, death, spike), `/stats draft`, `/match` replay detail, AI prompt inputs | WP1-WP7 | M | a Discord report shows draft + lane + fight findings for a focus player |
+| WP8 | Reports, planned in `2026-10-11-replay-discord-report-plan.md` (work packages R0-R7, shipped group by group after the matching extraction WP): stage-3 follow-up in the match thread, analyzers, formatters, settings; `/stats draft`; AI prompt inputs | WP1-WP7 | M | a Discord report shows draft + lane + fight findings for a focus player |
 | WP9 | Operations: admin recompute of an `analysisVersion` (shares the one-replay semaphore), retention checks, disk/temp cleanup, load test with 20 replays one after another on the prod-sized heap (the single-replay memory check is already a WP0 exit criterion) | WP0-WP7 | S | 20 replays at `-Xmx512m` without GC thrash; temp files always deleted |
 
 Order and parallelism: WP0 first. WP1 and WP2 can run in parallel after WP0. WP3 and WP4 depend on WP2 (WP4 also on
