@@ -21,6 +21,11 @@ final class Prettify {
     return words(name);
   }
 
+  /** A replay entity name: {@code PhantomAssassin} to {@code Phantom Assassin}. */
+  static String entity(String camelCase) {
+    return camelCase == null ? "" : camelCase.replaceAll("([a-z0-9])([A-Z])", "$1 $2");
+  }
+
   /**
    * {@code item_black_king_bar} to {@code Black King Bar}, {@code sven_storm_bolt} to {@code Sven
    * Storm Bolt}.

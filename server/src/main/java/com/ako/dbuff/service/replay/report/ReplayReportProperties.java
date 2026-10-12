@@ -24,6 +24,12 @@ public class ReplayReportProperties {
   /** The longest a team's composition verdict line may be; a longer one ends in an ellipsis. */
   private int maxCompositionLineLength = 300;
 
+  /** The most reasons a lost fight in the swings section gives. */
+  private int maxReasonsPerFight = 3;
+
+  /** The most lost fights one swing tells the reasons of. */
+  private int maxLostFightsPerSwing = 2;
+
   /** How far back a finished replay run is looked at for an analysis not yet posted. */
   private int lookbackHours = 48;
 }
