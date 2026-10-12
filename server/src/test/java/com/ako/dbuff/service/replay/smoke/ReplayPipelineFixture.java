@@ -109,51 +109,50 @@ public abstract class ReplayPipelineFixture {
     return Files.exists(fixture(id + ".json")) && Files.exists(fixture(id + ".dem.zst"));
   }
 
-  /** The pipeline changes the schema and commits data, so it only runs against this machine. */
-  protected static boolean isLocalDatabase() {
-    String url = System.getenv("SMOKE_PG_URL");
-    return url == null || url.contains("localhost") || url.contains("127.0.0.1");
-  }
-
   protected MatchDomain seedMatch(String id) throws IOException {
     JsonNode json = new ObjectMapper().readTree(fixture(id + ".json").toFile());
     MatchDomain match = new MatchDomain();
     match.setId(Long.parseLong(id));
-    match.setReplayCluster(json.get("cluster").asLong());
-    match.setReplaySalt(json.get("replay_salt").asLong());
-    match.setGameModeId(json.get("game_mode").asLong());
-    match.setDuration(json.get("duration").asLong());
-    match.setStartTime(json.get("start_time").asLong());
-    match.setRadiantWin(json.get("radiant_win").asBoolean());
-    match.setRadiantScore(json.get("radiant_score").asLong());
-    match.setDireScore(json.get("dire_score").asLong());
+    match.setReplayCluster(optLong(json, "cluster"));
+    match.setReplaySalt(optLong(json, "replay_salt"));
+    match.setGameModeId(optLong(json, "game_mode"));
+    match.setDuration(optLong(json, "duration"));
+    match.setStartTime(optLong(json, "start_time"));
+    match.setRadiantWin(
+        json.hasNonNull("radiant_win") ? json.get("radiant_win").asBoolean() : null);
+    match.setRadiantScore(optLong(json, "radiant_score"));
+    match.setDireScore(optLong(json, "dire_score"));
     matchRepo.save(match);
     playerStatRepo.deleteAll(playerStatRepo.findAllByMatchId(match.getId()));
     timelineRepo.deleteByMatchId(match.getId());
-    for (JsonNode p : json.get("players")) {
-      long slot = p.get("player_slot").asLong();
-      for (int minute = 0; minute < p.get("gold_t").size(); minute++) {
-        long gold = p.get("gold_t").get(minute).asLong();
+    for (JsonNode p : json.path("players")) {
+      long slot = p.path("player_slot").asLong();
+      for (int minute = 0; minute < p.path("gold_t").size(); minute++) {
+        long gold = p.path("gold_t").path(minute).asLong();
         timelineRepo.save(
             PlayerTimelineDomain.builder()
                 .matchId(match.getId())
                 .playerSlot(slot)
                 .gameMinute(minute)
                 .gold(gold)
-                .xp(p.get("xp_t").get(minute).asLong())
+                .xp(p.path("xp_t").path(minute).asLong())
                 .networth(gold + STARTING_WORTH)
                 .build());
       }
       PlayerMatchStatisticDomain stat = new PlayerMatchStatisticDomain();
       stat.setMatchId(match.getId());
       stat.setPlayerSlot(slot);
-      stat.setPlayerId(p.get("account_id").asLong());
-      stat.setHeroId(p.get("hero_id").asLong());
-      stat.setLaneRole(p.get("lane_role").asLong());
-      stat.setNetWorth(p.get("net_worth").asLong());
-      stat.setPositionEst(p.hasNonNull("position_est") ? p.get("position_est").asLong() : null);
+      stat.setPlayerId(optLong(p, "account_id"));
+      stat.setHeroId(optLong(p, "hero_id"));
+      stat.setLaneRole(optLong(p, "lane_role"));
+      stat.setNetWorth(optLong(p, "net_worth"));
+      stat.setPositionEst(optLong(p, "position_est"));
       playerStatRepo.save(stat);
     }
     return match;
+  }
+
+  private static Long optLong(JsonNode node, String field) {
+    return node.hasNonNull(field) ? node.get(field).asLong() : null;
   }
 }

@@ -52,4 +52,40 @@ class RoleLoopDiffTest {
     assertThat(RoleLoopDiff.changes(RoleLoopReport.unavailable(1, "x"), report("1", "A")))
         .containsExactly("slot 0: added", "slot 5: added", "RADIANT FINAL: added");
   }
+
+  @Test
+  void aSkippedMatchIsNotListedAsRemoved() {
+    assertThat(RoleLoopDiff.changes(report("1", "A"), RoleLoopReport.unavailable(1, "no fixture")))
+        .containsExactly("skipped this round (no fixture)");
+  }
+
+  @Test
+  void escapedPipesCrlfAndTrailingBlanksAreRead() {
+    String before = report("1", "A").replace("| 0 | Sniper", "| 0 | Sni\\|per");
+    String after =
+        report("2", "A").replace("| 0 | Sniper", "| 0 | Sni\\|per").replace("\n", "  \r\n");
+
+    assertThat(RoleLoopDiff.changes(before, after)).containsExactly("slot 0, final: 1 -> 2");
+  }
+
+  @Test
+  void aChangedHeaderIsAFormatChange() {
+    String after =
+        report("1", "A").replace("| slot | hero | intent | final |", "| slot | hero | final |");
+
+    assertThat(RoleLoopDiff.changes(report("1", "A"), after))
+        .singleElement()
+        .asString()
+        .startsWith("format changed in Roles");
+  }
+
+  @Test
+  void aRowWithTheWrongCellCountIsAFormatChange() {
+    String after = report("1", "A").replace("| 5 | Axe | 3 | 3 |", "| 5 | Axe | 3 |");
+
+    assertThat(RoleLoopDiff.changes(report("1", "A"), after))
+        .singleElement()
+        .asString()
+        .startsWith("format changed in Roles, slot 5");
+  }
 }

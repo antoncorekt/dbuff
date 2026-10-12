@@ -45,14 +45,42 @@ final class RoleLoopReport {
 
   private RoleLoopReport() {}
 
+  private static final String NOT_REPORTED = "Not reported: ";
+
   static String unavailable(long matchId, String reason) {
-    return "# Match %d%n%nNot reported: %s%n".formatted(matchId, reason);
+    return "# Match %d\n\n%s%s\n".formatted(matchId, NOT_REPORTED, singleLine(reason));
+  }
+
+  static boolean isUnavailable(String report) {
+    return report.lines().anyMatch(l -> l.startsWith(NOT_REPORTED));
+  }
+
+  static String reasonOf(String report) {
+    return report
+        .lines()
+        .filter(l -> l.startsWith(NOT_REPORTED))
+        .map(l -> l.substring(NOT_REPORTED.length()))
+        .findFirst()
+        .orElse("");
+  }
+
+  /** A table cell: a pipe or a line break in a value must not split the row. */
+  static String cell(String value) {
+    return singleLine(value).replace("\\", "\\\\").replace("|", "\\|");
+  }
+
+  private static String singleLine(String value) {
+    return value.replaceAll("\\s*[\\r\\n]+\\s*", " ");
   }
 
   static String render(MatchData d) {
     List<String> out = new ArrayList<>();
     out.add(header(d));
     out.add("");
+    if (d.stats().isEmpty()) {
+      out.add("**No player statistics stored.**");
+      return String.join("\n", out) + "\n";
+    }
     boolean noProfiles = d.profiles().isEmpty() && d.roles().isEmpty();
     boolean noIntent = d.profiles().stream().noneMatch(p -> "INTENT".equals(p.getStage()));
     if (noProfiles) {
@@ -115,11 +143,11 @@ final class RoleLoopReport {
             "| %d | %s | %s | %s |"
                 .formatted(
                     slot,
-                    hero(d, stat),
+                    cell(hero(d, stat)),
                     stage(d, slot, "INTENT")
                         .map(p -> String.valueOf(p.getRole()))
                         .orElse(NO_INTENT),
-                    finalRole(d, slot).map(String::valueOf).orElse("none")));
+                    finalRole(d, slot).orElse("none")));
       }
     }
     return rows;
@@ -137,7 +165,7 @@ final class RoleLoopReport {
                     team,
                     stage,
                     composition(d, team, stage)
-                        .map(c -> blankAs(c.getTokens(), "no findings"))
+                        .map(c -> cell(blankAs(c.getTokens(), "no findings")))
                         .orElse("none stored")));
       }
     }
@@ -176,9 +204,9 @@ final class RoleLoopReport {
   private static String stageLine(PlayerRoleProfileDomain p) {
     return "role %s (confidence %s), fitRole %s, lane %s%n  - roleScores %s%n  - %s%n  - evidence: %s"
         .formatted(
-            orQuestion(p.getRole()),
+            roleText(p.getRole()),
             number(p.getConfidence()),
-            orQuestion(p.getFitRole()),
+            roleText(p.getFitRole()),
             p.getLane() == null ? "unknown" : p.getLane(),
             blankAs(p.getRoleScores(), "unknown"),
             functions(p),
@@ -230,15 +258,19 @@ final class RoleLoopReport {
         .findFirst();
   }
 
-  private static Optional<Integer> finalRole(MatchData d, long slot) {
+  private static Optional<String> finalRole(MatchData d, long slot) {
     return stage(d, slot, "FINAL")
-        .map(PlayerRoleProfileDomain::getRole)
+        .map(p -> roleText(p.getRole()))
         .or(
             () ->
                 d.roles().stream()
                     .filter(r -> r.getPlayerSlot() == slot)
                     .findFirst()
-                    .map(PlayerRoleDomain::getRole));
+                    .map(r -> roleText(r.getRole())));
+  }
+
+  private static String roleText(Integer role) {
+    return role == null ? "unknown" : String.valueOf(role);
   }
 
   private static List<String> skills(MatchData d, long slot) {

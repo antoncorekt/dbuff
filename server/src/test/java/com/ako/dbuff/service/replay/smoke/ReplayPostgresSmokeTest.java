@@ -30,7 +30,6 @@ import com.ako.dbuff.service.replay.report.FightSection;
 import com.ako.dbuff.service.replay.report.MovementSection;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.SwingSection;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -88,9 +87,6 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Commit
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   void aRealReplayGoesThroughEveryStageAndLandsInPostgres() throws Exception {
-    Assumptions.assumeTrue(
-        isLocalDatabase(),
-        "The smoke test changes the schema and commits data, so it only runs against localhost");
     for (String id : MATCHES) {
       MatchDomain match = seedMatch(id);
 

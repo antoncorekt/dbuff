@@ -191,4 +191,70 @@ class RoleLoopReportTest {
     assertThat(RoleLoopReport.unavailable(5L, "no fixture"))
         .isEqualTo("# Match 5\n\nNot reported: no fixture\n");
   }
+
+  @Test
+  void aNullRoleOnAnExistingRowReadsUnknownNotNull() {
+    String report =
+        RoleLoopReport.render(
+            data(List.of(), List.of(profile(0, "FINAL", 1, 0.5)), List.of(), List.of()));
+    PlayerRoleProfileDomain noRole = profile(0, "FINAL", 1, 0.5);
+    noRole.setRole(null);
+    noRole.setFitRole(null);
+
+    String withNull = RoleLoopReport.render(data(List.of(), List.of(noRole), List.of(), List.of()));
+
+    assertThat(withNull).contains("| 0 | Sniper | n/a | unknown |").doesNotContain("null");
+    assertThat(withNull).contains("role unknown (confidence 0.64), fitRole unknown");
+    assertThat(report).contains("| 0 | Sniper | n/a | 1 |");
+  }
+
+  @Test
+  void aPipeInAValueDoesNotSplitTheRow() {
+    String report =
+        RoleLoopReport.render(
+            data(
+                List.of(),
+                List.of(),
+                List.of(
+                    TeamCompositionDomain.builder()
+                        .matchId(MATCH)
+                        .team("DIRE")
+                        .stage("FINAL")
+                        .tokens("A|B\nC")
+                        .build()),
+                List.of()));
+
+    assertThat(report).contains("| DIRE | FINAL | A\\|B C |");
+  }
+
+  @Test
+  void aMatchWithoutPlayerStatisticsSaysSo() {
+    MatchData noStats =
+        new MatchData(
+            MATCH,
+            match,
+            "All Pick",
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of());
+
+    String report = RoleLoopReport.render(noStats);
+
+    assertThat(report).contains("**No player statistics stored.**").doesNotContain("## Roles");
+  }
+
+  @Test
+  void anUnavailableReportIsRecognisedAndItsReasonRead() {
+    String report = RoleLoopReport.unavailable(5L, "skipped: a\nb");
+
+    assertThat(RoleLoopReport.isUnavailable(report)).isTrue();
+    assertThat(RoleLoopReport.reasonOf(report)).isEqualTo("skipped: a b");
+    assertThat(
+            RoleLoopReport.isUnavailable(
+                RoleLoopReport.render(data(List.of(), List.of(), List.of(), List.of()))))
+        .isFalse();
+  }
 }

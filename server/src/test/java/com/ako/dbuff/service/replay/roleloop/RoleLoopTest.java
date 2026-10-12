@@ -24,7 +24,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -61,32 +60,48 @@ class RoleLoopTest extends ReplayPipelineFixture {
   @Test
   @Commit
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  void writesTheReviewReportsOfOneRound() throws IOException {
-    Assumptions.assumeTrue(
-        isLocalDatabase(), "The loop changes the schema and commits data, so it needs localhost");
-    String requested = System.getenv("ROUND");
+  void writesTheReviewReportsOfOneRound() {
     RoleLoopRound round =
         RoleLoopRound.open(
-            OUTPUT, requested == null || requested.isBlank() ? null : Integer.valueOf(requested));
+            OUTPUT, System.getenv("ROUND"), "1".equals(System.getenv("ROUND_OVERWRITE")));
     List<String> summary = new ArrayList<>();
     summary.add("# Round %02d".formatted(round.number()));
-    for (long id : RoleLoopMatchList.read(MATCH_LIST)) {
-      String how = prepare(id);
-      String report = reportOf(id, how);
-      round.write(id + ".md", report);
-      List<String> changes =
-          round
-              .previous(id + ".md")
-              .map(before -> RoleLoopDiff.changes(before, report))
-              .orElse(null);
-      summary.add("");
-      summary.add("## " + report.lines().findFirst().orElse("Match " + id).substring(2));
-      summary.add("- " + how);
-      summary.addAll(changeLines(changes));
+    try {
+      for (long id : RoleLoopMatchList.read(MATCH_LIST)) {
+        summarise(round, id, summary);
+      }
+    } finally {
+      round.write("summary.md", String.join("\n", summary) + "\n");
+      System.out.println(String.join("\n", summary));
+      System.out.println("Reports in " + round.dir().toAbsolutePath());
     }
-    round.write("summary.md", String.join("\n", summary) + "\n");
-    System.out.println(String.join("\n", summary));
-    System.out.println("Reports in " + round.dir().toAbsolutePath());
+  }
+
+  private record Outcome(String how, String report) {}
+
+  private void summarise(RoleLoopRound round, long id, List<String> summary) {
+    Outcome outcome = run(id);
+    round.write(id + ".md", outcome.report());
+    List<String> changes =
+        round
+            .previous(id + ".md", r -> !RoleLoopReport.isUnavailable(r))
+            .map(before -> RoleLoopDiff.changes(before, outcome.report()))
+            .orElse(null);
+    summary.add("");
+    summary.add("## " + outcome.report().lines().findFirst().orElse("Match " + id).substring(2));
+    summary.add("- " + outcome.how());
+    summary.addAll(changeLines(changes));
+  }
+
+  /** One bad match is reported as such and does not stop the round. */
+  private Outcome run(long id) {
+    try {
+      String how = prepare(id);
+      return new Outcome(how, reportOf(id, how));
+    } catch (Exception e) {
+      String how = "failed: " + e;
+      return new Outcome(how, RoleLoopReport.unavailable(id, how));
+    }
   }
 
   private static List<String> changeLines(List<String> changes) {

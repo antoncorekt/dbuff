@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RoleLoopFilesTest {
   @TempDir Path base;
@@ -15,7 +16,7 @@ class RoleLoopFilesTest {
   void theMatchListIgnoresCommentsBlanksAndRepeats() {
     assertThat(
             RoleLoopMatchList.parse(
-                List.of("# Ability Draft", "", " 11 ", "22 # a note", "11", "  # x")))
+                List.of("# Ability Draft", "", " 11 ", "22 # a note", "11", "  # x"), "list"))
         .containsExactly(11L, 22L);
   }
 
@@ -27,14 +28,14 @@ class RoleLoopFilesTest {
 
   @Test
   void theFirstRoundIsOneAndTheNextFollowsTheLastExisting() {
-    assertThat(RoleLoopRound.open(base, null).number()).isEqualTo(1);
+    assertThat(RoleLoopRound.open(base, null, false).number()).isEqualTo(1);
     new RoleLoopRound(base, 3).write("a.md", "x");
 
-    RoleLoopRound next = RoleLoopRound.open(base, null);
+    RoleLoopRound next = RoleLoopRound.open(base, null, false);
 
     assertThat(next.number()).isEqualTo(4);
     assertThat(next.dir().getFileName().toString()).isEqualTo("round-04");
-    assertThat(RoleLoopRound.open(base, 2).number()).isEqualTo(2);
+    assertThat(RoleLoopRound.open(base, "2", false).number()).isEqualTo(2);
   }
 
   @Test
@@ -44,7 +45,41 @@ class RoleLoopFilesTest {
 
     RoleLoopRound third = new RoleLoopRound(base, 3);
 
-    assertThat(third.previous("a.md")).contains("one");
-    assertThat(new RoleLoopRound(base, 1).previous("a.md")).isEmpty();
+    assertThat(third.previous("a.md", r -> true)).contains("one");
+    assertThat(new RoleLoopRound(base, 1).previous("a.md", r -> true)).isEmpty();
+  }
+
+  @Test
+  void aMalformedLineIsNamedWithItsFileAndNumber() {
+    assertThatThrownBy(() -> RoleLoopMatchList.parse(List.of("11", "# ok", "12ab"), "matches.txt"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("matches.txt line 3: not a match id: '12ab'");
+  }
+
+  @Test
+  void aBadRoundNumberIsExplained() {
+    assertThatThrownBy(() -> RoleLoopRound.open(base, "two", false))
+        .hasMessageContaining("ROUND must be a positive whole number, got 'two'");
+    assertThatThrownBy(() -> RoleLoopRound.open(base, "0", false))
+        .hasMessageContaining("positive whole number");
+  }
+
+  @Test
+  void anExplicitRoundWithReportsIsNotOverwrittenUnlessAsked() {
+    new RoleLoopRound(base, 2).write("a.md", "x");
+
+    assertThatThrownBy(() -> RoleLoopRound.open(base, "2", false))
+        .hasMessageContaining("ROUND_OVERWRITE=1");
+    assertThat(RoleLoopRound.open(base, "2", true).number()).isEqualTo(2);
+    assertThat(RoleLoopRound.open(base, "3", false).number()).isEqualTo(3);
+  }
+
+  @Test
+  void aSkippedReportIsNotTheBaseline() {
+    new RoleLoopRound(base, 1).write("a.md", "# Match 1\n\n## Roles\n");
+    new RoleLoopRound(base, 2).write("a.md", RoleLoopReport.unavailable(1, "no fixture"));
+
+    assertThat(new RoleLoopRound(base, 3).previous("a.md", r -> !RoleLoopReport.isUnavailable(r)))
+        .contains("# Match 1\n\n## Roles\n");
   }
 }

@@ -1,7 +1,6 @@
 package com.ako.dbuff.service.replay.roleloop;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -16,14 +15,19 @@ final class RoleLoopDiff {
   private RoleLoopDiff() {}
 
   static List<String> changes(String previous, String current) {
+    if (RoleLoopReport.isUnavailable(current)) {
+      return List.of("skipped this round (" + RoleLoopReport.reasonOf(current) + ")");
+    }
     List<String> out = new ArrayList<>();
     out.addAll(
         compare(
+            RoleLoopReport.ROLES,
             "slot",
             table(previous, RoleLoopReport.ROLES, ROLE_KEY_COLUMNS),
             table(current, RoleLoopReport.ROLES, ROLE_KEY_COLUMNS)));
     out.addAll(
         compare(
+            RoleLoopReport.VERDICTS,
             "",
             table(previous, RoleLoopReport.VERDICTS, VERDICT_KEY_COLUMNS),
             table(current, RoleLoopReport.VERDICTS, VERDICT_KEY_COLUMNS)));
@@ -32,7 +36,13 @@ final class RoleLoopDiff {
 
   private record Table(List<String> header, Map<String, List<String>> rows, int keyColumns) {}
 
-  private static List<String> compare(String keyLabel, Table before, Table after) {
+  private static List<String> compare(String heading, String keyLabel, Table before, Table after) {
+    boolean bothPresent = !before.header().isEmpty() && !after.header().isEmpty();
+    if (bothPresent && !before.header().equals(after.header())) {
+      return List.of(
+          "format changed in %s: columns %s -> %s"
+              .formatted(heading, before.header(), after.header()));
+    }
     List<String> out = new ArrayList<>();
     Set<String> keys = new LinkedHashSet<>(before.rows().keySet());
     keys.addAll(after.rows().keySet());
@@ -42,12 +52,16 @@ final class RoleLoopDiff {
       List<String> is = after.rows().get(key);
       if (was == null || is == null) {
         out.add(label + ": " + (was == null ? "added" : "removed"));
-        continue;
-      }
-      for (int i = after.keyColumns(); i < is.size(); i++) {
-        if (i < was.size() && !was.get(i).equals(is.get(i))) {
-          out.add(
-              "%s, %s: %s -> %s".formatted(label, after.header().get(i), was.get(i), is.get(i)));
+      } else if (was.size() != is.size() || is.size() != after.header().size()) {
+        out.add(
+            "format changed in %s, %s: %d -> %d cells, header has %d"
+                .formatted(heading, label, was.size(), is.size(), after.header().size()));
+      } else {
+        for (int i = after.keyColumns(); i < is.size(); i++) {
+          if (!was.get(i).equals(is.get(i))) {
+            out.add(
+                "%s, %s: %s -> %s".formatted(label, after.header().get(i), was.get(i), is.get(i)));
+          }
         }
       }
     }
@@ -59,7 +73,8 @@ final class RoleLoopDiff {
     List<String> header = List.of();
     boolean inSection = false;
     boolean seenHeader = false;
-    for (String line : report.split("\n")) {
+    for (String raw : report.split("\\R")) {
+      String line = raw.strip();
       if (line.startsWith("## ")) {
         inSection = line.substring(3).strip().equals(heading);
         continue;
@@ -67,17 +82,35 @@ final class RoleLoopDiff {
       if (!inSection || !line.startsWith("|") || line.startsWith("|---")) {
         continue;
       }
-      List<String> cells =
-          Arrays.stream(line.substring(1, line.length() - 1).split("\\|", -1))
-              .map(String::strip)
-              .toList();
+      List<String> cells = cells(line);
       if (!seenHeader) {
         header = cells;
         seenHeader = true;
-      } else {
+      } else if (cells.size() >= keyColumns) {
         rows.put(String.join(" ", cells.subList(0, keyColumns)), cells);
       }
     }
     return new Table(header, rows, keyColumns);
+  }
+
+  /** The cells of a table row; a backslash escapes the pipe or the backslash that follows. */
+  private static List<String> cells(String line) {
+    List<String> cells = new ArrayList<>();
+    StringBuilder cell = new StringBuilder();
+    for (int i = 1; i < line.length(); i++) {
+      char c = line.charAt(i);
+      if (c == '\\' && i + 1 < line.length()) {
+        cell.append(line.charAt(++i));
+      } else if (c == '|') {
+        cells.add(cell.toString().strip());
+        cell.setLength(0);
+      } else {
+        cell.append(c);
+      }
+    }
+    if (!cell.toString().isBlank()) {
+      cells.add(cell.toString().strip());
+    }
+    return cells;
   }
 }

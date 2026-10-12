@@ -25,8 +25,9 @@ Keep the container for the whole loop: it holds the stored matches, so a later r
 | Variable | Meaning |
 |---|---|
 | `REPLAY_FIXTURE_DIR` | Directory with `<id>.dem.zst` and `<id>.json`; the task is skipped when it is not set |
-| `SMOKE_PG_URL` | JDBC URL of the database, default `jdbc:postgresql://localhost:5544/dbuff` (user `postgres`, password `password`); only localhost is accepted |
-| `ROUND` | The round number to write; default the one after the last in `server/build/role-loop` |
+| `SMOKE_PG_URL` | JDBC URL of the database, default `jdbc:postgresql://localhost:5544/dbuff` (user `postgres`, password `password`); only localhost, 127.0.0.1 and ::1 as the host of the URL are accepted, and otherwise the task is skipped before anything is written |
+| `ROUND` | The round number to write (a positive whole number); default the one after the last in `server/build/role-loop`. An explicit round that already has reports is refused |
+| `ROUND_OVERWRITE` | Set to `1` to let an explicit `ROUND` write over its existing reports |
 
 Replay processing and the Discord report stay off in the application; the task never touches production.
 
@@ -42,6 +43,8 @@ Replay processing and the Discord report stay off in the application; the task n
 A match of a mode with no resolver says "No roles stored (no resolver for this mode)". An All Pick match has only FINAL rows and says there is no intent and no PICK verdict, instead of printing blanks.
 
 `summary.md` and the console list, for every match, what changed against the same match in the latest earlier round: roles and verdict tokens that differ, rows added or removed. A regression on an earlier accepted row shows up here.
+
+One match that cannot be reported (no fixture, a failed replay run, an error) gets a report that says why, the round goes on, and `summary.md` is always written. Such a report is never the baseline of a later diff: the diff of that match says "skipped this round (reason)", and the next round compares with the latest earlier real report. A match with no stored player statistics says so in a banner.
 
 ## Recording a round
 
