@@ -1,6 +1,7 @@
 package com.ako.dbuff.dao.repo;
 
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
+import com.ako.dbuff.dao.model.ReplayStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 public interface ReplayParseRunRepo extends JpaRepository<ReplayParseRunDomain, Long> {
 
   Optional<ReplayParseRunDomain> findByMatchIdAndParserVersion(Long matchId, Integer parserVersion);
+
+  List<ReplayParseRunDomain> findByParserVersionAndStatusInOrderByMatchId(
+      Integer parserVersion, java.util.Collection<ReplayStatus> statuses);
 
   /** Runs of this parser version that finished with analysis stored since the given time. */
   @Query(
