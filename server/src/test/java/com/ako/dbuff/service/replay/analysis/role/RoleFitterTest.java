@@ -112,4 +112,18 @@ class RoleFitterTest {
   void aTeamOfAnotherSizeIsNotFitted() {
     assertThat(fitter.fit(List.of(CARRY, MID))).isEmpty();
   }
+
+  @Test
+  void theFinalStageCountsAnUnknownFunctionAsNothingAndTheLaneLess() {
+    double[] unknownIntent = fitter.scores(FunctionProfile.UNKNOWN, RoleStage.INTENT);
+    double[] unknownFinal = fitter.scores(FunctionProfile.UNKNOWN, RoleStage.FINAL);
+    double[] laneIntent = fitter.scores(profile(LanePosition.MID, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+    double[] laneFinal =
+        fitter.scores(profile(LanePosition.MID, 0, 0, 0, 0, 0, 0, 0, 0, 0), RoleStage.FINAL);
+
+    assertThat(unknownIntent).isNotEqualTo(unknownFinal);
+    assertThat(unknownFinal).containsOnly(0.0);
+    assertThat(laneFinal[1]).isLessThan(laneIntent[1]).isPositive();
+    assertThat(fitter.scores(CARRY, RoleStage.INTENT)).containsExactly(fitter.scores(CARRY));
+  }
 }

@@ -223,4 +223,97 @@ class IntentProfileCalculatorTest {
     assertThat(tuned.initiation()).isGreaterThan(normal.initiation());
     assertThat(tuned.disable()).isEqualTo(normal.disable());
   }
+
+  private FunctionProfile holding(String json) {
+    try {
+      AbilityConstant ability = MAPPER.readValue(json, AbilityConstant.class);
+      return calculator.profile(HEROES.get("1"), List.of(new HeldAbility("x", ability, false)));
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  @Test
+  void aRangedStunCountsAsInitiationWhateverItsCooldown() {
+    FunctionProfile stun =
+        holding(
+            """
+            {"behavior":"Point Target","target_team":"Enemy","cd":[20],
+             "attrib":[{"key":"stun_duration","value":["1.5"]},
+                       {"key":"abilitycastrange","value":["1100"]}]}\
+            """);
+
+    assertThat(stun.initiation()).isGreaterThanOrEqualTo(0.4);
+  }
+
+  @Test
+  void aShortRangeStunOrASlowIsNotInitiation() {
+    FunctionProfile close =
+        holding(
+            """
+            {"behavior":"Unit Target","target_team":"Enemy","cd":[20],
+             "attrib":[{"key":"stun_duration","value":["1.5"]},
+                       {"key":"abilitycastrange","value":["150"]}]}\
+            """);
+    FunctionProfile slow =
+        holding(
+            """
+            {"behavior":"Unit Target","target_team":"Enemy","cd":[20],
+             "attrib":[{"key":"slow","value":["50"]},{"key":"abilitycastrange","value":["900"]}]}\
+            """);
+
+    assertThat(close.initiation()).isLessThan(0.4);
+    assertThat(slow.initiation()).isZero();
+  }
+
+  @Test
+  void anAreaHealWithNoTargetAndADamageBlockOnAnAllyCountAsSaves() {
+    FunctionProfile area =
+        holding(
+            """
+            {"behavior":"No Target","cd":[35],"attrib":[{"key":"heal","value":["4","8"]}]}\
+            """);
+    FunctionProfile block =
+        holding(
+            """
+            {"behavior":["Unit Target"],"target_team":"Friendly","cd":[20],
+             "attrib":[{"key":"heal_per_second","value":["4"]},
+                       {"key":"damage_block_base","value":["60"]}]}\
+            """);
+    FunctionProfile passive =
+        holding(
+            """
+            {"behavior":"Passive","attrib":[{"key":"bonus_hp_regen","value":["7"]}]}\
+            """);
+
+    assertThat(area.saveHeal()).isGreaterThanOrEqualTo(0.3);
+    assertThat(block.saveHeal()).isGreaterThanOrEqualTo(0.3);
+    assertThat(passive.saveHeal()).isZero();
+  }
+
+  @Test
+  void anAttackSpeedSkillAnAttackModifierAndAPassiveDamageCountAsDamageAndFarm() {
+    FunctionProfile none = holding("{\"behavior\":\"Point Target\",\"cd\":[10],\"attrib\":[]}");
+    FunctionProfile speed =
+        holding(
+            """
+            {"behavior":"Unit Target","cd":[50],
+             "attrib":[{"key":"bonus_attack_speed","value":["350"]}]}\
+            """);
+    FunctionProfile modifier =
+        holding(
+            """
+            {"behavior":["Unit Target","Autocast","Attack Modifier"],"cd":[4],"attrib":[]}\
+            """);
+    FunctionProfile passive =
+        holding(
+            """
+            {"behavior":"Passive","attrib":[{"key":"damage","value":["20","110"]}]}\
+            """);
+
+    for (FunctionProfile p : List.of(speed, modifier, passive)) {
+      assertThat(p.damage()).isGreaterThan(none.damage());
+      assertThat(p.farmPriority()).isGreaterThan(none.farmPriority());
+    }
+  }
 }

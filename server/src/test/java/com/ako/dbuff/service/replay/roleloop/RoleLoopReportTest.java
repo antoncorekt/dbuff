@@ -94,7 +94,7 @@ class RoleLoopReportTest {
     String report = RoleLoopReport.render(data(List.of(), List.of(), List.of(), List.of()));
 
     assertThat(report).contains("No roles stored (no resolver for this mode).");
-    assertThat(report).contains("| 0 | Sniper | n/a | none |");
+    assertThat(report).contains("| 0 | Sniper | n/a | none | n/a | n/a |");
     assertThat(report).contains("| RADIANT | PICK | none stored |");
   }
 
@@ -123,7 +123,7 @@ class RoleLoopReportTest {
 
     assertThat(report).contains("No intent rows");
     assertThat(report).contains("- intent: n/a (none stored)");
-    assertThat(report).contains("| 0 | Sniper | n/a | 1 |");
+    assertThat(report).contains("| 0 | Sniper | n/a | 1 | n/a | 1(1.50) 2(0.20) 3(0.10) |");
     assertThat(report).contains("| RADIANT | FINAL | no findings |");
     assertThat(report).contains("none stored (needs intent rows for all five players)");
     assertThat(report).contains("summary: Balanced.");
@@ -166,7 +166,7 @@ class RoleLoopReportTest {
 
     assertThat(report)
         .contains("### RADIANT slot 0, Sniper")
-        .contains("| 0 | Sniper | 1 | 3 |")
+        .contains("| 0 | Sniper | 1 | 3 | 1(1.50) 2(0.20) 3(0.10) | 1(1.50) 2(0.20) 3(0.10) |")
         .contains("- intent: role 1 (confidence 0.64), fitRole 1, lane SAFE")
         .contains("farmPriority 0.90, jungle unknown")
         .contains("farmPriority unknown")
@@ -177,6 +177,18 @@ class RoleLoopReportTest {
             "- OpenDota: position_est 1, lane_role 1, net worth rank 1 of 5 (net worth 20000)")
         .contains("| DIRE | PICK | CARRIES_3,NO_INITIATOR |")
         .contains("tokens: CARRIES_3,NO_INITIATOR");
+  }
+
+  @Test
+  void theRolesTableShowsTheThreeBestFitsNextToTheAssignedRole() {
+    PlayerRoleProfileDomain leftover = profile(0, "FINAL", 5, 0.5);
+    leftover.setRoleScores("-0.50,2.00,3.25,1.10,-2.00");
+
+    String report = RoleLoopReport.render(data(List.of(), List.of(leftover), List.of(), List.of()));
+
+    assertThat(report)
+        .contains("| slot | hero | intent | final | intent fit | final fit |")
+        .contains("| 0 | Sniper | n/a | 5 | n/a | 3(3.25) 2(2.00) 4(1.10) |");
   }
 
   @Test
@@ -203,9 +215,11 @@ class RoleLoopReportTest {
 
     String withNull = RoleLoopReport.render(data(List.of(), List.of(noRole), List.of(), List.of()));
 
-    assertThat(withNull).contains("| 0 | Sniper | n/a | unknown |").doesNotContain("null");
+    assertThat(withNull)
+        .contains("| 0 | Sniper | n/a | unknown | n/a | 1(1.50) 2(0.20) 3(0.10) |")
+        .doesNotContain("null");
     assertThat(withNull).contains("role unknown (confidence 0.64), fitRole unknown");
-    assertThat(report).contains("| 0 | Sniper | n/a | 1 |");
+    assertThat(report).contains("| 0 | Sniper | n/a | 1 | n/a | 1(1.50) 2(0.20) 3(0.10) |");
   }
 
   @Test

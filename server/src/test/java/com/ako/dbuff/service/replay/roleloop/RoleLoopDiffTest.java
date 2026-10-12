@@ -88,4 +88,17 @@ class RoleLoopDiffTest {
         .asString()
         .startsWith("format changed in Roles, slot 5");
   }
+
+  @Test
+  void columnsAddedAtTheEndDoNotHideTheChangesInTheSharedOnes() {
+    String after =
+        report("2", "A")
+            .replace("| slot | hero | intent | final |", "| slot | hero | intent | final | fit |")
+            .replace("|---|---|---|---|\n", "|---|---|---|---|---|\n")
+            .replace("| 0 | Sniper | 1 | 2 |", "| 0 | Sniper | 1 | 2 | 1(1.00) |")
+            .replace("| 5 | Axe | 3 | 3 |", "| 5 | Axe | 3 | 3 | 3(2.00) |");
+
+    assertThat(RoleLoopDiff.changes(report("1", "A"), after))
+        .containsExactly("slot 0, final: 1 -> 2");
+  }
 }

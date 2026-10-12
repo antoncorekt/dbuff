@@ -105,7 +105,7 @@ class PlayerRoleAnalyzerTest {
         .allSatisfy(
             r -> {
               assertThat(r.getSource()).isEqualTo("DERIVED");
-              assertThat(r.getAnalysisVersion()).isEqualTo(2);
+              assertThat(r.getAnalysisVersion()).isEqualTo(3);
               assertThat(r.getEvidence()).isNotBlank();
             });
     for (boolean dire : new boolean[] {false, true}) {

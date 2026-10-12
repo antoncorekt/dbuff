@@ -18,7 +18,12 @@
     "nevermore_shadowraze1": {"DAMAGE": 0.3, "FARM_PRIORITY": 0.3},
     "nevermore_shadowraze2": {"DAMAGE": 0.3, "FARM_PRIORITY": 0.3},
     "nevermore_shadowraze3": {"DAMAGE": 0.3, "FARM_PRIORITY": 0.3},
-    "juggernaut_blade_fury": {"FARM_PRIORITY": 0.3, "DURABILITY": 0.1}
+    "juggernaut_blade_fury": {"FARM_PRIORITY": 0.3, "DURABILITY": 0.1},
+    "doom_bringer_doom": {"DISABLE": 0.4, "INITIATION": 0.5},
+    "rattletrap_power_cogs": {"DISABLE": 0.4, "INITIATION": 0.5},
+    "largo_amphibian_rhapsody": {"SAVE_HEAL": 0.4, "DURABILITY": 0.2},
+    "kez_falcon_rush_ad": {"DAMAGE": 0.4, "FARM_PRIORITY": 0.3},
+    "kez_talon_toss_ad": {"DAMAGE": 0.4}
   },
   "heroes": {}
 }

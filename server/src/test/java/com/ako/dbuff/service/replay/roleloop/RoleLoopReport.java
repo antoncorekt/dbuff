@@ -17,6 +17,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * The review report of one stored match, as markdown. It only lays out what the tables hold; the
@@ -31,6 +32,7 @@ final class RoleLoopReport {
   private static final List<String> TEAMS = List.of("RADIANT", "DIRE");
   private static final List<String> VERDICT_STAGES = List.of("PICK", "FINAL");
   private static final int FIRST_DIRE_SLOT = 5;
+  private static final int BEST_FITS = 3;
 
   record MatchData(
       long matchId,
@@ -134,23 +136,44 @@ final class RoleLoopReport {
 
   private static List<String> rolesTable(MatchData d) {
     List<String> rows =
-        new ArrayList<>(List.of("## " + ROLES, "", "| slot | hero | intent | final |"));
-    rows.add("|---|---|---|---|");
+        new ArrayList<>(
+            List.of(
+                "## " + ROLES, "", "| slot | hero | intent | final | intent fit | final fit |"));
+    rows.add("|---|---|---|---|---|---|");
     for (String team : TEAMS) {
       for (PlayerMatchStatisticDomain stat : team(d, team)) {
         long slot = stat.getPlayerSlot();
         rows.add(
-            "| %d | %s | %s | %s |"
+            "| %d | %s | %s | %s | %s | %s |"
                 .formatted(
                     slot,
                     cell(hero(d, stat)),
                     stage(d, slot, "INTENT")
                         .map(p -> String.valueOf(p.getRole()))
                         .orElse(NO_INTENT),
-                    finalRole(d, slot).orElse("none")));
+                    finalRole(d, slot).orElse("none"),
+                    bestFits(stage(d, slot, "INTENT")),
+                    bestFits(stage(d, slot, "FINAL"))));
       }
     }
     return rows;
+  }
+
+  /**
+   * The three roles with the best scores of a stage, so a role left over by the assignment shows.
+   */
+  private static String bestFits(Optional<PlayerRoleProfileDomain> profile) {
+    String scores = profile.map(PlayerRoleProfileDomain::getRoleScores).orElse(null);
+    if (scores == null || scores.isBlank()) {
+      return NO_INTENT;
+    }
+    String[] parts = scores.split(",");
+    return IntStream.range(0, parts.length)
+        .boxed()
+        .sorted(Comparator.comparingDouble((Integer i) -> -Double.parseDouble(parts[i])))
+        .limit(BEST_FITS)
+        .map(i -> "%d(%s)".formatted(i + 1, parts[i].strip()))
+        .collect(Collectors.joining(" "));
   }
 
   private static List<String> verdictsTable(MatchData d) {

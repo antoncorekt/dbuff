@@ -95,7 +95,20 @@ public class RoleProfileProperties {
     private double initiationDisableShare = 1.0;
 
     /** Attribute keys of a gap closer, a skill that takes the hero to the enemy in one step. */
-    private List<String> gapCloserKeys = List.of("min_blink_range", "blink_range");
+    private List<String> gapCloserKeys =
+        List.of("min_blink_range", "blink_range", "max_travel_distance", "leap_distance");
+
+    /**
+     * A stun, hex, root, sleep, fear, taunt or silence of at least {@code initiationMinControl}
+     * seconds on a skill that reaches at least {@code initiationMinCastRange} (read from {@code
+     * initiationRangeKeys}) or hits an area is an initiation, whatever its cooldown; each such
+     * skill adds {@code initiationSkill}.
+     */
+    private List<String> initiationRangeKeys = List.of("abilitycastrange");
+
+    private double initiationMinCastRange = 400;
+    private double initiationMinControl = 1.0;
+    private double initiationSkill = 0.5;
 
     /** A gap closer adds this to initiation, and to roaming as a mobility skill. */
     private double gapCloserInitiation = 0.4;
@@ -120,6 +133,30 @@ public class RoleProfileProperties {
     private List<String> damageKeys =
         List.of("damage", "nova_damage", "total_damage", "damage_per_second");
 
+    /**
+     * Attribute keys of a skill that makes the hero's attacks stronger or faster: a positive value
+     * counts. A skill that is an attack modifier, or a passive that deals damage, counts as well.
+     */
+    private List<String> attackDamageKeys =
+        List.of(
+            "bonus_attack_speed",
+            "attack_speed",
+            "bonus_damage",
+            "illusion_outgoing_tooltip",
+            "gods_strength_damage",
+            "great_cleave_damage",
+            "distance_damage_pct",
+            "katana_bleed_attack_damage_pct",
+            "wolf_damage");
+
+    private List<String> attackBehaviors = List.of("Attack Modifier");
+
+    /** An attack skill adds this to damage... */
+    private double attackSkillDamage = 0.2;
+
+    /** ...and this to farm priority. */
+    private double attackSkillFarm = 0.15;
+
     /** Skill damage per second of cooldown, summed over the skills, that makes a 1. */
     private double damageFull = 60;
 
@@ -128,7 +165,10 @@ public class RoleProfileProperties {
 
     private double attackDamageShare = 0.3;
 
-    /** Attribute keys that mark a skill as healing, shielding or reducing damage for an ally. */
+    /**
+     * Attribute keys that mark a skill as healing, shielding or reducing damage for an ally. The
+     * skill must target a friendly unit or, to count a heal over an area, have no target.
+     */
     private List<String> saveKeys =
         List.of(
             "heal",
@@ -136,11 +176,16 @@ public class RoleProfileProperties {
             "heal_pct",
             "base_heal",
             "hp_heal",
+            "heal_per_second",
             "damage_reduction",
+            "damage_block",
+            "damage_block_base",
             "barrier",
             "barrier_amount",
             "shield_pct_absorb",
-            "base_shield");
+            "base_shield",
+            "damage_absorb",
+            "shield_amount");
 
     /** Ally-target save skills, summed, that make a 1. */
     private double saveFull = 1.5;
@@ -151,7 +196,6 @@ public class RoleProfileProperties {
     private List<String> scalingKeys =
         List.of(
             "crit_chance",
-            "crit_multiplier",
             "crit_bonus",
             "lifesteal",
             "lifesteal_percent",
@@ -228,6 +272,15 @@ public class RoleProfileProperties {
   public static class Fit {
     /** What a function counts as when it is unknown, 0 to 1. */
     private double unknownValue = 0.5;
+
+    /**
+     * In the FINAL stage of a mode that fits profiles, the lane bonus is multiplied by this, so
+     * that the net worth place and the farm carry more of the role than the lane.
+     */
+    private double finalLaneFactor = 0.5;
+
+    /** What a function the FINAL stage does not know counts as: none, so it favours no role. */
+    private double finalUnknownValue = 0.0;
 
     /** The drop of the team total when the player takes any other role that gives confidence 1. */
     private double fullConfidenceMargin = 2.0;

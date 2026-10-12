@@ -16,6 +16,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -125,6 +126,7 @@ class AbilityDraftRoleResolverTest {
     assertThat(resolver.supports(TestModes.ALL_PICK)).isFalse();
     assertThat(resolver.stages()).containsExactlyInAnyOrder(RoleStage.INTENT, RoleStage.FINAL);
     assertThat(resolver.requires()).containsExactly("ability-draft");
+    assertThat(resolver.scoredAs(RoleStage.FINAL)).isEqualTo(RoleStage.FINAL);
   }
 
   @Test
@@ -168,7 +170,7 @@ class AbilityDraftRoleResolverTest {
   @Test
   void aFitterThatReturnsTooFewFitsGivesNoRolesInsteadOfAMisalignedOnes() {
     RoleFitter shortFitter = mock(RoleFitter.class);
-    when(shortFitter.fit(anyList())).thenReturn(List.of());
+    when(shortFitter.fit(anyList(), any())).thenReturn(List.of());
     AbilityDraftRoleResolver broken =
         new AbilityDraftRoleResolver(new StageProfilers(List.of(intent, observed)), shortFitter);
 

@@ -83,7 +83,7 @@ class TeamCompositionAnalyzerTest {
     assertThat(rows)
         .extracting(c -> c.getTeam() + "/" + c.getStage())
         .containsExactlyInAnyOrder("RADIANT/PICK", "RADIANT/FINAL", "DIRE/PICK", "DIRE/FINAL");
-    assertThat(rows).allSatisfy(r -> assertThat(r.getAnalysisVersion()).isEqualTo(1));
+    assertThat(rows).allSatisfy(r -> assertThat(r.getAnalysisVersion()).isEqualTo(2));
     assertThat(row(ABILITY_DRAFT_MATCH, "RADIANT", "PICK").getTokens())
         .doesNotContain("INTENT_NOT_PLAYED");
     TeamCompositionDomain played = row(ABILITY_DRAFT_MATCH, "DIRE", "FINAL");
