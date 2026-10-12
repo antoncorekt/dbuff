@@ -7,7 +7,7 @@ import java.util.Locale;
  * The tokens of a fixed name, with their plain wording. The counts {@code CARRIES_n} and {@code
  * SUPPORTS_n} carry a number and are worded by {@link #words(String)}.
  */
-enum CompositionToken {
+public enum CompositionToken {
   NO_INITIATOR("no initiator", RoleFunction.INITIATION, false),
   NO_DISABLE("no disable", RoleFunction.DISABLE, false),
   /** The profile has no wave clear function; damage stands in for it. */
@@ -34,7 +34,7 @@ enum CompositionToken {
   }
 
   /** The function whose absence the token says; null for a token that is not about one. */
-  RoleFunction function() {
+  public RoleFunction function() {
     return function;
   }
 
@@ -44,7 +44,7 @@ enum CompositionToken {
   }
 
   /** A stored token in plain words; a name this class does not know is written in lower case. */
-  static String words(String token) {
+  public static String words(String token) {
     if (token.startsWith(CARRIES_PREFIX)) {
       return count(token.substring(CARRIES_PREFIX.length()), "carry", "carries");
     }

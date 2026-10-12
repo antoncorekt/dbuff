@@ -6,6 +6,8 @@ import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
+import com.ako.dbuff.dao.model.PlayerRoleDomain;
+import com.ako.dbuff.dao.model.TeamCompositionDomain;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightAbilityUseRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
@@ -36,6 +38,9 @@ import static org.assertj.core.api.Assertions.tuple;
 @Import({
   FightReasonAnalyzer.class,
   AbsenceReasonContributor.class,
+  CarryFarmingElsewhereContributor.class,
+  SupportAbsentContributor.class,
+  RoleGapContributor.class,
   AbilityNonCastReasonContributor.class,
   DeathReasonContributor.class,
   ReasonProperties.class,
@@ -171,11 +176,54 @@ class FightReasonAnalyzerTest {
             r -> {
               assertThat(r.getScope()).isEqualTo("PLAYER");
               assertThat(r.getSource()).isEqualTo("COMMON");
-              assertThat(r.getAnalysisVersion()).isEqualTo(1);
+              assertThat(r.getAnalysisVersion()).isEqualTo(2);
             });
     assertThat(rows)
         .filteredOn(r -> r.getSubjectSlot() == 128L)
         .allSatisfy(r -> assertThat(r.getTeam()).isEqualTo("DIRE"));
+  }
+
+  @Test
+  void roleAwareReasonsAreStoredFromRolesAndCompositionAndSkippedWithoutThem() {
+    stored(ALL_PICK_MATCH, 22);
+    fightRepo.findByMatchId(ALL_PICK_MATCH).stream()
+        .filter(f -> f.getFightIndex() == 0)
+        .forEach(
+            f -> {
+              f.setWinner("DIRE");
+              fightRepo.save(f);
+            });
+    fightPlayerRepo.save(
+        FightPlayerDomain.builder()
+            .matchId(ALL_PICK_MATCH)
+            .fightIndex(0)
+            .playerSlot(1L)
+            .presence("ABSENT_FARMING")
+            .activityAtStart("JUNGLE_FARM")
+            .build());
+    entityManager.persist(
+        PlayerRoleDomain.builder().matchId(ALL_PICK_MATCH).playerSlot(1L).role(1).build());
+    entityManager.persist(
+        TeamCompositionDomain.builder()
+            .matchId(ALL_PICK_MATCH)
+            .team("RADIANT")
+            .stage("FINAL")
+            .tokens("CARRIES_1,NO_DISABLE")
+            .build());
+    entityManager.flush();
+
+    analyzer.analyze(ALL_PICK_MATCH);
+
+    assertThat(reasonRepo.findByMatchId(ALL_PICK_MATCH))
+        .filteredOn(r -> r.getFightIndex() == 0)
+        .extracting(
+            r -> r.getScope() + "/" + r.getTeam() + "/" + r.getSubjectSlot() + "/" + r.getCode())
+        .contains("PLAYER/RADIANT/1/CARRY_FARMING_ELSEWHERE", "TEAM/RADIANT/null/NO_DISABLE")
+        .doesNotContain("PLAYER/RADIANT/1/SUPPORT_ABSENT");
+    assertThat(reasonRepo.findByMatchId(ALL_PICK_MATCH))
+        .filteredOn(r -> r.getFightIndex() == 1)
+        .extracting(FightReasonDomain::getCode)
+        .doesNotContain("NO_DISABLE", "CARRY_FARMING_ELSEWHERE");
   }
 
   @Test
