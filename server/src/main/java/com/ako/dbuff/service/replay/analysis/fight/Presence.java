@@ -12,5 +12,10 @@ public enum Presence {
   ABSENT_BASE,
   ABSENT_PUSHING,
   /** Alive and elsewhere, with nothing the classifier can name. */
-  ABSENT_FAR
+  ABSENT_FAR;
+
+  /** Alive and not in the fight. */
+  public boolean isAbsentAlive() {
+    return this != ACTIVE && this != PRESENT_PASSIVE && this != ABSENT_DEAD;
+  }
 }

@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis.reason;
 
+import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
 import com.ako.dbuff.service.replay.analysis.death.DeathReason;
 import com.ako.dbuff.service.replay.analysis.fight.AbsenceReason;
 import java.util.EnumMap;
@@ -59,11 +60,32 @@ public class ReasonProperties {
 
   private int diedFirstMinDeaths = 2;
 
+  /** By final role: a carry or mid who was farming while his team fought without him. */
+  private Map<Integer, Double> carryFarmingSeverity = Map.of(1, 0.8, 2, 0.6);
+
+  /** By final role: a soft or hard support who was alive and not in the fight. */
+  private Map<Integer, Double> supportAbsentSeverity = Map.of(4, 0.4, 5, 0.3);
+
+  /** A function the losing team's final composition lacked; the others use the default. */
+  private Map<CompositionToken, Double> roleGapSeverity =
+      new EnumMap<>(
+          Map.of(
+              CompositionToken.NO_INITIATOR, 0.5,
+              CompositionToken.NO_DISABLE, 0.5,
+              CompositionToken.NO_FRONTLINE, 0.4,
+              CompositionToken.NO_SAVE_HEAL, 0.3,
+              CompositionToken.NO_WAVECLEAR, 0.2,
+              CompositionToken.NO_VISION_DUTY, 0.2));
+
   public double severity(AbsenceReason reason) {
     return absenceSeverity.getOrDefault(reason, defaultSeverity);
   }
 
   public double severity(DeathReason reason) {
     return deathSeverity.getOrDefault(reason, defaultSeverity);
+  }
+
+  public double severity(CompositionToken token) {
+    return roleGapSeverity.getOrDefault(token, defaultSeverity);
   }
 }

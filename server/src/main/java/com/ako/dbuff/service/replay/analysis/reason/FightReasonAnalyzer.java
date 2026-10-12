@@ -5,11 +5,15 @@ import com.ako.dbuff.dao.model.FightAbilityUseDomain;
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.FightReasonDomain;
+import com.ako.dbuff.dao.model.PlayerRoleDomain;
+import com.ako.dbuff.dao.model.TeamCompositionDomain;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightAbilityUseRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
+import com.ako.dbuff.dao.repo.PlayerRoleRepo;
+import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.StoredMatchModes;
@@ -40,6 +44,8 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
   private final FightPlayerRepo fightPlayerRepo;
   private final FightAbilityUseRepo abilityUseRepo;
   private final DeathAnalysisRepo deathRepo;
+  private final PlayerRoleRepo roleRepo;
+  private final TeamCompositionRepo compositionRepo;
   private final FightReasonRepo reasonRepo;
 
   @Override
@@ -49,7 +55,7 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 1;
+    return 2;
   }
 
   @Override
@@ -72,6 +78,8 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
         group(abilityUseRepo.findByMatchId(matchId), FightAbilityUseDomain::getFightIndex);
     Map<Integer, List<DeathAnalysisDomain>> deaths =
         group(deathRepo.findByMatchId(matchId), DeathAnalysisDomain::getFightIndex);
+    List<PlayerRoleDomain> roles = roleRepo.findByMatchId(matchId);
+    List<TeamCompositionDomain> compositions = compositionRepo.findByMatchId(matchId);
     List<FightReasonDomain> rows = new ArrayList<>();
     for (FightDomain fight : fightRepo.findByMatchId(matchId)) {
       int index = fight.getFightIndex();
@@ -82,7 +90,9 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
               fight,
               players.getOrDefault(index, List.of()),
               uses.getOrDefault(index, List.of()),
-              deaths.getOrDefault(index, List.of()));
+              deaths.getOrDefault(index, List.of()),
+              roles,
+              compositions);
       Map<String, Reason> byKey = new LinkedHashMap<>();
       for (ReasonContributor contributor : active) {
         for (Reason reason : contributor.contribute(context)) {

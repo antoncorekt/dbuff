@@ -1,5 +1,8 @@
 package com.ako.dbuff.service.replay.smoke;
 
+import com.ako.dbuff.dao.model.FightDomain;
+import com.ako.dbuff.dao.model.FightPlayerDomain;
+import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
@@ -9,6 +12,7 @@ import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.dao.repo.AbilityDraftPoolRepo;
 import com.ako.dbuff.dao.repo.BuybackEventRepo;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
+import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
@@ -27,7 +31,14 @@ import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.ReplayDataService;
 import com.ako.dbuff.service.replay.ReplayRunService;
+import com.ako.dbuff.service.replay.analysis.activity.Activity;
+import com.ako.dbuff.service.replay.analysis.composition.CompositionStage;
+import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
+import com.ako.dbuff.service.replay.analysis.fight.Presence;
+import com.ako.dbuff.service.replay.analysis.reason.Enums;
+import com.ako.dbuff.service.replay.analysis.reason.ReasonScope;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
+import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.report.CompositionSection;
 import com.ako.dbuff.service.replay.report.DeathSection;
 import com.ako.dbuff.service.replay.report.DraftSection;
@@ -36,10 +47,14 @@ import com.ako.dbuff.service.replay.report.MovementSection;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.SwingSection;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -97,6 +112,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private CompositionSection compositionSection;
   @Autowired private PlayerGameStatisticRepo playerStatRepo;
   @Autowired private HeroKits heroKits;
+  @Autowired private FightPlayerRepo fightPlayerRepo;
 
   @Test
   @Commit
@@ -200,8 +216,68 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .as("%s: a pick and a final verdict per team", id)
           .extracting(c -> c.getTeam() + " " + c.getStage())
           .containsExactlyInAnyOrder("RADIANT PICK", "RADIANT FINAL", "DIRE PICK", "DIRE FINAL");
+      assertRoleAwareReasons(id, match.getId());
       printAbilityDraft(id, match.getId(), profiles);
     }
+  }
+
+  /** Derives the expected rows from the stored roles, fight players and compositions. */
+  private void assertRoleAwareReasons(String id, long matchId) {
+    Map<Long, Integer> roles = new TreeMap<>();
+    roleRepo.findByMatchId(matchId).forEach(r -> roles.put(r.getPlayerSlot(), r.getRole()));
+    Set<String> expected = new TreeSet<>();
+    for (FightPlayerDomain p : fightPlayerRepo.findByMatchId(matchId)) {
+      Presence presence = Enums.find(Presence.class, p.getPresence());
+      Activity activity = Enums.find(Activity.class, p.getActivityAtStart());
+      Integer role = roles.get(p.getPlayerSlot());
+      if (presence == null || !presence.isAbsentAlive() || role == null) {
+        continue;
+      }
+      if (role >= 4) {
+        expected.add(p.getFightIndex() + "/" + p.getPlayerSlot() + "/SUPPORT_ABSENT");
+      }
+      if (role <= 2 && (activity == Activity.JUNGLE_FARM || activity == Activity.LANE_FARM)) {
+        expected.add(p.getFightIndex() + "/" + p.getPlayerSlot() + "/CARRY_FARMING_ELSEWHERE");
+      }
+    }
+    List<FightReasonDomain> stored = reasonRepo.findByMatchId(matchId);
+    Set<String> storedPlayer =
+        stored.stream()
+            .filter(
+                r ->
+                    r.getCode().equals("SUPPORT_ABSENT")
+                        || r.getCode().equals("CARRY_FARMING_ELSEWHERE"))
+            .map(r -> r.getFightIndex() + "/" + r.getSubjectSlot() + "/" + r.getCode())
+            .collect(Collectors.toCollection(TreeSet::new));
+    assertThat(storedPlayer)
+        .as("%s: role-aware player reasons follow roles, presence and activity", id)
+        .isEqualTo(expected);
+
+    Map<String, String> finalTokens = new TreeMap<>();
+    compositionRepo.findByMatchId(matchId).stream()
+        .filter(c -> c.getStage().equals(CompositionStage.FINAL.name()))
+        .forEach(c -> finalTokens.put(c.getTeam(), c.getTokens()));
+    Set<String> expectedGaps = new TreeSet<>();
+    for (FightDomain fight : fightRepo.findByMatchId(matchId)) {
+      TeamSide winner = Enums.find(TeamSide.class, fight.getWinner());
+      if (winner == null) {
+        continue;
+      }
+      String loser = (winner == TeamSide.RADIANT ? TeamSide.DIRE : TeamSide.RADIANT).name();
+      for (String token : finalTokens.getOrDefault(loser, "").split(",")) {
+        Arrays.stream(CompositionToken.values())
+            .filter(known -> known.name().equals(token.trim()) && known.function() != null)
+            .forEach(known -> expectedGaps.add(fight.getFightIndex() + "/" + loser + "/" + known));
+      }
+    }
+    Set<String> storedGaps =
+        stored.stream()
+            .filter(r -> r.getScope().equals(ReasonScope.TEAM.name()))
+            .map(r -> r.getFightIndex() + "/" + r.getTeam() + "/" + r.getCode())
+            .collect(Collectors.toCollection(TreeSet::new));
+    assertThat(storedGaps)
+        .as("%s: team gaps are the losing team's final function tokens", id)
+        .isEqualTo(expectedGaps);
   }
 
   private void printAbilityDraft(String id, long matchId, List<PlayerRoleProfileDomain> profiles) {
