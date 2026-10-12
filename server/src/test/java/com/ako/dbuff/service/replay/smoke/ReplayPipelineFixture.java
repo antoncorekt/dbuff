@@ -180,6 +180,7 @@ public abstract class ReplayPipelineFixture {
       stat.setPositionEst(optLong(p, "position_est"));
       stat.setHeroDamage(optLong(p, "hero_damage"));
       stat.setHeroHealing(optLong(p, "hero_healing"));
+      stat.setDamageTaken(heroDamageTaken(p));
       stat.setLastHits(optLong(p, "last_hits"));
       stat.setObsPlaced(optLong(p, "obs_placed"));
       stat.setSenPlaced(optLong(p, "sen_placed"));
