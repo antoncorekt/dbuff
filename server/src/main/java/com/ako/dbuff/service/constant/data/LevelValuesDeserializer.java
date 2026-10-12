@@ -7,36 +7,60 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Reads OpenDota's per-level numbers, which arrive as a single value or a list and as strings or
- * numbers. Entries that are not numbers (an empty string, {@code undefined}) are skipped, because
- * one dirty ability must not fail the whole constants load.
+ * numbers. A list keeps its level positions: an entry that is not a number becomes null at its
+ * index. A single value that is not a number gives null for the whole field, so "no data" differs
+ * from an empty list. A text of numbers separated by slashes or spaces ("60 / 120") is read as
+ * levels. One dirty ability must not fail the whole constants load.
  */
 public class LevelValuesDeserializer extends JsonDeserializer<List<Double>> {
+
+  private static final Pattern SEPARATOR = Pattern.compile("\\s*/\\s*|\\s+");
 
   @Override
   public List<Double> deserialize(JsonParser parser, DeserializationContext context)
       throws IOException {
     JsonNode node = parser.readValueAsTree();
-    List<Double> values = new ArrayList<>();
-    if (node.isArray()) {
-      node.forEach(element -> addIfNumber(values, element));
-    } else {
-      addIfNumber(values, node);
+    if (!node.isArray()) {
+      return parseSingle(node);
     }
+    List<Double> values = new ArrayList<>();
+    node.forEach(element -> values.add(parseNumber(element)));
     return values;
   }
 
-  private static void addIfNumber(List<Double> values, JsonNode node) {
-    if (node.isNumber()) {
-      values.add(node.doubleValue());
-    } else if (node.isTextual()) {
-      try {
-        values.add(Double.parseDouble(node.textValue().trim()));
-      } catch (NumberFormatException ignored) {
-        // not a number, skipped on purpose
+  private static List<Double> parseSingle(JsonNode node) {
+    if (node.isTextual()) {
+      String[] parts = SEPARATOR.split(node.textValue().trim());
+      List<Double> values = new ArrayList<>();
+      for (String part : parts) {
+        Double value = parseText(part);
+        if (value == null) {
+          return null;
+        }
+        values.add(value);
       }
+      return values;
+    }
+    Double value = parseNumber(node);
+    return value == null ? null : new ArrayList<>(List.of(value));
+  }
+
+  private static Double parseNumber(JsonNode node) {
+    if (node.isNumber()) {
+      return node.doubleValue();
+    }
+    return node.isTextual() ? parseText(node.textValue().trim()) : null;
+  }
+
+  private static Double parseText(String text) {
+    try {
+      return Double.parseDouble(text);
+    } catch (NumberFormatException e) {
+      return null;
     }
   }
 }

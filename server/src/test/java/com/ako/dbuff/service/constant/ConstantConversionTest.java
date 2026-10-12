@@ -7,6 +7,7 @@ import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -88,8 +89,32 @@ class ConstantConversionTest {
     assertNull(blink.getBkbpierce());
     assertNull(blink.getDmg_type());
 
-    assertEquals(List.of(), all.get("phantom_lancer_juxtapose").getCd());
+    assertNull(all.get("phantom_lancer_juxtapose").getCd());
     assertEquals(List.of(), all.get("lich_frost_shield").getBkbpierce());
+  }
+
+  @Test
+  void perLevelValues_keepLevelAlignmentAndDistinguishNoData() throws Exception {
+    Map<String, Object> raw =
+        reader.readValue(
+            """
+            {"a":{"dname":"A","cd":["10","","30"],"mc":"undefined","dmg":"60 / 120 / 180"},
+             "b":{"dname":"B","cd":[],"mc":"abc","dmg":"x / 120","is_innate":true},
+             "c":{"dname":"C","cd":"","mc":75,"dmg":["1.5",2]}}
+            """,
+            new TypeReference<>() {});
+
+    Map<String, AbilityConstant> all = abilityService.convert(raw);
+
+    assertEquals(Arrays.asList(10.0, null, 30.0), all.get("a").getCd());
+    assertNull(all.get("a").getMc());
+    assertEquals(List.of(60.0, 120.0, 180.0), all.get("a").getDmg());
+    assertEquals(List.of(), all.get("b").getCd());
+    assertNull(all.get("b").getMc());
+    assertNull(all.get("b").getDmg());
+    assertNull(all.get("c").getCd());
+    assertEquals(List.of(75.0), all.get("c").getMc());
+    assertEquals(List.of(1.5, 2.0), all.get("c").getDmg());
   }
 
   @Test
