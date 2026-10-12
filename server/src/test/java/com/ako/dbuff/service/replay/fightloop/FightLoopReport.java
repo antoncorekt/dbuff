@@ -10,9 +10,11 @@ import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.Lo
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.MatchExplanation;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.RankedReason;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.SwingExplanation;
+import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -70,7 +72,7 @@ final class FightLoopReport {
       s.fights().forEach(f -> rows.add(new Row(String.valueOf(s.swing().getSpikeIndex()), f)));
     }
     d.explanation().otherFights().forEach(f -> rows.add(new Row(swingOf(f), f)));
-    rows.sort(java.util.Comparator.comparing((Row r) -> r.lost().fight().getFightIndex()));
+    rows.sort(Comparator.comparing((Row r) -> r.lost().fight().getFightIndex()));
     return rows;
   }
 
@@ -85,21 +87,22 @@ final class FightLoopReport {
             List.of(
                 "## " + FIGHTS,
                 "",
-                "| swing | fight | time | loser | gold lost | reasons | OD teamfight | OD deaths |"
-                    + " OD gold delta of the loser |",
-                "|---|---|---|---|---|---|---|---|---|"));
+                "| swing | fight | time | loser | gold lost | unmatched deaths | reasons | OD"
+                    + " teamfight | OD deaths | OD gold delta of the loser |",
+                "|---|---|---|---|---|---|---|---|---|---|"));
     for (Row r : rows) {
       FightDomain f = r.lost().fight();
-      TeamSide loser = TeamSide.valueOf(r.lost().explanation().getLosingTeam());
+      TeamSide loser = Enums.find(TeamSide.class, r.lost().explanation().getLosingTeam());
       Optional<TeamfightDomain> od = openDotaFight(d, f);
       out.add(
-          "| %s | %d | %s | %s | %s | %d | %s | %s | %s |"
+          "| %s | %d | %s | %s | %s | %s | %d | %s | %s | %s |"
               .formatted(
                   ReviewLoopReport.tableCell(r.swing()),
                   f.getFightIndex(),
                   clock(f.getStartSeconds()),
-                  loser,
+                  orQuestion(loser),
                   orQuestion(r.lost().explanation().getGoldLost()),
+                  orQuestion(r.lost().explanation().getUnmatchedDeaths()),
                   r.lost().totalReasons(),
                   od.map(t -> "#" + t.getFightIndex()).orElse("none"),
                   od.map(t -> String.valueOf(t.getDeaths())).orElse("none"),
@@ -125,11 +128,13 @@ final class FightLoopReport {
                 .formatted(
                     ReviewLoopReport.tableCell(r.swing()),
                     r.lost().fight().getFightIndex(),
-                    reason.getCode(),
+                    orQuestion(reason.getCode()),
                     ReviewLoopReport.tableCell(
                         subject(d, reason.getSubjectSlot(), reason.getTeam())),
                     ranked.rank(),
-                    String.format(Locale.ROOT, "%.2f", reason.getSeverity()),
+                    reason.getSeverity() == null
+                        ? "?"
+                        : String.format(Locale.ROOT, "%.2f", reason.getSeverity()),
                     ReviewLoopReport.tableCell(
                         reason.getEvidence() == null ? "" : reason.getEvidence())));
       }
@@ -170,15 +175,23 @@ final class FightLoopReport {
     return "slot %d (%s)".formatted(slot, hero);
   }
 
+  /** The OpenDota teamfight that overlaps the fight most; of equal overlap, the nearest start. */
   private static Optional<TeamfightDomain> openDotaFight(MatchData d, FightDomain fight) {
+    if (fight.getStartSeconds() == null || fight.getEndSeconds() == null) {
+      return Optional.empty();
+    }
+    double from = fight.getStartSeconds() - OPEN_DOTA_SLACK_SECONDS;
+    double to = fight.getEndSeconds() + OPEN_DOTA_SLACK_SECONDS;
     return d.openDotaFights().stream()
-        .filter(
-            t ->
-                t.getStartTime() != null
-                    && t.getEndTime() != null
-                    && t.getStartTime() <= fight.getEndSeconds() + OPEN_DOTA_SLACK_SECONDS
-                    && t.getEndTime() >= fight.getStartSeconds() - OPEN_DOTA_SLACK_SECONDS)
-        .findFirst();
+        .filter(t -> t.getStartTime() != null && t.getEndTime() != null)
+        .filter(t -> overlap(t, from, to) > 0)
+        .max(
+            Comparator.comparingDouble((TeamfightDomain t) -> overlap(t, from, to))
+                .thenComparing(t -> -Math.abs(t.getStartTime() - fight.getStartSeconds())));
+  }
+
+  private static double overlap(TeamfightDomain t, double from, double to) {
+    return Math.min(t.getEndTime(), to) - Math.max(t.getStartTime(), from);
   }
 
   private static String goldDelta(MatchData d, TeamfightDomain fight, TeamSide loser) {

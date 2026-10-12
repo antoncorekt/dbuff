@@ -122,10 +122,11 @@ class FightLossAnalyzerTest {
             FightExplanationDomain::getLosingTeam,
             FightExplanationDomain::getSpikeIndex,
             FightExplanationDomain::getGoldLost,
+            FightExplanationDomain::getUnmatchedDeaths,
             FightExplanationDomain::getReasonCount,
             FightExplanationDomain::getAnalysisVersion)
         .containsExactlyInAnyOrder(
-            tuple(0, "DIRE", 0, 500L, 2, 1), tuple(1, "RADIANT", null, null, 0, 1));
+            tuple(0, "DIRE", 0, 500L, 1, 2, 1), tuple(1, "RADIANT", null, null, 0, 0, 1));
   }
 
   @Test
@@ -167,6 +168,26 @@ class FightLossAnalyzerTest {
     assertThat(explanationRepo.findByMatchId(MATCH))
         .extracting(FightExplanationDomain::getGoldLost)
         .containsExactly((Long) null);
+  }
+
+  @Test
+  void anOpenDotaDeathPaysForOneReplayDeathOnly_andTheOtherCountsAsUnmatched() {
+    fight(0, "RADIANT");
+    death(128, 0, 100, 400L);
+    deathRepo.save(
+        DeathAnalysisDomain.builder()
+            .matchId(MATCH)
+            .playerSlot(128L)
+            .deathIndex(1)
+            .deathSeconds(102.5)
+            .fightIndex(0)
+            .build());
+
+    analyzer.analyze(MATCH);
+
+    assertThat(explanationRepo.findByMatchId(MATCH))
+        .extracting(FightExplanationDomain::getGoldLost, FightExplanationDomain::getUnmatchedDeaths)
+        .containsExactly(tuple(400L, 1));
   }
 
   @Test

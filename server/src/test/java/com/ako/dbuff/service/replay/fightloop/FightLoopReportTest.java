@@ -85,7 +85,7 @@ class FightLoopReportTest {
                     List.of())));
 
     assertThat(report)
-        .contains("| 0 | 5 | 23:03 | DIRE | 1200 | 1 | #2 | 4 | -1000 |")
+        .contains("| 0 | 5 | 23:03 | DIRE | 1200 | ? | 1 | #2 | 4 | -1000 |")
         .contains("| 0 | 5 | NO_TP | slot 128 (npc_x) | 1 | 0.70 | no \\| teleport at start | | |")
         .contains("### Swing 0, 22:00 to 24:00, 3200 gold");
   }
@@ -105,7 +105,7 @@ class FightLoopReportTest {
             List.of());
 
     assertThat(FightLoopReport.render(noOd))
-        .contains("| - | 5 | 23:03 | DIRE | ? | 1 | none | none | none |");
+        .contains("| - | 5 | 23:03 | DIRE | ? | ? | 1 | none | none | none |");
   }
 
   @Test
@@ -126,6 +126,34 @@ class FightLoopReportTest {
             FightLoopTopic.SECTIONS);
 
     assertThat(changes).containsExactly("fight 0 5, gold lost: 1200 -> 1500");
+  }
+
+  @Test
+  void ofTwoOverlappingOpenDotaFightsTheOneWithTheMostOverlapIsShown() {
+    MatchData d = data(new MatchExplanation(List.of(), List.of(lost(5, null, "DIRE", null, "X"))));
+    d =
+        new MatchData(
+            d.matchId(),
+            d.match(),
+            d.modeName(),
+            d.explanation(),
+            d.replayPlayers(),
+            List.of(
+                TeamfightDomain.builder()
+                    .fightIndex(1)
+                    .startTime(1370L)
+                    .endTime(1380L)
+                    .deaths(3L)
+                    .build(),
+                TeamfightDomain.builder()
+                    .fightIndex(2)
+                    .startTime(1385L)
+                    .endTime(1400L)
+                    .deaths(4L)
+                    .build()),
+            List.of());
+
+    assertThat(FightLoopReport.render(d)).contains("| #2 | 4 | ? |");
   }
 
   @Test

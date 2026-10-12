@@ -43,6 +43,9 @@ public class FightExplanationDomain {
   /** Gold the losing team's deaths in the fight cost it; null when no death has a gold figure. */
   private Long goldLost;
 
+  /** The losing team's deaths in the fight that no OpenDota death event could be matched to. */
+  private Integer unmatchedDeaths;
+
   /** Every reason stored for the losing team in this fight, zero included. */
   private Integer reasonCount;
 

@@ -11,6 +11,7 @@ import com.ako.dbuff.dao.repo.GameSpikeRepo;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -63,19 +64,22 @@ public class FightExplanationReader {
   public MatchExplanation read(long matchId, int topReasons, int maxFightsPerSwing) {
     Map<Integer, FightDomain> fights =
         fightRepo.findByMatchId(matchId).stream()
-            .collect(Collectors.toMap(FightDomain::getFightIndex, Function.identity()));
+            .filter(f -> f.getFightIndex() != null)
+            .collect(
+                Collectors.toMap(FightDomain::getFightIndex, Function.identity(), (a, b) -> a));
     Map<Integer, List<FightReasonDomain>> reasons =
         reasonRepo.findByMatchId(matchId).stream()
             .filter(r -> r.getFightIndex() != null)
             .collect(Collectors.groupingBy(FightReasonDomain::getFightIndex));
     List<LostFight> lost =
         explanationRepo.findByMatchId(matchId).stream()
-            .filter(e -> fights.containsKey(e.getFightIndex()))
+            .filter(e -> e.getFightIndex() != null && fights.containsKey(e.getFightIndex()))
             .sorted(Comparator.comparing(FightExplanationDomain::getFightIndex))
             .map(e -> lostFight(fights.get(e.getFightIndex()), e, reasons, topReasons))
             .toList();
     List<GameSpikeDomain> spikes =
         spikeRepo.findByMatchId(matchId).stream()
+            .filter(s -> s.getSpikeIndex() != null)
             .sorted(Comparator.comparing(GameSpikeDomain::getSpikeIndex))
             .toList();
     List<SwingExplanation> swings =
@@ -99,7 +103,7 @@ public class FightExplanationReader {
   private static boolean belongsTo(GameSpikeDomain swing, LostFight lost) {
     FightExplanationDomain e = lost.explanation();
     return swing.getSpikeIndex().equals(e.getSpikeIndex())
-        && !swing.getBenefitingTeam().equals(e.getLosingTeam());
+        && !Objects.equals(swing.getBenefitingTeam(), e.getLosingTeam());
   }
 
   private LostFight lostFight(

@@ -241,13 +241,15 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
             decided.stream().map(FightDomain::getFightIndex).toList());
     Map<Integer, FightDomain> fights = new TreeMap<>();
     decided.forEach(f -> fights.put(f.getFightIndex(), f));
+    List<FightReasonDomain> allReasons =
+        reasonRepo.findByMatchId(matchId).stream().filter(r -> r.getFightIndex() != null).toList();
     assertThat(explanations)
         .allSatisfy(
             e -> {
               String winner = fights.get(e.getFightIndex()).getWinner();
               assertThat(e.getLosingTeam()).isNotEqualTo(winner);
               long ofLoser =
-                  reasonRepo.findByMatchId(matchId).stream()
+                  allReasons.stream()
                       .filter(
                           r ->
                               r.getFightIndex().equals(e.getFightIndex())

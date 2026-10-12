@@ -4,7 +4,7 @@ The reasons behind a lost fight are shaped by review rounds on a small fixed lis
 
 ## What is stored and how it is ranked
 
-`FightLossAnalyzer` (`@Order(70)`, after the fight reasons and the spikes) writes one `fight_explanation` per fight with a decided winner (not a draw, not unknown), seen from the loser: the swing whose `FIGHT` factors list the fight (when two swings list it, the one the winner benefited from), the gold the losing team's deaths in the fight cost it (OpenDota's `death_event.goldLost`, matched to the replay's deaths by hero and time within `replay.analysis.fight-loss.death-match-seconds`; empty when no death has a figure) and how many reasons `fight_reason` holds for the losing team. A lost fight with no reason is stored with a count of zero, so a gap in the rules is visible.
+`FightLossAnalyzer` (`@Order(70)`, after the fight reasons and the spikes) writes one `fight_explanation` per fight with a decided winner (not a draw, not unknown), seen from the loser: the swing whose `FIGHT` factors list the fight (when two swings list it, the one the winner benefited from), the gold the losing team's deaths in the fight cost it (OpenDota's `death_event.goldLost`, matched to the replay's deaths by hero and time within `replay.analysis.fight-loss.death-match-seconds`; empty when no death has a figure; an OpenDota death pays for at most one replay death, the nearest first, and the rest are counted as unmatched) and how many reasons `fight_reason` holds for the losing team. A lost fight with no reason is stored with a count of zero, so a gap in the rules is visible.
 
 Nothing is capped in storage. The order of the reasons is computed on read (`ReasonRanking`, no stored rank, so a rule change needs no re-analysis): by severity, which weighs role and presence only, never hero gold; team reasons rank below player reasons, unless no player reason reaches `replay.analysis.fight-loss.min-player-severity`, in which case everything ranks by severity alone.
 
@@ -26,7 +26,7 @@ The match list is `server/src/test/resources/replay/fight-loop/matches.txt` (the
 
 One `<matchId>.md` per match, and `summary.md` with the diff against the previous round:
 
-- `Lost fights` (compared between rounds): swing, fight, time, loser, gold lost, reasons stored, and the OpenDota fact to compare with: the teamfight that overlaps the fight (OpenDota needs three deaths, so small fights show `none`), its deaths and the gold delta of the losing team. A fight under a swing the loser's opponent did not benefit from is marked "benefiting side lost".
+- `Lost fights` (compared between rounds): swing, fight, time, loser, gold lost, deaths of the loser with no OpenDota figure matched (`?` when unknown), reasons stored, and the OpenDota fact to compare with: the teamfight that overlaps the fight most (OpenDota needs three deaths, so small fights show `none`), its deaths and the gold delta of the losing team. A fight under a swing the loser's opponent did not benefit from is marked "benefiting side lost".
 - `Reasons` (compared between rounds): swing, fight, code, subject (slot and hero, or the team), rank, severity, evidence, and empty `assistant` and `owner` columns for the verdicts.
 - `Swings`: each swing's window, gold and cause, and its lost fights.
 
