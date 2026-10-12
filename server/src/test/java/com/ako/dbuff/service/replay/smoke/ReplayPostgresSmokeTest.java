@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.smoke;
 
 import com.ako.dbuff.dao.model.FightDomain;
+import com.ako.dbuff.dao.model.FightExplanationDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
@@ -12,6 +13,7 @@ import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.dao.repo.AbilityDraftPoolRepo;
 import com.ako.dbuff.dao.repo.BuybackEventRepo;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
+import com.ako.dbuff.dao.repo.FightExplanationRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
@@ -35,6 +37,7 @@ import com.ako.dbuff.service.replay.analysis.activity.Activity;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionStage;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
+import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.reason.ReasonScope;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
@@ -97,6 +100,8 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private FightRepo fightRepo;
   @Autowired private DeathAnalysisRepo deathRepo;
   @Autowired private FightReasonRepo reasonRepo;
+  @Autowired private FightExplanationRepo explanationRepo;
+  @Autowired private FightExplanationReader explanationReader;
   @Autowired private BuybackEventRepo buybackRepo;
   @Autowired private PlayerPhaseSummaryRepo phaseRepo;
   @Autowired private GameSpikeRepo spikeRepo;
@@ -188,6 +193,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     dataService.deleteByMatchId(Long.parseLong(MATCHES[0]));
     assertThat(deathRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
     assertThat(reasonRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
+    assertThat(explanationRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
   }
 
   @Test
@@ -217,8 +223,51 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .extracting(c -> c.getTeam() + " " + c.getStage())
           .containsExactlyInAnyOrder("RADIANT PICK", "RADIANT FINAL", "DIRE PICK", "DIRE FINAL");
       assertRoleAwareReasons(id, match.getId());
+      assertFightExplanations(id, match.getId());
       printAbilityDraft(id, match.getId(), profiles);
     }
+  }
+
+  private void assertFightExplanations(String id, long matchId) {
+    List<FightDomain> decided =
+        fightRepo.findByMatchId(matchId).stream()
+            .filter(f -> "RADIANT".equals(f.getWinner()) || "DIRE".equals(f.getWinner()))
+            .toList();
+    List<FightExplanationDomain> explanations = explanationRepo.findByMatchId(matchId);
+    assertThat(explanations)
+        .as("%s: one explanation per fight with a winner", id)
+        .extracting(FightExplanationDomain::getFightIndex)
+        .containsExactlyInAnyOrderElementsOf(
+            decided.stream().map(FightDomain::getFightIndex).toList());
+    Map<Integer, FightDomain> fights = new TreeMap<>();
+    decided.forEach(f -> fights.put(f.getFightIndex(), f));
+    assertThat(explanations)
+        .allSatisfy(
+            e -> {
+              String winner = fights.get(e.getFightIndex()).getWinner();
+              assertThat(e.getLosingTeam()).isNotEqualTo(winner);
+              long ofLoser =
+                  reasonRepo.findByMatchId(matchId).stream()
+                      .filter(
+                          r ->
+                              r.getFightIndex().equals(e.getFightIndex())
+                                  && e.getLosingTeam().equals(r.getTeam()))
+                      .count();
+              assertThat(e.getReasonCount())
+                  .as("%s fight %d", id, e.getFightIndex())
+                  .isEqualTo((int) ofLoser);
+            });
+    FightExplanationReader.MatchExplanation read = explanationReader.read(matchId, 3, 2);
+    assertThat(read.swings()).hasSameSizeAs(spikeRepo.findByMatchId(matchId));
+    assertThat(read.swings()).allSatisfy(s -> assertThat(s.fights()).hasSizeLessThanOrEqualTo(2));
+    System.out.println(
+        "FIGHT LOSS "
+            + id
+            + ": "
+            + explanations.size()
+            + " lost fights, "
+            + explanations.stream().filter(e -> e.getReasonCount() == 0).count()
+            + " without a reason");
   }
 
   /** Derives the expected rows from the stored roles, fight players and compositions. */
