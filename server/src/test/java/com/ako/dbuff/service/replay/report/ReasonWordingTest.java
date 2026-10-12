@@ -61,4 +61,18 @@ class ReasonWordingTest {
         .isEqualTo("Sven: something odd");
     assertThat(ReasonWording.phrase(player("NEW_CODE", null), "Sven")).isEqualTo("Sven new code");
   }
+
+  @Test
+  void phrase_dropsTheAbilityListWhenTheEvidenceIsBlank() {
+    assertThat(ReasonWording.phrase(player("NO_MANA", " "), "Axe"))
+        .isEqualTo("Axe ran out of mana");
+    assertThat(ReasonWording.phrase(player("ABILITY_ON_COOLDOWN", null), "Axe"))
+        .isEqualTo("Axe had an ability on cooldown");
+  }
+
+  @Test
+  void phrase_survivesATeamReasonWithNoCode() {
+    assertThat(ReasonWording.phrase(team(null), "x")).isEqualTo("the team had a gap");
+    assertThat(ReasonWording.phrase(team(""), "x")).isEqualTo("the team had a gap");
+  }
 }

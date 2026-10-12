@@ -1,14 +1,15 @@
 package com.ako.dbuff.service.replay.report;
 
+import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.dao.model.GameSpikeDomain;
 import com.ako.dbuff.dao.model.GameSpikeFactorDomain;
-import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.GameSpikeFactorRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
-import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.LostFight;
+import com.ako.dbuff.service.replay.analysis.reason.Enums;
+import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.spike.SpikeCause;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -50,7 +51,7 @@ public class SwingSection implements ReplayReportSection {
   private final GameSpikeRepo spikeRepo;
   private final GameSpikeFactorRepo factorRepo;
   private final FightExplanationReader explanationReader;
-  private final ReplayPlayerRepo playerRepo;
+  private final ReportHeroNames heroNames;
   private final ReplayReportProperties properties;
 
   @Override
@@ -79,7 +80,7 @@ public class SwingSection implements ReplayReportSection {
         factorRepo.findByMatchId(input.matchId()).stream()
             .collect(Collectors.groupingBy(GameSpikeFactorDomain::getSpikeIndex));
     Map<Integer, List<LostFight>> lostBySwing = lostFights(input.matchId());
-    Map<Long, String> heroes = heroes(input.matchId());
+    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     List<String> lines = new ArrayList<>();
     lines.add("**Swings**");
     for (GameSpikeDomain spike : spikes) {
@@ -100,36 +101,39 @@ public class SwingSection implements ReplayReportSection {
         .collect(Collectors.toMap(s -> s.swing().getSpikeIndex(), s -> s.fights(), (a, b) -> a));
   }
 
-  private Map<Long, String> heroes(long matchId) {
-    return playerRepo.findByMatchId(matchId).stream()
-        .filter(p -> p.getPlayerSlot() != null && p.getHeroEntityName() != null)
-        .collect(
-            Collectors.toMap(
-                ReplayPlayerDomain::getPlayerSlot,
-                p -> Prettify.entity(p.getHeroEntityName()),
-                (a, b) -> a));
-  }
-
   private static Optional<String> lostLine(LostFight lost, Map<Long, String> heroes) {
+    TeamSide loser = Enums.find(TeamSide.class, lost.explanation().getLosingTeam());
+    Double start = lost.fight().getStartSeconds();
+    if (loser == null || start == null) {
+      return Optional.empty();
+    }
     String reasons =
         lost.reasons().stream()
-            .map(
-                r ->
-                    ReasonWording.phrase(
-                        r.reason(), heroes.getOrDefault(r.reason().getSubjectSlot(), "A hero")))
+            .map(r -> r.reason())
+            .map(r -> phrase(r, heroes))
+            .flatMap(Optional::stream)
             .collect(Collectors.joining(", "));
     if (reasons.isEmpty()) {
       return Optional.empty();
     }
     Long gold = lost.explanation().getGoldLost();
+    boolean worthSaying = gold != null && Math.round(gold / 100.0) > 0;
     return Optional.of(
         String.format(
             Locale.ROOT,
             "%s lost %sthe fight at %s: %s",
-            teamName(lost.explanation().getLosingTeam()),
-            gold == null ? "" : String.format(Locale.ROOT, "%.1fk from ", gold / 1000.0),
-            GameTime.clock(lost.fight().getStartSeconds()),
+            teamName(loser.name()),
+            worthSaying ? String.format(Locale.ROOT, "%.1fk from ", gold / 1000.0) : "",
+            GameTime.clock(start),
             reasons));
+  }
+
+  private static Optional<String> phrase(FightReasonDomain reason, Map<Long, String> heroes) {
+    String hero = reason.getSubjectSlot() == null ? null : heroes.get(reason.getSubjectSlot());
+    if (hero == null && !"TEAM".equals(reason.getScope())) {
+      return Optional.empty();
+    }
+    return Optional.of(ReasonWording.phrase(reason, hero));
   }
 
   private static String teamName(String team) {

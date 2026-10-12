@@ -25,9 +25,9 @@ final class ReasonWording {
           Map.entry("NO_TP", e -> "had no teleport"),
           Map.entry("TP_ON_COOLDOWN", e -> "had the teleport on cooldown"),
           Map.entry("HAD_TP_NOT_USED", e -> "had a teleport and did not use it"),
-          Map.entry("NO_MANA", e -> "was out of mana for " + abilities(e)),
-          Map.entry("ABILITY_ON_COOLDOWN", e -> "had " + abilities(e) + " on cooldown"),
-          Map.entry("ITEM_ON_COOLDOWN", e -> "had " + abilities(e) + " on cooldown"),
+          Map.entry("NO_MANA", ReasonWording::outOfMana),
+          Map.entry("ABILITY_ON_COOLDOWN", ReasonWording::onCooldown),
+          Map.entry("ITEM_ON_COOLDOWN", ReasonWording::onCooldown),
           Map.entry("CARRY_FARMING_ELSEWHERE", ReasonWording::farming),
           Map.entry("SUPPORT_ABSENT", e -> "was not in the fight"),
           Map.entry("DIED_FIRST", e -> "died first"),
@@ -54,15 +54,29 @@ final class ReasonWording {
     if (known != null) {
       return hero + " " + known.apply(evidence);
     }
+    String code = reason.getCode() == null ? "" : reason.getCode();
     return evidence.isEmpty()
-        ? hero + " " + reason.getCode().toLowerCase(Locale.ROOT).replace('_', ' ')
+        ? hero + " " + code.toLowerCase(Locale.ROOT).replace('_', ' ')
         : hero + ": " + evidence;
   }
 
   private static String teamGap(String code) {
-    String words = CompositionToken.words(code);
+    String words = code == null ? "" : CompositionToken.words(code);
+    if (words.isBlank()) {
+      return " had a gap";
+    }
     boolean has = words.startsWith("no ") || Character.isDigit(words.charAt(0));
     return has ? " had " + words : ": " + words;
+  }
+
+  private static String outOfMana(String evidence) {
+    String names = abilities(evidence);
+    return names.isEmpty() ? "ran out of mana" : "was out of mana for " + names;
+  }
+
+  private static String onCooldown(String evidence) {
+    String names = abilities(evidence);
+    return names.isEmpty() ? "had an ability on cooldown" : "had " + names + " on cooldown";
   }
 
   private static String abilities(String evidence) {

@@ -5,10 +5,8 @@ import com.ako.dbuff.dao.model.FightExplanationDomain;
 import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.dao.model.GameSpikeDomain;
 import com.ako.dbuff.dao.model.GameSpikeFactorDomain;
-import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.repo.GameSpikeFactorRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
-import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.LostFight;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.MatchExplanation;
@@ -31,10 +29,10 @@ class SwingSectionTest {
   private final GameSpikeRepo spikeRepo = mock(GameSpikeRepo.class);
   private final GameSpikeFactorRepo factorRepo = mock(GameSpikeFactorRepo.class);
   private final FightExplanationReader reader = mock(FightExplanationReader.class);
-  private final ReplayPlayerRepo playerRepo = mock(ReplayPlayerRepo.class);
+  private final ReportHeroNames heroNames = mock(ReportHeroNames.class);
   private final ReplayReportProperties properties = new ReplayReportProperties();
   private final SwingSection section =
-      new SwingSection(spikeRepo, factorRepo, reader, playerRepo, properties);
+      new SwingSection(spikeRepo, factorRepo, reader, heroNames, properties);
 
   SwingSectionTest() {
     when(reader.read(anyLong(), anyInt(), anyInt()))
@@ -76,11 +74,7 @@ class SwingSectionTest {
   }
 
   private void heroes() {
-    when(playerRepo.findByMatchId(1L))
-        .thenReturn(
-            List.of(
-                ReplayPlayerDomain.builder().playerSlot(2L).heroEntityName("Terrorblade").build(),
-                ReplayPlayerDomain.builder().playerSlot(3L).heroEntityName("Venomancer").build()));
+    when(heroNames.bySlot(1L)).thenReturn(Map.of(2L, "Terrorblade", 3L, "Venomancer"));
   }
 
   private ReplayReportInput input() {
@@ -224,5 +218,67 @@ class SwingSectionTest {
         String.join("\n", section.lines(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3)));
 
     assertThat(text.length()).isLessThan(2000);
+  }
+
+  private void oneSwing() {
+    when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spike(0, 1300, 5000, "FIGHT_WIN", false)));
+    heroes();
+  }
+
+  @Test
+  void lines_skipAFightWhoseLosingTeamOrStartIsUnknown() {
+    oneSwing();
+    LostFight unknownTeam = lost(4, 1390.0, 3200L, ranked(1, "PLAYER", 3L, "NO_TP", "x"));
+    unknownTeam.explanation().setLosingTeam("NOBODY");
+    LostFight noStart = lost(5, 1390.0, 3200L, ranked(1, "PLAYER", 3L, "NO_TP", "x"));
+    noStart.fight().setStartSeconds(null);
+    explain(0, unknownTeam, noStart);
+
+    assertThat(section.lines(input())).hasSize(2);
+  }
+
+  @Test
+  void lines_leaveOutGoldThatRoundsToNothing() {
+    oneSwing();
+    explain(0, lost(4, 1390.0, 40L, ranked(1, "PLAYER", 3L, "NO_TP", "x")));
+
+    assertThat(section.lines(input()).get(2))
+        .isEqualTo("Radiant lost the fight at 23:10: Venomancer had no teleport");
+  }
+
+  @Test
+  void lines_skipAReasonWhoseHeroIsUnknownButKeepTeamReasons() {
+    oneSwing();
+    explain(
+        0,
+        lost(
+            4,
+            1390.0,
+            3200L,
+            ranked(1, "PLAYER", 99L, "NO_TP", "x"),
+            ranked(2, "TEAM", null, "NO_DISABLE", "x")));
+
+    assertThat(section.lines(input()).get(2))
+        .isEqualTo("Radiant lost 3.2k from the fight at 23:10: the team had no disable");
+  }
+
+  @Test
+  void lines_listAtMostTheFindingsCapOfSwingsEachWithItsFights() {
+    List<GameSpikeDomain> spikes =
+        java.util.stream.IntStream.range(0, 8)
+            .mapToObj(i -> spike(i, 300 + i * 100, 5000 + i, "FIGHT_WIN", false))
+            .toList();
+    when(spikeRepo.findByMatchId(1L)).thenReturn(spikes);
+    heroes();
+    LostFight fight = lost(1, 1390.0, 3200L, ranked(1, "PLAYER", 3L, "NO_TP", "x"));
+    when(reader.read(anyLong(), anyInt(), anyInt()))
+        .thenReturn(
+            new MatchExplanation(
+                spikes.stream().map(sp -> new SwingExplanation(sp, List.of(fight, fight))).toList(),
+                List.of()));
+
+    List<String> lines = section.lines(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3));
+
+    assertThat(lines).hasSize(1 + 3 * 3);
   }
 }
