@@ -39,8 +39,10 @@ import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
+import com.ako.dbuff.service.replay.analysis.reason.Reason;
 import com.ako.dbuff.service.replay.analysis.reason.ReasonScope;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
+import com.ako.dbuff.service.replay.analysis.role.IntentProfileCalculator;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.report.CompositionSection;
 import com.ako.dbuff.service.replay.report.DeathSection;
@@ -58,6 +60,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -118,6 +121,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private PlayerGameStatisticRepo playerStatRepo;
   @Autowired private HeroKits heroKits;
   @Autowired private FightPlayerRepo fightPlayerRepo;
+  @Autowired private IntentProfileCalculator intentCalculator;
 
   @Test
   @Commit
@@ -165,6 +169,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
               })
           .extracting(c -> c.getTeam())
           .containsExactlyInAnyOrder("RADIANT", "DIRE");
+      assertAllPickReasons(id, match.getId());
       assertThat(buybackRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(spikeRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(stateSegmentRepo.findByMatchId(match.getId())).isNotEmpty();
@@ -223,6 +228,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .extracting(c -> c.getTeam() + " " + c.getStage())
           .containsExactlyInAnyOrder("RADIANT PICK", "RADIANT FINAL", "DIRE PICK", "DIRE FINAL");
       assertRoleAwareReasons(id, match.getId());
+      assertAbilityDraftReasons(id, match.getId());
       assertFightExplanations(id, match.getId());
       printAbilityDraft(id, match.getId(), profiles);
     }
@@ -324,11 +330,222 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     Set<String> storedGaps =
         stored.stream()
             .filter(r -> r.getScope().equals(ReasonScope.TEAM.name()))
+            .filter(r -> r.getSource().equals(Reason.COMMON))
             .map(r -> r.getFightIndex() + "/" + r.getTeam() + "/" + r.getCode())
             .collect(Collectors.toCollection(TreeSet::new));
     assertThat(storedGaps)
         .as("%s: team gaps are the losing team's final function tokens", id)
         .isEqualTo(expectedGaps);
+  }
+
+  private static Set<String> keys(List<FightReasonDomain> rows, String code) {
+    return rows.stream()
+        .filter(r -> r.getCode().equals(code))
+        .map(r -> r.getFightIndex() + "/" + r.getTeam() + "/" + r.getSubjectSlot())
+        .collect(Collectors.toCollection(TreeSet::new));
+  }
+
+  private static String countsPerCode(List<FightReasonDomain> rows, String... codes) {
+    return Arrays.stream(codes)
+        .map(c -> c + "=" + keys(rows, c).size())
+        .collect(Collectors.joining(" "));
+  }
+
+  private static TeamSide loserOf(FightDomain fight) {
+    TeamSide winner = Enums.find(TeamSide.class, fight.getWinner());
+    if (winner == null) {
+      return null;
+    }
+    return winner == TeamSide.RADIANT ? TeamSide.DIRE : TeamSide.RADIANT;
+  }
+
+  private static boolean inFight(FightPlayerDomain p) {
+    Presence presence = Enums.find(Presence.class, p.getPresence());
+    return presence == Presence.ACTIVE || presence == Presence.PRESENT_PASSIVE;
+  }
+
+  /** Derives the expected Ability Draft rows from the stored profiles, compositions and pool. */
+  private void assertAbilityDraftReasons(String id, long matchId) {
+    List<FightReasonDomain> stored = reasonRepo.findByMatchId(matchId);
+    Map<Long, Map<String, Integer>> roles = new TreeMap<>();
+    roleProfileRepo
+        .findByMatchId(matchId)
+        .forEach(
+            p ->
+                roles
+                    .computeIfAbsent(p.getPlayerSlot(), s -> new TreeMap<>())
+                    .put(p.getStage(), p.getRole()));
+    Set<String> expectedIntent = new TreeSet<>();
+    for (FightPlayerDomain p : fightPlayerRepo.findByMatchId(matchId)) {
+      Map<String, Integer> byStage = roles.getOrDefault(p.getPlayerSlot(), Map.of());
+      Integer intent = byStage.get("INTENT");
+      Integer played = byStage.get("FINAL");
+      if (inFight(p) && intent != null && played != null && !intent.equals(played)) {
+        expectedIntent.add(
+            p.getFightIndex() + "/" + TeamSide.ofSlot(p.getPlayerSlot()) + "/" + p.getPlayerSlot());
+      }
+    }
+    assertThat(keys(stored, "INTENT_NOT_PLAYED"))
+        .as("%s: heroes in the fight whose intent role differs from the final one", id)
+        .isEqualTo(expectedIntent);
+
+    Map<TeamSide, Map<String, Double>> peaks = new TreeMap<>();
+    Map<TeamSide, Long> intentProfiled = new TreeMap<>();
+    for (PlayerRoleProfileDomain p : roleProfileRepo.findByMatchId(matchId)) {
+      if (p.getStage().equals("INTENT")) {
+        intentProfiled.merge(TeamSide.ofSlot(p.getPlayerSlot()), 1L, Long::sum);
+        Map<String, Double> team =
+            peaks.computeIfAbsent(TeamSide.ofSlot(p.getPlayerSlot()), t -> new TreeMap<>());
+        team.merge("initiation", p.getInitiation() == null ? -1 : p.getInitiation(), Math::max);
+        team.merge("disable", p.getDisable() == null ? -1 : p.getDisable(), Math::max);
+        team.merge("damage", p.getDamage() == null ? -1 : p.getDamage(), Math::max);
+      }
+    }
+    Set<String> skippedStrong =
+        draftPoolRepo.findByMatchId(matchId).stream()
+            .filter(p -> p.getPickedBySlot() == null && p.getAbilityName() != null)
+            .filter(p -> isStrong(p.getAbilityName()))
+            .map(p -> p.getAbilityName())
+            .collect(Collectors.toCollection(TreeSet::new));
+    Set<String> expectedWeak = new TreeSet<>();
+    Set<String> expectedStrong = new TreeSet<>();
+    for (FightDomain fight : fightRepo.findByMatchId(matchId)) {
+      TeamSide loser = loserOf(fight);
+      if (loser == null) {
+        continue;
+      }
+      String key = fight.getFightIndex() + "/" + loser + "/null";
+      long profiled = intentProfiled.getOrDefault(loser, 0L);
+      long gaps =
+          profiled < 4
+              ? 0
+              : peaks.getOrDefault(loser, Map.of()).values().stream()
+                  .filter(v -> v >= 0 && v < 0.6)
+                  .count();
+      if (gaps >= 2) {
+        expectedWeak.add(key);
+      }
+    }
+    assertThat(keys(stored, "WEAK_COMBINATION"))
+        .as(
+            "%s: the losing team's best player stays below 0.6 in two of initiation, disable,"
+                + " damage",
+            id)
+        .isEqualTo(expectedWeak);
+    assertThat(keys(stored, "STRONG_SKILL_LEFT"))
+        .as("%s: STRONG_SKILL_LEFT is off by default", id)
+        .isEqualTo(expectedStrong);
+    assertThat(stored)
+        .filteredOn(r -> r.getCode().equals("HERO_ROLE_MISMATCH"))
+        .as("%s: no All Pick reason in an Ability Draft", id)
+        .isEmpty();
+    System.out.println(
+        "AD REASONS "
+            + id
+            + " fights="
+            + fightRepo.findByMatchId(matchId).size()
+            + " "
+            + countsPerCode(stored, "INTENT_NOT_PLAYED", "WEAK_COMBINATION", "STRONG_SKILL_LEFT")
+            + " strongSkippedSkills="
+            + skippedStrong
+            + " intentPeaks="
+            + peaks
+            + " skipped="
+            + skippedValues(matchId));
+  }
+
+  private String skippedValues(long matchId) {
+    return draftPoolRepo.findByMatchId(matchId).stream()
+        .filter(p -> p.getPickedBySlot() == null && p.getAbilityName() != null)
+        .map(
+            p ->
+                heroKits
+                    .ability(p.getAbilityName())
+                    .map(
+                        c -> {
+                          var f =
+                              intentCalculator.profile(
+                                  null,
+                                  List.of(
+                                      new IntentProfileCalculator.HeldAbility(
+                                          p.getAbilityName(), c, false)));
+                          return String.format(
+                              "%s(i%.2f d%.2f x%.2f)",
+                              p.getAbilityName(), f.initiation(), f.disable(), f.damage());
+                        })
+                    .orElse(p.getAbilityName() + "(no constant)"))
+        .collect(Collectors.joining(" "));
+  }
+
+  private boolean isStrong(String abilityName) {
+    var constant = heroKits.ability(abilityName);
+    if (constant.isEmpty()) {
+      return false;
+    }
+    var profile =
+        intentCalculator.profile(
+            null,
+            List.of(new IntentProfileCalculator.HeldAbility(abilityName, constant.get(), false)));
+    return Stream.of(profile.initiation(), profile.disable(), profile.damage())
+        .anyMatch(v -> v != null && v >= 0.35);
+  }
+
+  /** Derives the expected All Pick rows from the stored roles, heroes and fight presence. */
+  private void assertAllPickReasons(String id, long matchId) {
+    List<FightReasonDomain> stored = reasonRepo.findByMatchId(matchId);
+    Map<Long, Integer> roles = new TreeMap<>();
+    roleRepo.findByMatchId(matchId).forEach(r -> roles.put(r.getPlayerSlot(), r.getRole()));
+    Map<Long, Long> heroes = new TreeMap<>();
+    playerStatRepo
+        .findAllByMatchId(matchId)
+        .forEach(s -> heroes.put(s.getPlayerSlot(), s.getHeroId()));
+    Map<Integer, Set<String>> fitting =
+        Map.of(
+            1, Set.of("Carry"),
+            2, Set.of("Carry", "Nuker"),
+            3, Set.of("Durable", "Initiator"),
+            4, Set.of("Support", "Initiator", "Disabler"),
+            5, Set.of("Support"));
+    Set<String> expected = new TreeSet<>();
+    for (FightPlayerDomain p : fightPlayerRepo.findByMatchId(matchId)) {
+      Integer role = roles.get(p.getPlayerSlot());
+      List<String> tags =
+          heroes.get(p.getPlayerSlot()) == null
+              ? List.of()
+              : heroKits
+                  .hero(heroes.get(p.getPlayerSlot()))
+                  .map(h -> h.getRoles())
+                  .orElse(List.of());
+      if (inFight(p)
+          && role != null
+          && !tags.isEmpty()
+          && tags.stream().noneMatch(fitting.get(role)::contains)) {
+        expected.add(
+            p.getFightIndex() + "/" + TeamSide.ofSlot(p.getPlayerSlot()) + "/" + p.getPlayerSlot());
+      }
+    }
+    assertThat(keys(stored, "HERO_ROLE_MISMATCH"))
+        .as("%s: heroes in the fight whose tags do not fit the final role", id)
+        .isEqualTo(expected);
+    assertThat(stored)
+        .extracting(FightReasonDomain::getCode)
+        .as("%s: no Ability Draft reason in an All Pick", id)
+        .doesNotContain("INTENT_NOT_PLAYED", "WEAK_COMBINATION", "STRONG_SKILL_LEFT");
+    System.out.println(
+        "AP REASONS "
+            + id
+            + " fights="
+            + fightRepo.findByMatchId(matchId).size()
+            + " "
+            + countsPerCode(stored, "HERO_ROLE_MISMATCH")
+            + " "
+            + stored.stream()
+                .filter(r -> r.getCode().equals("HERO_ROLE_MISMATCH"))
+                .collect(
+                    Collectors.groupingBy(
+                        r -> r.getEvidence() + " sev " + r.getSeverity(),
+                        TreeMap::new,
+                        Collectors.counting())));
   }
 
   private void printAbilityDraft(String id, long matchId, List<PlayerRoleProfileDomain> profiles) {

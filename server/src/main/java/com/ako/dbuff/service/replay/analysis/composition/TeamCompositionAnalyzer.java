@@ -142,17 +142,7 @@ public class TeamCompositionAnalyzer implements ReplayAnalyzer {
         p.getPlayerSlot(),
         p.getRole(),
         intentRoles == null ? null : intentRoles.get(p.getPlayerSlot()),
-        new FunctionProfile(
-            null,
-            p.getFarmPriority(),
-            p.getJungle(),
-            p.getRoaming(),
-            p.getVisionDuty(),
-            p.getInitiation(),
-            p.getDisable(),
-            p.getSaveHeal(),
-            p.getDamage(),
-            p.getDurability()));
+        FunctionProfile.stored(p));
   }
 
   /**

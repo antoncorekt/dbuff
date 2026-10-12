@@ -1,17 +1,23 @@
 package com.ako.dbuff.service.replay.analysis.reason;
 
+import com.ako.dbuff.dao.model.AbilityDraftPoolDomain;
 import com.ako.dbuff.dao.model.DeathAnalysisDomain;
 import com.ako.dbuff.dao.model.FightAbilityUseDomain;
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.FightReasonDomain;
+import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerRoleDomain;
+import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.dao.model.TeamCompositionDomain;
+import com.ako.dbuff.dao.repo.AbilityDraftPoolRepo;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightAbilityUseRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
+import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
+import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
@@ -46,6 +52,9 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
   private final DeathAnalysisRepo deathRepo;
   private final PlayerRoleRepo roleRepo;
   private final TeamCompositionRepo compositionRepo;
+  private final PlayerRoleProfileRepo roleProfileRepo;
+  private final PlayerGameStatisticRepo statisticRepo;
+  private final AbilityDraftPoolRepo poolRepo;
   private final FightReasonRepo reasonRepo;
 
   @Override
@@ -55,7 +64,7 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 2;
+    return 3;
   }
 
   @Override
@@ -80,6 +89,16 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
         group(deathRepo.findByMatchId(matchId), DeathAnalysisDomain::getFightIndex);
     List<PlayerRoleDomain> roles = roleRepo.findByMatchId(matchId);
     List<TeamCompositionDomain> compositions = compositionRepo.findByMatchId(matchId);
+    List<PlayerRoleProfileDomain> profiles = roleProfileRepo.findByMatchId(matchId);
+    Map<Long, Long> heroIds =
+        statisticRepo.findAllByMatchId(matchId).stream()
+            .filter(s -> s.getPlayerSlot() != null && s.getHeroId() != null)
+            .collect(
+                Collectors.toMap(
+                    PlayerMatchStatisticDomain::getPlayerSlot,
+                    PlayerMatchStatisticDomain::getHeroId,
+                    (first, second) -> first));
+    List<AbilityDraftPoolDomain> pool = poolRepo.findByMatchId(matchId);
     List<FightReasonDomain> rows = new ArrayList<>();
     for (FightDomain fight : fightRepo.findByMatchId(matchId)) {
       int index = fight.getFightIndex();
@@ -92,7 +111,10 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
               uses.getOrDefault(index, List.of()),
               deaths.getOrDefault(index, List.of()),
               roles,
-              compositions);
+              compositions,
+              profiles,
+              heroIds,
+              pool);
       Map<String, Reason> byKey = new LinkedHashMap<>();
       for (ReasonContributor contributor : active) {
         for (Reason reason : contributor.contribute(context)) {

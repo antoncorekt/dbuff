@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.analysis.reason;
 import com.ako.dbuff.dao.model.DeathAnalysisDomain;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,6 +33,9 @@ class DeathReasonContributorTest {
         List.of(),
         List.of(deaths),
         List.of(),
+        List.of(),
+        List.of(),
+        Map.of(),
         List.of());
   }
 

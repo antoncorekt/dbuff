@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.analysis.reason;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +37,9 @@ class AbsenceReasonContributorTest {
             List.of(),
             List.of(),
             List.of(),
+            List.of(),
+            List.of(),
+            Map.of(),
             List.of());
 
     List<Reason> reasons = contributor.contribute(context);
@@ -72,6 +76,9 @@ class AbsenceReasonContributorTest {
             List.of(),
             List.of(),
             List.of(),
+            List.of(),
+            List.of(),
+            Map.of(),
             List.of());
 
     assertThat(contributor.contribute(context)).extracting(Reason::subjectSlot).containsExactly(3L);

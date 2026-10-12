@@ -1,21 +1,29 @@
 package com.ako.dbuff.service.replay.analysis.reason;
 
+import com.ako.dbuff.dao.model.AbilityDraftPoolDomain;
 import com.ako.dbuff.dao.model.DeathAnalysisDomain;
 import com.ako.dbuff.dao.model.FightAbilityUseDomain;
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.PlayerRoleDomain;
+import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.dao.model.TeamCompositionDomain;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionStage;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
+import com.ako.dbuff.service.replay.analysis.role.RoleStage;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
  * What is stored about one fight, for the contributors that explain it, with the roles and team
- * compositions of the whole match; both lists are empty when the match has none stored.
+ * compositions of the whole match; both lists are empty when the match has none stored. The
+ * profiles, hero ids and Ability Draft pool are what the mode contributors read, empty when not
+ * stored.
+ *
+ * @param heroIds the hero each player slot played
  */
 public record FightContext(
     long matchId,
@@ -25,7 +33,10 @@ public record FightContext(
     List<FightAbilityUseDomain> abilityUses,
     List<DeathAnalysisDomain> deaths,
     List<PlayerRoleDomain> roles,
-    List<TeamCompositionDomain> compositions) {
+    List<TeamCompositionDomain> compositions,
+    List<PlayerRoleProfileDomain> profiles,
+    Map<Long, Long> heroIds,
+    List<AbilityDraftPoolDomain> draftPool) {
 
   /** Empty when the player has no row in this fight. */
   public Optional<FightPlayerDomain> player(long playerSlot) {
@@ -37,6 +48,19 @@ public record FightContext(
   /** Null when the player has no row in this fight, or the row has no known presence. */
   public Presence presenceOf(long playerSlot) {
     return player(playerSlot).map(p -> Enums.find(Presence.class, p.getPresence())).orElse(null);
+  }
+
+  /** Whether the player dealt or took damage in the fight, or was near it. */
+  public boolean inFight(long playerSlot) {
+    Presence presence = presenceOf(playerSlot);
+    return presence == Presence.ACTIVE || presence == Presence.PRESENT_PASSIVE;
+  }
+
+  public Optional<PlayerRoleProfileDomain> profile(long playerSlot, RoleStage stage) {
+    return profiles.stream()
+        .filter(p -> p.getPlayerSlot() != null && p.getPlayerSlot() == playerSlot)
+        .filter(p -> stage.name().equals(p.getStage()))
+        .findFirst();
   }
 
   public Optional<TeamCompositionDomain> composition(TeamSide team, CompositionStage stage) {
