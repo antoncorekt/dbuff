@@ -10,6 +10,7 @@ import com.ako.dbuff.service.constant.data.MatchTypeConstant;
 import com.ako.dbuff.service.details.DotabuffBuildDetailsParser;
 import com.ako.dbuff.service.details.ScrapperService;
 import com.ako.dbuff.service.match.data.MatchDetailService;
+import com.ako.dbuff.service.replay.ReplayRequestAnnouncer;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ class BasicMatchDetailsMapperTest {
   private final MatchRepo matchRepo = mock(MatchRepo.class);
   private final MatchDetailService matchDetailService = mock(MatchDetailService.class);
   private final ScrapperApiService scrapperApiService = mock(ScrapperApiService.class);
+  private final ReplayRequestAnnouncer announcer = mock(ReplayRequestAnnouncer.class);
 
   private final BasicMatchDetailsMapper mapper =
       new BasicMatchDetailsMapper(
@@ -37,7 +39,8 @@ class BasicMatchDetailsMapperTest {
           mock(ScrapperService.class),
           mock(DotabuffBuildDetailsParser.class),
           scrapperApiService,
-          matchDetailService);
+          matchDetailService,
+          announcer);
 
   @Test
   void handle_storesDetailRowsBeforePersistingTheMatch() {
@@ -49,6 +52,7 @@ class BasicMatchDetailsMapperTest {
     InOrder order = inOrder(matchDetailService, matchRepo);
     order.verify(matchDetailService).replace(response, match);
     order.verify(matchRepo).save(match);
+    verify(announcer).announce(match);
   }
 
   @Test

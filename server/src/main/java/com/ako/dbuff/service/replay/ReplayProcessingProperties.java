@@ -29,6 +29,17 @@ public class ReplayProcessingProperties {
   private DataSize maxDemoBytes = DataSize.ofMegabytes(500);
   private Path tempDir = Path.of(System.getProperty("java.io.tmpdir"), "dbuff-replays");
 
+  /** A match whose details were mapped this recently is taken before everything else. */
+  private int freshWindowHours = 6;
+
+  /** A retry of a match mapped within this many hours goes before older new matches. */
+  private int retryPriorityHours = 24;
+
+  /** ...but only while it has had at most this many attempts. */
+  private int retryPriorityAttempts = 2;
+
+  private Backlog backlog = new Backlog();
+
   private int maxAttempts = 5;
 
   /** A run where an extractor failed is tried again fewer times: the cause is often permanent. */
@@ -53,4 +64,13 @@ public class ReplayProcessingProperties {
 
   /** Whole download, headers and body; a stalled body is cut off when this passes. */
   private int maxDownloadSeconds = 300;
+
+  /** Old retries and matches mapped long ago; worked on only when nothing else is waiting. */
+  @Data
+  public static class Backlog {
+    private boolean enabled = false;
+
+    /** Backlog matches taken per job run. */
+    private int batchSize = 2;
+  }
 }

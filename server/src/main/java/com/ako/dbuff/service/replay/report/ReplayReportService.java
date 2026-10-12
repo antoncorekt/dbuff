@@ -8,6 +8,7 @@ import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayReportPostedDomain;
+import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.DbufInstanceConfigRepository;
 import com.ako.dbuff.dao.repo.MatchRepo;
@@ -71,6 +72,22 @@ public class ReplayReportService {
         .map(ReplayParseRunDomain::getMatchId)
         .distinct()
         .forEach(this::deliver);
+  }
+
+  /** Delivers the match's report if its run ended DONE or PARTIAL with no retry left. */
+  public void deliverFinished(long matchId) {
+    boolean complete =
+        runRepo
+            .findByMatchIdAndParserVersion(matchId, processing.getParserVersion())
+            .filter(
+                run ->
+                    run.getStatus() == ReplayStatus.DONE
+                        || (run.getStatus() == ReplayStatus.PARTIAL
+                            && run.getNextAttemptAt() == null))
+            .isPresent();
+    if (complete) {
+      deliver(matchId);
+    }
   }
 
   public void deliver(long matchId) {
