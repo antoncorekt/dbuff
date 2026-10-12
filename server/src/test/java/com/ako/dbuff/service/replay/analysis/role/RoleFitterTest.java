@@ -42,7 +42,8 @@ class RoleFitterTest {
 
   @Test
   void aTypicalTeamGetsItsFiveRolesInOrder() {
-    List<RoleFit> fits = fitter.fit(List.of(CARRY, MID, OFFLANER, ROAMER, HARD_SUPPORT));
+    List<RoleFit> fits =
+        fitter.fit(List.of(CARRY, MID, OFFLANER, ROAMER, HARD_SUPPORT), RoleStage.INTENT);
 
     assertThat(roles(fits)).containsExactly(1, 2, 3, 4, 5);
     assertThat(fits).allSatisfy(f -> assertThat(f.confidence()).isBetween(0.0, 1.0));
@@ -50,25 +51,26 @@ class RoleFitterTest {
 
   @Test
   void theOrderOfThePlayersDoesNotChangeWhoGetsWhichRole() {
-    List<RoleFit> fits = fitter.fit(List.of(HARD_SUPPORT, OFFLANER, CARRY, ROAMER, MID));
+    List<RoleFit> fits =
+        fitter.fit(List.of(HARD_SUPPORT, OFFLANER, CARRY, ROAMER, MID), RoleStage.INTENT);
 
     assertThat(roles(fits)).containsExactly(5, 3, 1, 4, 2);
   }
 
   @Test
   void everyRoleIsUsedOnceEvenWhenAllFivePlayersLookLikeCarries() {
-    List<RoleFit> fits = fitter.fit(List.of(CARRY, CARRY, CARRY, CARRY, CARRY));
+    List<RoleFit> fits = fitter.fit(List.of(CARRY, CARRY, CARRY, CARRY, CARRY), RoleStage.INTENT);
 
     assertThat(roles(fits)).containsExactlyInAnyOrder(1, 2, 3, 4, 5);
   }
 
   @Test
   void identicalPlayersTieAndTheFirstInOrderTakesTheFirstRole() {
-    List<RoleFit> fits = fitter.fit(List.of(MID, MID, MID, MID, MID));
+    List<RoleFit> fits = fitter.fit(List.of(MID, MID, MID, MID, MID), RoleStage.INTENT);
 
     assertThat(roles(fits)).containsExactly(1, 2, 3, 4, 5);
     assertThat(fits).extracting(RoleFit::confidence).containsOnly(0.0);
-    assertThat(fitter.fit(List.of(MID, MID, MID, MID, MID)))
+    assertThat(fitter.fit(List.of(MID, MID, MID, MID, MID), RoleStage.INTENT))
         .usingRecursiveComparison()
         .isEqualTo(fits);
   }
@@ -79,18 +81,20 @@ class RoleFitterTest {
         new FunctionProfile(null, 1.0, null, null, null, null, null, null, null, null);
     List<FunctionProfile> known = List.of(CARRY, MID, OFFLANER, ROAMER, HARD_SUPPORT);
 
-    List<RoleFit> withUnknown = fitter.fit(List.of(partial, MID, OFFLANER, ROAMER, HARD_SUPPORT));
+    List<RoleFit> withUnknown =
+        fitter.fit(List.of(partial, MID, OFFLANER, ROAMER, HARD_SUPPORT), RoleStage.INTENT);
 
     assertThat(roles(withUnknown)).containsExactlyInAnyOrder(1, 2, 3, 4, 5);
     assertThat(withUnknown.getFirst().confidence())
         .isLessThanOrEqualTo(1.0 / RoleFunction.values().length);
-    assertThat(fitter.fit(known).getFirst().confidence())
+    assertThat(fitter.fit(known, RoleStage.INTENT).getFirst().confidence())
         .isGreaterThan(withUnknown.getFirst().confidence());
   }
 
   @Test
   void aTeamOfNothingKnownStillGetsFiveRolesWithZeroConfidence() {
-    List<RoleFit> fits = fitter.fit(java.util.Collections.nCopies(5, FunctionProfile.UNKNOWN));
+    List<RoleFit> fits =
+        fitter.fit(java.util.Collections.nCopies(5, FunctionProfile.UNKNOWN), RoleStage.INTENT);
 
     assertThat(roles(fits)).containsExactlyInAnyOrder(1, 2, 3, 4, 5);
     assertThat(fits).extracting(RoleFit::confidence).containsOnly(0.0);
@@ -101,15 +105,30 @@ class RoleFitterTest {
     double[] mid =
         fitter.scores(
             new FunctionProfile(
-                LanePosition.MID, null, null, null, null, null, null, null, null, null));
-    double[] none = fitter.scores(FunctionProfile.UNKNOWN);
+                LanePosition.MID, null, null, null, null, null, null, null, null, null),
+            RoleStage.INTENT);
+    double[] none = fitter.scores(FunctionProfile.UNKNOWN, RoleStage.INTENT);
 
     assertThat(mid[1] - none[1]).isGreaterThan(mid[0] - none[0]);
-    assertThat(fitter.scores(CARRY)).hasSize(RoleFitter.ROLES);
+    assertThat(fitter.scores(CARRY, RoleStage.INTENT)).hasSize(RoleFitter.ROLES);
   }
 
   @Test
   void aTeamOfAnotherSizeIsNotFitted() {
-    assertThat(fitter.fit(List.of(CARRY, MID))).isEmpty();
+    assertThat(fitter.fit(List.of(CARRY, MID), RoleStage.INTENT)).isEmpty();
+  }
+
+  @Test
+  void theFinalStageCountsAnUnknownFunctionAsNothingAndTheLaneLess() {
+    double[] unknownIntent = fitter.scores(FunctionProfile.UNKNOWN, RoleStage.INTENT);
+    double[] unknownFinal = fitter.scores(FunctionProfile.UNKNOWN, RoleStage.FINAL);
+    double[] laneIntent =
+        fitter.scores(profile(LanePosition.MID, 0, 0, 0, 0, 0, 0, 0, 0, 0), RoleStage.INTENT);
+    double[] laneFinal =
+        fitter.scores(profile(LanePosition.MID, 0, 0, 0, 0, 0, 0, 0, 0, 0), RoleStage.FINAL);
+
+    assertThat(unknownIntent).isNotEqualTo(unknownFinal);
+    assertThat(unknownFinal).containsOnly(0.0);
+    assertThat(laneFinal[1]).isLessThan(laneIntent[1]).isPositive();
   }
 }

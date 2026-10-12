@@ -38,7 +38,8 @@ final class RoleLoopDiff {
 
   private static List<String> compare(String heading, String keyLabel, Table before, Table after) {
     boolean bothPresent = !before.header().isEmpty() && !after.header().isEmpty();
-    if (bothPresent && !before.header().equals(after.header())) {
+    boolean extended = extendedBy(before.header(), after.header());
+    if (bothPresent && !extended && !before.header().equals(after.header())) {
       return List.of(
           "format changed in %s: columns %s -> %s"
               .formatted(heading, before.header(), after.header()));
@@ -52,12 +53,14 @@ final class RoleLoopDiff {
       List<String> is = after.rows().get(key);
       if (was == null || is == null) {
         out.add(label + ": " + (was == null ? "added" : "removed"));
-      } else if (was.size() != is.size() || is.size() != after.header().size()) {
+      } else if (was.size() != before.header().size()
+          || is.size() != after.header().size()
+          || (!extended && was.size() != is.size())) {
         out.add(
             "format changed in %s, %s: %d -> %d cells, header has %d"
                 .formatted(heading, label, was.size(), is.size(), after.header().size()));
       } else {
-        for (int i = after.keyColumns(); i < is.size(); i++) {
+        for (int i = after.keyColumns(); i < was.size(); i++) {
           if (!was.get(i).equals(is.get(i))) {
             out.add(
                 "%s, %s: %s -> %s".formatted(label, after.header().get(i), was.get(i), is.get(i)));
@@ -66,6 +69,13 @@ final class RoleLoopDiff {
       }
     }
     return out;
+  }
+
+  /** The later report only added columns after the earlier ones, so the shared ones compare. */
+  private static boolean extendedBy(List<String> before, List<String> after) {
+    return !before.isEmpty()
+        && after.size() > before.size()
+        && after.subList(0, before.size()).equals(before);
   }
 
   private static Table table(String report, String heading, int keyColumns) {

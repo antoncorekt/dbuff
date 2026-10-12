@@ -25,19 +25,20 @@ public class RoleFitter {
    */
   public record RoleFit(int role, double confidence, double[] scores) {}
 
-  public double[] scores(FunctionProfile profile) {
+  /** The scores of a profile read for a stage: the FINAL stage weighs the lane less. */
+  public double[] scores(FunctionProfile profile, RoleStage stage) {
     RoleProfileProperties.Fit fit = properties.getFit();
+    double unknown = stage == RoleStage.FINAL ? fit.getFinalUnknownValue() : fit.getUnknownValue();
+    double laneFactor = stage == RoleStage.FINAL ? fit.getFinalLaneFactor() : 1;
     double[] scores = new double[ROLES];
     for (int role = 1; role <= ROLES; role++) {
       double sum = 0;
       for (RoleFunction function : RoleFunction.values()) {
         Double value = profile.of(function);
-        sum +=
-            fit.getWeights().get(role).get(function)
-                * (value == null ? fit.getUnknownValue() : value);
+        sum += fit.getWeights().get(role).get(function) * (value == null ? unknown : value);
       }
       if (profile.lane() != null) {
-        sum += fit.getLaneBonus().get(role).get(profile.lane());
+        sum += laneFactor * fit.getLaneBonus().get(role).get(profile.lane());
       }
       scores[role - 1] = sum;
     }
@@ -59,11 +60,14 @@ public class RoleFitter {
    * @param team the profiles of one team
    * @return one fit per profile in the same order; empty unless the team has one profile per role
    */
-  public List<RoleFit> fit(List<FunctionProfile> team) {
+  /**
+   * @param stage how the profiles are scored: the FINAL stage weighs the lane less
+   */
+  public List<RoleFit> fit(List<FunctionProfile> team, RoleStage stage) {
     if (team.size() != ROLES) {
       return List.of();
     }
-    double[][] score = team.stream().map(this::scores).toArray(double[][]::new);
+    double[][] score = team.stream().map(p -> scores(p, stage)).toArray(double[][]::new);
     RoleAssignmentSolver.Solution solution = RoleAssignmentSolver.solve(score);
     List<RoleFit> result = new ArrayList<>();
     for (int i = 0; i < ROLES; i++) {

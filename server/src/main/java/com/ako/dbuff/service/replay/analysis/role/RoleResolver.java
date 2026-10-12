@@ -17,6 +17,14 @@ public interface RoleResolver {
   }
 
   /**
+   * The stage whose weights score a profile stored next to the roles of {@code stage}: that stage
+   * itself unless a resolver says otherwise.
+   */
+  default RoleStage scoredAs(RoleStage stage) {
+    return stage;
+  }
+
+  /**
    * @return one assignment per player with each role 1 to 5 used once; empty when the team cannot
    *     be resolved
    */

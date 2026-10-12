@@ -74,6 +74,7 @@ class PlayerRoleAnalyzerTest {
   private static final long[] WORTH = {24000, 18000, 13000, 7000, 5000};
 
   @Autowired private PlayerRoleAnalyzer analyzer;
+  @Autowired private RoleFitter fitter;
   @Autowired private PlayerRoleRepo roleRepo;
   @Autowired private PlayerRoleProfileRepo profileRepo;
   @Autowired private PlayerTimelineRepo timelineRepo;
@@ -105,7 +106,7 @@ class PlayerRoleAnalyzerTest {
         .allSatisfy(
             r -> {
               assertThat(r.getSource()).isEqualTo("DERIVED");
-              assertThat(r.getAnalysisVersion()).isEqualTo(2);
+              assertThat(r.getAnalysisVersion()).isEqualTo(3);
               assertThat(r.getEvidence()).isNotBlank();
             });
     for (boolean dire : new boolean[] {false, true}) {
@@ -155,6 +156,23 @@ class PlayerRoleAnalyzerTest {
               .mapToDouble(Double::parseDouble)
               .toArray();
       assertThat(profile.getFitRole()).isEqualTo(RoleFitter.bestRole(scores));
+      FunctionProfile read =
+          new FunctionProfile(
+              LanePosition.valueOf(profile.getLane()),
+              profile.getFarmPriority(),
+              profile.getJungle(),
+              profile.getRoaming(),
+              profile.getVisionDuty(),
+              profile.getInitiation(),
+              profile.getDisable(),
+              profile.getSaveHeal(),
+              profile.getDamage(),
+              profile.getDurability());
+      assertThat(profile.getRoleScores())
+          .isEqualTo(
+              java.util.Arrays.stream(fitter.scores(read, RoleStage.INTENT))
+                  .mapToObj(s -> String.format(java.util.Locale.ROOT, "%.2f", s))
+                  .collect(java.util.stream.Collectors.joining(",")));
     }
   }
 

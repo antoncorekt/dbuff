@@ -65,7 +65,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 2;
+    return 3;
   }
 
   @Override
@@ -143,7 +143,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
           assignments.forEach(a -> rows.add(row(matchId, a)));
         }
         try {
-          profiles.addAll(profileRows(matchId, stage, team, assignments, context));
+          profiles.addAll(profileRows(matchId, stage, team, assignments, context, resolver));
         } catch (RuntimeException e) {
           log.warn("Match {}: no {} profiles, the roles are kept", matchId, stage, e);
         }
@@ -169,7 +169,8 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
       RoleStage stage,
       List<RolePlayer> team,
       List<RoleAssignment> assignments,
-      RoleContext context) {
+      RoleContext context,
+      RoleResolver resolver) {
     StageProfiler profiler = profilers.of(stage);
     Map<Long, RoleAssignment> bySlot = new HashMap<>();
     assignments.forEach(a -> bySlot.put(a.slot(), a));
@@ -193,7 +194,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
         continue;
       }
       FunctionProfile p = profiles.get(i);
-      double[] scores = fitter.scores(p);
+      double[] scores = fitter.scores(p, resolver.scoredAs(stage));
       rows.add(
           PlayerRoleProfileDomain.builder()
               .matchId(matchId)

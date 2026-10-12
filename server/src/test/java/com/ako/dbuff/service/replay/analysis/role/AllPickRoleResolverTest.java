@@ -27,6 +27,11 @@ class AllPickRoleResolverTest {
   }
 
   @Test
+  void itsProfilesAreScoredWithThePlainWeightsInEveryStage() {
+    assertThat(resolver.scoredAs(RoleStage.FINAL)).isEqualTo(RoleStage.INTENT);
+  }
+
+  @Test
   void supportsAllPickOnly() {
     assertThat(resolver.supports(TestModes.ALL_PICK)).isTrue();
     assertThat(resolver.supports(TestModes.ABILITY_DRAFT)).isFalse();

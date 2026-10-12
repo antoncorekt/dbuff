@@ -29,6 +29,7 @@ public class IntentProfileCalculator {
   private static final String AREA = "AOE";
   private static final String NO_TARGET = "No Target";
   private static final String BKB_PIERCE = "Yes";
+  private static final String PASSIVE = "Passive";
 
   private final RoleProfileProperties properties;
   private final RoleOverrides overrides;
@@ -68,7 +69,8 @@ public class IntentProfileCalculator {
         plus(
             clamp(
                 sums.areaControl / rules.getInitiationFull()
-                    + sums.gapClosers * rules.getGapCloserInitiation()),
+                    + sums.gapClosers * rules.getGapCloserInitiation()
+                    + sums.initiators * rules.getInitiationSkill()),
             RoleFunction.INITIATION,
             extra),
         plus(clamp(sums.disable / rules.getDisableFull()), RoleFunction.DISABLE, extra),
@@ -112,7 +114,11 @@ public class IntentProfileCalculator {
       body += "Ranged".equals(hero.getAttack_type()) ? r.getRangedBody() : 0;
       body += tag(hero, r.getCarryTagName()) * r.getCarryTag();
     }
-    return clamp(body + sums.scaling * r.getScalingSkill() + sums.farmSkills * r.getFarmSkill());
+    return clamp(
+        body
+            + sums.scaling * r.getScalingSkill()
+            + sums.farmSkills * r.getFarmSkill()
+            + sums.attackSkills * r.getAttackSkillFarm());
   }
 
   private static Double roaming(HeroConstant hero, Sums sums, RoleProfileProperties.Intent r) {
@@ -132,7 +138,8 @@ public class IntentProfileCalculator {
     }
     return clamp(
         clamp(sums.damage / r.getDamageFull()) * (1 - r.getAttackDamageShare())
-            + clamp(attack / r.getAttackDamageFull()) * r.getAttackDamageShare());
+            + clamp(attack / r.getAttackDamageFull()) * r.getAttackDamageShare()
+            + sums.attackSkills * r.getAttackSkillDamage());
   }
 
   private static Double durability(HeroConstant hero, Sums sums, RoleProfileProperties.Intent r) {
@@ -166,6 +173,8 @@ public class IntentProfileCalculator {
     double disable;
     double areaControl;
     double gapClosers;
+    double initiators;
+    double attackSkills;
     double mobility;
     double damage;
     double save;
@@ -187,6 +196,18 @@ public class IntentProfileCalculator {
         disable += value;
         areaControl += area ? value * r.getInitiationDisableShare() : 0;
       }
+      double hardControl = number(a, r.getDisableKeySuffixes(), String::endsWith);
+      if (hardControl >= r.getInitiationMinControl()
+          && (area
+              || number(a, r.getInitiationRangeKeys(), String::equals)
+                  >= r.getInitiationMinCastRange())) {
+        initiators += weight;
+      }
+      if (hasKey(a, r.getAttackDamageKeys())
+          || hasAny(a.getBehavior(), r.getAttackBehaviors())
+          || (hit > 0 && has(a.getBehavior(), PASSIVE))) {
+        attackSkills += weight;
+      }
       if (hasKey(a, r.getGapCloserKeys())) {
         gapClosers += weight;
         mobility += weight;
@@ -204,7 +225,8 @@ public class IntentProfileCalculator {
           && cooldown <= r.getCheapMaxCooldown()) {
         cheap += r.getSkillWeight();
       }
-      if (has(a.getTarget_team(), FRIENDLY) && hasKey(a, r.getSaveKeys())) {
+      if ((has(a.getTarget_team(), FRIENDLY) && hasKey(a, r.getSaveKeys()))
+          || (has(a.getBehavior(), NO_TARGET) && hasKey(a, r.getAreaSaveKeys()))) {
         save += weight;
       }
       scaling += hasKey(a, r.getScalingKeys()) ? weight : 0;
@@ -239,6 +261,10 @@ public class IntentProfileCalculator {
 
     private static boolean has(List<String> values, String wanted) {
       return values != null && values.contains(wanted);
+    }
+
+    private static boolean hasAny(List<String> values, List<String> wanted) {
+      return values != null && wanted.stream().anyMatch(values::contains);
     }
 
     private static boolean hasKey(AbilityConstant a, List<String> keys) {
