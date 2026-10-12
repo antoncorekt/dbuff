@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
 import com.ako.dbuff.service.replay.analysis.role.RoleStage;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Component;
@@ -40,7 +41,7 @@ public class IntentNotPlayedContributor extends ModeReasonContributor {
     long slot = intent.getPlayerSlot();
     Integer played =
         context.profile(slot, RoleStage.FINAL).map(PlayerRoleProfileDomain::getRole).orElse(null);
-    if (played == null || played.equals(intent.getRole())) {
+    if (played == null || played.equals(intent.getRole()) || !validRole(intent.getRole(), played)) {
       return null;
     }
     int distance = Math.abs(played - intent.getRole());
@@ -57,5 +58,9 @@ public class IntentNotPlayedContributor extends ModeReasonContributor {
         severity,
         "%s was drafted as %s and played %s"
             .formatted(hero, RoleLabels.of(intent.getRole()), RoleLabels.of(played)));
+  }
+
+  private static boolean validRole(int... roles) {
+    return Arrays.stream(roles).allMatch(r -> r >= 1 && r <= 5);
   }
 }

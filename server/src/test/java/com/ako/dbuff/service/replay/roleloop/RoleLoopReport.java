@@ -8,8 +8,6 @@ import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.model.TeamCompositionDomain;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
-import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -48,14 +46,9 @@ final class RoleLoopReport {
 
   private RoleLoopReport() {}
 
-  /** A table cell: a pipe or a line break in a value must not split the row. */
-  static String cell(String value) {
-    return ReviewLoopReport.singleLine(value).replace("\\", "\\\\").replace("|", "\\|");
-  }
-
   static String render(MatchData d) {
     List<String> out = new ArrayList<>();
-    out.add(header(d));
+    out.add(ReviewLoopReport.matchHeader(d.matchId(), d.modeName(), d.match()));
     out.add("");
     if (d.stats().isEmpty()) {
       out.add("**No player statistics stored.**");
@@ -94,24 +87,6 @@ final class RoleLoopReport {
     return String.join("\n", out) + "\n";
   }
 
-  private static String header(MatchData d) {
-    MatchDomain m = d.match();
-    String date =
-        m.getStartTime() == null
-            ? "unknown date"
-            : Instant.ofEpochSecond(m.getStartTime()).atZone(ZoneOffset.UTC).toLocalDate() + "";
-    String winner =
-        m.getRadiantWin() == null ? "unknown" : (m.getRadiantWin() ? "Radiant" : "Dire");
-    return "# Match %d | %s | %s | Radiant %s : %s Dire | winner %s"
-        .formatted(
-            d.matchId(),
-            d.modeName(),
-            date,
-            m.getRadiantScore() == null ? "?" : m.getRadiantScore(),
-            m.getDireScore() == null ? "?" : m.getDireScore(),
-            winner);
-  }
-
   private static List<String> rolesTable(MatchData d) {
     List<String> rows =
         new ArrayList<>(
@@ -125,7 +100,7 @@ final class RoleLoopReport {
             "| %d | %s | %s | %s | %s | %s |"
                 .formatted(
                     slot,
-                    cell(hero(d, stat)),
+                    ReviewLoopReport.tableCell(hero(d, stat)),
                     stage(d, slot, "INTENT")
                         .map(p -> String.valueOf(p.getRole()))
                         .orElse(NO_INTENT),
@@ -166,7 +141,7 @@ final class RoleLoopReport {
                     team,
                     stage,
                     composition(d, team, stage)
-                        .map(c -> cell(blankAs(c.getTokens(), "no findings")))
+                        .map(c -> ReviewLoopReport.tableCell(blankAs(c.getTokens(), "no findings")))
                         .orElse("none stored")));
       }
     }

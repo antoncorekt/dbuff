@@ -37,7 +37,7 @@ public class StrongSkillLeftContributor extends ModeReasonContributor {
   @Override
   public List<Reason> contribute(FightContext context) {
     TeamSide loser = context.loser().orElse(null);
-    if (loser == null) {
+    if (!properties.getStrongSkillLeft().isEnabled() || loser == null) {
       return List.of();
     }
     List<String> strong =

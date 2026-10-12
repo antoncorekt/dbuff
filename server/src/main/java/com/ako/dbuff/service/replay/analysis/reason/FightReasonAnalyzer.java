@@ -96,7 +96,8 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
             .collect(
                 Collectors.toMap(
                     PlayerMatchStatisticDomain::getPlayerSlot,
-                    PlayerMatchStatisticDomain::getHeroId));
+                    PlayerMatchStatisticDomain::getHeroId,
+                    (first, second) -> first));
     List<AbilityDraftPoolDomain> pool = poolRepo.findByMatchId(matchId);
     List<FightReasonDomain> rows = new ArrayList<>();
     for (FightDomain fight : fightRepo.findByMatchId(matchId)) {

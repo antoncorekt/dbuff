@@ -99,6 +99,8 @@ public class ReasonProperties {
   /** How many of those functions must be low for the combination to be weak. */
   private int weakCombinationMinGaps = 2;
 
+  private WeakCombination weakCombination = new WeakCombination();
+
   private double weakCombinationBase = 0.4;
 
   /** Added for each lacking function beyond the minimum. */
@@ -109,6 +111,8 @@ public class ReasonProperties {
    */
   private Set<RoleFunction> strongSkillFunctions =
       EnumSet.of(RoleFunction.INITIATION, RoleFunction.DISABLE, RoleFunction.DAMAGE);
+
+  private StrongSkillLeft strongSkillLeft = new StrongSkillLeft();
 
   private double strongSkillMinValue = 0.35;
 
@@ -145,5 +149,20 @@ public class ReasonProperties {
 
   public double severity(CompositionToken token) {
     return roleGapSeverity.getOrDefault(token, defaultSeverity);
+  }
+
+  @Data
+  public static class WeakCombination {
+    /** The losing team needs at least this many players with an INTENT profile to be judged. */
+    private int minProfiledPlayers = 4;
+  }
+
+  @Data
+  public static class StrongSkillLeft {
+    /**
+     * Off by default: the single-skill scoring misses disables and initiation of well-known skills,
+     * and the reason repeats the same draft-level finding in every lost fight.
+     */
+    private boolean enabled = false;
   }
 }

@@ -30,12 +30,14 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** The mode contributors run through the unchanged analyzer, each only for its own mode. */
 @DataJpaTest
 @ActiveProfiles("test")
+@TestPropertySource(properties = "replay.analysis.reasons.strong-skill-left.enabled=true")
 @Import({
   FightReasonAnalyzer.class,
   IntentNotPlayedContributor.class,
@@ -98,6 +100,17 @@ class FightReasonModeAnalyzerTest {
   private void draftData() {
     entityManager.persist(profile("INTENT", 1));
     entityManager.persist(profile("FINAL", 3));
+    for (long slot = 1; slot <= 3; slot++) {
+      entityManager.persist(
+          PlayerRoleProfileDomain.builder()
+              .matchId(DRAFT_MATCH)
+              .playerSlot(slot)
+              .stage("INTENT")
+              .role((int) slot + 1)
+              .initiation(0.1)
+              .disable(0.2)
+              .build());
+    }
     entityManager.persist(
         AbilityDraftPoolDomain.builder()
             .matchId(DRAFT_MATCH)

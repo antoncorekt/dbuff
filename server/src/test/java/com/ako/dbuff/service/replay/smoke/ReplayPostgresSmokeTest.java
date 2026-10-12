@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.smoke;
 
 import com.ako.dbuff.dao.model.FightDomain;
+import com.ako.dbuff.dao.model.FightExplanationDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
@@ -12,6 +13,7 @@ import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.dao.repo.AbilityDraftPoolRepo;
 import com.ako.dbuff.dao.repo.BuybackEventRepo;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
+import com.ako.dbuff.dao.repo.FightExplanationRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
@@ -35,6 +37,7 @@ import com.ako.dbuff.service.replay.analysis.activity.Activity;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionStage;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
+import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.reason.Reason;
 import com.ako.dbuff.service.replay.analysis.reason.ReasonScope;
@@ -100,6 +103,8 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private FightRepo fightRepo;
   @Autowired private DeathAnalysisRepo deathRepo;
   @Autowired private FightReasonRepo reasonRepo;
+  @Autowired private FightExplanationRepo explanationRepo;
+  @Autowired private FightExplanationReader explanationReader;
   @Autowired private BuybackEventRepo buybackRepo;
   @Autowired private PlayerPhaseSummaryRepo phaseRepo;
   @Autowired private GameSpikeRepo spikeRepo;
@@ -193,6 +198,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     dataService.deleteByMatchId(Long.parseLong(MATCHES[0]));
     assertThat(deathRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
     assertThat(reasonRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
+    assertThat(explanationRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
   }
 
   @Test
@@ -223,8 +229,53 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .containsExactlyInAnyOrder("RADIANT PICK", "RADIANT FINAL", "DIRE PICK", "DIRE FINAL");
       assertRoleAwareReasons(id, match.getId());
       assertAbilityDraftReasons(id, match.getId());
+      assertFightExplanations(id, match.getId());
       printAbilityDraft(id, match.getId(), profiles);
     }
+  }
+
+  private void assertFightExplanations(String id, long matchId) {
+    List<FightDomain> decided =
+        fightRepo.findByMatchId(matchId).stream()
+            .filter(f -> "RADIANT".equals(f.getWinner()) || "DIRE".equals(f.getWinner()))
+            .toList();
+    List<FightExplanationDomain> explanations = explanationRepo.findByMatchId(matchId);
+    assertThat(explanations)
+        .as("%s: one explanation per fight with a winner", id)
+        .extracting(FightExplanationDomain::getFightIndex)
+        .containsExactlyInAnyOrderElementsOf(
+            decided.stream().map(FightDomain::getFightIndex).toList());
+    Map<Integer, FightDomain> fights = new TreeMap<>();
+    decided.forEach(f -> fights.put(f.getFightIndex(), f));
+    List<FightReasonDomain> allReasons =
+        reasonRepo.findByMatchId(matchId).stream().filter(r -> r.getFightIndex() != null).toList();
+    assertThat(explanations)
+        .allSatisfy(
+            e -> {
+              String winner = fights.get(e.getFightIndex()).getWinner();
+              assertThat(e.getLosingTeam()).isNotEqualTo(winner);
+              long ofLoser =
+                  allReasons.stream()
+                      .filter(
+                          r ->
+                              r.getFightIndex().equals(e.getFightIndex())
+                                  && e.getLosingTeam().equals(r.getTeam()))
+                      .count();
+              assertThat(e.getReasonCount())
+                  .as("%s fight %d", id, e.getFightIndex())
+                  .isEqualTo((int) ofLoser);
+            });
+    FightExplanationReader.MatchExplanation read = explanationReader.read(matchId, 3, 2);
+    assertThat(read.swings()).hasSameSizeAs(spikeRepo.findByMatchId(matchId));
+    assertThat(read.swings()).allSatisfy(s -> assertThat(s.fights()).hasSizeLessThanOrEqualTo(2));
+    System.out.println(
+        "FIGHT LOSS "
+            + id
+            + ": "
+            + explanations.size()
+            + " lost fights, "
+            + explanations.stream().filter(e -> e.getReasonCount() == 0).count()
+            + " without a reason");
   }
 
   /** Derives the expected rows from the stored roles, fight players and compositions. */
@@ -339,8 +390,10 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
         .isEqualTo(expectedIntent);
 
     Map<TeamSide, Map<String, Double>> peaks = new TreeMap<>();
+    Map<TeamSide, Long> intentProfiled = new TreeMap<>();
     for (PlayerRoleProfileDomain p : roleProfileRepo.findByMatchId(matchId)) {
       if (p.getStage().equals("INTENT")) {
+        intentProfiled.merge(TeamSide.ofSlot(p.getPlayerSlot()), 1L, Long::sum);
         Map<String, Double> team =
             peaks.computeIfAbsent(TeamSide.ofSlot(p.getPlayerSlot()), t -> new TreeMap<>());
         team.merge("initiation", p.getInitiation() == null ? -1 : p.getInitiation(), Math::max);
@@ -362,15 +415,15 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
         continue;
       }
       String key = fight.getFightIndex() + "/" + loser + "/null";
+      long profiled = intentProfiled.getOrDefault(loser, 0L);
       long gaps =
-          peaks.getOrDefault(loser, Map.of()).values().stream()
-              .filter(v -> v >= 0 && v < 0.6)
-              .count();
+          profiled < 4
+              ? 0
+              : peaks.getOrDefault(loser, Map.of()).values().stream()
+                  .filter(v -> v >= 0 && v < 0.6)
+                  .count();
       if (gaps >= 2) {
         expectedWeak.add(key);
-      }
-      if (!skippedStrong.isEmpty()) {
-        expectedStrong.add(key);
       }
     }
     assertThat(keys(stored, "WEAK_COMBINATION"))
@@ -380,7 +433,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
             id)
         .isEqualTo(expectedWeak);
     assertThat(keys(stored, "STRONG_SKILL_LEFT"))
-        .as("%s: a strong skill stayed in the pool, reported for the loser", id)
+        .as("%s: STRONG_SKILL_LEFT is off by default", id)
         .isEqualTo(expectedStrong);
     assertThat(stored)
         .filteredOn(r -> r.getCode().equals("HERO_ROLE_MISMATCH"))

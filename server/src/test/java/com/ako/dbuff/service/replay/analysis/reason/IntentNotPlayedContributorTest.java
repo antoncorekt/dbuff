@@ -102,4 +102,19 @@ class IntentNotPlayedContributorTest {
     assertThat(contributor.supports(TestModes.ABILITY_DRAFT)).isTrue();
     assertThat(contributor.supports(TestModes.ALL_PICK)).isFalse();
   }
+
+  @Test
+  void rolesOutsideOneToFiveGiveNoReason() {
+    FightContext context =
+        context(
+            List.of(
+                profile(0, "INTENT", 0),
+                profile(0, "FINAL", 3),
+                profile(1, "INTENT", 2),
+                profile(1, "FINAL", 9)),
+            row(0, "ACTIVE"),
+            row(1, "ACTIVE"));
+
+    assertThat(contributor.contribute(context)).isEmpty();
+  }
 }

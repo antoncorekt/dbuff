@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.PlayerRoleDomain;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,7 +28,17 @@ class CarryFarmingElsewhereContributorTest {
 
   private static FightContext context(List<PlayerRoleDomain> roles, FightPlayerDomain... rows) {
     return new FightContext(
-        1, TestModes.ALL_PICK, null, List.of(rows), List.of(), List.of(), roles, List.of());
+        1,
+        TestModes.ALL_PICK,
+        null,
+        List.of(rows),
+        List.of(),
+        List.of(),
+        roles,
+        List.of(),
+        List.of(),
+        Map.of(),
+        List.of());
   }
 
   @Test

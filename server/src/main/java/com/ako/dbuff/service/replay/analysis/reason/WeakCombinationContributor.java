@@ -40,6 +40,9 @@ public class WeakCombinationContributor extends ModeReasonContributor {
             .filter(p -> RoleStage.INTENT.name().equals(p.getStage()))
             .filter(p -> p.getPlayerSlot() != null && TeamSide.ofSlot(p.getPlayerSlot()) == loser)
             .toList();
+    if (team.size() < properties.getWeakCombination().getMinProfiledPlayers()) {
+      return List.of();
+    }
     Map<RoleFunction, Double> low =
         properties.getWeakCombinationFunctions().stream()
             .sorted()

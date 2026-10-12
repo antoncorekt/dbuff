@@ -18,11 +18,19 @@ import static org.assertj.core.api.Assertions.tuple;
 class StrongSkillLeftContributorTest {
   private static final Map<String, AbilityConstant> ABILITIES = ModeTestKits.fixtureAbilities();
 
+  private static final ReasonProperties ENABLED = enabled();
+
   private final StrongSkillLeftContributor contributor =
       new StrongSkillLeftContributor(
-          new ReasonProperties(),
+          ENABLED,
           new ModeTestKits(Map.of(), ABILITIES),
           new IntentProfileCalculator(new RoleProfileProperties(), RoleOverrides.NONE));
+
+  private static ReasonProperties enabled() {
+    ReasonProperties properties = new ReasonProperties();
+    properties.getStrongSkillLeft().setEnabled(true);
+    return properties;
+  }
 
   private static AbilityDraftPoolDomain pool(int index, String name, Long pickedBy) {
     return AbilityDraftPoolDomain.builder()
@@ -85,5 +93,16 @@ class StrongSkillLeftContributorTest {
   void supportsAbilityDraftOnly() {
     assertThat(contributor.supports(TestModes.ABILITY_DRAFT)).isTrue();
     assertThat(contributor.supports(TestModes.ALL_PICK)).isFalse();
+  }
+
+  @Test
+  void quietUnlessEnabled() {
+    StrongSkillLeftContributor off =
+        new StrongSkillLeftContributor(
+            new ReasonProperties(),
+            new ModeTestKits(Map.of(), ABILITIES),
+            new IntentProfileCalculator(new RoleProfileProperties(), RoleOverrides.NONE));
+
+    assertThat(off.contribute(context("DIRE", pool(1, "sven_storm_bolt", null)))).isEmpty();
   }
 }

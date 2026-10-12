@@ -14,7 +14,13 @@ import static org.assertj.core.api.Assertions.within;
 
 class WeakCombinationContributorTest {
   private final WeakCombinationContributor contributor =
-      new WeakCombinationContributor(new ReasonProperties());
+      new WeakCombinationContributor(withMinProfiled(1));
+
+  private static ReasonProperties withMinProfiled(int players) {
+    ReasonProperties properties = new ReasonProperties();
+    properties.getWeakCombination().setMinProfiledPlayers(players);
+    return properties;
+  }
 
   private static PlayerRoleProfileDomain profile(
       long slot, String stage, Double initiation, Double disable, Double damage) {
@@ -96,5 +102,26 @@ class WeakCombinationContributorTest {
   void supportsAbilityDraftOnly() {
     assertThat(contributor.supports(TestModes.ABILITY_DRAFT)).isTrue();
     assertThat(contributor.supports(TestModes.ALL_PICK)).isFalse();
+  }
+
+  @Test
+  void aTeamWithTooFewProfiledPlayersIsNotJudged() {
+    WeakCombinationContributor strict = new WeakCombinationContributor(new ReasonProperties());
+    FightContext three =
+        context(
+            "DIRE",
+            profile(0, "INTENT", 0.1, 0.1, 0.1),
+            profile(1, "INTENT", 0.1, 0.1, 0.1),
+            profile(2, "INTENT", 0.1, 0.1, 0.1));
+    FightContext four =
+        context(
+            "DIRE",
+            profile(0, "INTENT", 0.1, 0.1, 0.1),
+            profile(1, "INTENT", 0.1, 0.1, 0.1),
+            profile(2, "INTENT", 0.1, 0.1, 0.1),
+            profile(3, "INTENT", 0.1, 0.1, 0.1));
+
+    assertThat(strict.contribute(three)).isEmpty();
+    assertThat(strict.contribute(four)).hasSize(1);
   }
 }

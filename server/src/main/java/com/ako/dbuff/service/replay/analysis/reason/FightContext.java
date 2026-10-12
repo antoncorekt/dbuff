@@ -38,29 +38,6 @@ public record FightContext(
     Map<Long, Long> heroIds,
     List<AbilityDraftPoolDomain> draftPool) {
 
-  public FightContext(
-      long matchId,
-      GameModeProfile mode,
-      FightDomain fight,
-      List<FightPlayerDomain> players,
-      List<FightAbilityUseDomain> abilityUses,
-      List<DeathAnalysisDomain> deaths,
-      List<PlayerRoleDomain> roles,
-      List<TeamCompositionDomain> compositions) {
-    this(
-        matchId,
-        mode,
-        fight,
-        players,
-        abilityUses,
-        deaths,
-        roles,
-        compositions,
-        List.of(),
-        Map.of(),
-        List.of());
-  }
-
   /** Empty when the player has no row in this fight. */
   public Optional<FightPlayerDomain> player(long playerSlot) {
     return players.stream()
