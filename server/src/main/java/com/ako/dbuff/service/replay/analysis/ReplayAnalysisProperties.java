@@ -94,6 +94,18 @@ public class ReplayAnalysisProperties {
   /** A source must make up this share of a swing to be named as its cause, in percent. */
   private int spikeMinSharePercent = 10;
 
+  /** A player holding more than this share of his team's net worth, in percent, stands out. */
+  private int outlierSharePercent = 35;
+
+  /** ...for at least this many minutes. */
+  private int outlierMinutes = 3;
+
+  /** A player holding less than this share, in percent, and dying a lot, is feeding. */
+  private int feederSharePercent = 10;
+
+  /** ...for at least this many minutes. */
+  private int feederMinutes = 5;
+
   public SpikeDetector.Tuning spikeTuning() {
     return new SpikeDetector.Tuning(
         Math.max(1, spikeMinGold),
