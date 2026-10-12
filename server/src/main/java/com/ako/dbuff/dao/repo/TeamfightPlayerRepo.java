@@ -1,6 +1,7 @@
 package com.ako.dbuff.dao.repo;
 
 import com.ako.dbuff.dao.model.TeamfightPlayerDomain;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -10,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface TeamfightPlayerRepo extends JpaRepository<TeamfightPlayerDomain, Long> {
+  List<TeamfightPlayerDomain> findByMatchId(Long matchId);
+
   @Transactional
   @Modifying
   @Query("DELETE FROM TeamfightPlayerDomain e WHERE e.matchId = :matchId")

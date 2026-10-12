@@ -1,5 +1,9 @@
 package com.ako.dbuff.service.replay.looprunner;
 
+import com.ako.dbuff.dao.model.MatchDomain;
+import java.time.Instant;
+import java.time.ZoneOffset;
+
 /** The stand-in report of a match a topic could not report, which is never a diff baseline. */
 public final class ReviewLoopReport {
   private static final String NOT_REPORTED = "Not reported: ";
@@ -26,5 +30,28 @@ public final class ReviewLoopReport {
   /** A value on one line: a line break in it must not split a markdown row. */
   public static String singleLine(String value) {
     return value.replaceAll("\\s*[\\r\\n]+\\s*", " ");
+  }
+
+  /** A table cell: a pipe or a line break in a value must not split the row. */
+  public static String tableCell(String value) {
+    return singleLine(value).replace("\\", "\\\\").replace("|", "\\|");
+  }
+
+  /** The title line of every topic's report of one match. */
+  public static String matchHeader(long matchId, String modeName, MatchDomain m) {
+    String date =
+        m.getStartTime() == null
+            ? "unknown date"
+            : Instant.ofEpochSecond(m.getStartTime()).atZone(ZoneOffset.UTC).toLocalDate() + "";
+    String winner =
+        m.getRadiantWin() == null ? "unknown" : (m.getRadiantWin() ? "Radiant" : "Dire");
+    return "# Match %d | %s | %s | Radiant %s : %s Dire | winner %s"
+        .formatted(
+            matchId,
+            modeName,
+            date,
+            m.getRadiantScore() == null ? "?" : m.getRadiantScore(),
+            m.getDireScore() == null ? "?" : m.getDireScore(),
+            winner);
   }
 }
