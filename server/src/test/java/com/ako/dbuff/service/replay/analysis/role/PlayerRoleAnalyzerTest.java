@@ -3,10 +3,14 @@ package com.ako.dbuff.service.replay.analysis.role;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerRoleDomain;
+import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
+import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleRepo;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
+import com.ako.dbuff.service.constant.data.AbilityConstant;
+import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
@@ -17,9 +21,12 @@ import com.ako.dbuff.service.replay.mode.StoredMatchModes;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import jakarta.persistence.EntityManager;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -36,9 +43,29 @@ import static org.assertj.core.api.Assertions.assertThat;
   ReplayProcessingProperties.class,
   ReplayAnalysisProperties.class,
   AllPickProfile.class,
-  AbilityDraftProfile.class
+  AbilityDraftProfile.class,
+  RoleProfileTestConfig.class,
+  PlayerRoleAnalyzerTest.NoKits.class
 })
 class PlayerRoleAnalyzerTest {
+
+  @TestConfiguration
+  static class NoKits {
+    @Bean
+    HeroKits heroKits() {
+      return new HeroKits() {
+        @Override
+        public Optional<HeroConstant> hero(long heroId) {
+          return Optional.empty();
+        }
+
+        @Override
+        public Optional<AbilityConstant> ability(String name) {
+          return Optional.empty();
+        }
+      };
+    }
+  }
 
   private static final long ALL_PICK_MATCH = 31L;
   private static final long ABILITY_DRAFT_MATCH = 32L;
@@ -48,6 +75,7 @@ class PlayerRoleAnalyzerTest {
 
   @Autowired private PlayerRoleAnalyzer analyzer;
   @Autowired private PlayerRoleRepo roleRepo;
+  @Autowired private PlayerRoleProfileRepo profileRepo;
   @Autowired private PlayerTimelineRepo timelineRepo;
   @Autowired private PlayerGameStatisticRepo statisticRepo;
   @Autowired private EntityManager entityManager;
@@ -77,7 +105,7 @@ class PlayerRoleAnalyzerTest {
         .allSatisfy(
             r -> {
               assertThat(r.getSource()).isEqualTo("DERIVED");
-              assertThat(r.getAnalysisVersion()).isEqualTo(1);
+              assertThat(r.getAnalysisVersion()).isEqualTo(2);
               assertThat(r.getEvidence()).isNotBlank();
             });
     for (boolean dire : new boolean[] {false, true}) {
@@ -97,6 +125,32 @@ class PlayerRoleAnalyzerTest {
     analyzer.analyze(ALL_PICK_MATCH);
 
     assertThat(roleRepo.findByMatchId(ALL_PICK_MATCH)).hasSize(10);
+    assertThat(profileRepo.findByMatchId(ALL_PICK_MATCH)).hasSize(10);
+  }
+
+  @Test
+  void allPickStoresFinalProfilesNextToTheRolesAndNoIntentRows() {
+    stored(ALL_PICK_MATCH, 22);
+
+    analyzer.analyze(ALL_PICK_MATCH);
+
+    List<PlayerRoleProfileDomain> profiles = profileRepo.findByMatchId(ALL_PICK_MATCH);
+    assertThat(profiles).hasSize(10).extracting(p -> p.getStage()).containsOnly("FINAL");
+    for (PlayerRoleDomain role : roleRepo.findByMatchId(ALL_PICK_MATCH)) {
+      PlayerRoleProfileDomain profile =
+          profiles.stream()
+              .filter(p -> p.getPlayerSlot().equals(role.getPlayerSlot()))
+              .findFirst()
+              .orElseThrow();
+      assertThat(profile.getRole()).isEqualTo(role.getRole());
+      assertThat(profile.getConfidence()).isEqualTo(role.getConfidence());
+      assertThat(profile.getEvidence()).isEqualTo(role.getEvidence());
+      assertThat(profile.getAnalysisVersion()).isEqualTo(analyzer.version());
+      assertThat(profile.getFarmPriority()).isBetween(0.0, 1.0);
+      assertThat(profile.getLane()).isNotNull();
+      assertThat(profile.getVisionDuty()).isNull();
+      assertThat(profile.getRoleScores().split(",")).hasSize(5);
+    }
   }
 
   @Test
@@ -107,6 +161,7 @@ class PlayerRoleAnalyzerTest {
     analyzer.analyze(ABILITY_DRAFT_MATCH);
 
     assertThat(roleRepo.findByMatchId(ABILITY_DRAFT_MATCH)).isEmpty();
+    assertThat(profileRepo.findByMatchId(ABILITY_DRAFT_MATCH)).isEmpty();
   }
 
   @Test
@@ -131,6 +186,7 @@ class PlayerRoleAnalyzerTest {
     analyzer.deleteByMatchId(ALL_PICK_MATCH);
 
     assertThat(roleRepo.findByMatchId(ALL_PICK_MATCH)).isEmpty();
+    assertThat(profileRepo.findByMatchId(ALL_PICK_MATCH)).isEmpty();
   }
 
   @Test
