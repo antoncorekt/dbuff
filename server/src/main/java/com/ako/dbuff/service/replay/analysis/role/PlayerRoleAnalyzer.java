@@ -44,7 +44,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class PlayerRoleAnalyzer implements ReplayAnalyzer {
-  private static final long FIRST_DIRE_SLOT = 128;
   private static final int TEAM_SIZE = 5;
 
   private final List<RoleResolver> resolvers;
@@ -115,7 +114,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
     List<PlayerRoleProfileDomain> profiles = new ArrayList<>();
     for (boolean dire : new boolean[] {false, true}) {
       List<RolePlayer> team =
-          players.stream().filter(p -> (p.slot() >= FIRST_DIRE_SLOT) == dire).toList();
+          players.stream().filter(p -> (p.slot() >= TeamSide.FIRST_DIRE_SLOT) == dire).toList();
       if (!isTeam(team, dire)) {
         log.info(
             "Match {} has stored slots {} on the {} team, no roles for it",
@@ -239,7 +238,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
   }
 
   private static boolean isTeam(List<RolePlayer> team, boolean dire) {
-    long first = dire ? FIRST_DIRE_SLOT : 0;
+    long first = dire ? TeamSide.FIRST_DIRE_SLOT : 0;
     return team.size() == TEAM_SIZE
         && team.stream()
             .map(RolePlayer::slot)
