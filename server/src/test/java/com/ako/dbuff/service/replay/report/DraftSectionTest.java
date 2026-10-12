@@ -41,7 +41,7 @@ class DraftSectionTest {
     assertThat(lines)
         .containsExactly(
             "**Draft**",
-            "Anton drafted Faceless Void Chronosphere (3rd), Sven Gods Strength (12th), Sven Storm"
+            "Anton drafted Faceless Void Chronosphere (2nd), Sven Gods Strength (6th), Sven Storm"
                 + " Bolt (22nd)");
   }
 
