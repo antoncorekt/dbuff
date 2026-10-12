@@ -35,7 +35,7 @@ Every threshold is in one properties class, a hypothesis for the loop.
 
 ### 3.3 From a swing to a ranked explanation
 
-A `FightLossAnalyzer` (after the fight, death, role and composition analyzers) writes `fight_explanation` per lost fight: the losing team, the gold of the fight (from the swing factors, or the deaths' gold), and the top reasons by severity times the share of the loss they explain. A read model joins `game_spike`, its `FIGHT` factors, `fight_explanation` and `fight_reason`. Ranking rule, first guess: team-level reasons first only when no player reason reaches the minimum severity; at most three reasons per fight, at most two fights per swing.
+A `FightLossAnalyzer` (after the fight, death, role and composition analyzers) writes `fight_explanation` per lost fight: the losing team, the gold of the fight (from the swing factors, or the deaths' gold), and every reason found, ranked by severity (role and presence only, no hero gold). A read model joins `game_spike`, its `FIGHT` factors, `fight_explanation` and `fight_reason`. Ranking rule, first guess: team-level reasons first only when no player reason reaches the minimum severity. Nothing is capped in storage; the report shows at most three reasons per fight and two fights per swing.
 
 ### 3.4 Report
 
@@ -43,19 +43,19 @@ A `FightLossAnalyzer` (after the fight, death, role and composition analyzers) w
 
 ### 3.5 Wards (separate group, not required for the rest)
 
-No vision needs ward data: placed and killed wards per team and area. The earlier spike (S5) says the combat log has no placement and that entity create and delete is the source. This is its own extraction PR with a parse cost to measure at 512 MB before anything depends on it; reasons that need it are added after it exists.
+No vision needs ward data: wards placed and killed per team and area, sentry and dust use with times, and the time a ward appeared before a fight (a ward that appeared just before the fight weighs less). Reason codes to be defined in that PR: `NO_VISION`, `INVISIBLE_HERO_NO_DETECTION`, `LATE_WARD`. The earlier spike (S5) says the combat log has no placement and that entity create and delete is the source. This is its own extraction PR with a parse cost to measure at 512 MB before anything depends on it; reasons that need it are added after it exists.
 
 ## 4. Review loop for fights
 
-Reasons are judgement calls, so they go through the review loop (`docs/replay-review-loop.md`). This is the second topic, so the generic parts are extracted first: round numbering, match list, diff, the local-database guard and the Gradle task get a neutral name, with the role renderer on top. A fights renderer prints, per swing, the fights inside, per fight the ranked reasons with their evidence, the OpenDota fight facts to compare with, and the verdict columns. The match list starts with the four matches in `role-loop/matches.txt`; more matches with lost-fight swings may be added.
+Reasons are judgement calls, so they go through the review loop (`docs/replay-review-loop.md`). This is the second topic, so the generic parts are extracted first: round numbering, match list, diff, the local-database guard and the Gradle task get a neutral name, with the role renderer on top. A fights renderer prints, per swing, the fights inside, per fight the ranked reasons with their evidence, the OpenDota fight facts to compare with, and the verdict columns. The match list starts with the two Ability Draft matches 9038725154 and 9037038717 (owner decision, section 6); more matches with lost-fight swings may be added.
 
 ## 5. PR split
 
 1. **6a, loop made generic** (rename, topic parameter, no behaviour change; tests prove the role loop still works).
-2. **6b, reason model:** `Reason`, `ReasonContributor`, `fight_reason`, the analyzer that mirrors the existing absence, ability and death reasons into it (the old columns untouched). Common contributors for data that exists. Tests per contributor, DB test, smoke test on the four matches.
+2. **6b, reason model:** `Reason`, `ReasonContributor`, `fight_reason`, the analyzer that mirrors the existing absence, ability and death reasons into it (the old columns untouched). Common contributors for data that exists. Tests per contributor, DB test, smoke test on the four fixture matches (a separate check from the loop's match list).
 3. **6c, role-aware common reasons** (`CARRY_FARMING_ELSEWHERE`, `SUPPORT_ABSENT`, team gap from composition tokens).
 4. **6d, `FightLossAnalyzer`, `fight_explanation`, the swing read model** and the fights renderer for the loop.
-5. **6e, mode contributors:** Ability Draft first, All Pick after.
+5. **6e, mode contributors:** Ability Draft first, All Pick after (the role-based ones need 6c).
 6. **6f, report line** in `SwingSection`.
 7. **Loop rounds on fights** after 6d, until the owner accepts; mode contributors are reviewed in their own rounds.
 8. **Roles, final-stage data** (damage dealt and healing done per player from the stored combat log into the final profile, then a roles round 3) can run in parallel with 6a to 6c and is the fix for the two open final rows (Brewmaster, Venomancer).
@@ -63,9 +63,11 @@ Reasons are judgement calls, so they go through the review loop (`docs/replay-re
 
 Each PR is reviewed with the code review before the next, and nothing is merged without the owner's word.
 
-## 6. Questions for the owner
+## 6. Decisions of the owner (2026-10-12)
 
-1. Are three reasons per lost fight and two fights per swing the right amount for a Discord message?
-2. Should a reason weigh by the gold of the heroes involved (a carry's absence counts more), or only by role and presence? The first is more accurate and needs more tuning.
-3. Wards: worth the extraction cost now, or after the reasons that need no new data are accepted? The plan assumes after.
-4. Which extra matches (lost-fight swings, both modes) should join the list for the fights loop?
+1. **Storage and message are separate.** The lost-fight analysis stores every reason it finds (several per fight, no cap). The Discord line only shows the top three. The caps (three reasons, two fights per swing) belong to the report, not to the analyzer.
+2. **Weight by role and presence only,** not by the gold of the heroes. Gold weighting is not built.
+3. **Wards mean vision in a fight in general,** mostly for invisible heroes (sentry ward, dust used or missing) and a ward that appeared just before the fight (smaller weight). Extracted after the reasons that need no new data are accepted; the extraction scope is wards placed and killed, sentry and dust use, with times.
+4. **The fights loop starts with the same two matches** as the first role loop round (Ability Draft 9038725154 and 9037038717). All Pick matches and more lost-fight swings are added later.
+
+Next step: 6a and 6b in parallel (6a changes only the loop under `src/test` and the Gradle task; 6b does not use the loop), then 6c, 6d, 6e, 6f as in section 5.
