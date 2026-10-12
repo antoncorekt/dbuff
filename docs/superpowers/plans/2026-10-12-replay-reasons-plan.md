@@ -63,9 +63,11 @@ Reasons are judgement calls, so they go through the review loop (`docs/replay-re
 
 Each PR is reviewed with the code review before the next, and nothing is merged without the owner's word.
 
-## 6. Questions for the owner
+## 6. Decisions of the owner (2026-10-12)
 
-1. Are three reasons per lost fight and two fights per swing the right amount for a Discord message?
-2. Should a reason weigh by the gold of the heroes involved (a carry's absence counts more), or only by role and presence? The first is more accurate and needs more tuning.
-3. Wards: worth the extraction cost now, or after the reasons that need no new data are accepted? The plan assumes after.
-4. Which extra matches (lost-fight swings, both modes) should join the list for the fights loop?
+1. **Storage and message are separate.** The lost-fight analysis stores every reason it finds (several per fight, no cap). The Discord line only shows the top three. The caps (three reasons, two fights per swing) belong to the report, not to the analyzer.
+2. **Weight by role and presence only,** not by the gold of the heroes. Gold weighting is not built.
+3. **Wards mean vision in a fight in general,** mostly for invisible heroes (sentry ward, dust used or missing) and a ward that appeared just before the fight (smaller weight). Extracted after the reasons that need no new data are accepted; the extraction scope is wards placed and killed, sentry and dust use, with times.
+4. **The fights loop starts with the same two matches** as the first role loop round (Ability Draft 9038725154 and 9037038717). All Pick matches and more lost-fight swings are added later.
+
+Next step: 6a and 6b in parallel (no shared classes), then 6c, 6d, 6e, 6f as in section 5.
