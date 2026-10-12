@@ -1,8 +1,15 @@
 package com.ako.dbuff.service.replay.analysis.reason;
 
-/** The role numbers of {@code player_role} in words, for evidence texts. */
+import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import java.util.Locale;
+
+/** The role numbers of {@code player_role} and the teams in words, for evidence texts. */
 final class RoleLabels {
   private RoleLabels() {}
+
+  static String team(TeamSide team) {
+    return team.name().charAt(0) + team.name().substring(1).toLowerCase(Locale.ROOT);
+  }
 
   static String of(int role) {
     return switch (role) {

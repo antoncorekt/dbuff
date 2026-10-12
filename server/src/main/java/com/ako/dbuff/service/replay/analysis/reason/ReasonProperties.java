@@ -3,8 +3,12 @@ package com.ako.dbuff.service.replay.analysis.reason;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
 import com.ako.dbuff.service.replay.analysis.death.DeathReason;
 import com.ako.dbuff.service.replay.analysis.fight.AbsenceReason;
+import com.ako.dbuff.service.replay.analysis.fight.Presence;
+import com.ako.dbuff.service.replay.analysis.role.RoleFunction;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.Map;
+import java.util.Set;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -76,6 +80,60 @@ public class ReasonProperties {
               CompositionToken.NO_SAVE_HEAL, 0.3,
               CompositionToken.NO_WAVECLEAR, 0.2,
               CompositionToken.NO_VISION_DUTY, 0.2));
+
+  /**
+   * Ability Draft: a hero in the fight who played another role than his skills were drafted for.
+   */
+  private double intentNotPlayedBase = 0.3;
+
+  /** Added for each step between the drafted role and the played one (1 to 4). */
+  private double intentNotPlayedDistanceStep = 0.15;
+
+  /** Ability Draft: the functions that the team's drafted skills, taken together, must reach. */
+  private Set<RoleFunction> weakCombinationFunctions =
+      EnumSet.of(RoleFunction.INITIATION, RoleFunction.DISABLE, RoleFunction.DAMAGE);
+
+  /** A function is low when no player of the team reaches this value in his INTENT profile. */
+  private double weakCombinationLow = 0.6;
+
+  /** How many of those functions must be low for the combination to be weak. */
+  private int weakCombinationMinGaps = 2;
+
+  private double weakCombinationBase = 0.4;
+
+  /** Added for each lacking function beyond the minimum. */
+  private double weakCombinationStep = 0.2;
+
+  /**
+   * Ability Draft: a skill nobody picked is strong when one of these functions reaches the value.
+   */
+  private Set<RoleFunction> strongSkillFunctions =
+      EnumSet.of(RoleFunction.INITIATION, RoleFunction.DISABLE, RoleFunction.DAMAGE);
+
+  private double strongSkillMinValue = 0.35;
+
+  private double strongSkillBase = 0.3;
+
+  /** Added for each further strong skill left in the pool. */
+  private double strongSkillStep = 0.1;
+
+  /** All Pick: the hero tags of the constants that fit each final role; a hero with none is out. */
+  private Map<Integer, Set<String>> heroRoleTags =
+      Map.of(
+          1, Set.of("Carry"),
+          2, Set.of("Carry", "Nuker"),
+          3, Set.of("Durable", "Initiator"),
+          4, Set.of("Support", "Initiator", "Disabler"),
+          5, Set.of("Support"));
+
+  /** All Pick: by final role, the severity of a hero whose tags do not fit it. */
+  private Map<Integer, Double> heroRoleMismatchSeverity =
+      Map.of(1, 0.6, 2, 0.4, 3, 0.3, 4, 0.3, 5, 0.3);
+
+  /** The severity of a reason about a player, lowered when he was near the fight but passive. */
+  public double byPresence(double severity, Presence presence) {
+    return presence == Presence.PRESENT_PASSIVE ? severity * passivePresenceFactor : severity;
+  }
 
   public double severity(AbsenceReason reason) {
     return absenceSeverity.getOrDefault(reason, defaultSeverity);
