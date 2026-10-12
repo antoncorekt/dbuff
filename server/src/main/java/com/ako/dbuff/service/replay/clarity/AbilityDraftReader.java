@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.IntSupplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import skadistats.clarity.model.Entity;
@@ -24,7 +25,7 @@ final class AbilityDraftReader implements DraftReader {
 
   /** A pick is the moment an entry's player id changes from "nobody" to a player. */
   @Override
-  public void observe(Entity rules, FieldPath[] paths, int count, int gameTick) {
+  public void observe(Entity rules, FieldPath[] paths, int count, IntSupplier gameTick) {
     for (int i = 0; i < count; i++) {
       Matcher match = PICK_FIELD.matcher(rules.getNameForFieldPath(paths[i]));
       if (!match.matches()) {
@@ -34,7 +35,7 @@ final class AbilityDraftReader implements DraftReader {
       int player = ((Number) rules.getPropertyForFieldPath(paths[i])).intValue();
       if (player != NOT_PICKED && !picked.get(poolIndex)) {
         picked.set(poolIndex);
-        picks.add(new DraftPick(picks.size() + 1, poolIndex, player, gameTick));
+        picks.add(new DraftPick(picks.size() + 1, poolIndex, player, gameTick.getAsInt()));
       }
     }
   }

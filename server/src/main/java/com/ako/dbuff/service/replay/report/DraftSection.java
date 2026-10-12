@@ -18,10 +18,11 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class DraftSection implements ReplayReportSection {
   private final AbilityDraftPickRepo pickRepo;
+  private final AbilityDraftProfile profile;
 
   @Override
   public boolean supports(GameModeProfile mode) {
-    return mode.gameModeId() == AbilityDraftProfile.MODE_ID;
+    return mode.gameModeId() == profile.gameModeId();
   }
 
   @Override

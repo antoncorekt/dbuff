@@ -14,6 +14,7 @@ import com.ako.dbuff.service.replay.mode.GameModeRegistry;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Semaphore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -85,11 +86,12 @@ public class ReplayRunService {
 
   private ReplayStatus run(MatchDomain match) {
     ReplayParseRunDomain run = start(match);
-    var skip = eligibility.skipReason(match);
+    Optional<GameModeProfile> activeMode = modes.activeFor(match.getGameModeId());
+    var skip = eligibility.skipReason(match, activeMode);
     if (skip.isPresent()) {
       return finish(run, skip.get().getStatus(), skip.get().getMessage());
     }
-    GameModeProfile mode = modes.activeFor(match.getGameModeId()).orElseThrow();
+    GameModeProfile mode = activeMode.get();
     boolean acquired = false;
     List<String> failedExtractors;
     try {

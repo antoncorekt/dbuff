@@ -89,7 +89,7 @@ class DeathReplayTest {
       return assessments;
     }
     ReplayFacts facts =
-        new ClarityReplayParser()
+        Parsers.standard()
             .parse(
                 Path.of(System.getenv("REPLAY_FIXTURE_DIR"), "9038725154.dem"),
                 TestModes.ABILITY_DRAFT,

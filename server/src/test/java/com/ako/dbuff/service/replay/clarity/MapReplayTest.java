@@ -87,7 +87,7 @@ class MapReplayTest {
   }
 
   private static ReplayFacts parse(String replay) {
-    return new ClarityReplayParser()
+    return Parsers.standard()
         .parse(
             Path.of(System.getenv("REPLAY_FIXTURE_DIR")).resolve(replay),
             TestModes.ABILITY_DRAFT,

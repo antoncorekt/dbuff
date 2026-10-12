@@ -5,6 +5,8 @@ import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisService;
+import com.ako.dbuff.service.replay.mode.GameModeProfile;
+import com.ako.dbuff.service.replay.mode.StoredMatchModes;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,11 +38,14 @@ public class ReplayResources {
   private static final List<ReplayStatus> ANALYSED = List.of(ReplayStatus.DONE);
 
   private static final int MAX_LIMIT = 500;
+  private static final String NO_ACTIVE_MODE =
+      "The match is not stored or its game mode is not active for replay processing";
 
   private final AtomicBoolean reanalysing = new AtomicBoolean();
 
   private final ReplayParseRunRepo runRepo;
   private final ReplayAnalysisService analysis;
+  private final StoredMatchModes matchModes;
   private final ReplayProcessingProperties properties;
 
   /** How the replay run of a match ended. */
@@ -69,12 +74,16 @@ public class ReplayResources {
     if (run == null || !ANALYSED.contains(run.getStatus())) {
       return ResponseEntity.notFound().build();
     }
+    GameModeProfile mode = matchModes.activeFor(matchId).orElse(null);
+    if (mode == null) {
+      return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", NO_ACTIVE_MODE));
+    }
     if (!reanalysing.compareAndSet(false, true)) {
       return ResponseEntity.status(HttpStatus.CONFLICT)
           .body(Map.of("error", "A re-analysis is already running"));
     }
     try {
-      List<String> failed = analysis.analyze(matchId, List.of());
+      List<String> failed = analysis.analyze(matchId, mode, List.of());
       log.info("Re-analysed replay of match {}, failed analyzers: {}", matchId, failed);
       return ResponseEntity.ok(Map.of("matchId", matchId, "failedAnalyzers", failed));
     } finally {
@@ -103,31 +112,42 @@ public class ReplayResources {
               properties.getParserVersion(), ANALYSED);
       int done = 0;
       int withFailures = 0;
+      int skipped = 0;
       long last = after;
       for (ReplayParseRunDomain run :
           runs.stream().filter(r -> r.getMatchId() > after).limit(limit).toList()) {
-        done++;
         last = run.getMatchId();
-        if (failed(run.getMatchId())) {
+        GameModeProfile mode = matchModes.activeFor(last).orElse(null);
+        if (mode == null) {
+          skipped++;
+          continue;
+        }
+        done++;
+        if (failed(last, mode)) {
           withFailures++;
         }
       }
       log.info(
-          "Re-analysed {} of {} replay runs, {} with failures", done, runs.size(), withFailures);
+          "Re-analysed {} of {} replay runs, {} with failures, {} skipped",
+          done,
+          runs.size(),
+          withFailures,
+          skipped);
       return ResponseEntity.ok(
           Map.of(
               "analysed", done,
               "available", runs.size(),
               "withFailures", withFailures,
+              "skipped", skipped,
               "lastMatchId", last));
     } finally {
       reanalysing.set(false);
     }
   }
 
-  private boolean failed(long matchId) {
+  private boolean failed(long matchId, GameModeProfile mode) {
     try {
-      return !analysis.analyze(matchId, List.of()).isEmpty();
+      return !analysis.analyze(matchId, mode, List.of()).isEmpty();
     } catch (RuntimeException e) {
       log.warn("Re-analysis of match {} failed", matchId, e);
       return true;

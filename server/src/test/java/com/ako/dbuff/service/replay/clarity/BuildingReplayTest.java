@@ -24,8 +24,7 @@ class BuildingReplayTest {
     for (String match : new String[] {"9040892342", "9040889566"}) {
       Path dir = Path.of(System.getenv("REPLAY_FIXTURE_DIR"));
       ReplayFacts facts =
-          new ClarityReplayParser()
-              .parse(dir.resolve(match + ".dem"), TestModes.ALL_PICK, () -> false);
+          Parsers.standard().parse(dir.resolve(match + ".dem"), TestModes.ALL_PICK, () -> false);
       JsonNode objectives =
           new ObjectMapper().readTree(dir.resolve(match + ".json").toFile()).get("objectives");
       long openDota = 0;

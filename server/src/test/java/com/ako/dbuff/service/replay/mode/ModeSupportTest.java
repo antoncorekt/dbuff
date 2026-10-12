@@ -45,7 +45,7 @@ class ModeSupportTest {
   void theDraftExtractorAndSectionApplyToAbilityDraftOnly() {
     AbilityDraftExtractor extractor =
         new AbilityDraftExtractor(null, null, null, new AbilityDraftProfile());
-    DraftSection section = new DraftSection(null);
+    DraftSection section = new DraftSection(null, new AbilityDraftProfile());
 
     assertThat(extractor.supports(TestModes.ABILITY_DRAFT)).isTrue();
     assertThat(extractor.supports(TestModes.ALL_PICK)).isFalse();

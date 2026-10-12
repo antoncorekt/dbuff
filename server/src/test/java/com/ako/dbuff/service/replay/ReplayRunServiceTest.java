@@ -294,7 +294,7 @@ class ReplayRunServiceTest {
     return new ReplayRunService(
         runRepo,
         statRepo,
-        new ReplayEligibility(properties, modes),
+        new ReplayEligibility(properties),
         fileProvider,
         parser,
         verifier,

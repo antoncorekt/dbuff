@@ -1,8 +1,6 @@
 package com.ako.dbuff.service.replay.analysis;
 
-import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
-import com.ako.dbuff.service.replay.mode.GameModeRegistry;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -16,20 +14,6 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ReplayAnalysisService {
   private final List<ReplayAnalyzer> analyzers;
-  private final MatchRepo matchRepo;
-  private final GameModeRegistry modes;
-
-  /**
-   * Analyses a match already stored, taking its mode from the match; a match whose mode is not
-   * active has nothing to analyse.
-   */
-  public List<String> analyze(long matchId, Collection<String> failedExtractors) {
-    return matchRepo
-        .findById(matchId)
-        .flatMap(match -> modes.activeFor(match.getGameModeId()))
-        .map(mode -> analyze(matchId, mode, failedExtractors))
-        .orElseGet(List::of);
-  }
 
   /**
    * An analyzer whose input extractor failed is skipped, so that rows from an earlier run are kept

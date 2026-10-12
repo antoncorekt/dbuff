@@ -6,13 +6,13 @@ import com.ako.dbuff.service.replay.ReplayException;
 import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.ReplayParser;
 import com.ako.dbuff.service.replay.ReplayPlayerFact;
-import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
-import java.util.function.Supplier;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import skadistats.clarity.event.Insert;
@@ -39,8 +39,13 @@ import skadistats.clarity.source.MappedFileSource;
 public class ClarityReplayParser implements ReplayParser {
   static final String CLARITY_VERSION = "5.0.1";
 
-  private static final Map<Long, Supplier<DraftReader>> DRAFT_READERS =
-      Map.of(AbilityDraftProfile.MODE_ID, AbilityDraftReader::new);
+  private final Map<Long, DraftReaderFactory> draftReaders;
+
+  public ClarityReplayParser(List<DraftReaderFactory> draftReaders) {
+    this.draftReaders =
+        draftReaders.stream()
+            .collect(Collectors.toMap(DraftReaderFactory::gameModeId, Function.identity()));
+  }
 
   @Override
   public String version() {
@@ -49,8 +54,8 @@ public class ClarityReplayParser implements ReplayParser {
 
   @Override
   public ReplayFacts parse(Path demoFile, GameModeProfile mode, BooleanSupplier cancelled) {
-    DraftReader draftReader =
-        DRAFT_READERS.getOrDefault(mode.gameModeId(), NoDraftReader::new).get();
+    DraftReaderFactory factory = draftReaders.get(mode.gameModeId());
+    DraftReader draftReader = factory == null ? new NoDraftReader() : factory.create();
     Collector collector = new Collector(cancelled, draftReader);
     try {
       new SimpleRunner(new MappedFileSource(demoFile.toString())).runWith(collector);
@@ -153,7 +158,7 @@ public class ClarityReplayParser implements ReplayParser {
 
     @OnEntityUpdated(classPattern = "CDOTAGamerulesProxy")
     public void rulesUpdated(Context ctx, Entity rules, FieldPath[] paths, int count) {
-      draftReader.observe(rules, paths, count, (int) clock.gameTick(ctx.getTick()));
+      draftReader.observe(rules, paths, count, () -> (int) clock.gameTick(ctx.getTick()));
       if (rules.hasProperty(PAUSED) && rules.getProperty(PAUSED) instanceof Boolean paused) {
         clock.paused(paused, ctx.getTick());
       }

@@ -30,7 +30,7 @@ class ClarityReplayParserReplayTest {
 
   private static final String MATCH = "9038725154.dem";
 
-  private final ClarityReplayParser parser = new ClarityReplayParser();
+  private final ClarityReplayParser parser = Parsers.standard();
 
   @Test
   void parse_readsTheClockStartAndTheRosterOfARealReplay() {

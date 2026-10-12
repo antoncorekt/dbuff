@@ -32,7 +32,7 @@ class BuybackReplayTest {
   @Test
   void theSamplesStayInStepWithTheCombatLogThroughPausesOfTheGame() {
     ReplayFacts facts =
-        new ClarityReplayParser()
+        Parsers.standard()
             .parse(
                 Path.of(System.getenv("REPLAY_FIXTURE_DIR"), "9040889566.dem"),
                 TestModes.ALL_PICK,
@@ -57,7 +57,7 @@ class BuybackReplayTest {
 
   private static void assertDeaths(String file, int[] openDota) {
     ReplayFacts facts =
-        new ClarityReplayParser()
+        Parsers.standard()
             .parse(
                 Path.of(System.getenv("REPLAY_FIXTURE_DIR"), file),
                 TestModes.ALL_PICK,
@@ -126,7 +126,7 @@ class BuybackReplayTest {
 
   private static void assertBuybacks(String file, double[][] openDota) {
     ReplayFacts facts =
-        new ClarityReplayParser()
+        Parsers.standard()
             .parse(
                 Path.of(System.getenv("REPLAY_FIXTURE_DIR"), file),
                 TestModes.ALL_PICK,

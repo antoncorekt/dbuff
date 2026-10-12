@@ -2,7 +2,7 @@ package com.ako.dbuff.service.replay;
 
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
-import com.ako.dbuff.service.replay.mode.GameModeRegistry;
+import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
@@ -16,14 +16,17 @@ public class ReplayEligibility {
   private static final int SECONDS_PER_MINUTE = 60;
 
   private final ReplayProcessingProperties properties;
-  private final GameModeRegistry modes;
 
-  /** The reason to skip the match, empty when its replay should be fetched. */
-  public Optional<ReplayException> skipReason(MatchDomain match) {
+  /**
+   * The reason to skip the match, empty when its replay should be fetched.
+   *
+   * @param mode the active profile of the match's game mode, empty when the mode is not active
+   */
+  public Optional<ReplayException> skipReason(MatchDomain match, Optional<GameModeProfile> mode) {
     if (match.getReplayCluster() == null || match.getReplaySalt() == null) {
       return skip(ReplayStatus.SKIPPED_NO_REPLAY_INFO, "OpenDota has no replay location");
     }
-    if (modes.activeFor(match.getGameModeId()).isEmpty()) {
+    if (mode.isEmpty()) {
       return skip(ReplayStatus.SKIPPED_NOT_SUPPORTED, "Game mode " + match.getGameModeId());
     }
     if (match.getDuration() == null || match.getDuration() <= 0) {

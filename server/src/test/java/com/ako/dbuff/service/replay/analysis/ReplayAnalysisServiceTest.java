@@ -1,7 +1,5 @@
 package com.ako.dbuff.service.replay.analysis;
 
-import com.ako.dbuff.dao.model.MatchDomain;
-import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,9 +16,7 @@ class ReplayAnalysisServiceTest {
 
   private final ReplayAnalyzer good = mock(ReplayAnalyzer.class);
   private final ReplayAnalyzer broken = mock(ReplayAnalyzer.class);
-  private final MatchRepo matchRepo = mock(MatchRepo.class);
-  private final ReplayAnalysisService service =
-      new ReplayAnalysisService(List.of(broken, good), matchRepo, TestModes.registry());
+  private final ReplayAnalysisService service = new ReplayAnalysisService(List.of(broken, good));
 
   @BeforeEach
   void analyzersApplyToEveryMode() {
@@ -58,20 +54,6 @@ class ReplayAnalysisServiceTest {
     assertThat(failed).isEmpty();
     verify(broken, org.mockito.Mockito.never()).analyze(5L);
     verify(good).analyze(5L);
-  }
-
-  @Test
-  void analyze_takesTheModeFromTheStoredMatch_andDoesNothingForAnInactiveMode() {
-    when(matchRepo.findById(5L))
-        .thenReturn(java.util.Optional.of(MatchDomain.builder().id(5L).gameModeId(18L).build()));
-    when(matchRepo.findById(6L))
-        .thenReturn(java.util.Optional.of(MatchDomain.builder().id(6L).gameModeId(3L).build()));
-
-    service.analyze(5L, List.of());
-    service.analyze(6L, List.of());
-
-    verify(good).analyze(5L);
-    verify(good, org.mockito.Mockito.never()).analyze(6L);
   }
 
   @Test

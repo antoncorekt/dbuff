@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay;
 
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
+import com.ako.dbuff.service.replay.mode.GameModeRegistry;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -13,12 +14,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ReplayEligibilityTest {
 
   private final ReplayProcessingProperties properties = new ReplayProcessingProperties();
-  private final ReplayEligibility eligibility =
-      new ReplayEligibility(properties, TestModes.registry(properties));
+  private final ReplayEligibility eligibility = new ReplayEligibility(properties);
+  private final GameModeRegistry modes = TestModes.registry(properties);
 
   @Test
   void skipReason_isEmptyForARecentSupportedMatchWithAReplayLocation() {
-    assertThat(eligibility.skipReason(match())).isEmpty();
+    assertThat(status(match())).isEmpty();
   }
 
   @Test
@@ -55,7 +56,9 @@ class ReplayEligibilityTest {
   }
 
   private Optional<ReplayStatus> status(MatchDomain match) {
-    return eligibility.skipReason(match).map(ReplayException::getStatus);
+    return eligibility
+        .skipReason(match, modes.activeFor(match.getGameModeId()))
+        .map(ReplayException::getStatus);
   }
 
   private static MatchDomain match() {
