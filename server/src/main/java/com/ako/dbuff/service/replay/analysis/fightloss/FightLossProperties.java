@@ -17,4 +17,9 @@ public class FightLossProperties {
 
   /** How far apart a replay death and OpenDota's death of the same hero may be, in seconds. */
   private double deathMatchSeconds = 3;
+
+  /**
+   * A fight that starts before this many seconds leaves its cooldown reasons out of the ranking.
+   */
+  private int earlyFightSeconds = 300;
 }

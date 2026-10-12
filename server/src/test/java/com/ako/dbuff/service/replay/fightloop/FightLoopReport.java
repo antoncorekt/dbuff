@@ -28,6 +28,7 @@ final class FightLoopReport {
   static final String FIGHTS = "Lost fights";
   static final String REASONS = "Reasons";
   static final String NO_SWING = "-";
+  static final String NOT_RANKED = "not ranked (early fight)";
 
   /** How far OpenDota's teamfight may start before, or end after, the replay's fight. */
   private static final int OPEN_DOTA_SLACK_SECONDS = 10;
@@ -117,21 +118,22 @@ final class FightLoopReport {
             List.of(
                 "## " + REASONS,
                 "",
-                "| swing | fight | code | subject | rank | severity | evidence | assistant | owner"
-                    + " |",
-                "|---|---|---|---|---|---|---|---|---|"));
+                "| swing | fight | code | subject | rank | also | severity | evidence | assistant"
+                    + " | owner |",
+                "|---|---|---|---|---|---|---|---|---|---|"));
     for (Row r : rows) {
       for (RankedReason ranked : r.lost().reasons()) {
         var reason = ranked.reason();
         out.add(
-            "| %s | %d | %s | %s | %d | %s | %s | | |"
+            "| %s | %d | %s | %s | %s | %s | %s | %s | | |"
                 .formatted(
                     ReviewLoopReport.tableCell(r.swing()),
                     r.lost().fight().getFightIndex(),
                     orQuestion(reason.getCode()),
                     ReviewLoopReport.tableCell(
                         subject(d, reason.getSubjectSlot(), reason.getTeam())),
-                    ranked.rank(),
+                    ranked.ranked() ? String.valueOf(ranked.rank()) : NOT_RANKED,
+                    ReviewLoopReport.tableCell(String.join(", ", ranked.also())),
                     reason.getSeverity() == null
                         ? "?"
                         : String.format(Locale.ROOT, "%.2f", reason.getSeverity()),

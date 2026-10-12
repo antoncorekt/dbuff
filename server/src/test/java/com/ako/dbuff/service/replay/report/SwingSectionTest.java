@@ -48,7 +48,9 @@ class SwingSectionTest {
             .code(code)
             .evidence(ev)
             .severity(0.5)
-            .build());
+            .build(),
+        List.of(),
+        true);
   }
 
   private static LostFight lost(int fightIndex, double start, Long gold, RankedReason... reasons) {
@@ -135,6 +137,28 @@ class SwingSectionTest {
     when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spike(0, 300, 9000, "OTHER", false)));
 
     assertThat(section.lines(input())).isEmpty();
+  }
+
+  @Test
+  void lines_leaveOutReasonsThatAreNotRanked() {
+    when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spike(0, 1300, 5000, "FIGHT_WIN", false)));
+    heroes();
+    RankedReason early =
+        new RankedReason(
+            0,
+            FightReasonDomain.builder()
+                .scope("PLAYER")
+                .subjectSlot(2L)
+                .code("ABILITY_ON_COOLDOWN")
+                .severity(0.5)
+                .build(),
+            List.of(),
+            false);
+    explain(0, lost(4, 1390.0, 3200L, ranked(1, "PLAYER", 3L, "NO_TP", "x"), early));
+
+    List<String> lines = section.lines(input());
+
+    assertThat(lines.get(2)).endsWith("Venomancer had no teleport");
   }
 
   @Test

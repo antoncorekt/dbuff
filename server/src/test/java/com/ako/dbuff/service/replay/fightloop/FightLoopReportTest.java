@@ -40,7 +40,8 @@ class FightLoopReportTest {
             .severity(0.7)
             .evidence("no | teleport\nat start")
             .build();
-    return new LostFight(fight, explanation, List.of(new RankedReason(1, reason)), 1);
+    return new LostFight(
+        fight, explanation, List.of(new RankedReason(1, reason, List.of(), true)), 1);
   }
 
   private static MatchData data(MatchExplanation explanation) {
@@ -86,7 +87,8 @@ class FightLoopReportTest {
 
     assertThat(report)
         .contains("| 0 | 5 | 23:03 | DIRE | 1200 | ? | 1 | #2 | 4 | -1000 |")
-        .contains("| 0 | 5 | NO_TP | slot 128 (npc_x) | 1 | 0.70 | no \\| teleport at start | | |")
+        .contains(
+            "| 0 | 5 | NO_TP | slot 128 (npc_x) | 1 |  | 0.70 | no \\| teleport at start | | |")
         .contains("### Swing 0, 22:00 to 24:00, 3200 gold");
   }
 
@@ -154,6 +156,43 @@ class FightLoopReportTest {
             List.of());
 
     assertThat(FightLoopReport.render(d)).contains("| #2 | 4 | ? |");
+  }
+
+  @Test
+  void anAbsenceEntryListsItsAlsoCodes_andAnEarlyCooldownReasonIsMarkedNotRanked() {
+    LostFight base = lost(5, 0, "DIRE", 1200L, "NO_TP");
+    FightReasonDomain cooldown =
+        FightReasonDomain.builder()
+            .code("ABILITY_ON_COOLDOWN")
+            .scope("PLAYER")
+            .subjectSlot(128L)
+            .team("DIRE")
+            .severity(0.4)
+            .evidence("e")
+            .build();
+    LostFight fight =
+        new LostFight(
+            base.fight(),
+            base.explanation(),
+            List.of(
+                new RankedReason(
+                    1,
+                    base.reasons().get(0).reason(),
+                    List.of("TP_ON_COOLDOWN", "SUPPORT_ABSENT"),
+                    true),
+                new RankedReason(0, cooldown, List.of(), false)),
+            2);
+
+    String report =
+        FightLoopReport.render(
+            data(
+                new MatchExplanation(
+                    List.of(new SwingExplanation(SWING, List.of(fight))), List.of())));
+
+    assertThat(report)
+        .contains("| NO_TP | slot 128 (npc_x) | 1 | TP_ON_COOLDOWN, SUPPORT_ABSENT | 0.70 |")
+        .contains(
+            "| ABILITY_ON_COOLDOWN | slot 128 (npc_x) | not ranked (early fight) |  | 0.40 |");
   }
 
   @Test

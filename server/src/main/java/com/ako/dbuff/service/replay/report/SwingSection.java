@@ -109,6 +109,7 @@ public class SwingSection implements ReplayReportSection {
     }
     String reasons =
         lost.reasons().stream()
+            .filter(FightExplanationReader.RankedReason::ranked)
             .map(r -> r.reason())
             .map(r -> phrase(r, heroes))
             .flatMap(Optional::stream)
