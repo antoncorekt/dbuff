@@ -1,36 +1,62 @@
-package com.ako.dbuff.service.replay.roleloop;
+package com.ako.dbuff.service.replay.looprunner;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
-/** What changed between two reports of one match, read from their roles and verdicts tables. */
-final class RoleLoopDiff {
-  private static final int ROLE_KEY_COLUMNS = 1;
-  private static final int VERDICT_KEY_COLUMNS = 2;
+/**
+ * What changed between two reports of one match, read from the tables a topic names. A named table
+ * missing from a report that was produced is an error, not an empty table.
+ */
+public final class ReviewLoopDiff {
+  /**
+   * A table compared between rounds.
+   *
+   * @param heading the {@code ##} heading above the table
+   * @param keyLabel the word before the key of a changed row, empty for none
+   * @param keyColumns how many leading columns identify a row
+   */
+  public record Section(String heading, String keyLabel, int keyColumns) {}
 
-  private RoleLoopDiff() {}
+  private ReviewLoopDiff() {}
 
-  static List<String> changes(String previous, String current) {
-    if (RoleLoopReport.isUnavailable(current)) {
-      return List.of("skipped this round (" + RoleLoopReport.reasonOf(current) + ")");
+  /** The summary bullets of one match; a diff that cannot be made is a line, not a failure. */
+  public static List<String> summaryLines(
+      Optional<String> previous, String current, List<Section> sections) {
+    if (previous.isEmpty()) {
+      return List.of("- no earlier round to compare with");
+    }
+    List<String> changes;
+    try {
+      changes = changes(previous.get(), current, sections);
+    } catch (IllegalStateException e) {
+      return List.of("- diff failed: " + e.getMessage());
+    }
+    if (changes.isEmpty()) {
+      return List.of("- unchanged since the earlier round");
+    }
+    return changes.stream().map(c -> "- " + c).toList();
+  }
+
+  public static List<String> changes(String previous, String current, List<Section> sections) {
+    if (ReviewLoopReport.isUnavailable(current)) {
+      return List.of("skipped this round (" + ReviewLoopReport.reasonOf(current) + ")");
     }
     List<String> out = new ArrayList<>();
-    out.addAll(
-        compare(
-            RoleLoopReport.ROLES,
-            "slot",
-            table(previous, RoleLoopReport.ROLES, ROLE_KEY_COLUMNS),
-            table(current, RoleLoopReport.ROLES, ROLE_KEY_COLUMNS)));
-    out.addAll(
-        compare(
-            RoleLoopReport.VERDICTS,
-            "",
-            table(previous, RoleLoopReport.VERDICTS, VERDICT_KEY_COLUMNS),
-            table(current, RoleLoopReport.VERDICTS, VERDICT_KEY_COLUMNS)));
+    for (Section s : sections) {
+      out.addAll(
+          compare(
+              s.heading(),
+              s.keyLabel(),
+              ReviewLoopReport.isUnavailable(previous)
+                  ? new Table(List.of(), Map.of(), s.keyColumns())
+                  : table(previous, s.heading(), s.keyColumns()),
+              table(current, s.heading(), s.keyColumns())));
+    }
     return out;
   }
 
@@ -83,10 +109,12 @@ final class RoleLoopDiff {
     List<String> header = List.of();
     boolean inSection = false;
     boolean seenHeader = false;
+    boolean found = false;
     for (String raw : report.split("\\R")) {
       String line = raw.strip();
       if (line.startsWith("## ")) {
         inSection = line.substring(3).strip().equals(heading);
+        found |= inSection;
         continue;
       }
       if (!inSection || !line.startsWith("|") || line.startsWith("|---")) {
@@ -99,6 +127,9 @@ final class RoleLoopDiff {
       } else if (cells.size() >= keyColumns) {
         rows.put(String.join(" ", cells.subList(0, keyColumns)), cells);
       }
+    }
+    if (!found) {
+      throw new IllegalStateException("the report has no '## " + heading + "' section");
     }
     return new Table(header, rows, keyColumns);
   }

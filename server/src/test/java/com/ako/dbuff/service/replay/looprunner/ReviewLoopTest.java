@@ -1,26 +1,17 @@
-package com.ako.dbuff.service.replay.roleloop;
+package com.ako.dbuff.service.replay.looprunner;
 
-import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
-import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
-import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
-import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
-import com.ako.dbuff.dao.repo.PlayerRoleRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
-import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
-import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.ReplayRunService;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisService;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.StoredMatchModes;
-import com.ako.dbuff.service.replay.roleloop.RoleLoopReport.MatchData;
 import com.ako.dbuff.service.replay.smoke.ReplayPipelineFixture;
 import com.ako.dbuff.service.replay.smoke.ReplayPipelineTest;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -33,42 +24,40 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * One round of the role learning loop: stores or re-analyses every match of {@code matches.txt}
- * against the local PostgreSQL and writes the review reports (see docs/replay-role-loop). Run it
- * with {@code :server:roleLoop}.
+ * One round of a review loop: stores or re-analyses every match of the topic's list against the
+ * local PostgreSQL and writes the review reports (see docs/replay-review-loop.md). Run it with
+ * {@code :server:reviewLoop -Ploop.topic=<name>}.
  */
-@Tag("roleloop")
+@Tag("reviewloop")
 @EnabledIfEnvironmentVariable(named = "REPLAY_FIXTURE_DIR", matches = ".+")
 @ReplayPipelineTest
-class RoleLoopTest extends ReplayPipelineFixture {
-  private static final Path OUTPUT = Path.of("build", "role-loop");
-  private static final Path MATCH_LIST = Path.of("src/test/resources/replay/role-loop/matches.txt");
+class ReviewLoopTest extends ReplayPipelineFixture {
+  private static final String DEFAULT_TOPIC = "roles";
 
   @Autowired private ReplayRunService runService;
   @Autowired private ReplayAnalysisService analysis;
   @Autowired private StoredMatchModes matchModes;
+  @Autowired private List<ReviewLoopTopic> topics;
   @Autowired private ReplayProcessingProperties properties;
   @Autowired private ReplayParseRunRepo runRepo;
   @Autowired private MatchRepo matchRepo;
-  @Autowired private PlayerGameStatisticRepo statRepo;
-  @Autowired private ReplayPlayerRepo replayPlayerRepo;
-  @Autowired private PlayerRoleRepo roleRepo;
-  @Autowired private PlayerRoleProfileRepo profileRepo;
-  @Autowired private TeamCompositionRepo compositionRepo;
-  @Autowired private AbilityDraftPickRepo pickRepo;
 
   @Test
   @Commit
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   void writesTheReviewReportsOfOneRound() {
-    RoleLoopRound round =
-        RoleLoopRound.open(
-            OUTPUT, System.getenv("ROUND"), "1".equals(System.getenv("ROUND_OVERWRITE")));
+    ReviewLoopTopic topic = selectedTopic();
+    List<Long> matches = ReviewLoopMatchList.read(topic.matchList());
+    ReviewLoopRound round =
+        ReviewLoopRound.open(
+            topic.outputDir(),
+            System.getenv("ROUND"),
+            "1".equals(System.getenv("ROUND_OVERWRITE")));
     List<String> summary = new ArrayList<>();
     summary.add("# Round %02d".formatted(round.number()));
     try {
-      for (long id : RoleLoopMatchList.read(MATCH_LIST)) {
-        summarise(round, id, summary);
+      for (long id : matches) {
+        summarise(topic, round, id, summary);
       }
     } finally {
       round.write("summary.md", String.join("\n", summary) + "\n");
@@ -79,58 +68,45 @@ class RoleLoopTest extends ReplayPipelineFixture {
 
   private record Outcome(String how, String report) {}
 
-  private void summarise(RoleLoopRound round, long id, List<String> summary) {
-    Outcome outcome = run(id);
+  private void summarise(
+      ReviewLoopTopic topic, ReviewLoopRound round, long id, List<String> summary) {
+    Outcome outcome = run(topic, id);
     round.write(id + ".md", outcome.report());
-    List<String> changes =
-        round
-            .previous(id + ".md", r -> !RoleLoopReport.isUnavailable(r))
-            .map(before -> RoleLoopDiff.changes(before, outcome.report()))
-            .orElse(null);
+    Optional<String> before = round.previous(id + ".md", r -> !ReviewLoopReport.isUnavailable(r));
     summary.add("");
     summary.add("## " + outcome.report().lines().findFirst().orElse("Match " + id).substring(2));
     summary.add("- " + outcome.how());
-    summary.addAll(changeLines(changes));
+    summary.addAll(ReviewLoopDiff.summaryLines(before, outcome.report(), topic.sections()));
   }
 
   /** One bad match is reported as such and does not stop the round. */
-  private Outcome run(long id) {
+  private Outcome run(ReviewLoopTopic topic, long id) {
     try {
       String how = prepare(id);
-      return new Outcome(how, reportOf(id, how));
+      return new Outcome(how, reportOf(topic, id, how));
     } catch (Exception e) {
       String how = "failed: " + e;
-      return new Outcome(how, RoleLoopReport.unavailable(id, how));
+      return new Outcome(how, ReviewLoopReport.unavailable(id, how));
     }
   }
 
-  private static List<String> changeLines(List<String> changes) {
-    if (changes == null) {
-      return List.of("- no earlier round to compare with");
+  private String reportOf(ReviewLoopTopic topic, long id, String how) {
+    if (how.startsWith("skipped") || !matchRepo.existsById(id)) {
+      return ReviewLoopReport.unavailable(id, how);
     }
-    if (changes.isEmpty()) {
-      return List.of("- unchanged since the earlier round");
-    }
-    return changes.stream().map(c -> "- " + c).toList();
+    return topic.render(id);
   }
 
-  private String reportOf(long id, String how) {
-    Optional<MatchDomain> match = matchRepo.findById(id);
-    if (match.isEmpty() || how.startsWith("skipped")) {
-      return RoleLoopReport.unavailable(id, how);
-    }
-    String mode = matchModes.activeFor(id).map(GameModeProfile::name).orElse("mode not active");
-    return RoleLoopReport.render(
-        new MatchData(
-            id,
-            match.get(),
-            mode,
-            statRepo.findAllByMatchId(id),
-            replayPlayerRepo.findByMatchId(id),
-            roleRepo.findByMatchId(id),
-            profileRepo.findByMatchId(id),
-            compositionRepo.findByMatchId(id),
-            pickRepo.findByMatchId(id)));
+  private ReviewLoopTopic selectedTopic() {
+    String name = Optional.ofNullable(System.getenv("LOOP_TOPIC")).orElse(DEFAULT_TOPIC);
+    return topics.stream()
+        .filter(t -> t.name().equals(name))
+        .findFirst()
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    "unknown loop.topic '%s', known: %s"
+                        .formatted(name, topics.stream().map(ReviewLoopTopic::name).toList())));
   }
 
   /** The stored data is the source: the replay is read only once, for a match not stored yet. */

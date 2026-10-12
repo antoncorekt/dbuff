@@ -1,4 +1,4 @@
-package com.ako.dbuff.service.replay.roleloop;
+package com.ako.dbuff.service.replay.looprunner;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -11,13 +11,13 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 /** The report files of one round, {@code <base>/round-NN/<matchId>.md}. */
-final class RoleLoopRound {
+final class ReviewLoopRound {
   private static final String PREFIX = "round-";
 
   private final Path base;
   private final int number;
 
-  RoleLoopRound(Path base, int number) {
+  ReviewLoopRound(Path base, int number) {
     this.base = base;
     this.number = number;
   }
@@ -28,9 +28,9 @@ final class RoleLoopRound {
    * @param requested the {@code ROUND} text, null or blank for the next free round
    * @param overwrite whether an explicit round that already has reports may be written over
    */
-  static RoleLoopRound open(Path base, String requested, boolean overwrite) {
+  static ReviewLoopRound open(Path base, String requested, boolean overwrite) {
     if (requested == null || requested.isBlank()) {
-      return new RoleLoopRound(base, last(base).orElse(0) + 1);
+      return new ReviewLoopRound(base, last(base).orElse(0) + 1);
     }
     int number;
     try {
@@ -42,7 +42,7 @@ final class RoleLoopRound {
     if (number < 1) {
       throw new IllegalArgumentException("ROUND must be a positive whole number, got " + number);
     }
-    RoleLoopRound round = new RoleLoopRound(base, number);
+    ReviewLoopRound round = new ReviewLoopRound(base, number);
     if (!overwrite && round.hasReports()) {
       throw new IllegalStateException(
           "%s already has reports; choose another ROUND or set ROUND_OVERWRITE=1"
@@ -85,9 +85,9 @@ final class RoleLoopRound {
         .filter(n -> n < number)
         .boxed()
         .sorted((a, b) -> b - a)
-        .map(n -> new RoleLoopRound(base, n).dir().resolve(fileName))
+        .map(n -> new ReviewLoopRound(base, n).dir().resolve(fileName))
         .filter(Files::exists)
-        .map(RoleLoopRound::read)
+        .map(ReviewLoopRound::read)
         .filter(usable)
         .findFirst();
   }

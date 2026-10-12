@@ -7,6 +7,7 @@ import com.ako.dbuff.dao.model.PlayerRoleDomain;
 import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.model.TeamCompositionDomain;
+import com.ako.dbuff.service.replay.looprunner.ReviewLoopDiff;
 import com.ako.dbuff.service.replay.roleloop.RoleLoopReport.MatchData;
 import java.util.ArrayList;
 import java.util.List;
@@ -199,12 +200,6 @@ class RoleLoopReportTest {
   }
 
   @Test
-  void anUnavailableMatchIsReportedWithItsReason() {
-    assertThat(RoleLoopReport.unavailable(5L, "no fixture"))
-        .isEqualTo("# Match 5\n\nNot reported: no fixture\n");
-  }
-
-  @Test
   void aNullRoleOnAnExistingRowReadsUnknownNotNull() {
     String report =
         RoleLoopReport.render(
@@ -261,14 +256,14 @@ class RoleLoopReportTest {
   }
 
   @Test
-  void anUnavailableReportIsRecognisedAndItsReasonRead() {
-    String report = RoleLoopReport.unavailable(5L, "skipped: a\nb");
+  void theTopicSectionsAreFoundInARealReport() {
+    String before =
+        RoleLoopReport.render(
+            data(List.of(), List.of(profile(0, "FINAL", 1, 0.5)), List.of(), List.of()));
+    String after = before.replace("| 0 | Sniper | n/a | 1 |", "| 0 | Sniper | n/a | 2 |");
 
-    assertThat(RoleLoopReport.isUnavailable(report)).isTrue();
-    assertThat(RoleLoopReport.reasonOf(report)).isEqualTo("skipped: a b");
-    assertThat(
-            RoleLoopReport.isUnavailable(
-                RoleLoopReport.render(data(List.of(), List.of(), List.of(), List.of()))))
-        .isFalse();
+    assertThat(ReviewLoopDiff.changes(before, before, RoleLoopTopic.SECTIONS)).isEmpty();
+    assertThat(ReviewLoopDiff.changes(before, after, RoleLoopTopic.SECTIONS))
+        .containsExactly("slot 0, final: 1 -> 2");
   }
 }
