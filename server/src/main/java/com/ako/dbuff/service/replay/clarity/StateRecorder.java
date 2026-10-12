@@ -22,6 +22,10 @@ final class StateRecorder implements SampleObserver {
   private static final int MAX_ITEMS = 20;
   private static final int MAX_ABILITIES = 40;
   private static final double MIN_COOLDOWN = 0.05;
+
+  /** The cooldown length of a change that ends a cooldown early, as a reset or a refresher does. */
+  static final double RESET = -1;
+
   private static final double NEW_COOLDOWN_JUMP_TICKS = TICKS_PER_SECOND;
 
   private final Entities entities;
@@ -178,7 +182,11 @@ final class StateRecorder implements SampleObserver {
       double remaining,
       double length) {
     if (remaining <= MIN_COOLDOWN) {
-      state.readyAt.remove(key);
+      Double ended = state.readyAt.remove(key);
+      if (ended != null && ended > tick + NEW_COOLDOWN_JUMP_TICKS) {
+        changes.add(
+            new RawChange(playerId, tick, StateChangeKind.COOLDOWN, name, slot, tick, RESET, 0, 0));
+      }
       return;
     }
     double readyAt = tick + remaining * TICKS_PER_SECOND;

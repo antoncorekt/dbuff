@@ -15,8 +15,9 @@ package com.ako.dbuff.service.replay;
  * @param name the game's internal item or ability name
  * @param slotIndex inventory slot for an item, ability slot for an ability, -1 when unknown
  * @param readyAtSeconds for a cooldown, the second it ends; otherwise 0
- * @param cooldownLength for a cooldown, its full length in seconds; 0 when the replay does not say
- *     (some abilities leave it unset)
+ * @param cooldownLength for a cooldown, its full length in seconds; 0 when the replay does not say,
+ *     and -1 for a change that ends a cooldown early (a reset), whose {@code readyAtSeconds} is the
+ *     moment it was seen to be over (some abilities leave it unset)
  * @param level for an ability level change, the new level; otherwise 0
  * @param manaCost for a mana cost change, the new cost; otherwise 0
  */

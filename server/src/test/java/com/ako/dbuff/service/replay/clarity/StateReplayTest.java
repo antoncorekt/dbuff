@@ -36,7 +36,9 @@ class StateReplayTest {
   @Test
   void aCooldownEndsAfterItWasSeenAndNoLaterThanItsLengthWhenTheLengthIsKnown() {
     List<StateChange> cooldowns =
-        changes(StateChangeKind.COOLDOWN).stream().filter(c -> c.gameSecond() > 0).toList();
+        changes(StateChangeKind.COOLDOWN).stream()
+            .filter(c -> c.gameSecond() > 0 && c.cooldownLength() >= 0)
+            .toList();
 
     assertThat(cooldowns).isNotEmpty();
     assertThat(cooldowns)
@@ -99,7 +101,7 @@ class StateReplayTest {
 
   private long cooldowns(String name) {
     return changes(StateChangeKind.COOLDOWN).stream()
-        .filter(c -> c.name().equals(name) && c.gameSecond() > 0)
+        .filter(c -> c.name().equals(name) && c.gameSecond() > 0 && c.cooldownLength() >= 0)
         .count();
   }
 

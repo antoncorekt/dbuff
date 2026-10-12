@@ -172,6 +172,9 @@ public class ClarityReplayParser implements ReplayParser {
           gameOverTick = ctx.getTick();
         }
       } else if (state == GAME_IN_PROGRESS && facts == null) {
+        if (!rules.hasProperty(START_TIME) || !(rules.getProperty(START_TIME) instanceof Number)) {
+          return;
+        }
         Number startTime = rules.getProperty(START_TIME);
         facts =
             ReplayFacts.builder()

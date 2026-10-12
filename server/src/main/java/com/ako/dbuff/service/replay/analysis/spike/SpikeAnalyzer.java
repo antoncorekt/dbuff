@@ -21,6 +21,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -82,6 +83,11 @@ public class SpikeAnalyzer implements ReplayAnalyzer {
   }
 
   @Override
+  public Set<String> requires() {
+    return Set.of("minutes");
+  }
+
+  @Override
   public int version() {
     return 1;
   }
@@ -116,7 +122,13 @@ public class SpikeAnalyzer implements ReplayAnalyzer {
       String team = spike.delta() > 0 ? "RADIANT" : "DIRE";
       double sign = spike.delta() > 0 ? 1 : -1;
       List<GameSpikeFactorDomain> found = evidence.factors(matchId, index, spike, team);
-      Primary primary = evidence.primary(found, team, properties.getSpikeMinSharePercent());
+      Primary primary =
+          evidence.primary(
+              found,
+              team,
+              properties.getSpikeMinSharePercent(),
+              spike.startMinute() * 60,
+              spike.endMinute() * 60);
       rows.add(
           GameSpikeDomain.builder()
               .matchId(matchId)
@@ -234,21 +246,22 @@ public class SpikeAnalyzer implements ReplayAnalyzer {
     }
 
     /** The source that explains the most, if it explains at least the minimum share. */
-    Primary primary(List<GameSpikeFactorDomain> factors, String team, int minSharePercent) {
+    Primary primary(
+        List<GameSpikeFactorDomain> factors, String team, int minSharePercent, int from, int to) {
       return factors.stream()
           .filter(f -> f.getFactorType().equals("SOURCE") && f.getSharePercent() >= minSharePercent)
           .max(Comparator.comparingDouble(GameSpikeFactorDomain::getSharePercent))
           .map(
               f ->
                   new Primary(
-                      causeOf(Source.valueOf(f.getRef()), team),
+                      causeOf(Source.valueOf(f.getRef()), team, from, to),
                       Math.min(1, Math.round(f.getSharePercent()) / 100.0)))
           .orElse(new Primary(SpikeCause.OTHER, 0));
     }
 
-    private SpikeCause causeOf(Source source, String team) {
+    private SpikeCause causeOf(Source source, String team, int from, int to) {
       return switch (source) {
-        case HERO_KILLS -> fightWonBy(team) ? SpikeCause.FIGHT_WIN : SpikeCause.PICKOFF;
+        case HERO_KILLS -> fightWonBy(team, from, to) ? SpikeCause.FIGHT_WIN : SpikeCause.PICKOFF;
         case FARM, BOUNTY -> SpikeCause.CARRY_FARM;
         case BUILDINGS -> SpikeCause.OBJECTIVE;
         case ROSHAN -> SpikeCause.ROSHAN_AEGIS;
@@ -257,8 +270,14 @@ public class SpikeAnalyzer implements ReplayAnalyzer {
       };
     }
 
-    private boolean fightWonBy(String team) {
-      return fights.stream().anyMatch(f -> team.equals(f.getWinner()));
+    /** Whether the team won a fight that began in the window, or just before it. */
+    private boolean fightWonBy(String team, int from, int to) {
+      return fights.stream()
+          .anyMatch(
+              f ->
+                  team.equals(f.getWinner())
+                      && f.getStartSeconds() >= from - FIGHT_LEAD_SECONDS
+                      && f.getStartSeconds() <= to);
     }
 
     /** What the team gained from a source between two minutes, less what the other team did. */

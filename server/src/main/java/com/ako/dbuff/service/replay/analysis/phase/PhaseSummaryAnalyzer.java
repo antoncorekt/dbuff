@@ -58,7 +58,7 @@ public class PhaseSummaryAnalyzer implements ReplayAnalyzer {
 
   @Override
   public Set<String> requires() {
-    return Set.of("players", "tracks", "combat-log", "state-changes");
+    return Set.of("players", "tracks", "combat-log", "state-changes", "minutes");
   }
 
   @Override

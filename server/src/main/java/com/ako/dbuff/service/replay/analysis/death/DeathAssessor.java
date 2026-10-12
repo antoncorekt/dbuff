@@ -304,7 +304,8 @@ public final class DeathAssessor {
     }
     int died = trace.indexAt(second);
     int later = trace.indexAtOrAfter(second + afterSeconds);
-    return trace.level()[later] > 0
+    return later != died
+        && trace.level()[later] > 0
         && (trace.flags()[later] & 1) == 1
         && Math.hypot(trace.x()[later] - trace.x()[died], trace.y()[later] - trace.y()[died])
             <= REINCARNATION_RADIUS;

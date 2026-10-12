@@ -29,6 +29,10 @@ final class SampleRecorder {
   private final Map<Integer, Series> series = new TreeMap<>();
   private final List<RawSnapshot> snapshots = new ArrayList<>();
   private long anchorTick = -1;
+
+  /** The tick of 0:00 as far as is known: assumed from the pre-game phase, then seen. */
+  private long clockOriginTick;
+
   private long nextGridTick;
   private boolean stopped;
   private final List<SampleObserver> observers = new ArrayList<>();
@@ -44,6 +48,7 @@ final class SampleRecorder {
   void preGameStarted(long tick) {
     if (anchorTick < 0) {
       anchorTick = tick;
+      clockOriginTick = tick + PRE_GAME_TICKS;
       nextGridTick = tick;
     }
   }
@@ -51,9 +56,10 @@ final class SampleRecorder {
   /** A replay without a recorded pre-game phase is sampled from 0:00. */
   void gameStarted(long tick) {
     if (anchorTick < 0) {
-      anchorTick = tick - PRE_GAME_TICKS;
+      anchorTick = tick;
       nextGridTick = tick;
     }
+    clockOriginTick = tick;
   }
 
   /** The game is over; what the entities hold afterwards is not play. */
@@ -93,7 +99,7 @@ final class SampleRecorder {
 
   private void sample(long grid) {
     List<Controllers.View> players = Controllers.read(entities);
-    boolean minuteBoundary = (grid - anchorTick - MINUTE_OFFSET_TICKS) % MINUTE_TICKS == 0;
+    boolean minuteBoundary = Math.floorMod(grid - clockOriginTick, MINUTE_TICKS) == 0;
     Entity resource = minuteBoundary ? first("CDOTA_PlayerResource") : null;
     Entity radiant = minuteBoundary ? first("CDOTA_DataRadiant") : null;
     Entity dire = minuteBoundary ? first("CDOTA_DataDire") : null;
