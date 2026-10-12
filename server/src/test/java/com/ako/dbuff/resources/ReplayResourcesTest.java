@@ -59,7 +59,7 @@ class ReplayResourcesTest {
     when(runRepo.findByMatchIdAndParserVersion(5L, 1))
         .thenReturn(Optional.of(run(5L, ReplayStatus.DONE)));
     when(runRepo.findByMatchIdAndParserVersion(7L, 1))
-        .thenReturn(Optional.of(run(7L, ReplayStatus.FAILED_DOWNLOAD)));
+        .thenReturn(Optional.of(run(7L, ReplayStatus.PARTIAL)));
     when(analysis.analyze(5L, List.of())).thenReturn(List.of("spikes"));
 
     mvc.perform(post("/api/v1/replay/5/reanalyze"))
@@ -71,11 +71,21 @@ class ReplayResourcesTest {
   }
 
   @Test
+  void reanalyzeAll_rejectsALimitOutOfRange() throws Exception {
+    mvc.perform(post("/api/v1/replay/reanalyze").param("limit", "0"))
+        .andExpect(status().isBadRequest());
+    mvc.perform(post("/api/v1/replay/reanalyze").param("limit", "501"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   void reanalyzeAll_goesThroughTheFinishedRunsUpToTheLimit() throws Exception {
     when(runRepo.findByParserVersionAndStatusInOrderByMatchId(eq(1), anyCollection()))
         .thenReturn(
             List.of(
-                run(1L, ReplayStatus.DONE), run(2L, ReplayStatus.DONE), run(3L, ReplayStatus.PARTIAL)));
+                run(1L, ReplayStatus.DONE),
+                run(2L, ReplayStatus.DONE),
+                run(3L, ReplayStatus.DONE)));
     when(analysis.analyze(anyLong(), anyCollection())).thenReturn(List.of());
     when(analysis.analyze(2L, List.of())).thenReturn(List.of("fights"));
 
