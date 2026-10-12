@@ -72,15 +72,11 @@ class ReviewLoopTest extends ReplayPipelineFixture {
       ReviewLoopTopic topic, ReviewLoopRound round, long id, List<String> summary) {
     Outcome outcome = run(topic, id);
     round.write(id + ".md", outcome.report());
-    List<String> changes =
-        round
-            .previous(id + ".md", r -> !ReviewLoopReport.isUnavailable(r))
-            .map(before -> ReviewLoopDiff.changes(before, outcome.report(), topic.sections()))
-            .orElse(null);
+    Optional<String> before = round.previous(id + ".md", r -> !ReviewLoopReport.isUnavailable(r));
     summary.add("");
     summary.add("## " + outcome.report().lines().findFirst().orElse("Match " + id).substring(2));
     summary.add("- " + outcome.how());
-    summary.addAll(changeLines(changes));
+    summary.addAll(ReviewLoopDiff.summaryLines(before, outcome.report(), topic.sections()));
   }
 
   /** One bad match is reported as such and does not stop the round. */
@@ -92,16 +88,6 @@ class ReviewLoopTest extends ReplayPipelineFixture {
       String how = "failed: " + e;
       return new Outcome(how, ReviewLoopReport.unavailable(id, how));
     }
-  }
-
-  private static List<String> changeLines(List<String> changes) {
-    if (changes == null) {
-      return List.of("- no earlier round to compare with");
-    }
-    if (changes.isEmpty()) {
-      return List.of("- unchanged since the earlier round");
-    }
-    return changes.stream().map(c -> "- " + c).toList();
   }
 
   private String reportOf(ReviewLoopTopic topic, long id, String how) {

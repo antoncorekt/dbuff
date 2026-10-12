@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.looprunner;
 
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -120,5 +121,18 @@ class ReviewLoopDiffTest {
         .hasMessageContaining("## Verdicts");
     assertThatThrownBy(() -> changes(noVerdicts, report("1", "A")))
         .hasMessageContaining("## Verdicts");
+  }
+
+  @Test
+  void aDiffThatCannotBeMadeIsALineNotAFailure() {
+    String noStats = "# Match 1\n\n**No player statistics stored.**\n";
+
+    assertThat(ReviewLoopDiff.summaryLines(Optional.of(report("1", "A")), noStats, SECTIONS))
+        .containsExactly("- diff failed: the report has no '## Roles' section");
+    assertThat(ReviewLoopDiff.summaryLines(Optional.empty(), noStats, SECTIONS))
+        .containsExactly("- no earlier round to compare with");
+    assertThat(
+            ReviewLoopDiff.summaryLines(Optional.of(report("1", "A")), report("1", "A"), SECTIONS))
+        .containsExactly("- unchanged since the earlier round");
   }
 }

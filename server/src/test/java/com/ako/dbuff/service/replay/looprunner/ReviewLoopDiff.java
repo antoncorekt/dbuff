@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -22,6 +23,24 @@ public final class ReviewLoopDiff {
   public record Section(String heading, String keyLabel, int keyColumns) {}
 
   private ReviewLoopDiff() {}
+
+  /** The summary bullets of one match; a diff that cannot be made is a line, not a failure. */
+  public static List<String> summaryLines(
+      Optional<String> previous, String current, List<Section> sections) {
+    if (previous.isEmpty()) {
+      return List.of("- no earlier round to compare with");
+    }
+    List<String> changes;
+    try {
+      changes = changes(previous.get(), current, sections);
+    } catch (IllegalStateException e) {
+      return List.of("- diff failed: " + e.getMessage());
+    }
+    if (changes.isEmpty()) {
+      return List.of("- unchanged since the earlier round");
+    }
+    return changes.stream().map(c -> "- " + c).toList();
+  }
 
   public static List<String> changes(String previous, String current, List<Section> sections) {
     if (ReviewLoopReport.isUnavailable(current)) {
