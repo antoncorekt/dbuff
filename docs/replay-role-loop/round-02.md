@@ -10,7 +10,7 @@
   - Final stage, Ability Draft only (All Pick scores and profiles are unchanged): the lane bonus is multiplied by `fit.final-lane-factor` (0.5), and a function the FINAL stage does not know counts `fit.final-unknown-value` (0) instead of 0.5, because with 0.5 the unknown initiation and durability gave roles 3 and 4 a constant lead over 1 and 5 and every player fitted 3 best.
   - Report: the `Roles` table has `intent fit` and `final fit` columns (the three best roles by score); the diff compares the columns both reports share.
   - Analyzer versions: `roles` 2 to 3, `composition` 1 to 2.
-- Status: assistant reviewed
+- Status: accepted for now (owner, 2026-10-12): the owner agrees with every assistant verdict and accepts the round for roles at this point; the rejected rows stay open as follow-ups below, not as blockers
 
 `assistant` and `owner` are `OK` or `REJECT`. `expected` is filled for a reject: the role (1 to 5) the reviewer says the player filled (final) or was meant to fill (intent, named in the comment). `intent` is `n/a` for a mode without intent rows (All Pick). Read the roles from `server/build/role-loop/round-02/<matchId>.md`.
 
@@ -32,36 +32,43 @@
 
 | match | slot | hero | intent | final | expected | assistant | owner | comment |
 |---|---|---|---|---|---|---|---|---|
-| 9038725154 | 0 | Sniper | 2 | 3 | 3 | REJECT | | intent was 3 and accepted; Oracle's False Promise now gives save 0.90 and farm is 1.00, best fits 2(1.46) 3(1.32) 1(1.28): regression, expected 3 (1 tolerated). Final OK |
-| 9038725154 | 1 | Enchantress | 5 | 2 | 2 | REJECT | | intent still 5: best fits 3(0.76) 2(0.69) 1(0.45), so 5 is the leftover of the assignment; damage 0.33 for Impetus, Sunder, Immaterial, Shrapnel is low. Final OK |
-| 9038725154 | 2 | Riki | 4 | 4 | | OK | | |
-| 9038725154 | 3 | Death Prophet | 3 | 5 | | OK | | intent fixed (was 2); final 5 OK |
-| 9038725154 | 4 | Phantom Assassin | 1 | 1 | | OK | | |
-| 9038725154 | 128 | Sven | 3 | 5 | 4 | REJECT | | intent 3, was 1; Storm Bolt, Assassinate, Enchant, Reflection is a utility kit with a nuke (damage 1.00, farm 0.80); adjacent to the expected 4. Final 5 OK |
-| 9038725154 | 129 | Venomancer | 4 | 4 | 3 | REJECT | | final unchanged: richest of the team (17.3k, farm 0.50 because the laning place counts half), fits 3(1.29) 4(1.27), Furion takes 3 and the solver gives Venomancer 4 |
-| 9038725154 | 130 | Furion | 5 | 3 | 3 | REJECT | | intent was 3 and accepted; Nature's Attendants is now a heal (save 0.67), so he reads 5 with best fits 3(0.74) 5(0.68): regression, expected 3. Final 3 OK |
-| 9038725154 | 131 | Terrorblade | 2 | 1 | | OK | | |
-| 9038725154 | 132 | Jakiro | 1 | 2 | | OK | | intent was the leftover 5, now 1 with damage 1.00; expected 2, 1 tolerated. Final 2 OK |
-| 9037038717 | 0 | Crystal Maiden | 5 | 5 | | OK | | intent confidence 0.89 now |
-| 9037038717 | 1 | Void Spirit | 1 | 1 | | OK | | intent fixed (was 4): Focus Fire, Falcon Rush and the katana give farm 0.93 and damage 1.00 |
-| 9037038717 | 2 | Windrunner | 4 | 2 | 2 | REJECT | | intent was 2 and accepted; Infernal Blade, Ice Blast, Leap, Warcry now fits 3(2.07) 4(1.81) 2(1.63), 4 is the leftover: regression, expected 2 (3 tolerated). Final 2 OK |
-| 9037038717 | 3 | Brewmaster | 3 | 3 | 1 | REJECT | | final unchanged: 30.6k, farm 0.88, jungle 1.00, best fit 1(2.05) over 3(1.94) but Void Spirit needs the 1; intent 3 OK |
-| 9037038717 | 4 | Ancient Apparition | 2 | 4 | 4 | REJECT | | intent 2, was 1; Storm Bolt, Powershot, Shapeshift, Talon Toss: expected 3 or 4, 2 is adjacent; best fits 3(2.54) 2(2.20). Final 4 OK |
-| 9037038717 | 128 | Tusk | 2 | 1 | 3 | REJECT | | intent was 3 and accepted; Walrus Punch, Windrun, Scorched Earth are now attack skills (damage 0.95, farm 0.83 with the crit multiplier counted as scaling), best fits 2(2.83) 1(2.35) 3(1.74), 2 is adjacent. Final 1 OK |
-| 9037038717 | 129 | Lycan | 4 | 3 | | OK | | |
-| 9037038717 | 130 | Mirana | 1 | 2 | | OK | | |
-| 9037038717 | 131 | Doom | 3 | 5 | | OK | | intent 3, was 5: Snowball, Ice Shards and Doom give initiation 1.00; confidence now readable. Final 5 OK |
-| 9037038717 | 132 | Largo | 5 | 4 | | OK | | intent fixed (was 2): Living Armor and Rhapsody give save 1.00. Final 4 OK |
+| 9038725154 | 0 | Sniper | 2 | 3 | 3 | REJECT | REJECT | intent was 3 and accepted; Oracle's False Promise now gives save 0.90 and farm is 1.00, best fits 2(1.46) 3(1.32) 1(1.28): regression, expected 3 (1 tolerated). Final OK |
+| 9038725154 | 1 | Enchantress | 5 | 2 | 2 | REJECT | REJECT | intent still 5: best fits 3(0.76) 2(0.69) 1(0.45), so 5 is the leftover of the assignment; damage 0.33 for Impetus, Sunder, Immaterial, Shrapnel is low. Final OK |
+| 9038725154 | 2 | Riki | 4 | 4 | | OK | OK | |
+| 9038725154 | 3 | Death Prophet | 3 | 5 | | OK | OK | intent fixed (was 2); final 5 OK |
+| 9038725154 | 4 | Phantom Assassin | 1 | 1 | | OK | OK | |
+| 9038725154 | 128 | Sven | 3 | 5 | 4 | REJECT | REJECT | intent 3, was 1; Storm Bolt, Assassinate, Enchant, Reflection is a utility kit with a nuke (damage 1.00, farm 0.80); adjacent to the expected 4. Final 5 OK |
+| 9038725154 | 129 | Venomancer | 4 | 4 | 3 | REJECT | REJECT | final unchanged: richest of the team (17.3k, farm 0.50 because the laning place counts half), fits 3(1.29) 4(1.27), Furion takes 3 and the solver gives Venomancer 4 |
+| 9038725154 | 130 | Furion | 5 | 3 | 3 | REJECT | REJECT | intent was 3 and accepted; Nature's Attendants is now a heal (save 0.67), so he reads 5 with best fits 3(0.74) 5(0.68): regression, expected 3. Final 3 OK |
+| 9038725154 | 131 | Terrorblade | 2 | 1 | | OK | OK | |
+| 9038725154 | 132 | Jakiro | 1 | 2 | | OK | OK | intent was the leftover 5, now 1 with damage 1.00; expected 2, 1 tolerated. Final 2 OK |
+| 9037038717 | 0 | Crystal Maiden | 5 | 5 | | OK | OK | intent confidence 0.89 now |
+| 9037038717 | 1 | Void Spirit | 1 | 1 | | OK | OK | intent fixed (was 4): Focus Fire, Falcon Rush and the katana give farm 0.93 and damage 1.00 |
+| 9037038717 | 2 | Windrunner | 4 | 2 | 2 | REJECT | REJECT | intent was 2 and accepted; Infernal Blade, Ice Blast, Leap, Warcry now fits 3(2.07) 4(1.81) 2(1.63), 4 is the leftover: regression, expected 2 (3 tolerated). Final 2 OK |
+| 9037038717 | 3 | Brewmaster | 3 | 3 | 1 | REJECT | REJECT | final unchanged: 30.6k, farm 0.88, jungle 1.00, best fit 1(2.05) over 3(1.94) but Void Spirit needs the 1; intent 3 OK |
+| 9037038717 | 4 | Ancient Apparition | 2 | 4 | 4 | REJECT | REJECT | intent 2, was 1; Storm Bolt, Powershot, Shapeshift, Talon Toss: expected 3 or 4, 2 is adjacent; best fits 3(2.54) 2(2.20). Final 4 OK |
+| 9037038717 | 128 | Tusk | 2 | 1 | 3 | REJECT | REJECT | intent was 3 and accepted; Walrus Punch, Windrun, Scorched Earth are now attack skills (damage 0.95, farm 0.83 with the crit multiplier counted as scaling), best fits 2(2.83) 1(2.35) 3(1.74), 2 is adjacent. Final 1 OK |
+| 9037038717 | 129 | Lycan | 4 | 3 | | OK | OK | |
+| 9037038717 | 130 | Mirana | 1 | 2 | | OK | OK | |
+| 9037038717 | 131 | Doom | 3 | 5 | | OK | OK | intent 3, was 5: Snowball, Ice Shards and Doom give initiation 1.00; confidence now readable. Final 5 OK |
+| 9037038717 | 132 | Largo | 5 | 4 | | OK | OK | intent fixed (was 2): Living Armor and Rhapsody give save 1.00. Final 4 OK |
 
 ## Team verdicts
 
 | match | team | stage | tokens | assistant | owner | comment |
 |---|---|---|---|---|---|---|
-| 9038725154 | RADIANT | PICK | no findings | OK | | Ice Path and Power Cogs now count as initiation |
-| 9038725154 | RADIANT | FINAL | INTENT_NOT_PLAYED | OK | | unchanged |
-| 9038725154 | DIRE | PICK | no findings | OK | | Nature's Attendants is a heal; Storm Bolt and Doom-like stuns count as initiation |
-| 9038725154 | DIRE | FINAL | CARRIES_3,INTENT_NOT_PLAYED | OK | | unchanged |
-| 9037038717 | RADIANT | PICK | CARRIES_3,NO_SAVE_HEAL | REJECT | | no heal is plausible and Storm Bolt and Astral Step now count as initiation, but three carries is too many: Void Spirit and Brewmaster farm, Ancient Apparition (0.65) does not; expected CARRIES_2 or none |
-| 9037038717 | RADIANT | FINAL | INTENT_NOT_PLAYED | OK | | unchanged |
-| 9037038717 | DIRE | PICK | no findings | OK | | Living Armor is a protection, Snowball and Doom are initiation |
-| 9037038717 | DIRE | FINAL | INTENT_NOT_PLAYED | OK | | unchanged |
+| 9038725154 | RADIANT | PICK | no findings | OK | OK | Ice Path and Power Cogs now count as initiation |
+| 9038725154 | RADIANT | FINAL | INTENT_NOT_PLAYED | OK | OK | unchanged |
+| 9038725154 | DIRE | PICK | no findings | OK | OK | Nature's Attendants is a heal; Storm Bolt and Doom-like stuns count as initiation |
+| 9038725154 | DIRE | FINAL | CARRIES_3,INTENT_NOT_PLAYED | OK | OK | unchanged |
+| 9037038717 | RADIANT | PICK | CARRIES_3,NO_SAVE_HEAL | REJECT | REJECT | no heal is plausible and Storm Bolt and Astral Step now count as initiation, but three carries is too many: Void Spirit and Brewmaster farm, Ancient Apparition (0.65) does not; expected CARRIES_2 or none |
+| 9037038717 | RADIANT | FINAL | INTENT_NOT_PLAYED | OK | OK | unchanged |
+| 9037038717 | DIRE | PICK | no findings | OK | OK | Living Armor is a protection, Snowball and Doom are initiation |
+| 9037038717 | DIRE | FINAL | INTENT_NOT_PLAYED | OK | OK | unchanged |
+
+## Open after acceptance (follow-ups, not blockers)
+
+- Final stage follows the lane label (20 of 20 equal to OpenDota's `position_est`); Brewmaster (expected 1) and Venomancer (expected 3) are the rows that show it. Next input to add: damage dealt and healing done per player from the stored combat log.
+- Intent rows still rejected: Sniper, Enchantress, Sven, Furion, Windrunner, Ancient Apparition, Tusk; the attack-skill rule is probably too generous (see the known hypotheses above).
+- Radiant of 9037038717 reads `CARRIES_3` at the pick stage, which is too many.
+- All Pick is not reviewed yet; it follows the same loop when the owner asks for it.
