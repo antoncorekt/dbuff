@@ -8,6 +8,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class ObservedProfilerTest {
 
@@ -94,6 +95,107 @@ class ObservedProfilerTest {
       assertThat(p.damage()).isNull();
       assertThat(p.durability()).isNull();
     }
+  }
+
+  private static RolePlayer produced(long slot, PlayerOutput output) {
+    return new RolePlayer(slot, 1L, 10000L, null, List.of(), null, List.of(), output);
+  }
+
+  private static List<RolePlayer> team(PlayerOutput... outputs) {
+    return java.util.stream.IntStream.range(0, outputs.length)
+        .mapToObj(i -> produced(i, outputs[i]))
+        .toList();
+  }
+
+  @Test
+  void damageHealingVisionAndDurabilityAreTheShareOfTheTeamOverTheFullShare() {
+    List<FunctionProfile> profiles =
+        profiler.profile(
+            team(
+                new PlayerOutput(35L, 0L, 70L, 0L, 0L),
+                new PlayerOutput(35L, 50L, 0L, 0L, 50L),
+                new PlayerOutput(10L, 0L, 0L, 0L, 0L),
+                new PlayerOutput(10L, 0L, 0L, 0L, 0L),
+                new PlayerOutput(10L, 0L, 0L, 0L, 0L)));
+
+    assertThat(profiles)
+        .extracting(FunctionProfile::damage)
+        .containsExactly(1.0, 1.0, 0.1 / 0.35, 0.1 / 0.35, 0.1 / 0.35);
+    assertThat(profiles)
+        .extracting(FunctionProfile::durability)
+        .containsExactly(1.0, 0.0, 0.0, 0.0, 0.0);
+    assertThat(profiles)
+        .extracting(FunctionProfile::saveHeal)
+        .containsExactly(0.0, 1.0, 0.0, 0.0, 0.0);
+    assertThat(profiles)
+        .extracting(FunctionProfile::visionDuty)
+        .containsExactly(0.0, 1.0, 0.0, 0.0, 0.0);
+  }
+
+  @Test
+  void aShareAboveTheFullShareIsCutAtOne() {
+    List<FunctionProfile> profiles =
+        profiler.profile(
+            team(
+                new PlayerOutput(90L, null, null, null, null),
+                new PlayerOutput(10L, null, null, null, null),
+                new PlayerOutput(0L, null, null, null, null),
+                new PlayerOutput(0L, null, null, null, null),
+                new PlayerOutput(0L, null, null, null, null)));
+
+    assertThat(profiles.get(0).damage()).isEqualTo(1.0);
+    assertThat(profiles.get(0).saveHeal()).isNull();
+  }
+
+  @Test
+  void aFunctionIsUnknownForAPlayerWithNoStoredValueAndForAllWhenTheTeamTotalIsZero() {
+    List<FunctionProfile> missing =
+        profiler.profile(
+            team(
+                new PlayerOutput(10L, null, null, null, null),
+                PlayerOutput.NONE,
+                new PlayerOutput(10L, null, null, null, null),
+                new PlayerOutput(10L, null, null, null, null),
+                new PlayerOutput(10L, null, null, null, null)));
+    List<FunctionProfile> silent =
+        profiler.profile(
+            team(
+                new PlayerOutput(0L, 0L, 0L, 0L, 0L),
+                new PlayerOutput(0L, 0L, 0L, 0L, 0L),
+                new PlayerOutput(0L, 0L, 0L, 0L, 0L),
+                new PlayerOutput(0L, 0L, 0L, 0L, 0L),
+                new PlayerOutput(0L, 0L, 0L, 0L, 0L)));
+
+    assertThat(missing.get(1).damage()).isNull();
+    assertThat(missing.get(0).damage()).isNotNull();
+    assertThat(silent).extracting(FunctionProfile::damage).containsOnlyNulls();
+    assertThat(silent).extracting(FunctionProfile::saveHeal).containsOnlyNulls();
+  }
+
+  @Test
+  void lastHitsPullFarmPriorityTowardsTheShareOfTheTeam() {
+    List<RolePlayer> byWorth = team(player(3, 3L, 7000));
+    List<RolePlayer> withLastHits =
+        java.util.stream.IntStream.range(0, byWorth.size())
+            .mapToObj(
+                i -> {
+                  RolePlayer p = byWorth.get(i);
+                  long lastHits = i == 4 ? 700 : 0;
+                  return new RolePlayer(
+                      p.slot(),
+                      p.laneRole(),
+                      p.finalNetWorth(),
+                      null,
+                      List.of(),
+                      null,
+                      List.of(),
+                      new PlayerOutput(null, null, null, lastHits, null));
+                })
+            .toList();
+
+    assertThat(profiler.profile(byWorth).get(4).farmPriority()).isZero();
+    assertThat(profiler.profile(withLastHits).get(4).farmPriority()).isCloseTo(0.3, within(1e-9));
+    assertThat(profiler.profile(withLastHits).get(0).farmPriority()).isCloseTo(0.7, within(1e-9));
   }
 
   @Test

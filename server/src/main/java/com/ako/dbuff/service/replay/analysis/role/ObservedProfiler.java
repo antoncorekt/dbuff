@@ -2,16 +2,18 @@ package com.ako.dbuff.service.replay.analysis.role;
 
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
  * The profile of what each player did, from what the match stored for the role analyzer: the net
  * worth place in the team, OpenDota's lane role and the laning-phase activity. The functions that
- * need data not stored yet (vision duty from wards and dust, initiation from the front-line rank at
- * fights, disable landed, healing and saves, damage and damage taken) stay unknown rather than
- * guessed; their sources are the statistics and fight tables the design names, to be added with the
- * analyzers that read them.
+ * need data not stored yet (initiation from the front-line rank at fights, disable landed) stay
+ * unknown rather than guessed. Damage, healing, durability from the damage taken, vision duty from
+ * the wards placed and the share of last hits come from OpenDota's statistics, as shares of the
+ * team total.
  */
 @Component
 @RequiredArgsConstructor
@@ -36,6 +38,12 @@ public class ObservedProfiler implements StageProfiler {
     double[] finalRank = NetWorthRanks.of(team.stream().map(RolePlayer::finalWorth).toList());
     double[] laningRank =
         NetWorthRanks.of(team.stream().map(p -> p.worthAt(laningMinute)).toList());
+    List<Double> damage = teamShares(team, PlayerOutput::heroDamage, rules.getDamageFullShare());
+    List<Double> healing = teamShares(team, PlayerOutput::heroHealing, rules.getHealFullShare());
+    List<Double> taken =
+        teamShares(team, PlayerOutput::damageTaken, rules.getDamageTakenFullShare());
+    List<Double> wards = teamShares(team, PlayerOutput::wardsPlaced, rules.getWardFullShare());
+    List<Double> lastHits = teamShares(team, PlayerOutput::lastHits, rules.getLastHitFullShare());
     return java.util.stream.IntStream.range(0, team.size())
         .mapToObj(
             i -> {
@@ -45,17 +53,44 @@ public class ObservedProfiler implements StageProfiler {
               double farmRank = NetWorthRanks.farmRank(finalRank[i], laningRank[i], Double.NaN);
               return new FunctionProfile(
                   lane(player, laning, rules),
-                  Double.isNaN(farmRank) ? null : (team.size() - farmRank) / (team.size() - 1),
+                  farm(farmRank, team.size(), lastHits.get(i), rules),
                   jungle(player, laning, seen, rules),
                   seen ? clamp(laning.roamShare() / rules.getRoamFullShare()) : null,
+                  wards.get(i),
                   null,
                   null,
-                  null,
-                  null,
-                  null,
-                  null);
+                  healing.get(i),
+                  damage.get(i),
+                  taken.get(i));
             })
         .toList();
+  }
+
+  private static Double farm(
+      double farmRank, int size, Double lastHitShare, RoleProfileProperties.Observed rules) {
+    Double byWorth = Double.isNaN(farmRank) ? null : (size - farmRank) / (size - 1);
+    if (byWorth == null || lastHitShare == null) {
+      return byWorth;
+    }
+    return (1 - rules.getLastHitFarmShare()) * byWorth + rules.getLastHitFarmShare() * lastHitShare;
+  }
+
+  /**
+   * The value of each player as his share of the team total over {@code fullShare}, cut at 1; null
+   * for a player with nothing stored, and for all of them when the team total is 0.
+   */
+  private static List<Double> teamShares(
+      List<RolePlayer> team, Function<PlayerOutput, Long> reader, double fullShare) {
+    List<Long> amounts = team.stream().map(p -> reader.apply(p.output())).toList();
+    long total = amounts.stream().filter(Objects::nonNull).mapToLong(Long::longValue).sum();
+    return amounts.stream().map(a -> share(a, total, fullShare)).toList();
+  }
+
+  private static Double share(Long amount, long total, double fullShare) {
+    if (amount == null || total <= 0) {
+      return null;
+    }
+    return clamp(amount / (double) total / fullShare);
   }
 
   private static LanePosition lane(

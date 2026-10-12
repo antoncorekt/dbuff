@@ -281,6 +281,23 @@ public class RoleProfileProperties {
 
     /** From this share of the laning phase in the mid lane the lane is mid. */
     private double midLaneShare = 0.5;
+
+    /**
+     * The share of the team total of hero damage, hero healing, damage taken, wards placed and last
+     * hits that makes the function 1; a player who does less gets the proportion. A team of equal
+     * players has 0.2 each.
+     */
+    private double damageFullShare = 0.35;
+
+    private double healFullShare = 0.5;
+    private double wardFullShare = 0.5;
+    private double lastHitFullShare = 0.35;
+    private double damageTakenFullShare = 0.35;
+
+    /**
+     * The part of farm priority that comes from the share of last hits, the rest from net worth.
+     */
+    private double lastHitFarmShare = 0.3;
   }
 
   /** How a profile becomes a score per role and a best role. */
@@ -293,7 +310,7 @@ public class RoleProfileProperties {
      * In the FINAL stage of a mode that fits profiles, the lane bonus is multiplied by this, so
      * that the net worth place and the farm carry more of the role than the lane.
      */
-    private double finalLaneFactor = 0.5;
+    private double finalLaneFactor = 0.1;
 
     /** What a function the FINAL stage does not know counts as: none, so it favours no role. */
     private double finalUnknownValue = 0.0;

@@ -13,6 +13,7 @@ import java.util.List;
  * @param activity empty when no replay activity was stored
  * @param heroId the picked hero; null when not stored
  * @param abilities the skills he holds after an Ability Draft; empty in other modes
+ * @param output what he dealt, healed, farmed and warded over the match
  */
 public record RolePlayer(
     long slot,
@@ -21,14 +22,42 @@ public record RolePlayer(
     double[] netWorthByMinute,
     List<ActivitySegment> activity,
     Long heroId,
-    List<DraftedAbility> abilities) {
+    List<DraftedAbility> abilities,
+    PlayerOutput output) {
+  public RolePlayer(
+      long slot,
+      Long laneRole,
+      Long finalNetWorth,
+      double[] netWorthByMinute,
+      List<ActivitySegment> activity,
+      Long heroId,
+      List<DraftedAbility> abilities) {
+    this(
+        slot,
+        laneRole,
+        finalNetWorth,
+        netWorthByMinute,
+        activity,
+        heroId,
+        abilities,
+        PlayerOutput.NONE);
+  }
+
   public RolePlayer(
       long slot,
       Long laneRole,
       Long finalNetWorth,
       double[] netWorthByMinute,
       List<ActivitySegment> activity) {
-    this(slot, laneRole, finalNetWorth, netWorthByMinute, activity, null, List.of());
+    this(
+        slot,
+        laneRole,
+        finalNetWorth,
+        netWorthByMinute,
+        activity,
+        null,
+        List.of(),
+        PlayerOutput.NONE);
   }
 
   /** The final net worth, else the last of the series; null when neither is stored. */
