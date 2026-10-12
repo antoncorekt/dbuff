@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.analysis.composition;
 
 import com.ako.dbuff.service.replay.analysis.role.RoleFunction;
+import java.util.Arrays;
 import java.util.Locale;
 
 /**
@@ -41,6 +42,19 @@ public enum CompositionToken {
   /** Whether the token only makes sense after the match, as the draft cannot say it. */
   boolean finalOnly() {
     return finalOnly;
+  }
+
+  /**
+   * Whether the code is one of the composition tokens, a fixed name or a carry or support count.
+   */
+  public static boolean isToken(String code) {
+    if (code == null) {
+      return false;
+    }
+    if (code.startsWith(CARRIES_PREFIX) || code.startsWith(SUPPORTS_PREFIX)) {
+      return true;
+    }
+    return Arrays.stream(values()).anyMatch(known -> known.name().equals(code));
   }
 
   /** A stored token in plain words; a name this class does not know is written in lower case. */

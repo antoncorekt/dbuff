@@ -18,8 +18,9 @@ public class ReplayAnalysisService {
   private final List<ReplayAnalyzer> analyzers;
 
   /**
-   * An analyzer whose input extractor failed is skipped, so that rows from an earlier run are kept
-   * rather than replaced by conclusions drawn from missing or stale data.
+   * An analyzer whose input extractor or input analyzer failed or was skipped is skipped, so that
+   * rows from an earlier run are kept rather than replaced by conclusions drawn from missing or
+   * stale data.
    *
    * @param mode analyzers that do not apply to it are left out
    * @param failedExtractors the extractors that failed in this run; an analyzer that failed or was
@@ -34,11 +35,14 @@ public class ReplayAnalysisService {
       if (!analyzer.supports(mode)) {
         continue;
       }
-      if (analyzer.requires(mode).stream().anyMatch(unavailable::contains)) {
+      List<String> missing =
+          analyzer.requires(mode).stream().filter(unavailable::contains).sorted().toList();
+      if (!missing.isEmpty()) {
         log.info(
-            "Skipping analyzer {} for match {}: an input extractor failed",
+            "Skipping analyzer {} for match {}: inputs failed or were skipped: {}",
             analyzer.name(),
-            matchId);
+            matchId,
+            missing);
         unavailable.add(analyzer.name());
         continue;
       }

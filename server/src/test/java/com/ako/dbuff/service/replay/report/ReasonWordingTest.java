@@ -19,6 +19,10 @@ class ReasonWordingTest {
         .build();
   }
 
+  private static FightReasonDomain teamWith(String code, String evidence) {
+    return FightReasonDomain.builder().scope("TEAM").code(code).evidence(evidence).build();
+  }
+
   @Test
   void phrase_startsAPlayerReasonWithTheHero() {
     assertThat(ReasonWording.phrase(player("NO_TP", "ABSENT_ALIVE"), "Venomancer"))
@@ -56,6 +60,25 @@ class ReasonWordingTest {
   }
 
   @Test
+  void phrase_wordsATeamReasonThatIsNoCompositionTokenFromItsEvidence() {
+    assertThat(
+            ReasonWording.phrase(
+                teamWith(
+                    "WEAK_COMBINATION",
+                    " Radiant drafted skills whose best player reaches only: x "),
+                "ignored"))
+        .isEqualTo("Radiant drafted skills whose best player reaches only: x");
+    assertThat(
+            ReasonWording.phrase(
+                teamWith("STRONG_SKILL_LEFT", "strong skills nobody drafted: a (b)"), "ignored"))
+        .isEqualTo("the team: strong skills nobody drafted: a (b)");
+    assertThat(ReasonWording.phrase(teamWith("NEW_MODE_CODE", "short note"), "ignored"))
+        .isEqualTo("the team: short note");
+    assertThat(ReasonWording.phrase(teamWith("WEAK_COMBINATION", null), "ignored"))
+        .isEqualTo("the team had a gap");
+  }
+
+  @Test
   void phrase_fallsBackToTheTrimmedEvidenceForAnUnknownCode() {
     assertThat(ReasonWording.phrase(player("NEW_CODE", "  something odd "), "Sven"))
         .isEqualTo("Sven: something odd");
@@ -72,8 +95,8 @@ class ReasonWordingTest {
 
   @Test
   void phrase_survivesATeamReasonWithNoCode() {
-    assertThat(ReasonWording.phrase(team(null), "x")).isEqualTo("the team had a gap");
-    assertThat(ReasonWording.phrase(team(""), "x")).isEqualTo("the team had a gap");
+    assertThat(ReasonWording.phrase(teamWith(null, null), "x")).isEqualTo("the team had a gap");
+    assertThat(ReasonWording.phrase(teamWith("", " "), "x")).isEqualTo("the team had a gap");
   }
 
   @Test

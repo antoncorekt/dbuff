@@ -21,9 +21,11 @@ import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
+import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.StoredMatchModes;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,7 +71,17 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
 
   @Override
   public Set<String> requires() {
-    return Set.of("fights", "fight-abilities", "deaths");
+    return Set.of("fights", "fight-abilities", "deaths", "roles", "composition");
+  }
+
+  @Override
+  public Set<String> requires(GameModeProfile mode) {
+    if (mode.gameModeId() != AbilityDraftProfile.MODE_ID) {
+      return requires();
+    }
+    Set<String> required = new HashSet<>(requires());
+    required.add("ability-draft");
+    return required;
   }
 
   @Override
@@ -101,6 +113,9 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
     List<AbilityDraftPoolDomain> pool = poolRepo.findByMatchId(matchId);
     List<FightReasonDomain> rows = new ArrayList<>();
     for (FightDomain fight : fightRepo.findByMatchId(matchId)) {
+      if (fight.getFightIndex() == null) {
+        continue;
+      }
       int index = fight.getFightIndex();
       FightContext context =
           new FightContext(

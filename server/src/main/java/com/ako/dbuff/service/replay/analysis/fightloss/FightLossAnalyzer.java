@@ -65,7 +65,7 @@ public class FightLossAnalyzer implements ReplayAnalyzer {
 
   @Override
   public Set<String> requires() {
-    return Set.of("fights");
+    return Set.of("fights", "fight-reasons", "deaths", "spikes");
   }
 
   @Override

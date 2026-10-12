@@ -64,6 +64,7 @@ public class DeathReasonContributor implements ReasonContributor {
   private static String evidence(DeathAnalysisDomain death) {
     int second = (int) death.getDeathSeconds().doubleValue();
     String killer = death.getKillerName() == null ? death.getKillerKind() : death.getKillerName();
-    return "died at %d:%02d to %s".formatted(second / 60, second % 60, killer);
+    String died = "died at %d:%02d".formatted(second / 60, second % 60);
+    return killer == null ? died : died + " to " + killer;
   }
 }

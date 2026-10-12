@@ -105,6 +105,25 @@ class FightReasonAnalyzerTest {
   }
 
   @Test
+  void requiresEveryAnalyzerItReads_andTheDraftExtractorOnlyForTheDraftMode() {
+    assertThat(analyzer.requires())
+        .containsExactlyInAnyOrder("fights", "fight-abilities", "deaths", "roles", "composition");
+    assertThat(analyzer.requires(new AllPickProfile())).doesNotContain("ability-draft");
+    assertThat(analyzer.requires(new AbilityDraftProfile())).contains("ability-draft", "roles");
+  }
+
+  @Test
+  void aFightWithNoIndexIsSkipped() {
+    stored(ALL_PICK_MATCH, 22);
+    fightRepo.save(FightDomain.builder().matchId(ALL_PICK_MATCH).build());
+    entityManager.flush();
+
+    analyzer.analyze(ALL_PICK_MATCH);
+
+    assertThat(reasonRepo.findByMatchId(ALL_PICK_MATCH)).isNotEmpty();
+  }
+
+  @Test
   void runsAfterTheRoleAndCompositionAnalyzers() {
     int reasons = AnnotationUtils.findAnnotation(FightReasonAnalyzer.class, Order.class).value();
 
