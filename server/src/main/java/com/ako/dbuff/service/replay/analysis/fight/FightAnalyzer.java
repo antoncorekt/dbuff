@@ -14,7 +14,6 @@ import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.PlayerSlots;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
-import com.ako.dbuff.service.replay.analysis.activity.Activity;
 import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
@@ -103,14 +102,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
     for (PlayerActivitySegmentDomain s : segmentRepo.findByMatchId(matchId)) {
       bySlot
           .computeIfAbsent(PlayerSlots.index(s.getPlayerSlot()), k -> new ArrayList<>())
-          .add(
-              new ActivitySegment(
-                  s.getStartSeconds(),
-                  s.getEndSeconds(),
-                  Activity.valueOf(s.getActivity()),
-                  Zone.Kind.valueOf(s.getZone()),
-                  s.getLane() == null ? null : Zone.Lane.valueOf(s.getLane()),
-                  s.getSide() == null ? null : ActivitySegment.Side.valueOf(s.getSide())));
+          .add(ActivitySegment.of(s));
     }
     return bySlot;
   }

@@ -49,6 +49,6 @@ class ReplayWiringTest {
   void theAnalyzersRunInTheOrderOfTheDataTheyReadFromEachOther() {
     assertThat(analyzers)
         .extracting(ReplayAnalyzer::name)
-        .containsSubsequence("activity", "fights", "deaths");
+        .containsSubsequence("activity", "roles", "fights", "deaths", "outliers");
   }
 }
