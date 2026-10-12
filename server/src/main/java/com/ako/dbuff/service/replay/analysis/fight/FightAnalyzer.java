@@ -2,11 +2,9 @@ package com.ako.dbuff.service.replay.analysis.fight;
 
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
-import com.ako.dbuff.dao.model.PlayerActivitySegmentDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
-import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatHeroes;
@@ -15,12 +13,12 @@ import com.ako.dbuff.service.replay.PlayerSlots;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
+import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import com.ako.dbuff.service.replay.map.MapLayout;
 import com.ako.dbuff.service.replay.map.MatchMapLayout;
 import com.ako.dbuff.service.replay.map.Zone;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class FightAnalyzer implements ReplayAnalyzer {
   private final PlayerTraces playerTraces;
   private final ReplayPlayerRepo playerRepo;
-  private final PlayerActivitySegmentRepo segmentRepo;
+  private final StoredActivity storedActivity;
   private final FightRepo fightRepo;
   private final FightPlayerRepo fightPlayerRepo;
   private final HeroStateTimelines timelines;
@@ -99,11 +97,9 @@ public class FightAnalyzer implements ReplayAnalyzer {
 
   private Map<Integer, List<ActivitySegment>> activities(long matchId) {
     Map<Integer, List<ActivitySegment>> bySlot = new HashMap<>();
-    for (PlayerActivitySegmentDomain s : segmentRepo.findByMatchId(matchId)) {
-      bySlot
-          .computeIfAbsent(PlayerSlots.index(s.getPlayerSlot()), k -> new ArrayList<>())
-          .add(ActivitySegment.of(s));
-    }
+    storedActivity
+        .bySlot(matchId)
+        .forEach((slot, list) -> bySlot.put(PlayerSlots.index(slot), list));
     return bySlot;
   }
 

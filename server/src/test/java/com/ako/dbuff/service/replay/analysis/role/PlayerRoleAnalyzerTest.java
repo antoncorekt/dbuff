@@ -3,10 +3,13 @@ package com.ako.dbuff.service.replay.analysis.role;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerRoleDomain;
+import com.ako.dbuff.dao.model.PlayerTimelineDomain;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleRepo;
+import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
+import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.AllPickProfile;
 import com.ako.dbuff.service.replay.mode.GameModeRegistry;
@@ -26,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 @Import({
   PlayerRoleAnalyzer.class,
+  StoredActivity.class,
   AllPickRoleResolver.class,
   StoredMatchModes.class,
   GameModeRegistry.class,
@@ -44,6 +48,7 @@ class PlayerRoleAnalyzerTest {
 
   @Autowired private PlayerRoleAnalyzer analyzer;
   @Autowired private PlayerRoleRepo roleRepo;
+  @Autowired private PlayerTimelineRepo timelineRepo;
   @Autowired private PlayerGameStatisticRepo statisticRepo;
   @Autowired private EntityManager entityManager;
 
@@ -126,5 +131,57 @@ class PlayerRoleAnalyzerTest {
     analyzer.deleteByMatchId(ALL_PICK_MATCH);
 
     assertThat(roleRepo.findByMatchId(ALL_PICK_MATCH)).isEmpty();
+  }
+
+  @Test
+  void namesTheActivityAnalyzerAsAnInput() {
+    assertThat(analyzer.requires()).contains("activity");
+  }
+
+  @Test
+  void aTeamWithAForeignSlotIsSkippedAndTheOtherStillGetsRoles() {
+    stored(ALL_PICK_MATCH, 22);
+    PlayerMatchStatisticDomain stray = new PlayerMatchStatisticDomain();
+    stray.setMatchId(ALL_PICK_MATCH);
+    stray.setPlayerSlot(5L);
+    statisticRepo.save(stray);
+    entityManager.flush();
+
+    analyzer.analyze(ALL_PICK_MATCH);
+
+    assertThat(roleRepo.findByMatchId(ALL_PICK_MATCH))
+        .hasSize(5)
+        .allSatisfy(r -> assertThat(r.getPlayerSlot()).isGreaterThanOrEqualTo(128));
+  }
+
+  @Test
+  void aMissingMinuteTakesTheLatestEarlierWorthAndAMissingSeriesLowersConfidence() {
+    stored(ALL_PICK_MATCH, 22);
+    for (int i = 0; i < 9; i++) {
+      for (int minute = 0; minute < 14; minute++) {
+        if (i == 0 && minute == 12) {
+          continue;
+        }
+        timelineRepo.save(
+            PlayerTimelineDomain.builder()
+                .matchId(ALL_PICK_MATCH)
+                .playerSlot(SLOTS[i])
+                .gameMinute(minute)
+                .networth(WORTH[i % 5])
+                .build());
+      }
+    }
+    entityManager.flush();
+
+    analyzer.analyze(ALL_PICK_MATCH);
+
+    List<PlayerRoleDomain> rows = roleRepo.findByMatchId(ALL_PICK_MATCH);
+    PlayerRoleDomain gap =
+        rows.stream().filter(r -> r.getPlayerSlot() == 0).findFirst().orElseThrow();
+    PlayerRoleDomain none =
+        rows.stream().filter(r -> r.getPlayerSlot() == 132).findFirst().orElseThrow();
+    assertThat(gap.getEvidence()).contains("1.0 final and 1.0 in the laning phase");
+    assertThat(none.getEvidence()).contains("unknown in the laning phase");
+    assertThat(none.getConfidence()).isLessThanOrEqualTo(0.5);
   }
 }

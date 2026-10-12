@@ -8,7 +8,8 @@ import java.util.List;
  *
  * @param laneRole OpenDota's lane role (1 safe lane, 2 mid, 3 offlane, 4 jungle); null when absent
  * @param finalNetWorth null when absent
- * @param netWorthByMinute from minute 0; null when there is no series
+ * @param netWorthByMinute from minute 0, NaN before the first known minute; null when there is no
+ *     series
  * @param activity empty when no replay activity was stored
  */
 public record RolePlayer(
@@ -27,11 +28,16 @@ public record RolePlayer(
         : netWorthByMinute[netWorthByMinute.length - 1];
   }
 
-  /** The net worth at the minute, or at the last stored one when the game was shorter. */
+  /**
+   * The net worth at the minute, or at the last stored one when the game was shorter; null without
+   * a series or when the series has nothing yet at that minute. A net worth is never taken from the
+   * final one, which is a different point in time.
+   */
   public Double worthAt(int minute) {
     if (netWorthByMinute == null || netWorthByMinute.length == 0) {
-      return finalWorth();
+      return null;
     }
-    return netWorthByMinute[Math.min(minute, netWorthByMinute.length - 1)];
+    double worth = netWorthByMinute[Math.min(minute, netWorthByMinute.length - 1)];
+    return Double.isNaN(worth) ? null : worth;
   }
 }

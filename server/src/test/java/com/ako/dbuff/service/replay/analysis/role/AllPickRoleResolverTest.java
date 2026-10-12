@@ -58,7 +58,7 @@ class AllPickRoleResolverTest {
               assertThat(a.confidence()).isBetween(0.0, 1.0);
               assertThat(a.evidence()).contains("lane role");
             });
-    assertThat(result.getFirst().confidence()).isGreaterThan(0.5);
+    assertThat(result.getFirst().confidence()).as("no series halves it").isEqualTo(0.5);
   }
 
   @Test
@@ -141,5 +141,42 @@ class AllPickRoleResolverTest {
   @Test
   void aTeamOfAnotherSizeIsNotResolved() {
     assertThat(resolver.resolve(List.of(player(0, 1L, 1000)))).isEmpty();
+  }
+
+  @Test
+  void aPlayerWithoutASeriesIsNotRankedByFinalWorthAgainstLaningWorthOfTheOthers() {
+    double[] flat = new double[13];
+    List<RolePlayer> team =
+        List.of(
+            new RolePlayer(0, 1L, 20000L, series(13, 9000), List.of()),
+            new RolePlayer(1, 2L, 15000L, series(13, 8000), List.of()),
+            new RolePlayer(2, 3L, 12000L, series(13, 7000), List.of()),
+            new RolePlayer(3, 3L, 6000L, series(13, 6000), List.of()),
+            new RolePlayer(4, 1L, 5000L, null, List.of()));
+
+    List<RoleAssignment> result = resolver.resolve(team);
+
+    RoleAssignment noSeries = result.get(4);
+    assertThat(noSeries.evidence()).contains("5.0 final and unknown in the laning phase");
+    assertThat(noSeries.confidence()).isLessThanOrEqualTo(0.5);
+    assertThat(result.get(0).evidence()).contains("1.0 final and 1.0 in the laning phase");
+    assertThat(flat).hasSize(13);
+  }
+
+  @Test
+  void aSeriesThatIsNotKnownYetAtTheLaningMinuteCountsAsUnknown() {
+    double[] late = series(13, 5000);
+    java.util.Arrays.fill(late, 0, 13, Double.NaN);
+    RolePlayer player = new RolePlayer(0, 1L, 5000L, late, List.of());
+
+    assertThat(player.worthAt(12)).isNull();
+    assertThat(new RolePlayer(0, 1L, 5000L, null, List.of()).worthAt(12)).isNull();
+    assertThat(new RolePlayer(0, 1L, 5000L, series(5, 7), List.of()).worthAt(12)).isEqualTo(7.0);
+  }
+
+  private static double[] series(int minutes, double value) {
+    double[] series = new double[minutes];
+    java.util.Arrays.fill(series, value);
+    return series;
   }
 }

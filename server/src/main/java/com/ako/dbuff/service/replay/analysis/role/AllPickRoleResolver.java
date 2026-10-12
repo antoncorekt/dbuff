@@ -59,7 +59,7 @@ public class AllPickRoleResolver implements RoleResolver {
     double[][] score = new double[TEAM_SIZE][ROLES];
     double[] farmRank = new double[TEAM_SIZE];
     for (int i = 0; i < TEAM_SIZE; i++) {
-      farmRank[i] = (finalRank[i] + laningRank[i]) / 2;
+      farmRank[i] = farmRank(finalRank[i], laningRank[i]);
       for (int role = 0; role < ROLES; role++) {
         score[i][role] =
             -FARM_WEIGHT * Math.abs(farmRank[i] - (role + 1))
@@ -74,10 +74,32 @@ public class AllPickRoleResolver implements RoleResolver {
               team.get(i).slot(),
               solution.roleOf()[i] + 1,
               PlayerRoleSource.DERIVED,
-              Math.round(Math.min(1, solution.margin()[i] / FULL_CONFIDENCE_MARGIN) * 100) / 100.0,
+              confidence(solution.margin()[i], finalRank[i], laningRank[i]),
               evidence(team.get(i), activity.get(i), finalRank[i], laningRank[i])));
     }
     return result;
+  }
+
+  private static double farmRank(double finalRank, double laningRank) {
+    if (Double.isNaN(finalRank) && Double.isNaN(laningRank)) {
+      return UNKNOWN_RANK;
+    }
+    if (Double.isNaN(laningRank)) {
+      return finalRank;
+    }
+    return Double.isNaN(finalRank) ? laningRank : (finalRank + laningRank) / 2;
+  }
+
+  /** Each missing net worth rank halves the confidence, as the player was placed on less. */
+  private static double confidence(double margin, double finalRank, double laningRank) {
+    double confidence = Math.min(1, margin / FULL_CONFIDENCE_MARGIN);
+    if (Double.isNaN(finalRank)) {
+      confidence /= 2;
+    }
+    if (Double.isNaN(laningRank)) {
+      confidence /= 2;
+    }
+    return Math.round(confidence * 100) / 100.0;
   }
 
   private static double laneBonus(RolePlayer player, LaningActivity activity, int role) {
@@ -101,12 +123,15 @@ public class AllPickRoleResolver implements RoleResolver {
     return bonus;
   }
 
-  /** Place by worth with 1 the highest and a tie sharing the average place; 3 when unknown. */
+  /**
+   * Place by worth with 1 the highest and a tie sharing the average place; NaN when unknown, and
+   * then he is left out of the places of the others.
+   */
   private static double[] ranks(List<Double> worth) {
     double[] ranks = new double[worth.size()];
     for (int i = 0; i < ranks.length; i++) {
       if (worth.get(i) == null) {
-        ranks[i] = UNKNOWN_RANK;
+        ranks[i] = Double.NaN;
         continue;
       }
       double own = worth.get(i);
@@ -117,15 +142,19 @@ public class AllPickRoleResolver implements RoleResolver {
     return ranks;
   }
 
+  private static String place(double rank) {
+    return Double.isNaN(rank) ? "unknown" : String.format(Locale.ROOT, "%.1f", rank);
+  }
+
   private static String evidence(
       RolePlayer player, LaningActivity activity, double finalRank, double laningRank) {
     return String.format(
         Locale.ROOT,
-        "lane role %s, net worth place %.1f final and %.1f in the laning phase, laning time mid"
+        "lane role %s, net worth place %s final and %s in the laning phase, laning time mid"
             + " %d%% jungle %d%% other lanes %d%%",
         player.laneRole() == null ? "unknown" : player.laneRole(),
-        finalRank,
-        laningRank,
+        place(finalRank),
+        place(laningRank),
         Math.round(activity.midShare() * 100),
         Math.round(activity.jungleShare() * 100),
         Math.round(activity.roamShare() * 100));
