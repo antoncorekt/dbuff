@@ -147,6 +147,19 @@ Still NOT verified:
 
 ## 7. What is left, in order
 
+### Update, evening of 2026-10-12
+
+Everything below is merged to `main` and deployed; replay processing and the report are still switched off in production.
+
+- Replay pipeline with all analyzers and the Discord report (#37, with #17 to #36 folded into it), run status and re-analysis endpoints.
+- Queue priority and flow (#39): fresh matches first (6 hours), young retries, backlog off by default; a new replay triggers the job; a match's report goes out right after its run.
+- Game-mode profiles (#40, #41): Ability Draft (18) and All Pick (22) each have a profile; the queue takes its modes from the registry.
+- Roles: `player_role` with the All Pick resolver (#43), widened hero and ability constants and `position_est` (#44, #45: the constants fetch had been broken since the client regeneration of 2026-05-07 and works again), role profiles with intent and final stages (#46), team composition verdicts (#47), the loop tooling (#48), the Ability Draft resolver and overrides (#49), rounds 1 and 2 of the loop (#51, #52). Round 2 is accepted for now by the owner; see `docs/replay-role-loop/round-02.md` for what stays open. The method is described in `docs/replay-review-loop.md`.
+
+Next, in order: (a) the final stage input for roles (damage dealt and healing done per player from the combat log, then a round 3); (b) mode-specific reasons (plan PR 6, `ReasonContributor`) once roles are accepted, with wards for "no vision"; (c) the items below. Small cleanup: use `TeamSide` in `SpikeAnalyzer`, `TeamNetWorth`, `OutlierAnalyzer`, `BuildingKillAnalyzer` (each still has its own slot-128 rule).
+
+Items 1 and 4 and part of 7 of the list below are done by the work above (the stack is merged, `FEEDER` and the outliers exist, the review loop replaced the calibration on 20 matches for roles); the rest stands.
+
 Done since the first version of this file: deaths (#17), fight reasons and ability use (#19-#21), front-line and
 out-of-position (#22, #23), BKB piercing (#24), buybacks (#25, with a match that has them), team states (#26),
 buildings (#27), phase summaries (#28), swings (#29), the PostgreSQL smoke test (#30), the Discord reports for swings,
