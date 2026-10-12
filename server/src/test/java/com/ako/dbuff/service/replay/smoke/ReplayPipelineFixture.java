@@ -1,11 +1,17 @@
 package com.ako.dbuff.service.replay.smoke;
 
+import com.ako.dbuff.dao.model.DeathEventDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
+import com.ako.dbuff.dao.model.TeamfightDomain;
+import com.ako.dbuff.dao.model.TeamfightPlayerDomain;
+import com.ako.dbuff.dao.repo.DeathEventRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
+import com.ako.dbuff.dao.repo.TeamfightPlayerRepo;
+import com.ako.dbuff.dao.repo.TeamfightRepo;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.replay.AbilityNames;
@@ -131,6 +137,9 @@ public abstract class ReplayPipelineFixture {
   @Autowired private PlayerGameStatisticRepo playerStatRepo;
   @Autowired private PlayerTimelineRepo timelineRepo;
   @Autowired private MatchRepo matchRepo;
+  @Autowired private DeathEventRepo deathEventRepo;
+  @Autowired private TeamfightRepo teamfightRepo;
+  @Autowired private TeamfightPlayerRepo teamfightPlayerRepo;
 
   protected static Path fixture(String fileName) {
     return Path.of(System.getenv("REPLAY_FIXTURE_DIR"), fileName);
@@ -186,6 +195,7 @@ public abstract class ReplayPipelineFixture {
       stat.setSenPlaced(optLong(p, "sen_placed"));
       playerStatRepo.save(stat);
     }
+    seedOpenDotaFights(match.getId(), json);
     return match;
   }
 
@@ -201,6 +211,57 @@ public abstract class ReplayPipelineFixture {
       }
     }
     return total;
+  }
+
+  /**
+   * The deaths with their gold and the teamfights of OpenDota's JSON, as its parser stores them.
+   */
+  private void seedOpenDotaFights(long matchId, JsonNode json) {
+    deathEventRepo.deleteByMatchId(matchId);
+    teamfightPlayerRepo.deleteByMatchId(matchId);
+    teamfightRepo.deleteByMatchId(matchId);
+    JsonNode players = json.path("players");
+    for (JsonNode p : players) {
+      long slot = p.path("player_slot").asLong();
+      int index = 0;
+      for (JsonNode death : p.path("deaths_log")) {
+        deathEventRepo.save(
+            DeathEventDomain.builder()
+                .matchId(matchId)
+                .playerSlot(slot)
+                .deathIndex(index++)
+                .deathTime(optLong(death, "time"))
+                .killerHeroName(death.path("key").asText(null))
+                .goldLost(optLong(death, "gold_lost"))
+                .goldFed(optLong(death, "gold_fed"))
+                .timeDead(optLong(death, "time_dead"))
+                .build());
+      }
+    }
+    int fightIndex = 0;
+    for (JsonNode fight : json.path("teamfights")) {
+      teamfightRepo.save(
+          TeamfightDomain.builder()
+              .matchId(matchId)
+              .fightIndex(fightIndex)
+              .startTime(optLong(fight, "start"))
+              .endTime(optLong(fight, "end"))
+              .lastDeathTime(optLong(fight, "last_death"))
+              .deaths(optLong(fight, "deaths"))
+              .build());
+      for (int i = 0; i < players.size() && i < fight.path("players").size(); i++) {
+        JsonNode entry = fight.path("players").get(i);
+        teamfightPlayerRepo.save(
+            TeamfightPlayerDomain.builder()
+                .matchId(matchId)
+                .fightIndex(fightIndex)
+                .playerSlot(players.get(i).path("player_slot").asLong())
+                .deaths(optLong(entry, "deaths"))
+                .goldDelta(optLong(entry, "gold_delta"))
+                .build());
+      }
+      fightIndex++;
+    }
   }
 
   private static Long optLong(JsonNode node, String field) {

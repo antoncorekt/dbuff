@@ -1,0 +1,126 @@
+package com.ako.dbuff.service.replay.analysis.fightloss;
+
+import com.ako.dbuff.dao.model.FightDomain;
+import com.ako.dbuff.dao.model.FightExplanationDomain;
+import com.ako.dbuff.dao.model.FightReasonDomain;
+import com.ako.dbuff.dao.model.GameSpikeDomain;
+import com.ako.dbuff.dao.repo.FightExplanationRepo;
+import com.ako.dbuff.dao.repo.FightReasonRepo;
+import com.ako.dbuff.dao.repo.FightRepo;
+import com.ako.dbuff.dao.repo.GameSpikeRepo;
+import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.MatchExplanation;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@DataJpaTest
+@ActiveProfiles("test")
+@Import({FightExplanationReader.class, FightLossProperties.class})
+class FightExplanationReaderTest {
+  private static final long MATCH = 71L;
+
+  @Autowired private FightExplanationReader reader;
+  @Autowired private FightRepo fightRepo;
+  @Autowired private GameSpikeRepo spikeRepo;
+  @Autowired private FightExplanationRepo explanationRepo;
+  @Autowired private FightReasonRepo reasonRepo;
+
+  private void swing(int index, String benefiting) {
+    spikeRepo.save(
+        GameSpikeDomain.builder()
+            .matchId(MATCH)
+            .spikeIndex(index)
+            .benefitingTeam(benefiting)
+            .build());
+  }
+
+  private void lost(int fight, Integer swing, String loser, Long gold, int reasons) {
+    fightRepo.save(FightDomain.builder().matchId(MATCH).fightIndex(fight).build());
+    explanationRepo.save(
+        FightExplanationDomain.builder()
+            .matchId(MATCH)
+            .fightIndex(fight)
+            .spikeIndex(swing)
+            .losingTeam(loser)
+            .goldLost(gold)
+            .reasonCount(reasons)
+            .build());
+  }
+
+  private void reason(int fight, String team, Long slot, String code, double severity) {
+    reasonRepo.save(
+        FightReasonDomain.builder()
+            .matchId(MATCH)
+            .fightIndex(fight)
+            .team(team)
+            .scope(slot == null ? "TEAM" : "PLAYER")
+            .subjectSlot(slot)
+            .code(code)
+            .severity(severity)
+            .evidence("e")
+            .build());
+  }
+
+  private void stored() {
+    swing(0, "RADIANT");
+    lost(0, 0, "DIRE", 300L, 4);
+    lost(1, 0, "DIRE", 900L, 0);
+    lost(2, 0, "DIRE", null, 0);
+    lost(3, 0, "RADIANT", 5000L, 0);
+    lost(4, null, "DIRE", 100L, 0);
+    reason(0, "DIRE", 128L, "NO_TP", 0.7);
+    reason(0, "DIRE", 129L, "TOWER", 0.4);
+    reason(0, "DIRE", null, "NO_DISABLE", 0.9);
+    reason(0, "DIRE", 130L, "NO_BKB", 0.3);
+    reason(0, "RADIANT", 1L, "DIED_FIRST", 0.9);
+  }
+
+  @Test
+  void aSwingListsItsLosersFightsCostliestFirstUpToTheLimit_theRestAreOther() {
+    stored();
+
+    MatchExplanation read = reader.read(MATCH, 3, 2);
+
+    assertThat(read.swings()).hasSize(1);
+    assertThat(read.swings().get(0).fights())
+        .extracting(f -> f.fight().getFightIndex())
+        .containsExactly(1, 0);
+    assertThat(read.otherFights()).extracting(f -> f.fight().getFightIndex()).containsExactly(3, 4);
+  }
+
+  @Test
+  void reasonsOfTheLosingTeamAreRankedAndCutToTopReasons_withTheTotalKept() {
+    stored();
+
+    var fight = reader.read(MATCH, 3, 5).swings().get(0).fights().get(1);
+
+    assertThat(fight.reasons())
+        .extracting(r -> r.rank() + " " + r.reason().getCode())
+        .containsExactly("1 NO_TP", "2 TOWER", "3 NO_BKB");
+    assertThat(fight.totalReasons()).isEqualTo(4);
+  }
+
+  @Test
+  void nothingIsCappedWhenTheLimitsAreUnbounded() {
+    stored();
+
+    var fight = reader.read(MATCH, Integer.MAX_VALUE, Integer.MAX_VALUE).swings().get(0);
+
+    assertThat(fight.fights()).hasSize(3);
+    assertThat(fight.fights().get(1).reasons())
+        .extracting(r -> r.reason().getCode())
+        .containsExactly("NO_TP", "TOWER", "NO_BKB", "NO_DISABLE");
+  }
+
+  @Test
+  void aMatchWithNothingStoredReadsAsEmpty() {
+    MatchExplanation read = reader.read(MATCH, 3, 2);
+
+    assertThat(read.swings()).isEmpty();
+    assertThat(read.otherFights()).isEmpty();
+  }
+}
