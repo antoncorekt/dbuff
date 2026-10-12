@@ -33,6 +33,7 @@ class MovementSectionTest {
                     .laneFarmSeconds(100)
                     .pushingSeconds(0)
                     .travelingSeconds(100)
+                    .positionedSeconds(0)
                     .fightsAvailable(7)
                     .fightsJoined(3)
                     .goldPerMinute(612.4)

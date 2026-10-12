@@ -19,6 +19,7 @@ class DraftSectionTest {
   private AbilityDraftPickDomain pick(int order, long slot, String ability) {
     return AbilityDraftPickDomain.builder()
         .pickOrder(order)
+        .teamPickIndex((order + 1) / 2)
         .playerSlot(slot)
         .abilityName(ability)
         .build();
