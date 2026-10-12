@@ -12,9 +12,11 @@ import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
 import com.ako.dbuff.dao.repo.GameStateSegmentRepo;
+import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerPhaseSummaryRepo;
+import com.ako.dbuff.dao.repo.PlayerRoleRepo;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
 import com.ako.dbuff.dao.repo.ReplayCombatLogRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
@@ -173,6 +175,8 @@ class ReplayPostgresSmokeTest {
   @Autowired private GameSpikeRepo spikeRepo;
   @Autowired private GameStateSegmentRepo stateSegmentRepo;
   @Autowired private PlayerTimelineRepo timelineRepo;
+  @Autowired private PlayerRoleRepo roleRepo;
+  @Autowired private MatchRepo matchRepo;
   @Autowired private SwingSection swingSection;
   @Autowired private DeathSection deathSection;
   @Autowired private FightSection fightSection;
@@ -209,6 +213,11 @@ class ReplayPostgresSmokeTest {
       assertThat(fightRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(deathRepo.findByMatchId(match.getId())).hasSizeGreaterThan(40);
       assertThat(phaseRepo.findByMatchId(match.getId())).hasSizeGreaterThanOrEqualTo(20);
+      assertThat(roleRepo.findByMatchId(match.getId()))
+          .as("%s: each team has each role once", id)
+          .hasSize(10)
+          .extracting(r -> r.getRole() + (r.getPlayerSlot() >= 128 ? 10 : 0))
+          .containsExactlyInAnyOrder(1, 2, 3, 4, 5, 11, 12, 13, 14, 15);
       assertThat(buybackRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(spikeRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(stateSegmentRepo.findByMatchId(match.getId())).isNotEmpty();
@@ -248,6 +257,7 @@ class ReplayPostgresSmokeTest {
     match.setGameModeId(json.get("game_mode").asLong());
     match.setDuration(json.get("duration").asLong());
     match.setStartTime(json.get("start_time").asLong());
+    matchRepo.save(match);
     playerStatRepo.deleteAll(playerStatRepo.findAllByMatchId(match.getId()));
     timelineRepo.deleteByMatchId(match.getId());
     for (JsonNode p : json.get("players")) {
@@ -268,6 +278,8 @@ class ReplayPostgresSmokeTest {
       stat.setMatchId(match.getId());
       stat.setPlayerSlot(p.get("player_slot").asLong());
       stat.setPlayerId(p.get("account_id").asLong());
+      stat.setLaneRole(p.get("lane_role").asLong());
+      stat.setNetWorth(p.get("net_worth").asLong());
       playerStatRepo.save(stat);
     }
     return match;
