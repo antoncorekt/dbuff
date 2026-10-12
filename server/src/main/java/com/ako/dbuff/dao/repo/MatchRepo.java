@@ -43,13 +43,16 @@ public interface MatchRepo extends JpaRepository<MatchDomain, Long> {
   /**
    * Matches that can have a replay worth fetching (details stored, replay location known, a
    * supported mode, actually played) and no run of this parser version yet, newest first. Only
-   * recent matches are listed because older replays are gone.
+   * recent matches are listed because older replays are gone. Details must have been mapped from
+   * {@code mappedFrom} (inclusive) up to {@code mappedBefore} (exclusive).
    */
   @Query(
       """
       select m from MatchDomain m
       where m.detailsMappedAt is not null
         and m.startTime > :recentAfter
+        and m.detailsMappedAt >= :mappedFrom
+        and m.detailsMappedAt < :mappedBefore
         and m.replayCluster is not null
         and m.replaySalt is not null
         and m.duration > 0
@@ -63,6 +66,8 @@ public interface MatchRepo extends JpaRepository<MatchDomain, Long> {
       @Param("version") Integer version,
       @Param("recentAfter") Long recentAfter,
       @Param("modes") Collection<Long> modes,
+      @Param("mappedFrom") LocalDateTime mappedFrom,
+      @Param("mappedBefore") LocalDateTime mappedBefore,
       Pageable pageable);
 
   /** Writes only the detail bookkeeping columns, leaving fields other jobs own untouched. */

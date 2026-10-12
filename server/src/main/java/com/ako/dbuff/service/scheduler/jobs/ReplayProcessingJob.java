@@ -30,6 +30,8 @@ public class ReplayProcessingJob implements Job {
       log.error("Replay processing failed: {}", e.getMessage(), e);
     }
     try {
+      // Reports go out as each run ends; this picks up the ones that had to wait (quiet hours, no
+      // thread yet).
       reportService.deliverPending();
     } catch (Exception e) {
       log.error("Replay report delivery failed: {}", e.getMessage(), e);

@@ -6,6 +6,7 @@ import com.ako.dbuff.dotapi.invoker.ApiException;
 import com.ako.dbuff.dotapi.model.MatchResponse;
 import com.ako.dbuff.service.match.DotaApiMatchDetailsService;
 import com.ako.dbuff.service.match.data.MatchDetailService;
+import com.ako.dbuff.service.replay.ReplayRequestAnnouncer;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -26,9 +27,10 @@ class MatchDetailBackfillServiceTest {
   private final MatchRepo matchRepo = mock(MatchRepo.class);
   private final DotaApiMatchDetailsService api = mock(DotaApiMatchDetailsService.class);
   private final MatchDetailService detailService = mock(MatchDetailService.class);
+  private final ReplayRequestAnnouncer announcer = mock(ReplayRequestAnnouncer.class);
   private final MatchDetailBackfillService service =
       new MatchDetailBackfillService(
-          matchRepo, api, detailService, new MatchDetailBackfillProperties());
+          matchRepo, api, detailService, new MatchDetailBackfillProperties(), announcer);
 
   private final MatchResponse response = new MatchResponse();
 
@@ -51,6 +53,7 @@ class MatchDetailBackfillServiceTest {
     assertThat(stored).isEqualTo(1);
     verify(matchRepo).updateDetailState(eq(1L), eq(true), any(), any(), any(), any());
     verify(matchRepo, never()).save(any());
+    verify(announcer).announce(match);
   }
 
   @Test
@@ -63,6 +66,7 @@ class MatchDetailBackfillServiceTest {
 
     assertThat(stored).isZero();
     verify(matchRepo).updateDetailState(eq(1L), any(), any(), any(), isNull(), any());
+    verify(announcer, never()).announce(any());
   }
 
   @Test
