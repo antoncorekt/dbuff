@@ -23,6 +23,14 @@ public interface ReplayAnalyzer {
     return Set.of();
   }
 
+  /**
+   * The extractors this analyzer reads for a match of the mode; an analyzer whose inputs differ by
+   * mode overrides it, so an extractor that matters to one mode does not hold back another.
+   */
+  default Set<String> requires(GameModeProfile mode) {
+    return requires();
+  }
+
   /** Replaces what an earlier run stored for the match. */
   void analyze(long matchId);
 

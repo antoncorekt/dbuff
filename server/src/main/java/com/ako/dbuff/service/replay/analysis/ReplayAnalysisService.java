@@ -23,7 +23,7 @@ public class ReplayAnalysisService {
    *
    * @param mode analyzers that do not apply to it are left out
    * @param failedExtractors the extractors that failed in this run; an analyzer that failed or was
-   *     skipped counts as failed for the analyzers after it that name it in {@code requires()}
+   *     skipped counts as failed for the analyzers after it that name it in {@code requires(mode)}
    * @return the names of the analyzers that failed
    */
   public List<String> analyze(
@@ -34,7 +34,7 @@ public class ReplayAnalysisService {
       if (!analyzer.supports(mode)) {
         continue;
       }
-      if (analyzer.requires().stream().anyMatch(unavailable::contains)) {
+      if (analyzer.requires(mode).stream().anyMatch(unavailable::contains)) {
         log.info(
             "Skipping analyzer {} for match {}: an input extractor failed",
             analyzer.name(),

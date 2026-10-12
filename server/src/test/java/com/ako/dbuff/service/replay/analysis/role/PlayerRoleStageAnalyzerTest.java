@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -58,6 +59,8 @@ class PlayerRoleStageAnalyzerTest {
   private static final long MATCH = 41L;
   private static final long[] SLOTS = {0, 1, 2, 3, 4, 128, 129, 130, 131, 132};
   private static final long STUNNER_HERO = 27;
+
+  private static final AtomicBoolean FAIL_INTENT = new AtomicBoolean();
 
   @TestConfiguration
   static class Config {
@@ -103,6 +106,9 @@ class PlayerRoleStageAnalyzerTest {
 
         @Override
         public List<RoleAssignment> resolve(RoleContext context) {
+          if (FAIL_INTENT.get() && context.stage() == RoleStage.INTENT) {
+            throw new IllegalStateException("intent boom");
+          }
           StageProfiler profiler =
               profilers.stream()
                   .filter(p -> p.stage() == context.stage())
@@ -200,9 +206,27 @@ class PlayerRoleStageAnalyzerTest {
 
   @Test
   void theAnalyzerNamesTheDraftExtractorOnlyBecauseTheResolverDoes() {
-    assertThat(analyzer.requires()).containsExactlyInAnyOrder("activity", "ability-draft");
+    assertThat(analyzer.requires(TestModes.ABILITY_DRAFT))
+        .containsExactlyInAnyOrder("activity", "ability-draft");
+    assertThat(analyzer.requires(TestModes.ALL_PICK)).containsExactly("activity");
     assertThat(analyzer.supports(TestModes.ABILITY_DRAFT)).isTrue();
     assertThat(analyzer.supports(TestModes.ALL_PICK)).isFalse();
+  }
+
+  @Test
+  void aStageThatThrowsLeavesTheOtherStageAndTheFinalRolesStored() {
+    stored();
+    FAIL_INTENT.set(true);
+    try {
+      analyzer.analyze(MATCH);
+    } finally {
+      FAIL_INTENT.set(false);
+    }
+
+    assertThat(roleRepo.findByMatchId(MATCH)).hasSize(10);
+    assertThat(profileRepo.findByMatchId(MATCH))
+        .hasSize(10)
+        .allSatisfy(p -> assertThat(p.getStage()).isEqualTo("FINAL"));
   }
 
   @Test

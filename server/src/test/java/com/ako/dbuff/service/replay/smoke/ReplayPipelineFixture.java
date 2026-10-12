@@ -10,6 +10,7 @@ import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.replay.AbilityNames;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -17,6 +18,8 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterAll;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -77,23 +80,51 @@ public abstract class ReplayPipelineFixture {
     }
 
     @Bean
-    AbilityNames abilityNames() {
-      return id -> Optional.of("ability_" + id);
+    AbilityNames abilityNames() throws IOException {
+      Map<String, String> names = new HashMap<>();
+      JsonNode ids = constants("constants-ability-ids.json");
+      if (ids != null) {
+        ids.fields()
+            .forEachRemaining(
+                e -> {
+                  for (String id : e.getKey().split(",")) {
+                    names.put(id.trim(), e.getValue().asText());
+                  }
+                });
+      }
+      return id ->
+          Optional.ofNullable(names.get(String.valueOf(id))).or(() -> Optional.of("ability_" + id));
     }
 
+    /**
+     * The hero and skill constants of OpenDota's {@code /constants} answers, read from {@code
+     * constants-heroes.json} and {@code constants-abilities.json} in the fixture directory; empty
+     * kits when they are not there.
+     */
     @Bean
-    HeroKits heroKits() {
+    HeroKits heroKits() throws IOException {
+      ObjectMapper lenient =
+          new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+      JsonNode heroes = constants("constants-heroes.json");
+      JsonNode abilities = constants("constants-abilities.json");
       return new HeroKits() {
         @Override
         public Optional<HeroConstant> hero(long heroId) {
-          return Optional.empty();
+          return Optional.ofNullable(heroes == null ? null : heroes.get(String.valueOf(heroId)))
+              .map(n -> lenient.convertValue(n, HeroConstant.class));
         }
 
         @Override
         public Optional<AbilityConstant> ability(String name) {
-          return Optional.empty();
+          return Optional.ofNullable(abilities == null ? null : abilities.get(name))
+              .map(n -> lenient.convertValue(n, AbilityConstant.class));
         }
       };
+    }
+
+    private static JsonNode constants(String file) throws IOException {
+      Path path = fixture(file);
+      return Files.exists(path) ? new ObjectMapper().readTree(path.toFile()) : null;
     }
   }
 

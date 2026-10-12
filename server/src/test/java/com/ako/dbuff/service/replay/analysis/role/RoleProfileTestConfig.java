@@ -11,6 +11,8 @@ import org.springframework.context.annotation.Import;
   IntentStageProfiler.class,
   IntentProfileCalculator.class,
   RoleFitter.class,
+  RoleOverrideFile.class,
+  StageProfilers.class,
   RoleProfileProperties.class,
   ReplayAnalysisProperties.class
 })

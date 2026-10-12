@@ -26,7 +26,7 @@ class IntentProfileCalculatorTest {
       load("constants_profile_abilities.json", new TypeReference<>() {});
 
   private final IntentProfileCalculator calculator =
-      new IntentProfileCalculator(new RoleProfileProperties());
+      new IntentProfileCalculator(new RoleProfileProperties(), RoleOverrides.NONE);
 
   private static <T> T load(String resource, TypeReference<T> type) {
     try (InputStream in =
@@ -41,7 +41,7 @@ class IntentProfileCalculatorTest {
   private FunctionProfile kit(String heroId, String... skills) {
     List<HeldAbility> held = new ArrayList<>();
     for (int i = 0; i < skills.length; i++) {
-      held.add(new HeldAbility(ABILITIES.get(skills[i]), i == skills.length - 1));
+      held.add(new HeldAbility(skills[i], ABILITIES.get(skills[i]), i == skills.length - 1));
     }
     return calculator.profile(HEROES.get(heroId), held);
   }
@@ -139,8 +139,12 @@ class IntentProfileCalculatorTest {
     HeroConstant hero = HEROES.get("27");
     AbilityConstant shackles = ABILITIES.get("shadow_shaman_shackles");
 
-    FunctionProfile regular = calculator.profile(hero, List.of(new HeldAbility(shackles, false)));
-    FunctionProfile ultimate = calculator.profile(hero, List.of(new HeldAbility(shackles, true)));
+    FunctionProfile regular =
+        calculator.profile(
+            hero, List.of(new HeldAbility("shadow_shaman_shackles", shackles, false)));
+    FunctionProfile ultimate =
+        calculator.profile(
+            hero, List.of(new HeldAbility("shadow_shaman_shackles", shackles, true)));
 
     assertThat(ultimate.disable()).isGreaterThan(regular.disable());
   }
@@ -170,7 +174,9 @@ class IntentProfileCalculatorTest {
   @Test
   void aMissingHeroStillProfilesTheSkillsAndNothingAtAllIsUnknown() {
     List<HeldAbility> skills =
-        List.of(new HeldAbility(ABILITIES.get("shadow_shaman_shackles"), false));
+        List.of(
+            new HeldAbility(
+                "shadow_shaman_shackles", ABILITIES.get("shadow_shaman_shackles"), false));
 
     assertThat(calculator.profile(null, skills).disable()).isPositive();
     assertThat(calculator.profile(null, skills).jungle()).isNull();
@@ -187,14 +193,18 @@ class IntentProfileCalculatorTest {
             .build();
 
     FunctionProfile profile =
-        calculator.profile(HEROES.get("1"), List.of(new HeldAbility(teleport, false)));
+        calculator.profile(HEROES.get("1"), List.of(new HeldAbility("teleport", teleport, false)));
 
     assertThat(profile.disable()).isZero();
     assertThat(
             calculator
                 .profile(
                     HEROES.get("27"),
-                    List.of(new HeldAbility(ABILITIES.get("shadow_shaman_shackles"), false)))
+                    List.of(
+                        new HeldAbility(
+                            "shadow_shaman_shackles",
+                            ABILITIES.get("shadow_shaman_shackles"),
+                            false)))
                 .disable())
         .isPositive();
   }
@@ -203,9 +213,11 @@ class IntentProfileCalculatorTest {
   void initiationAndDisableHaveTheirOwnScales() {
     RoleProfileProperties properties = new RoleProfileProperties();
     properties.getIntent().setInitiationFull(0.1);
-    List<HeldAbility> bolt = List.of(new HeldAbility(ABILITIES.get("sven_storm_bolt"), false));
+    List<HeldAbility> bolt =
+        List.of(new HeldAbility("sven_storm_bolt", ABILITIES.get("sven_storm_bolt"), false));
 
-    FunctionProfile tuned = new IntentProfileCalculator(properties).profile(HEROES.get("18"), bolt);
+    FunctionProfile tuned =
+        new IntentProfileCalculator(properties, RoleOverrides.NONE).profile(HEROES.get("18"), bolt);
     FunctionProfile normal = calculator.profile(HEROES.get("18"), bolt);
 
     assertThat(tuned.initiation()).isGreaterThan(normal.initiation());
