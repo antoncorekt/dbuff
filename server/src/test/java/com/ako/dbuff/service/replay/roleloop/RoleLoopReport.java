@@ -7,6 +7,7 @@ import com.ako.dbuff.dao.model.PlayerRoleDomain;
 import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.model.TeamCompositionDomain;
+import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -21,8 +22,8 @@ import java.util.stream.IntStream;
 
 /**
  * The review report of one stored match, as markdown. It only lays out what the tables hold; the
- * two tables headed {@link #ROLES} and {@link #VERDICTS} are what {@link RoleLoopDiff} compares
- * between rounds.
+ * two tables headed {@link #ROLES} and {@link #VERDICTS} are what {@link RoleLoopTopic} lets the
+ * loop compare between rounds.
  */
 final class RoleLoopReport {
   static final String ROLES = "Roles";
@@ -47,32 +48,9 @@ final class RoleLoopReport {
 
   private RoleLoopReport() {}
 
-  private static final String NOT_REPORTED = "Not reported: ";
-
-  static String unavailable(long matchId, String reason) {
-    return "# Match %d\n\n%s%s\n".formatted(matchId, NOT_REPORTED, singleLine(reason));
-  }
-
-  static boolean isUnavailable(String report) {
-    return report.lines().anyMatch(l -> l.startsWith(NOT_REPORTED));
-  }
-
-  static String reasonOf(String report) {
-    return report
-        .lines()
-        .filter(l -> l.startsWith(NOT_REPORTED))
-        .map(l -> l.substring(NOT_REPORTED.length()))
-        .findFirst()
-        .orElse("");
-  }
-
   /** A table cell: a pipe or a line break in a value must not split the row. */
   static String cell(String value) {
-    return singleLine(value).replace("\\", "\\\\").replace("|", "\\|");
-  }
-
-  private static String singleLine(String value) {
-    return value.replaceAll("\\s*[\\r\\n]+\\s*", " ");
+    return ReviewLoopReport.singleLine(value).replace("\\", "\\\\").replace("|", "\\|");
   }
 
   static String render(MatchData d) {

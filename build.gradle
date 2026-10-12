@@ -66,8 +66,8 @@ subprojects {
     }
     test {
         // Tests tagged 'replay' need a real replay file and run through :server:replayTest only;
-        // 'roleloop' is the local review round, run through :server:roleLoop.
-        useJUnitPlatform { excludeTags 'replay', 'roleloop' }
+        // 'reviewloop' is the local review round, run through :server:reviewLoop.
+        useJUnitPlatform { excludeTags 'replay', 'reviewloop' }
     }
     tasks.withType(Test) { task ->
         maxHeapSize '1024m'
@@ -128,18 +128,25 @@ project('server') {
         maxHeapSize = '512m'
     }
 
-    tasks.register('roleLoop', Test) {
-        description = 'One round of the role learning loop against the local PostgreSQL; set REPLAY_FIXTURE_DIR (and ROUND, SMOKE_PG_URL) first.'
+    tasks.register('reviewLoop', Test) {
+        description = 'One round of a review loop against the local PostgreSQL; set REPLAY_FIXTURE_DIR (and -Ploop.topic, ROUND, SMOKE_PG_URL) first.'
         group = 'verification'
         testClassesDirs = sourceSets.test.output.classesDirs
         classpath = sourceSets.test.runtimeClasspath
-        useJUnitPlatform { includeTags 'roleloop' }
+        useJUnitPlatform { includeTags 'reviewloop' }
         maxHeapSize = '512m'
+        environment 'LOOP_TOPIC', findProperty('loop.topic') ?: 'roles'
         // The inputs are the database and the environment, which Gradle does not track.
         outputs.upToDateWhen { false }
         testLogging { showStandardStreams = true }
     }
-    
+
+    tasks.register('roleLoop') {
+        description = 'Alias of reviewLoop for the roles topic.'
+        group = 'verification'
+        dependsOn 'reviewLoop'
+    }
+
     dependencies {
 
         implementation project(":clients:dotapi")

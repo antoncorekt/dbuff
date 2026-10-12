@@ -199,12 +199,6 @@ class RoleLoopReportTest {
   }
 
   @Test
-  void anUnavailableMatchIsReportedWithItsReason() {
-    assertThat(RoleLoopReport.unavailable(5L, "no fixture"))
-        .isEqualTo("# Match 5\n\nNot reported: no fixture\n");
-  }
-
-  @Test
   void aNullRoleOnAnExistingRowReadsUnknownNotNull() {
     String report =
         RoleLoopReport.render(
@@ -258,17 +252,5 @@ class RoleLoopReportTest {
     String report = RoleLoopReport.render(noStats);
 
     assertThat(report).contains("**No player statistics stored.**").doesNotContain("## Roles");
-  }
-
-  @Test
-  void anUnavailableReportIsRecognisedAndItsReasonRead() {
-    String report = RoleLoopReport.unavailable(5L, "skipped: a\nb");
-
-    assertThat(RoleLoopReport.isUnavailable(report)).isTrue();
-    assertThat(RoleLoopReport.reasonOf(report)).isEqualTo("skipped: a b");
-    assertThat(
-            RoleLoopReport.isUnavailable(
-                RoleLoopReport.render(data(List.of(), List.of(), List.of(), List.of()))))
-        .isFalse();
   }
 }

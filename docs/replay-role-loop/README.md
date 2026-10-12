@@ -4,7 +4,7 @@ The role and team-composition rules are shaped by review rounds on a small fixed
 
 ## What a round does
 
-`:server:roleLoop` takes every match of `server/src/test/resources/replay/role-loop/matches.txt` (match ids, one per line, `#` comments allowed) and, against a local throwaway PostgreSQL:
+`:server:reviewLoop` (the roles topic; `-Ploop.topic=roles` is the default and `:server:roleLoop` is an alias) takes every match of `server/src/test/resources/replay/role-loop/matches.txt` (match ids, one per line, `#` comments allowed) and, against a local throwaway PostgreSQL:
 
 - a match whose replay run is already stored is re-analysed from the stored data, the same path as `POST /api/v1/replay/{matchId}/reanalyze` (no replay needed, a few seconds per match);
 - otherwise, when `REPLAY_FIXTURE_DIR` has `<id>.dem.zst` and `<id>.json` (OpenDota's match JSON), the whole pipeline runs on the replay once, with a local HTTP server standing in for Valve, and the match is stored;
@@ -16,7 +16,7 @@ It then reads the stored tables only (`player_role`, `player_role_profile`, `tea
 
 ```
 docker run -d --name roleloop-pg -e POSTGRES_PASSWORD=password -e POSTGRES_DB=dbuff -p 5544:5432 postgres:16-alpine
-REPLAY_FIXTURE_DIR=/path/to/replays ./gradlew :server:roleLoop
+REPLAY_FIXTURE_DIR=/path/to/replays ./gradlew :server:reviewLoop
 docker rm -f roleloop-pg    # when the loop is done; the stored matches go with it
 ```
 
@@ -24,6 +24,7 @@ Keep the container for the whole loop: it holds the stored matches, so a later r
 
 | Variable | Meaning |
 |---|---|
+| `-Ploop.topic` | The review topic, default `roles` (Gradle property, not an environment variable) |
 | `REPLAY_FIXTURE_DIR` | Directory with `<id>.dem.zst` and `<id>.json`; the task is skipped when it is not set |
 | `SMOKE_PG_URL` | JDBC URL of the database, default `jdbc:postgresql://localhost:5544/dbuff` (user `postgres`, password `password`); only localhost, 127.0.0.1 and ::1 as the host of the URL are accepted, and otherwise the task is skipped before anything is written |
 | `ROUND` | The round number to write (a positive whole number); default the one after the last in `server/build/role-loop`. An explicit round that already has reports is refused |

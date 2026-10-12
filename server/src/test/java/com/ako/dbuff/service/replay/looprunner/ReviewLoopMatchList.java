@@ -1,4 +1,4 @@
-package com.ako.dbuff.service.replay.roleloop;
+package com.ako.dbuff.service.replay.looprunner;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -10,10 +10,10 @@ import java.util.List;
 import java.util.Set;
 
 /** The match ids of the review list: one per line, blank lines and {@code #} comments ignored. */
-final class RoleLoopMatchList {
-  private RoleLoopMatchList() {}
+public final class ReviewLoopMatchList {
+  private ReviewLoopMatchList() {}
 
-  static List<Long> read(Path file) {
+  public static List<Long> read(Path file) {
     try {
       return parse(Files.readAllLines(file), file.getFileName().toString());
     } catch (IOException e) {

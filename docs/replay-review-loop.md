@@ -25,15 +25,12 @@ Use it when the question is "does this output look right to someone who knows Do
 
 ## Adding a new topic
 
-The generic pieces today carry the role name (`RoleLoopRound`, `RoleLoopDiff`, `RoleLoopMatchList`, the `roleLoop` Gradle task, the `roleloop` test tag); only `RoleLoopReport` is really role-specific. When the second topic arrives, do this once:
+The topic-free parts live in `server/src/test/java/com/ako/dbuff/service/replay/looprunner` (round numbering `ReviewLoopRound`, match list `ReviewLoopMatchList`, diff `ReviewLoopDiff`, the "not reported" stand-in `ReviewLoopReport`, the round itself `ReviewLoopTest`), the local database guard is `LocalDatabase` in the smoke package, and the Gradle task is `:server:reviewLoop` (JUnit tag `reviewloop`, topic picked with `-Ploop.topic=<name>`, default `roles`; `:server:roleLoop` is kept as an alias of the roles topic). A topic is one implementation of `ReviewLoopTopic`, a Spring `@Component` next to its renderer (roles: `RoleLoopTopic` and `RoleLoopReport` in the `roleloop` package). To add a topic:
 
-1. Extract the topic-free parts (round numbering, match list, diff, the local database guard in `ReplayPipelineFixture`/`LocalDatabase`) under a neutral name and keep the role renderer on top of them (DRY: do not copy them).
-2. Add a renderer for the new topic that reads its stored tables (for example fights: `fight`, `fight_player`, `fight_ability_use`; deaths: `death_analysis`; swings: `game_spike`, `game_spike_factor`) and prints, per row, the verdict next to the evidence behind it and the OpenDota fact to compare with.
-3. Add a match list (or a section of the same list) and a Gradle task or a parameter of the existing one with its own tag.
-4. Add `docs/<topic>-loop/README.md` (short: what to look at) and a round template.
-5. Make the rule's analyzer version bump part of every round that changes it, so the re-analysis replaces the old rows.
-
-Do not generalize before the second topic exists: the first copy of a pattern shows what really varies.
+1. Implement `ReviewLoopTopic`: its `name()` (the `-Ploop.topic` value), match list, output directory, the tables the diff compares (`ReviewLoopDiff.Section`: heading, key label, key columns) and `render(matchId)`, a renderer that reads its stored tables (for example fights: `fight`, `fight_player`, `fight_ability_use`; deaths: `death_analysis`; swings: `game_spike`, `game_spike_factor`) and prints, per row, the verdict next to the evidence behind it and the OpenDota fact to compare with. Do not copy the runner parts (DRY).
+2. Add a match list (or a section of the same list) under `server/src/test/resources/replay/<topic>-loop/`.
+3. Add `docs/<topic>-loop/README.md` (short: what to look at) and a round template.
+4. Make the rule's analyzer version bump part of every round that changes it, so the re-analysis replaces the old rows.
 
 ## Checklist for a round
 

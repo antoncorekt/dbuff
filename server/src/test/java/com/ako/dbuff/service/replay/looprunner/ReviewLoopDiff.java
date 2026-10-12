@@ -1,4 +1,4 @@
-package com.ako.dbuff.service.replay.roleloop;
+package com.ako.dbuff.service.replay.looprunner;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -7,30 +7,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** What changed between two reports of one match, read from their roles and verdicts tables. */
-final class RoleLoopDiff {
-  private static final int ROLE_KEY_COLUMNS = 1;
-  private static final int VERDICT_KEY_COLUMNS = 2;
+/** What changed between two reports of one match, read from the tables a topic names. */
+public final class ReviewLoopDiff {
+  /**
+   * A table compared between rounds.
+   *
+   * @param heading the {@code ##} heading above the table
+   * @param keyLabel the word before the key of a changed row, empty for none
+   * @param keyColumns how many leading columns identify a row
+   */
+  public record Section(String heading, String keyLabel, int keyColumns) {}
 
-  private RoleLoopDiff() {}
+  private ReviewLoopDiff() {}
 
-  static List<String> changes(String previous, String current) {
-    if (RoleLoopReport.isUnavailable(current)) {
-      return List.of("skipped this round (" + RoleLoopReport.reasonOf(current) + ")");
+  public static List<String> changes(String previous, String current, List<Section> sections) {
+    if (ReviewLoopReport.isUnavailable(current)) {
+      return List.of("skipped this round (" + ReviewLoopReport.reasonOf(current) + ")");
     }
     List<String> out = new ArrayList<>();
-    out.addAll(
-        compare(
-            RoleLoopReport.ROLES,
-            "slot",
-            table(previous, RoleLoopReport.ROLES, ROLE_KEY_COLUMNS),
-            table(current, RoleLoopReport.ROLES, ROLE_KEY_COLUMNS)));
-    out.addAll(
-        compare(
-            RoleLoopReport.VERDICTS,
-            "",
-            table(previous, RoleLoopReport.VERDICTS, VERDICT_KEY_COLUMNS),
-            table(current, RoleLoopReport.VERDICTS, VERDICT_KEY_COLUMNS)));
+    for (Section s : sections) {
+      out.addAll(
+          compare(
+              s.heading(),
+              s.keyLabel(),
+              table(previous, s.heading(), s.keyColumns()),
+              table(current, s.heading(), s.keyColumns())));
+    }
     return out;
   }
 
