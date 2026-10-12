@@ -23,6 +23,10 @@ import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
 import com.ako.dbuff.service.replay.AbilityNames;
 import com.ako.dbuff.service.replay.ReplayDataService;
 import com.ako.dbuff.service.replay.ReplayRunService;
+import com.ako.dbuff.service.replay.report.DeathSection;
+import com.ako.dbuff.service.replay.report.FightSection;
+import com.ako.dbuff.service.replay.report.ReplayReportInput;
+import com.ako.dbuff.service.replay.report.SwingSection;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -82,8 +86,13 @@ import static org.assertj.core.api.Assertions.assertThat;
         @ComponentScan.Filter(
             type = FilterType.REGEX,
             pattern =
-                ".*\\.(ReplayProcessingJob|ReplayRunJanitor|ReplayQueue|ReplayBatchService|ConstantAbilityNames|ReplayTempCleaner)|.*Test(\\$.*)?"))
-@Import(ReplayPostgresSmokeTest.Config.class)
+                ".*\\.(ReplayProcessingJob|ReplayRunJanitor|ReplayQueue|ReplayBatchService|ConstantAbilityNames|ReplayTempCleaner|ReplayReportService)|.*Test(\\$.*)?"))
+@Import({
+  ReplayPostgresSmokeTest.Config.class,
+  SwingSection.class,
+  DeathSection.class,
+  FightSection.class
+})
 @TestPropertySource(properties = "replay.processing.enabled=true")
 class ReplayPostgresSmokeTest {
 
@@ -156,6 +165,9 @@ class ReplayPostgresSmokeTest {
   @Autowired private GameSpikeRepo spikeRepo;
   @Autowired private GameStateSegmentRepo stateSegmentRepo;
   @Autowired private PlayerTimelineRepo timelineRepo;
+  @Autowired private SwingSection swingSection;
+  @Autowired private DeathSection deathSection;
+  @Autowired private FightSection fightSection;
 
   @Test
   @Commit
@@ -187,6 +199,21 @@ class ReplayPostgresSmokeTest {
       assertThat(buybackRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(spikeRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(stateSegmentRepo.findByMatchId(match.getId())).isNotEmpty();
+      ReplayReportInput input =
+          new ReplayReportInput(
+              match.getId(),
+              match,
+              java.util.Set.of(0L, 1L, 2L, 3L, 4L, 128L, 129L, 130L, 131L, 132L),
+              java.util.Map.of(
+                  0L, "P0", 1L, "P1", 2L, "P2", 3L, "P3", 4L, "P4", 128L, "P5", 129L, "P6", 130L,
+                  "P7", 131L, "P8", 132L, "P9"),
+              3);
+      java.util.List<String> report = new java.util.ArrayList<>();
+      report.addAll(swingSection.lines(input));
+      report.addAll(deathSection.lines(input));
+      report.addAll(fightSection.lines(input));
+      System.out.println("REPORT " + id + "\n" + String.join("\n", report));
+      assertThat(report).isNotEmpty();
     }
     ReplayStatus again = runService.process(match(MATCHES[0]));
     assertThat(again).as("a second run replaces the first").isEqualTo(ReplayStatus.DONE);

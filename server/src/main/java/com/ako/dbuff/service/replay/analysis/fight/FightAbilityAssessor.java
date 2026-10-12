@@ -17,7 +17,10 @@ import java.util.Set;
 public final class FightAbilityAssessor {
   private static final String ITEM_PREFIX = "item_";
 
-  /** Carried for upkeep or travel, not for fighting; teleports are covered by AbsenceReason. */
+  /**
+   * Carried for upkeep, travel or as a toggle, not cast in a fight; teleports are covered by
+   * AbsenceReason.
+   */
   private static final Set<String> NOT_FOR_FIGHTING =
       Set.of(
           "item_tpscroll",
@@ -32,7 +35,10 @@ public final class FightAbilityAssessor {
           "item_ward_observer",
           "item_ward_sentry",
           "item_ward_dispenser",
-          "item_bottle");
+          "item_bottle",
+          "item_power_treads",
+          "item_tranquil_boots",
+          "item_ring_of_basilius");
 
   private final int earlyDeathSeconds;
 
