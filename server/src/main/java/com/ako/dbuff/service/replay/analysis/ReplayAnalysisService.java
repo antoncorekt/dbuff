@@ -35,11 +35,14 @@ public class ReplayAnalysisService {
       if (!analyzer.supports(mode)) {
         continue;
       }
-      if (analyzer.requires(mode).stream().anyMatch(unavailable::contains)) {
+      List<String> missing =
+          analyzer.requires(mode).stream().filter(unavailable::contains).sorted().toList();
+      if (!missing.isEmpty()) {
         log.info(
-            "Skipping analyzer {} for match {}: an input failed or was skipped",
+            "Skipping analyzer {} for match {}: inputs failed or were skipped: {}",
             analyzer.name(),
-            matchId);
+            matchId,
+            missing);
         unavailable.add(analyzer.name());
         continue;
       }
