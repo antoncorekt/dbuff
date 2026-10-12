@@ -15,6 +15,7 @@ import com.ako.dbuff.service.details.DotabuffBuildDetailsParser;
 import com.ako.dbuff.service.details.ScrapperService;
 import com.ako.dbuff.service.match.data.MatchDetailService;
 import com.ako.dbuff.service.match.mapper.PlayersMapper.PlayerHeroInfo;
+import com.ako.dbuff.service.replay.ReplayRequestAnnouncer;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Instant;
@@ -43,6 +44,7 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
   private final DotabuffBuildDetailsParser dotabuffBuildDetailsParser;
   private final ScrapperApiService scrapperApiService;
   private final MatchDetailService matchDetailService;
+  private final ReplayRequestAnnouncer replayAnnouncer;
 
   private final Cache<Long, Document> scrappedDotabufPage = Caffeine.newBuilder().build();
 
@@ -74,6 +76,7 @@ public class BasicMatchDetailsMapper implements MatchInfoMapper {
 
     storeDetails(matchResponse, matchDomain);
     matchRepo.save(matchDomain);
+    replayAnnouncer.announce(matchDomain);
 
     checkAndScrapeAdditionalData(matchDomain);
   }

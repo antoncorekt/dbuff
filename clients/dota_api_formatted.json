@@ -2477,6 +2477,11 @@
             "type": "boolean",
             "nullable": true
           },
+          "position_est": {
+            "description": "position_est",
+            "type": "integer",
+            "nullable": true
+          },
           "cluster": {
             "description": "cluster",
             "type": "integer"

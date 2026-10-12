@@ -1,0 +1,29 @@
+{
+  "abilities": {
+    "axe_berserkers_call": {"DISABLE": 0.5, "INITIATION": 0.6},
+    "tidehunter_ravage": {"DISABLE": 0.4, "INITIATION": 0.4},
+    "enigma_black_hole": {"DISABLE": 0.4, "INITIATION": 0.4},
+    "legion_commander_duel": {"DISABLE": 0.4},
+    "treant_overgrowth": {"DISABLE": 0.4, "INITIATION": 0.3},
+    "furion_teleportation": {"ROAMING": 0.6, "FARM_PRIORITY": 0.2},
+    "tinker_keen_teleport": {"ROAMING": 0.4},
+    "abyssal_underlord_dark_rift": {"ROAMING": 0.3},
+    "wisp_relocate": {"ROAMING": 0.3, "SAVE_HEAL": 0.2},
+    "abaddon_borrowed_time": {"SAVE_HEAL": 0.5, "DURABILITY": 0.3},
+    "dazzle_shallow_grave": {"SAVE_HEAL": 0.6},
+    "omniknight_guardian_angel": {"SAVE_HEAL": 0.5},
+    "oracle_false_promise": {"SAVE_HEAL": 0.6},
+    "winter_wyvern_cold_embrace": {"SAVE_HEAL": 0.5},
+    "sandking_epicenter": {"DAMAGE": 0.4, "FARM_PRIORITY": 0.4},
+    "nevermore_shadowraze1": {"DAMAGE": 0.3, "FARM_PRIORITY": 0.3},
+    "nevermore_shadowraze2": {"DAMAGE": 0.3, "FARM_PRIORITY": 0.3},
+    "nevermore_shadowraze3": {"DAMAGE": 0.3, "FARM_PRIORITY": 0.3},
+    "juggernaut_blade_fury": {"FARM_PRIORITY": 0.3, "DURABILITY": 0.1},
+    "doom_bringer_doom": {"DISABLE": 0.4, "INITIATION": 0.5},
+    "rattletrap_power_cogs": {"DISABLE": 0.4, "INITIATION": 0.5},
+    "largo_amphibian_rhapsody": {"SAVE_HEAL": 0.4, "DURABILITY": 0.2},
+    "kez_falcon_rush_ad": {"DAMAGE": 0.4, "FARM_PRIORITY": 0.3},
+    "kez_talon_toss_ad": {"DAMAGE": 0.4}
+  },
+  "heroes": {}
+}

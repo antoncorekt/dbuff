@@ -5,6 +5,8 @@ import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisService;
+import com.ako.dbuff.service.replay.mode.StoredMatchModes;
+import com.ako.dbuff.service.replay.mode.TestModes;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -28,13 +31,15 @@ class ReplayResourcesTest {
 
   private final ReplayParseRunRepo runRepo = mock(ReplayParseRunRepo.class);
   private final ReplayAnalysisService analysis = mock(ReplayAnalysisService.class);
+  private final StoredMatchModes matchModes = mock(StoredMatchModes.class);
   private MockMvc mvc;
 
   @BeforeEach
   void setUp() {
     mvc =
         MockMvcBuilders.standaloneSetup(
-                new ReplayResources(runRepo, analysis, new ReplayProcessingProperties()))
+                new ReplayResources(
+                    runRepo, analysis, matchModes, new ReplayProcessingProperties()))
             .build();
   }
 
@@ -60,14 +65,15 @@ class ReplayResourcesTest {
         .thenReturn(Optional.of(run(5L, ReplayStatus.DONE)));
     when(runRepo.findByMatchIdAndParserVersion(7L, 1))
         .thenReturn(Optional.of(run(7L, ReplayStatus.PARTIAL)));
-    when(analysis.analyze(5L, List.of())).thenReturn(List.of("spikes"));
+    when(matchModes.activeFor(anyLong())).thenReturn(Optional.of(TestModes.ABILITY_DRAFT));
+    when(analysis.analyze(5L, TestModes.ABILITY_DRAFT, List.of())).thenReturn(List.of("spikes"));
 
     mvc.perform(post("/api/v1/replay/5/reanalyze"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.failedAnalyzers[0]").value("spikes"));
     mvc.perform(post("/api/v1/replay/7/reanalyze")).andExpect(status().isNotFound());
 
-    verify(analysis, never()).analyze(eq(7L), anyCollection());
+    verify(analysis, never()).analyze(eq(7L), any(), anyCollection());
   }
 
   @Test
@@ -86,13 +92,45 @@ class ReplayResourcesTest {
                 run(1L, ReplayStatus.DONE),
                 run(2L, ReplayStatus.DONE),
                 run(3L, ReplayStatus.DONE)));
-    when(analysis.analyze(anyLong(), anyCollection())).thenReturn(List.of());
-    when(analysis.analyze(2L, List.of())).thenReturn(List.of("fights"));
+    when(matchModes.activeFor(anyLong())).thenReturn(Optional.of(TestModes.ABILITY_DRAFT));
+    when(matchModes.activeFor(3L)).thenReturn(Optional.empty());
+    when(analysis.analyze(anyLong(), any(), anyCollection())).thenReturn(List.of());
+    when(analysis.analyze(2L, TestModes.ABILITY_DRAFT, List.of())).thenReturn(List.of("fights"));
 
     mvc.perform(post("/api/v1/replay/reanalyze").param("limit", "2"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.analysed").value(2))
+        .andExpect(jsonPath("$.skipped").value(0))
         .andExpect(jsonPath("$.available").value(3))
         .andExpect(jsonPath("$.withFailures").value(1));
+  }
+
+  @Test
+  void reanalyze_saysSoWhenTheMatchHasNoActiveMode() throws Exception {
+    when(runRepo.findByMatchIdAndParserVersion(5L, 1))
+        .thenReturn(Optional.of(run(5L, ReplayStatus.DONE)));
+    when(matchModes.activeFor(5L)).thenReturn(Optional.empty());
+
+    mvc.perform(post("/api/v1/replay/5/reanalyze"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.error").exists());
+
+    verify(analysis, never()).analyze(anyLong(), any(), anyCollection());
+  }
+
+  @Test
+  void reanalyzeAll_countsAMatchWithoutAnActiveModeAsSkipped() throws Exception {
+    when(runRepo.findByParserVersionAndStatusInOrderByMatchId(eq(1), anyCollection()))
+        .thenReturn(List.of(run(1L, ReplayStatus.DONE), run(3L, ReplayStatus.DONE)));
+    when(matchModes.activeFor(1L)).thenReturn(Optional.of(TestModes.ABILITY_DRAFT));
+    when(matchModes.activeFor(3L)).thenReturn(Optional.empty());
+    when(analysis.analyze(anyLong(), any(), anyCollection())).thenReturn(List.of());
+
+    mvc.perform(post("/api/v1/replay/reanalyze"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.analysed").value(1))
+        .andExpect(jsonPath("$.skipped").value(1));
+
+    verify(analysis, never()).analyze(eq(3L), any(), anyCollection());
   }
 }

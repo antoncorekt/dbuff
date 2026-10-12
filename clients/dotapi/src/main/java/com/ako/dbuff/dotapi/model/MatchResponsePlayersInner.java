@@ -162,6 +162,7 @@ import com.ako.dbuff.dotapi.invoker.JSON;
   MatchResponsePlayersInner.JSON_PROPERTY_LANE,
   MatchResponsePlayersInner.JSON_PROPERTY_LANE_ROLE,
   MatchResponsePlayersInner.JSON_PROPERTY_IS_ROAMING,
+  MatchResponsePlayersInner.JSON_PROPERTY_POSITION_EST,
   MatchResponsePlayersInner.JSON_PROPERTY_PURCHASE_TIME,
   MatchResponsePlayersInner.JSON_PROPERTY_FIRST_PURCHASE_TIME,
   MatchResponsePlayersInner.JSON_PROPERTY_ITEM_WIN,
@@ -647,6 +648,9 @@ public class MatchResponsePlayersInner {
 
   public static final String JSON_PROPERTY_IS_ROAMING = "is_roaming";
   private JsonNullable<Boolean> isRoaming = JsonNullable.<Boolean>undefined();
+
+  public static final String JSON_PROPERTY_POSITION_EST = "position_est";
+  private JsonNullable<Long> positionEst = JsonNullable.<Long>undefined();
 
   public static final String JSON_PROPERTY_PURCHASE_TIME = "purchase_time";
   @jakarta.annotation.Nullable
@@ -3848,6 +3852,39 @@ public class MatchResponsePlayersInner {
   }
 
 
+  public MatchResponsePlayersInner positionEst(@jakarta.annotation.Nullable Long positionEst) {
+    this.positionEst = JsonNullable.<Long>of(positionEst);
+    return this;
+  }
+
+  /**
+   * position_est
+   * @return positionEst
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Long getPositionEst() {
+        return positionEst.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_POSITION_EST)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Long> getPositionEst_JsonNullable() {
+    return positionEst;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_POSITION_EST)
+  public void setPositionEst_JsonNullable(JsonNullable<Long> positionEst) {
+    this.positionEst = positionEst;
+  }
+
+  public void setPositionEst(@jakarta.annotation.Nullable Long positionEst) {
+    this.positionEst = JsonNullable.<Long>of(positionEst);
+  }
+
+
   public MatchResponsePlayersInner purchaseTime(@jakarta.annotation.Nullable Object purchaseTime) {
     this.purchaseTime = purchaseTime;
     return this;
@@ -4995,6 +5032,7 @@ public class MatchResponsePlayersInner {
         equalsNullable(this.lane, matchResponsePlayersInner.lane) &&
         equalsNullable(this.laneRole, matchResponsePlayersInner.laneRole) &&
         equalsNullable(this.isRoaming, matchResponsePlayersInner.isRoaming) &&
+        equalsNullable(this.positionEst, matchResponsePlayersInner.positionEst) &&
         Objects.equals(this.purchaseTime, matchResponsePlayersInner.purchaseTime) &&
         Objects.equals(this.firstPurchaseTime, matchResponsePlayersInner.firstPurchaseTime) &&
         Objects.equals(this.itemWin, matchResponsePlayersInner.itemWin) &&
@@ -5041,7 +5079,7 @@ public class MatchResponsePlayersInner {
 
   @Override
   public int hashCode() {
-    return Objects.hash(matchId, hashCodeNullable(playerSlot), abilityUpgradesArr, abilityUses, abilityTargets, damageTargets, accountId, actions, hashCodeNullable(additionalUnits), assists, backpack0, backpack1, backpack2, buybackLog, campsStacked, connectionLog, creepsStacked, damage, damageInflictor, damageInflictorReceived, damageTaken, deaths, denies, dnT, gold, goldPerMin, goldReasons, goldSpent, goldT, heroDamage, heroHealing, heroHits, heroId, item0, item1, item2, item3, item4, item5, itemUses, killStreaks, killed, killedBy, kills, killsLog, lanePos, lastHits, leaverStatus, level, lhT, lifeState, maxHeroHit, multiKills, obs, obsLeftLog, obsLog, obsPlaced, partyId, permanentBuffs, heroVariant, pings, purchase, purchaseLog, runePickups, runes, runesLog, sen, senLeftLog, senLog, senPlaced, stuns, times, towerDamage, xpPerMin, xpReasons, xpT, hashCodeNullable(personaname), hashCodeNullable(name), hashCodeNullable(lastLogin), hashCodeNullable(radiantWin), startTime, duration, cluster, lobbyType, gameMode, patch, region, isRadiant, win, lose, totalGold, totalXp, killsPerMin, kda, abandons, neutralKills, towerKills, courierKills, laneKills, heroKills, observerKills, sentryKills, roshanKills, necronomiconKills, ancientKills, buybackCount, observerUses, sentryUses, laneEfficiency, laneEfficiencyPct, hashCodeNullable(lane), hashCodeNullable(laneRole), hashCodeNullable(isRoaming), purchaseTime, firstPurchaseTime, itemWin, itemUsage, purchaseTpscroll, actionsPerMin, lifeStateDead, rankTier, cosmetics, benchmarks, neutralTokensLog, neutralItemHistory, aghanimsScepter, aghanimsShard, moonshard, firstbloodClaimed, teamfightParticipation, towersKilled, roshansKilled, observersPlaced, healing, randomed, predVict, partySize, teamNumber, teamSlot, itemNeutral, itemNeutral2, netWorth, computedMmr, isSubscriber, isContributor, networthT, heroDamageT, towerDamageT, heroHealingT, campsStackedT, deathsLog);
+    return Objects.hash(matchId, hashCodeNullable(playerSlot), abilityUpgradesArr, abilityUses, abilityTargets, damageTargets, accountId, actions, hashCodeNullable(additionalUnits), assists, backpack0, backpack1, backpack2, buybackLog, campsStacked, connectionLog, creepsStacked, damage, damageInflictor, damageInflictorReceived, damageTaken, deaths, denies, dnT, gold, goldPerMin, goldReasons, goldSpent, goldT, heroDamage, heroHealing, heroHits, heroId, item0, item1, item2, item3, item4, item5, itemUses, killStreaks, killed, killedBy, kills, killsLog, lanePos, lastHits, leaverStatus, level, lhT, lifeState, maxHeroHit, multiKills, obs, obsLeftLog, obsLog, obsPlaced, partyId, permanentBuffs, heroVariant, pings, purchase, purchaseLog, runePickups, runes, runesLog, sen, senLeftLog, senLog, senPlaced, stuns, times, towerDamage, xpPerMin, xpReasons, xpT, hashCodeNullable(personaname), hashCodeNullable(name), hashCodeNullable(lastLogin), hashCodeNullable(radiantWin), startTime, duration, cluster, lobbyType, gameMode, patch, region, isRadiant, win, lose, totalGold, totalXp, killsPerMin, kda, abandons, neutralKills, towerKills, courierKills, laneKills, heroKills, observerKills, sentryKills, roshanKills, necronomiconKills, ancientKills, buybackCount, observerUses, sentryUses, laneEfficiency, laneEfficiencyPct, hashCodeNullable(lane), hashCodeNullable(laneRole), hashCodeNullable(isRoaming), hashCodeNullable(positionEst), purchaseTime, firstPurchaseTime, itemWin, itemUsage, purchaseTpscroll, actionsPerMin, lifeStateDead, rankTier, cosmetics, benchmarks, neutralTokensLog, neutralItemHistory, aghanimsScepter, aghanimsShard, moonshard, firstbloodClaimed, teamfightParticipation, towersKilled, roshansKilled, observersPlaced, healing, randomed, predVict, partySize, teamNumber, teamSlot, itemNeutral, itemNeutral2, netWorth, computedMmr, isSubscriber, isContributor, networthT, heroDamageT, towerDamageT, heroHealingT, campsStackedT, deathsLog);
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -5168,6 +5206,7 @@ public class MatchResponsePlayersInner {
     sb.append("    lane: ").append(toIndentedString(lane)).append("\n");
     sb.append("    laneRole: ").append(toIndentedString(laneRole)).append("\n");
     sb.append("    isRoaming: ").append(toIndentedString(isRoaming)).append("\n");
+    sb.append("    positionEst: ").append(toIndentedString(positionEst)).append("\n");
     sb.append("    purchaseTime: ").append(toIndentedString(purchaseTime)).append("\n");
     sb.append("    firstPurchaseTime: ").append(toIndentedString(firstPurchaseTime)).append("\n");
     sb.append("    itemWin: ").append(toIndentedString(itemWin)).append("\n");

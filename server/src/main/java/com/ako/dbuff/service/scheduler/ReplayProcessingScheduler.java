@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class ReplayProcessingScheduler {
-  private static final JobKey JOB_KEY = JobKey.jobKey("replay-processing", "maintenance-jobs");
+  static final JobKey JOB_KEY = JobKey.jobKey("replay-processing", "maintenance-jobs");
 
   private final CronJobRegistrar registrar;
   private final ReplayProcessingProperties properties;

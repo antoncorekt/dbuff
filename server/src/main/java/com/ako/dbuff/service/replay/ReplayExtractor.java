@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay;
 
 import com.ako.dbuff.dao.model.MatchDomain;
+import com.ako.dbuff.service.replay.mode.GameModeProfile;
 
 /**
  * Writes one slice of replay facts for a match. Implementations are discovered as beans, so a new
@@ -8,6 +9,11 @@ import com.ako.dbuff.dao.model.MatchDomain;
  */
 public interface ReplayExtractor {
   String name();
+
+  /** Whether the extractor applies to the mode; a common one keeps the default. */
+  default boolean supports(GameModeProfile mode) {
+    return true;
+  }
 
   void extract(ReplayFacts facts, MatchDomain match);
 

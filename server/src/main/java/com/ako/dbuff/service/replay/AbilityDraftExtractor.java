@@ -5,6 +5,8 @@ import com.ako.dbuff.dao.model.AbilityDraftPoolDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.dao.repo.AbilityDraftPoolRepo;
+import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
+import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,8 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class AbilityDraftExtractor implements ReplayExtractor {
-  static final int POOL_SIZE = 48;
-  static final int PICKS = 40;
   private static final int ULTIMATE_SLOT = 3;
   private static final int RADIANT = 2;
   private static final double TICKS_PER_SECOND = 30.0;
@@ -28,10 +28,16 @@ public class AbilityDraftExtractor implements ReplayExtractor {
   private final AbilityDraftPickRepo pickRepo;
   private final AbilityDraftPoolRepo poolRepo;
   private final AbilityNames abilityNames;
+  private final AbilityDraftProfile profile;
 
   @Override
   public String name() {
     return "ability-draft";
+  }
+
+  @Override
+  public boolean supports(GameModeProfile mode) {
+    return mode.gameModeId() == profile.gameModeId();
   }
 
   /** A match with no draft, or one of an unexpected shape, stores nothing rather than a part. */
@@ -39,18 +45,18 @@ public class AbilityDraftExtractor implements ReplayExtractor {
   @Transactional
   public void extract(ReplayFacts facts, MatchDomain match) {
     deleteByMatchId(match.getId());
-    DraftFacts draft = facts.draft();
+    AbilityDraftFacts draft = facts.draft();
     if (draft == null) {
       return;
     }
-    if (draft.pool().size() != POOL_SIZE || draft.picks().size() != PICKS) {
+    if (draft.pool().size() != profile.poolSize() || draft.picks().size() != profile.picks()) {
       log.warn(
           "Match {} draft has {} skills and {} picks, expected {} and {}; not stored",
           match.getId(),
           draft.pool().size(),
           draft.picks().size(),
-          POOL_SIZE,
-          PICKS);
+          profile.poolSize(),
+          profile.picks());
       return;
     }
     Map<Integer, ReplayPlayerFact> players = facts.playersById();
@@ -67,7 +73,7 @@ public class AbilityDraftExtractor implements ReplayExtractor {
   }
 
   private List<AbilityDraftPickDomain> pickRows(
-      long matchId, DraftFacts draft, Map<Integer, ReplayPlayerFact> players) {
+      long matchId, AbilityDraftFacts draft, Map<Integer, ReplayPlayerFact> players) {
     List<AbilityDraftPickDomain> rows = new ArrayList<>();
     Map<Integer, Integer> picksPerTeam = new HashMap<>();
     int firstTick = draft.picks().getFirst().tick();
@@ -95,7 +101,7 @@ public class AbilityDraftExtractor implements ReplayExtractor {
               .abilityName(abilityNames.nameOf(entry.abilityId()).orElse(null))
               .finalAbilitySlot(entry.finalSlot())
               .ultimate(entry.finalSlot() == ULTIMATE_SLOT)
-              .poolRemainingBeforePick(POOL_SIZE - (pick.order() - 1))
+              .poolRemainingBeforePick(profile.poolSize() - (pick.order() - 1))
               .build());
       previousTick = pick.tick();
     }
@@ -103,7 +109,7 @@ public class AbilityDraftExtractor implements ReplayExtractor {
   }
 
   private List<AbilityDraftPoolDomain> poolRows(
-      long matchId, DraftFacts draft, List<AbilityDraftPickDomain> picks) {
+      long matchId, AbilityDraftFacts draft, List<AbilityDraftPickDomain> picks) {
     Map<Integer, AbilityDraftPickDomain> byPoolIndex = new HashMap<>();
     for (int i = 0; i < picks.size(); i++) {
       byPoolIndex.put(draft.picks().get(i).poolIndex(), picks.get(i));

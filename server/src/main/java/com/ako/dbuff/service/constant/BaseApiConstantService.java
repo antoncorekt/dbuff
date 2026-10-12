@@ -11,7 +11,10 @@ import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public abstract class BaseApiConstantService<T extends ConstantData> implements ConstantRepo<T> {
 
   private final ConstantDomainRepo constantDomainRepo;
@@ -20,6 +23,7 @@ public abstract class BaseApiConstantService<T extends ConstantData> implements 
 
   private final ConstantFetcherService constantFetcherService;
   protected final ObjectMapper objectMapper;
+  private final AtomicBoolean refreshFailureLogged = new AtomicBoolean();
 
   protected BaseApiConstantService(
       ConstantDomainRepo constantDomainRepo, ConstantFetcherService constantFetcherService) {
@@ -30,16 +34,44 @@ public abstract class BaseApiConstantService<T extends ConstantData> implements 
     this.clazz = (Class<T>) ((ParameterizedType) superClass).getActualTypeArguments()[0];
   }
 
+  /**
+   * Shape version of the converted data. Raise it when the constant class gains fields, so rows
+   * stored in the older shape are fetched again. Rows without a version count as 0.
+   */
+  protected int schemaVersion() {
+    return 0;
+  }
+
   @Override
   public Map<String, T> getConstantMap() {
 
     Optional<ConstantDomain> domainConstant =
         constantDomainRepo.findById(getConstantId().getName());
 
-    if (domainConstant.isPresent()) {
-      return convert(domainConstant.get().getConstantValue());
+    if (domainConstant.isEmpty()) {
+      return fetchAndStore();
     }
 
+    ConstantDomain stored = domainConstant.get();
+    int storedVersion = stored.getSchemaVersion() == null ? 0 : stored.getSchemaVersion();
+    if (storedVersion < schemaVersion()) {
+      try {
+        return fetchAndStore();
+      } catch (RuntimeException e) {
+        if (refreshFailureLogged.compareAndSet(false, true)) {
+          log.warn(
+              "Refreshing constant {} to schema version {} failed, serving the stored version {}",
+              getConstantId(),
+              schemaVersion(),
+              storedVersion,
+              e);
+        }
+      }
+    }
+    return convert(stored.getConstantValue());
+  }
+
+  private Map<String, T> fetchAndStore() {
     GetConstantsByResource200Response resp = constantFetcherService.fetch(getConstantId());
 
     Map<String, T> convertedMap = convert(resp);
@@ -48,6 +80,7 @@ public abstract class BaseApiConstantService<T extends ConstantData> implements 
         ConstantDomain.builder()
             .constantName(getConstantId().getName())
             .constantValue((Map) convertedMap)
+            .schemaVersion(schemaVersion())
             .build());
 
     return convertedMap;

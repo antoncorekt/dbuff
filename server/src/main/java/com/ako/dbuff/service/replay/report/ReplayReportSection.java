@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.ReportDetail;
+import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.util.List;
 
 /**
@@ -8,6 +9,11 @@ import java.util.List;
  * analyzers filled and writes plain statements with their game times; it never reads the replay.
  */
 public interface ReplayReportSection {
+
+  /** Whether the section applies to the mode; a common one keeps the default. */
+  default boolean supports(GameModeProfile mode) {
+    return true;
+  }
 
   /** Sections are posted in this order, lowest first. */
   int order();

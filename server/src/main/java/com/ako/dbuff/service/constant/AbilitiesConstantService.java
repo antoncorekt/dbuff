@@ -17,4 +17,9 @@ public class AbilitiesConstantService extends BaseApiConstantService<AbilityCons
   public DotaApiConstant getConstantId() {
     return DotaApiConstant.ABILITIES;
   }
+
+  @Override
+  protected int schemaVersion() {
+    return 1;
+  }
 }

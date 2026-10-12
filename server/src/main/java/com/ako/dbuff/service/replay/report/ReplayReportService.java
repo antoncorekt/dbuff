@@ -8,6 +8,7 @@ import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayReportPostedDomain;
+import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.DbufInstanceConfigRepository;
 import com.ako.dbuff.dao.repo.MatchRepo;
@@ -20,6 +21,8 @@ import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.TextReport;
 import com.ako.dbuff.service.match.report.formatter.ReportFormatter;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
+import com.ako.dbuff.service.replay.mode.GameModeProfile;
+import com.ako.dbuff.service.replay.mode.GameModeRegistry;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -60,6 +63,7 @@ public class ReplayReportService {
   private final ReportFormatter formatter;
   private final DiscordMessageService discord;
   private final QuietHoursGuard quietHours;
+  private final GameModeRegistry modes;
 
   /** Delivers what is waiting for the matches whose replay run finished lately. */
   public void deliverPending() {
@@ -71,6 +75,22 @@ public class ReplayReportService {
         .map(ReplayParseRunDomain::getMatchId)
         .distinct()
         .forEach(this::deliver);
+  }
+
+  /** Delivers the match's report if its run ended DONE or PARTIAL with no retry left. */
+  public void deliverFinished(long matchId) {
+    boolean complete =
+        runRepo
+            .findByMatchIdAndParserVersion(matchId, processing.getParserVersion())
+            .filter(
+                run ->
+                    run.getStatus() == ReplayStatus.DONE
+                        || (run.getStatus() == ReplayStatus.PARTIAL
+                            && run.getNextAttemptAt() == null))
+            .isPresent();
+    if (complete) {
+      deliver(matchId);
+    }
   }
 
   public void deliver(long matchId) {
@@ -155,9 +175,14 @@ public class ReplayReportService {
       List<PlayerMatchStatisticDomain> stats,
       DbufInstanceConfigDomain instance,
       InstanceSettings settings) {
+    GameModeProfile mode = modes.activeFor(match.getGameModeId()).orElse(null);
+    if (mode == null) {
+      return List.of();
+    }
     ReplayReportInput input = input(match, stats, instance);
     List<Report> reports = new ArrayList<>();
     sections.stream()
+        .filter(s -> s.supports(mode))
         .filter(s -> settings.detail().includes(s.minimumDetail()))
         .sorted(Comparator.comparingInt(ReplayReportSection::order))
         .forEach(

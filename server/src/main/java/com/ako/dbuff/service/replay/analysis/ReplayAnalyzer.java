@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis;
 
+import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.util.Set;
 
 /**
@@ -9,12 +10,25 @@ import java.util.Set;
 public interface ReplayAnalyzer {
   String name();
 
+  /** Whether the analyzer applies to the mode; a common one keeps the default. */
+  default boolean supports(GameModeProfile mode) {
+    return true;
+  }
+
   /** Bumped when the rules change; stored with the rows so old and new results are told apart. */
   int version();
 
   /** The extractors whose output this analyzer reads; it is skipped when one of them failed. */
   default Set<String> requires() {
     return Set.of();
+  }
+
+  /**
+   * The extractors this analyzer reads for a match of the mode; an analyzer whose inputs differ by
+   * mode overrides it, so an extractor that matters to one mode does not hold back another.
+   */
+  default Set<String> requires(GameModeProfile mode) {
+    return requires();
   }
 
   /** Replaces what an earlier run stored for the match. */

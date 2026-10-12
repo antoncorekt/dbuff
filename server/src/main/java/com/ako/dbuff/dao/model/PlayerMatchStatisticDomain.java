@@ -198,6 +198,12 @@ public class PlayerMatchStatisticDomain {
   /** Lane role (1=Safe, 2=Mid, 3=Off, 4=Jungle). */
   private Long laneRole;
 
+  /**
+   * OpenDota's position estimate (1 to 5). In practice a lane label, kept as a baseline, not as
+   * truth.
+   */
+  private Long positionEst;
+
   /** Player's rank tier. Tens place indicates rank, ones place indicates stars. */
   private Long rankTier;
 

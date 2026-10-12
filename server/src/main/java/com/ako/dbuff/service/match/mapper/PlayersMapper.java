@@ -186,6 +186,7 @@ public class PlayersMapper {
     stats.setTeamfightParticipation(player.getTeamfightParticipation());
     stats.setActionsPerMin(player.getActionsPerMin());
     stats.setLaneRole(player.getLaneRole());
+    stats.setPositionEst(player.getPositionEst());
     stats.setRankTier(player.getRankTier());
     stats.setHeroVariant(player.getHeroVariant());
     stats.setBuybackCount(player.getBuybackCount());

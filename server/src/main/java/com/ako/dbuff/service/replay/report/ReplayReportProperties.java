@@ -21,6 +21,9 @@ public class ReplayReportProperties {
   /** The most findings one section lists. */
   private int maxFindingsPerSection = 3;
 
+  /** The longest a team's composition verdict line may be; a longer one ends in an ellipsis. */
+  private int maxCompositionLineLength = 300;
+
   /** How far back a finished replay run is looked at for an analysis not yet posted. */
   private int lookbackHours = 48;
 }

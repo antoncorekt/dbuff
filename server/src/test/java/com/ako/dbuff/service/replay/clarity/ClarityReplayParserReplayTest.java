@@ -1,16 +1,17 @@
 package com.ako.dbuff.service.replay.clarity;
 
 import com.ako.dbuff.dao.model.ReplayStatus;
+import com.ako.dbuff.service.replay.AbilityDraftFacts;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.CombatLogCodec;
-import com.ako.dbuff.service.replay.DraftFacts;
 import com.ako.dbuff.service.replay.DraftPick;
 import com.ako.dbuff.service.replay.MinuteStat;
 import com.ako.dbuff.service.replay.ReplayException;
 import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.ReplayPlayerFact;
 import com.ako.dbuff.service.replay.SampleFacts;
+import com.ako.dbuff.service.replay.mode.TestModes;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -29,11 +30,11 @@ class ClarityReplayParserReplayTest {
 
   private static final String MATCH = "9038725154.dem";
 
-  private final ClarityReplayParser parser = new ClarityReplayParser();
+  private final ClarityReplayParser parser = Parsers.standard();
 
   @Test
   void parse_readsTheClockStartAndTheRosterOfARealReplay() {
-    ReplayFacts facts = parser.parse(replay(MATCH), () -> false);
+    ReplayFacts facts = parser.parse(replay(MATCH), TestModes.ABILITY_DRAFT, () -> false);
 
     assertThat(facts.clockStartTick()).isEqualTo(17136);
     assertThat(facts.gameStartTime()).isBetween(596.0, 597.0);
@@ -49,7 +50,8 @@ class ClarityReplayParserReplayTest {
 
   @Test
   void parse_readsTheAbilityDraftOfARealReplay() {
-    DraftFacts draft = parser.parse(replay(MATCH), () -> false).draft();
+    AbilityDraftFacts draft =
+        parser.parse(replay(MATCH), TestModes.ABILITY_DRAFT, () -> false).draft();
 
     assertThat(draft).isNotNull();
     assertThat(draft.pool()).hasSize(48);
@@ -64,8 +66,18 @@ class ClarityReplayParserReplayTest {
   }
 
   @Test
+  void parse_readsNoDraftPoolForAllPick_evenFromAnAbilityDraftReplayParsedAsAnotherMode() {
+    assertThat(parser.parse(replay("9040892342.dem"), TestModes.ALL_PICK, () -> false).draft())
+        .isNull();
+    assertThat(parser.parse(replay(MATCH), TestModes.ALL_PICK, () -> false).draft()).isNull();
+    assertThat(parser.parse(replay("9040892342.dem"), TestModes.ALL_PICK, () -> false).players())
+        .hasSize(10);
+  }
+
+  @Test
   void parse_readsTheSameDraftShapeFromAnotherReplay() {
-    DraftFacts draft = parser.parse(replay("9037038717.dem"), () -> false).draft();
+    AbilityDraftFacts draft =
+        parser.parse(replay("9037038717.dem"), TestModes.ABILITY_DRAFT, () -> false).draft();
 
     assertThat(draft.pool()).hasSize(48);
     assertThat(draft.picks()).hasSize(40);
@@ -74,7 +86,8 @@ class ClarityReplayParserReplayTest {
 
   @Test
   void parse_samplesEveryPlayerThroughTheWholeGame() {
-    SampleFacts samples = parser.parse(replay(MATCH), () -> false).samples();
+    SampleFacts samples =
+        parser.parse(replay(MATCH), TestModes.ABILITY_DRAFT, () -> false).samples();
 
     assertThat(samples.startSeconds()).isEqualTo(-90);
     assertThat(samples.stepSeconds()).isEqualTo(5);
@@ -103,7 +116,8 @@ class ClarityReplayParserReplayTest {
 
   @Test
   void parse_snapshotsTheCountersOncePerMinuteWithEveryFieldPresent() {
-    SampleFacts samples = parser.parse(replay(MATCH), () -> false).samples();
+    SampleFacts samples =
+        parser.parse(replay(MATCH), TestModes.ABILITY_DRAFT, () -> false).samples();
 
     var minutes = samples.minutes();
     assertThat(minutes).hasSize(10 * 40);
@@ -135,7 +149,7 @@ class ClarityReplayParserReplayTest {
       Files.write(cut, in.readNBytes((int) keep));
     }
 
-    ReplayFacts facts = parser.parse(cut, () -> false);
+    ReplayFacts facts = parser.parse(cut, TestModes.ABILITY_DRAFT, () -> false);
 
     assertThat(facts.cutShort()).isTrue();
     assertThat(facts.players()).hasSize(10);
@@ -145,19 +159,22 @@ class ClarityReplayParserReplayTest {
 
   @Test
   void parse_doesNotMarkAWholeReplayAsCutShort() {
-    assertThat(parser.parse(replay(MATCH), () -> false).cutShort()).isFalse();
+    assertThat(parser.parse(replay(MATCH), TestModes.ABILITY_DRAFT, () -> false).cutShort())
+        .isFalse();
   }
 
   @Test
   void parse_startsTheSamplesAtTheRealClockStart() {
-    SampleFacts samples = parser.parse(replay(MATCH), () -> false).samples();
+    SampleFacts samples =
+        parser.parse(replay(MATCH), TestModes.ABILITY_DRAFT, () -> false).samples();
 
     assertThat(samples.startSeconds()).isEqualTo(-90);
   }
 
   @Test
   void parse_keepsTheHeroCombatLogThatAgreesWithOpenDota() {
-    var events = parser.parse(replay(MATCH), () -> false).combatLog().events();
+    var events =
+        parser.parse(replay(MATCH), TestModes.ABILITY_DRAFT, () -> false).combatLog().events();
 
     long phantomDamage = heroDamage(events, "npc_dota_hero_phantom_assassin");
     long furionDamage = heroDamage(events, "npc_dota_hero_furion");
@@ -183,7 +200,7 @@ class ClarityReplayParserReplayTest {
 
   @Test
   void parse_stopsWhenCancelled() {
-    assertThatThrownBy(() -> parser.parse(replay(MATCH), () -> true))
+    assertThatThrownBy(() -> parser.parse(replay(MATCH), TestModes.ABILITY_DRAFT, () -> true))
         .isInstanceOfSatisfying(
             ReplayException.class,
             e -> assertThat(e.getStatus()).isEqualTo(ReplayStatus.FAILED_TIMEOUT));
@@ -195,7 +212,7 @@ class ClarityReplayParserReplayTest {
     Path garbage = dir.resolve("garbage.dem");
     Files.writeString(garbage, "this is not a replay".repeat(100));
 
-    assertThatThrownBy(() -> parser.parse(garbage, () -> false))
+    assertThatThrownBy(() -> parser.parse(garbage, TestModes.ABILITY_DRAFT, () -> false))
         .isInstanceOfSatisfying(
             ReplayException.class,
             e -> assertThat(e.getStatus()).isEqualTo(ReplayStatus.FAILED_PARSER));
