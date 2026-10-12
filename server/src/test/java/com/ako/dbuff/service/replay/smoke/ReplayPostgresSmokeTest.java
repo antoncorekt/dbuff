@@ -24,7 +24,9 @@ import com.ako.dbuff.service.replay.AbilityNames;
 import com.ako.dbuff.service.replay.ReplayDataService;
 import com.ako.dbuff.service.replay.ReplayRunService;
 import com.ako.dbuff.service.replay.report.DeathSection;
+import com.ako.dbuff.service.replay.report.DraftSection;
 import com.ako.dbuff.service.replay.report.FightSection;
+import com.ako.dbuff.service.replay.report.MovementSection;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.SwingSection;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -91,7 +93,9 @@ import static org.assertj.core.api.Assertions.assertThat;
   ReplayPostgresSmokeTest.Config.class,
   SwingSection.class,
   DeathSection.class,
-  FightSection.class
+  FightSection.class,
+  MovementSection.class,
+  DraftSection.class
 })
 @TestPropertySource(properties = "replay.processing.enabled=true")
 class ReplayPostgresSmokeTest {
@@ -168,6 +172,8 @@ class ReplayPostgresSmokeTest {
   @Autowired private SwingSection swingSection;
   @Autowired private DeathSection deathSection;
   @Autowired private FightSection fightSection;
+  @Autowired private MovementSection movementSection;
+  @Autowired private DraftSection draftSection;
 
   @Test
   @Commit
@@ -212,6 +218,8 @@ class ReplayPostgresSmokeTest {
       report.addAll(swingSection.lines(input));
       report.addAll(deathSection.lines(input));
       report.addAll(fightSection.lines(input));
+      report.addAll(movementSection.lines(input));
+      report.addAll(draftSection.lines(input));
       System.out.println("REPORT " + id + "\n" + String.join("\n", report));
       assertThat(report).isNotEmpty();
     }

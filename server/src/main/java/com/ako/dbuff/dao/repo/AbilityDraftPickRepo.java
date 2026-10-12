@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 public interface AbilityDraftPickRepo extends JpaRepository<AbilityDraftPickDomain, Long> {
 
+  java.util.List<AbilityDraftPickDomain> findByMatchId(Long matchId);
+
   @Transactional
   @Modifying
   @Query("delete from AbilityDraftPickDomain d where d.matchId = :matchId")
