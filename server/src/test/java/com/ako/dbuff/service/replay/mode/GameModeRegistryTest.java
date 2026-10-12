@@ -50,4 +50,19 @@ class GameModeRegistryTest {
     assertThat(registry.activeFor(18L)).isEmpty();
     assertThat(registry.activeFor(22L)).isPresent();
   }
+
+  @Test
+  void activeModeIds_holdsTheConfiguredModesThatHaveAProfile() {
+    properties.setSupportedModes(List.of(18L, 22L, 23L));
+
+    assertThat(TestModes.registry(properties).activeModeIds()).containsExactlyInAnyOrder(18L, 22L);
+  }
+
+  @Test
+  void activeModeIds_followsTheConfigurationAsItChanges() {
+    GameModeRegistry registry = TestModes.registry(properties);
+    properties.setSupportedModes(List.of(22L));
+
+    assertThat(registry.activeModeIds()).containsExactly(22L);
+  }
 }

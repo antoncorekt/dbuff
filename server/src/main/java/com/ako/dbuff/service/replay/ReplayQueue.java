@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.service.replay.QueuedMatch.Lane;
+import com.ako.dbuff.service.replay.mode.GameModeRegistry;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -36,12 +37,17 @@ public class ReplayQueue {
   private final MatchRepo matchRepo;
   private final ReplayParseRunRepo runRepo;
   private final ReplayProcessingProperties properties;
+  private final GameModeRegistry modes;
 
   /**
    * @param backlogRoom how many backlog matches this job run may still take
    * @param attempted matches this run already took; never handed out again
    */
   public Optional<QueuedMatch> next(int backlogRoom, Collection<Long> attempted) {
+    Set<Long> activeModes = modes.activeModeIds();
+    if (activeModes.isEmpty()) {
+      return Optional.empty();
+    }
     Collection<Long> excluded = attempted.isEmpty() ? NONE : attempted;
     LocalDateTime now = LocalDateTime.now();
     Window window =
@@ -49,7 +55,8 @@ public class ReplayQueue {
             now,
             now.minusHours(properties.getFreshWindowHours()),
             now.minusHours(properties.getRetryPriorityHours()),
-            excluded);
+            excluded,
+            activeModes);
     Optional<QueuedMatch> next =
         firstOf(
             () -> fresh(window),
@@ -117,7 +124,7 @@ public class ReplayQueue {
         matchRepo.findMatchesWithoutReplayRun(
             properties.getParserVersion(),
             startedAfter,
-            properties.getSupportedModes(),
+            window.modes(),
             mappedFrom,
             mappedBefore,
             window.excluded(),
@@ -151,5 +158,6 @@ public class ReplayQueue {
       LocalDateTime now,
       LocalDateTime freshAfter,
       LocalDateTime youngAfter,
-      Collection<Long> excluded) {}
+      Collection<Long> excluded,
+      Collection<Long> modes) {}
 }

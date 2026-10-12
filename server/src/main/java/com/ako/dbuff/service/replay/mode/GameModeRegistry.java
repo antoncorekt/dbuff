@@ -4,6 +4,7 @@ import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -36,5 +37,12 @@ public class GameModeRegistry {
       return Optional.empty();
     }
     return Optional.ofNullable(profiles.get(gameModeId));
+  }
+
+  /** The ids of the modes {@link #activeFor} accepts. */
+  public Set<Long> activeModeIds() {
+    return properties.getSupportedModes().stream()
+        .filter(profiles::containsKey)
+        .collect(Collectors.toUnmodifiableSet());
   }
 }

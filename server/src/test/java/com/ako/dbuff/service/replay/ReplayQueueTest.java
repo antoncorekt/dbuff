@@ -6,6 +6,7 @@ import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.service.replay.QueuedMatch.Lane;
+import com.ako.dbuff.service.replay.mode.TestModes;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -35,7 +36,7 @@ class ReplayQueueTest {
 
   @BeforeEach
   void setUp() {
-    queue = new ReplayQueue(matchRepo, runRepo, properties);
+    queue = new ReplayQueue(matchRepo, runRepo, properties, TestModes.registry(properties));
   }
 
   @Test
@@ -178,6 +179,24 @@ class ReplayQueueTest {
     assertThat(lanes(1)).containsExactly(entry(1L, Lane.YOUNG_RETRY));
   }
 
+  @Test
+  void next_ignoresAMatchOfAModeThatIsConfiguredButHasNoProfile() {
+    properties.setSupportedModes(List.of(18L, 23L));
+    match(1L, 1, 1);
+    match(2L, 2, 2, 23L);
+
+    assertThat(drain(2)).containsExactly(1L);
+  }
+
+  @Test
+  void next_hasNothingWhenNoModeIsActive() {
+    properties.setSupportedModes(List.of(23L));
+    match(1L, 1, 1);
+    retry(1L, 1);
+
+    assertThat(queue.next(5, Set.of())).isEmpty();
+  }
+
   private List<Long> drain(int max) {
     return lanes(max).stream().map(Entry::id).toList();
   }
@@ -219,13 +238,17 @@ class ReplayQueueTest {
   private record Entry(long id, Lane lane) {}
 
   private void match(long id, int startedHoursAgo, int mappedHoursAgo) {
+    match(id, startedHoursAgo, mappedHoursAgo, 18L);
+  }
+
+  private void match(long id, int startedHoursAgo, int mappedHoursAgo, long gameModeId) {
     MatchDomain match = new MatchDomain();
     match.setId(id);
     match.setStartTime(nowSeconds - startedHoursAgo * HOUR);
     match.setDetailsMappedAt(LocalDateTime.now().minusHours(mappedHoursAgo).plusMinutes(1));
     match.setReplayCluster(1L);
     match.setReplaySalt(2L);
-    match.setGameModeId(18L);
+    match.setGameModeId(gameModeId);
     match.setDuration(2400L);
     matchRepo.saveAndFlush(match);
   }
