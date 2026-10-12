@@ -1,6 +1,6 @@
 # Replay pipeline: status and next steps (resume point)
 
-Written 2026-10-12. Read this first in a fresh context. It says what is built, how we work, what has NOT been
+Written 2026-10-12, updated the same day after the stack of PRs #17 to #34 was built (none of it merged yet). Read this first in a fresh context. It says what is built, how we work, what has NOT been
 verified, and what to build next, in order. The design reasoning lives in
 `2026-10-11-replay-extraction-plan.md` (section numbers below refer to it); how the results reach Discord is in
 `2026-10-11-replay-discord-report-plan.md`. The architecture of the code is summarised in the "Replay pipeline"
@@ -30,11 +30,32 @@ conclusions can be recomputed from the facts without the replay. Everything is *
 | #14 | WP2d analysis framework + activity | `ReplayAnalyzer`/`ReplayAnalysisService`, `ActivityAnalyzer` (`PlayerActivitySegmentDomain`) |
 | #15 | WP4a fights | `FightDetector`/`FightAssessor`/`FightAnalyzer` (`FightDomain`, `FightPlayerDomain`) |
 | #16 | WP4b hero state | items gained/lost, cooldowns, skill levels (`ReplayStateChangeDomain`) |
-| #17 | WP6a deaths | `DeathAnalyzer`/`DeathAssessor` (`DeathAnalysisDomain`) - **open when this was written; check `gh pr list`** |
-| this PR | docs | this file, the Discord report plan, 5 more spike programs |
+| #18 | docs | this file, the Discord report plan, 5 more spike programs |
+
+**Open, stacked PRs, not merged** (each is based on the one before; merge them in this order, oldest first; merging a PR to `main` deploys, and the ones marked T add tables, so take a `pg_dump` first):
+
+| PR | What |
+|---|---|
+| #17 | deaths: `DeathAnalyzer`/`DeathAssessor`/`HeroStateTimeline` (T: `death_analysis`) |
+| #19 | fight reasons: `NO_TP` / `TP_ON_COOLDOWN` / `HAD_TP_NOT_USED` for a hero away from a fight |
+| #20 | mana cost changes and absolute mana in the state changes and tracks |
+| #21 | `FightAbilityAnalyzer`: per fight and hero, abilities and items cast or not and why (T: `fight_ability_use`) |
+| #22 | front-line rank (`FrontlineRanker`) and the attack range in the tracks; `PlayerTraces` loader |
+| #23 | `OUT_OF_POSITION` death reason |
+| #24 | disables counted until removed, and `BKB_PIERCED` with the modifier that went through BKB |
+| #25 | buybacks (`BuybackAnalyzer`, T: `buyback_event`), Aegis-versus-buyback-versus-fountain respawn, and **`GameClock`: sampling in game time through pauses** (a real bug found on a match with 218 s of pauses) |
+| #26 | `TeamStateAnalyzer`/`TeamStateSegmenter` (T: `game_state_segment`) from OpenDota net worth |
+| #27 | `BuildingKillAnalyzer` (T: `building_kill_context`), `MatchMapLayout` |
+| #28 | `PhaseSummaryAnalyzer` (T: `player_phase_summary`) |
+| #29 | `SpikeAnalyzer`/`SpikeDetector` swings and causes (T: `game_spike`, `game_spike_factor`); the All Pick spike S9 result |
+| #30 | `ReplayPostgresSmokeTest`: the whole pipeline against a real PostgreSQL |
+| #31 | Discord report R0: per-channel `replay_report` switch, thread storage (T: `match_report_thread`, `replay_report_posted`), `ReplayReportService`, `SwingSection` |
+| #32 | `DeathSection`, `FightSection` |
+| #33 | `DraftSection`, `MovementSection` |
+| #34 | `/api/v1/replay` run status and re-analysis endpoints; the switch-on steps |
 
 Extractors (L1, need the replay): players, ability-draft, tracks, minutes, combat-log, state-changes.
-Analyzers (L2, stored data only, `@Order`): activity (10), fights (20), deaths (30).
+Analyzers (L2, stored data only, `@Order`): activity (10), fights (20), fight abilities (25), deaths (30), buybacks (35), team states (40), buildings (45), phases (50), spikes (60). Report sections: `ReplayReportSection` beans, see the Discord part of `CLAUDE.md`.
 
 ## 3. How we work (rules that bind)
 
@@ -100,61 +121,54 @@ Analyzers (L2, stored data only, `@Order`): activity (10), fights (20), deaths (
   full length and is 0 for some abilities.
 - OpenDota lane numbering is geometric: 1 bottom, 2 mid, 3 top for both teams.
 
-## 6. NOT verified yet (do before turning the feature on in production)
+## 6. Verification state (do the rest before turning the feature on in production)
 
-1. **A real download from Valve has never run.** The downloader is tested against a local HTTP server only.
-2. **`zstd-jni` on the arm64 host** (spike S8) is unverified; fallback is `io.airlift:aircompressor`.
-3. **The pipeline has never run end to end against PostgreSQL.** All DB tests use H2: `integer array` columns,
-   `bytea`, the roster check against real stored OpenDota rows and table growth are untested on Postgres.
-4. **Memory in the real app at `-Xmx512m`** (Spring + Postgres on the 2 GiB host). The parse alone passes at 512 MB in
-   `replayTest`; 90-minute games are untested.
-5. Thresholds (lane corridor, farm window, fight burst/gap, death rules) were tuned on **2 matches**; the plan (S10)
-   wants 20. Roamers, All Pick and other patches are untested.
-6. `ReplayParseRunDomain.extractorStatus` (per-extractor status) was planned but not built; failures are only in the
-   `error` text.
-Suggested first step toward enabling: a small end-to-end smoke (local Postgres from `docker-compose.yml`, a local
-HTTP server serving a compressed sample replay through `replay.processing.url-template`, run `ReplayRunService`).
+Verified on 2026-10-12 with `ReplayPostgresSmokeTest` (#30): the whole pipeline on two All Pick matches against a real
+PostgreSQL 16 (Hibernate creates 41 tables, `integer array` columns, `bytea`, a re-run replaces the rows, deletion
+works), the real downloader against a local HTTP server, zstd decompression and the parse (about 1 s for 35 MB), the
+roster check against stored player rows, and the five report sections run on the stored rows.
+Per-player deaths, buybacks (8 of 8 against OpenDota's logs), building counts and the tracks' alignment with the combat
+log (including a match with pauses) were checked against OpenDota on three matches.
 
-## 7. Next PRs, in order
+Still NOT verified:
+1. **A real download from Valve** has never run (only a local HTTP server).
+2. **zstd-jni on the Linux arm64 host** (S8): it ran on arm64 macOS; the production platform is a different native
+   library. Fallback is `io.airlift:aircompressor`.
+3. **Memory in the real app at `-Xmx512m`** next to Spring and Postgres, and 90-minute games. The parse alone passes at
+   512 MB in `replayTest`.
+4. Thresholds (lane corridor, farm window, fight burst/gap, death rules, swing and team-state thresholds,
+   out-of-position, the 3000-unit Aegis radius) were tuned on **2 to 3 matches**; the plan (S10) wants 20. Roamers,
+   other patches and Turbo are untested.
+5. The report text was read on two matches printed from PostgreSQL, but never shown in a real Discord channel.
+6. `ReplayParseRunDomain.extractorStatus` was not built; so a partial run cannot be re-analysed (the re-analysis
+   endpoint leaves PARTIAL runs out).
+7. `m_iAttackRange`: whether item and talent bonuses are in it. The instant fountain respawn seen once in a match
+   (not an Aegis, not a buyback) has no known cause.
 
-Each is its own branch and PR with replay-tagged checks against OpenDota where possible.
+## 7. What is left, in order
 
-1. **Review and merge #17** (deaths), then check production logs.
-2. **Fight reasons (WP4c):** for each fight and player: had a teleport (scroll/boots owned and ready) with `NO_TP`,
-   `TP_ON_COOLDOWN`, `HAD_TP_NOT_USED`; per ability: ready at the fight start (`HeroStateTimeline.ready`), cast in the
-   fight (combat-log ABILITY), and why not (`ON_COOLDOWN`, `NO_MANA`, `DISABLED`, `DEAD_EARLY`, `HELD_BACK`), including
-   "used on creeps 20 s before" (damage events by that inflictor on non-hero targets). Needs: ability mana cost
-   (add `m_iManaCost` to the state recorder), ability metadata (passive, cast range) from the existing OpenDota
-   constants through a small interface like `AbilityNames`, and mana % from the track. Table `FightAbilityUseDomain`
-   (plan 7.2/7.3).
-3. **Front-line check:** project positions at the fight start on the axis between team centroids; `frontlineRank`,
-   expected rank (max health, attack range, role), `frontlineDelta` on `FightPlayerDomain`; "out of position" for
-   deaths (plan 7.3, 9.2). Needs hero max health / attack range (add to the sampler or take from constants).
-4. **BKB pierce table and disables (S4):** read `bkbpierce` / dispellable from the OpenDota ability constants (or a
-   curated resource); split disables that pierce from those that do not in the death analysis.
-5. **Buybacks (S11) and end-game (WP6b):** sample unspent gold and the buyback cooldown (`m_flBuybackCooldownTime`,
-   gold counters) on the grid; `BuybackEventDomain`; `canBuyback`; `EndGameAnalysisDomain` (decisive fight, ancient
-   fall, last carry death). The sample match has no BUYBACK combat-log entry, so find a match with buybacks first.
-6. **Group 4 (WP5):** add `NET_WORTH` to the minute counters (`m_iNetWorth`); `TeamStateSegmenter` (lead % with
-   hysteresis), `TeamMinuteStateDomain`, `GameStateSegmentDomain`, `BuildingKillContextDomain` (assists near, fight
-   link, matched to OpenDota's `ObjectiveEventDomain`), `PlayerPhaseSummaryDomain`, `TeamBehaviorDomain` (plan 8).
-   Add the activity classifier's fight override (ACTIVITY pass 2) here.
-7. **Group 2 (WP3):** runes and wards (spike S5: entity create/delete vs counters), courier events, lane
-   equilibrium (lane-creep entities), pre-game summary, `LaneAssignmentDomain`/`LaneMatchupDomain` (L2: the lane
-   dominance rule is already validated against OpenDota, 10/10 on two matches) (plan 6).
-8. **Group 6 (WP7):** spike detection on the net-worth difference, cause factors, outliers; needs 6 (plan 10).
-9. **Group 1 extras:** All Pick capture (needs a mode-22 replay, spike S9), nightly `AbilityPairStat` /
-   `AbilityPickPositionStat` aggregates, queue-position queries (plan 5).
-10. **Discord reports (WP8 = R0-R7)** per the report plan: persist thread ids (`MatchReportThreadDomain`), the
-    `postToThread` refactor of `MatchReportOrchestrator.processAndReportFull` (approved), `ReplayReportService`
-    listening to a `ReplayAnalysisCompleted` event, one analyzer + formatter per group, the per-channel
-    `replayReport` setting. R1 (draft section) only needs what is already stored, so it can come right after the
-    smoke test and be the first user-visible result.
-11. **Operations (WP9):** admin recompute of an `analysisVersion` (shares the parse semaphore), metrics per status,
-    retention checks, a 20-replay load test at 512 MB, threshold calibration on 20 matches (S10), the
-    production switch-on checklist of section 6.
-12. **Housekeeping:** many merged worktrees `../dbuff-*` and local branches can be removed
-    (`git -C dbuff worktree remove <path>`; delete the branches); update the local `dbuff/` checkout.
+Done since the first version of this file: deaths (#17), fight reasons and ability use (#19-#21), front-line and
+out-of-position (#22, #23), BKB piercing (#24), buybacks (#25, with a match that has them), team states (#26),
+buildings (#27), phase summaries (#28), swings (#29), the PostgreSQL smoke test (#30), the Discord reports for swings,
+deaths, fights, movement and draft (#31-#33), re-analysis endpoints and the switch-on steps (#34).
+
+1. **Review and merge the stack** in the order of section 2, on the user's word (backup first), then check production
+   logs. Then follow the switch-on steps in `CLAUDE.md` ("Switching it on in production").
+2. **Group 2 (plan 6), not started:** runes and wards (spike S5: entity create/delete versus counters), courier,
+   lane equilibrium, pre-game summary, `LaneAssignmentDomain`/`LaneMatchupDomain`, and the early-game report section
+   R2. Needs new extraction for runes and wards.
+3. **Team behaviour (plan 8.3), not started:** `TeamBehaviorDomain` for AHEAD, BEHIND and EVEN stretches, and the
+   activity classifier's fight override.
+4. **Group 6 rest (plan 10), not started:** key-item purchases as a swing cause, `FEEDER`, the net worth outliers,
+   `PlayerOutlierDomain`; the casting ability behind a piercing modifier (`BKB_PIERCED` names the modifier only).
+5. **End game (plan 9.5):** `EndGameAnalysisDomain`, `canBuyback` readiness at fights and deaths.
+6. **Report extras:** R7 (`/match <id>` shows the replay sections, a header marker, an admin repost), the early-game
+   section, ranking by severity times confidence, a message when the replay could not be read.
+7. **Operations:** metrics per status, `extractorStatus`, a 20-replay load test at 512 MB, threshold calibration on 20
+   matches (S10), a decision about the older review findings listed in section 9.
+8. **Housekeeping:** many merged worktrees `../dbuff-*` and local branches can be removed
+   (`git -C dbuff worktree remove <path>`; delete the branches); update the local `dbuff/` checkout. A throwaway
+   PostgreSQL container `dbuff-smoke` may still be running (`docker rm -f dbuff-smoke`).
 
 ## 8. Decisions already made by the user (do not re-ask)
 
