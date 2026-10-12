@@ -279,7 +279,7 @@ public class MatchReportOrchestrator {
       row.setCreatedAt(LocalDateTime.now());
       threadRepo.save(row);
     } catch (RuntimeException e) {
-      log.warn("Could not remember the thread of match {}: {}", match.getId(), e.getMessage());
+      log.warn("Could not remember the thread of match {}", match.getId(), e);
     }
   }
 

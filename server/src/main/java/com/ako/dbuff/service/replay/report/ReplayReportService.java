@@ -131,9 +131,6 @@ public class ReplayReportService {
       log.warn("Discord thread {} of match {} is gone", thread.getThreadId(), match.getId());
       messages = List.of();
     }
-    for (String message : messages) {
-      discord.sendThreadMessageBlocking(channel, message);
-    }
     postedRepo.save(
         ReplayReportPostedDomain.builder()
             .matchId(match.getId())
@@ -141,6 +138,9 @@ public class ReplayReportService {
             .messages(messages.size())
             .postedAt(LocalDateTime.now())
             .build());
+    for (String message : messages) {
+      discord.sendThreadMessageBlocking(channel, message);
+    }
     log.info("Replay report of match {} posted in {} messages", match.getId(), messages.size());
   }
 
@@ -166,9 +166,11 @@ public class ReplayReportService {
     }
     List<String> formatted = formatter.formatForDiscord(reports, Map.of());
     int cap =
-        settings.detail() == ReportDetail.FULL
-            ? properties.getMaxMessages()
-            : properties.getStandardMaxMessages();
+        Math.max(
+            1,
+            settings.detail() == ReportDetail.FULL
+                ? properties.getMaxMessages()
+                : properties.getStandardMaxMessages());
     if (formatted.size() <= cap) {
       return formatted;
     }
@@ -191,7 +193,9 @@ public class ReplayReportService {
             ? Map.of()
             : instance.getPlayers().stream()
                 .filter(p -> p.getId() != null)
-                .collect(Collectors.toMap(PlayerDomain::getId, PlayerDomain::getName, (a, b) -> a));
+                .collect(
+                    Collectors.toMap(
+                        PlayerDomain::getId, p -> String.valueOf(p.getName()), (a, b) -> a));
     Map<Long, String> namesBySlot = new HashMap<>();
     stats.stream()
         .filter(s -> focusIds.contains(s.getPlayerId()))

@@ -26,9 +26,13 @@ public class ReplayProcessingJob implements Job {
     }
     try {
       batchService.runBatch();
-      reportService.deliverPending();
     } catch (Exception e) {
       log.error("Replay processing failed: {}", e.getMessage(), e);
+    }
+    try {
+      reportService.deliverPending();
+    } catch (Exception e) {
+      log.error("Replay report delivery failed: {}", e.getMessage(), e);
     }
   }
 }

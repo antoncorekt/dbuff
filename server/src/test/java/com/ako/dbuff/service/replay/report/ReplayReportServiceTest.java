@@ -164,6 +164,16 @@ class ReplayReportServiceTest {
   }
 
   @Test
+  void deliver_marksTheReportPostedBeforeSending_soAFailureDoesNotRepostTheFirstMessage() {
+    org.mockito.InOrder order = Mockito.inOrder(postedRepo, discord);
+
+    service.deliver(1L);
+
+    order.verify(postedRepo).save(any());
+    order.verify(discord).sendThreadMessageBlocking(any(), any());
+  }
+
+  @Test
   void deliver_neverPostsTwice() {
     when(postedRepo.findByMatchIdAndInstanceId(1L, "i1"))
         .thenReturn(Optional.of(ReplayReportPostedDomain.builder().build()));

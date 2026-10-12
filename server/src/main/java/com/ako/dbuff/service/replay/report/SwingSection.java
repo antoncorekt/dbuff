@@ -9,6 +9,7 @@ import com.ako.dbuff.service.replay.analysis.spike.SpikeCause;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -91,15 +92,24 @@ public class SwingSection implements ReplayReportSection {
                         + Math.round(f.getSharePercent())
                         + "%")
             .collect(Collectors.joining(", "));
-    String cause = CAUSES.getOrDefault(SpikeCause.valueOf(spike.getPrimaryCause()), "");
-    return "%s-%s: %s gained %.1fk net worth%s, mostly from %s%s"
-        .formatted(
-            GameTime.clock(spike.getStartSeconds()),
-            GameTime.clock(spike.getEndSeconds()),
-            team,
-            spike.getDeltaGold() / 1000.0,
-            Boolean.TRUE.equals(spike.getDirectionChange()) ? " and took the lead" : "",
-            cause,
-            because.isEmpty() ? "" : " (" + because + ")");
+    String cause = causeText(spike.getPrimaryCause());
+    return String.format(
+        Locale.ROOT,
+        "%s-%s: %s gained %.1fk net worth%s%s%s",
+        GameTime.clock(spike.getStartSeconds()),
+        GameTime.clock(spike.getEndSeconds()),
+        team,
+        spike.getDeltaGold() / 1000.0,
+        Boolean.TRUE.equals(spike.getDirectionChange()) ? " and took the lead" : "",
+        cause.isEmpty() ? "" : ", mostly from " + cause,
+        because.isEmpty() ? "" : " (" + because + ")");
+  }
+
+  private static String causeText(String stored) {
+    try {
+      return CAUSES.getOrDefault(SpikeCause.valueOf(stored), "");
+    } catch (IllegalArgumentException | NullPointerException e) {
+      return "";
+    }
   }
 }
