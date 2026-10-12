@@ -17,6 +17,8 @@ import com.ako.dbuff.dao.repo.ReplayReportPostedRepo;
 import com.ako.dbuff.service.discord.DiscordMessageService;
 import com.ako.dbuff.service.match.report.formatter.DiscordReportFormatter;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
+import com.ako.dbuff.service.replay.mode.GameModeProfile;
+import com.ako.dbuff.service.replay.mode.TestModes;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import java.util.List;
 import java.util.Optional;
@@ -74,8 +76,10 @@ class ReplayReportServiceTest {
             List.of(section),
             new DiscordReportFormatter(),
             discord,
-            quiet);
-    when(matchRepo.findById(1L)).thenReturn(Optional.of(MatchDomain.builder().id(1L).build()));
+            quiet,
+            TestModes.registry());
+    when(matchRepo.findById(1L))
+        .thenReturn(Optional.of(MatchDomain.builder().id(1L).gameModeId(18L).build()));
     when(statRepo.findAllByMatchId(1L))
         .thenReturn(
             List.of(
@@ -125,6 +129,56 @@ class ReplayReportServiceTest {
         ArgumentCaptor.forClass(ReplayReportPostedDomain.class);
     verify(postedRepo).save(posted.capture());
     assertThat(posted.getValue().getMessages()).isEqualTo(1);
+  }
+
+  @Test
+  void deliver_leavesOutASectionThatDoesNotApplyToTheMatchMode() {
+    service =
+        new ReplayReportService(
+            properties,
+            new ReplayProcessingProperties(),
+            mock(ReplayParseRunRepo.class),
+            matchRepo,
+            statRepo,
+            instanceRepo,
+            threadRepo,
+            postedRepo,
+            List.of(new AbilityDraftOnlySection()),
+            new DiscordReportFormatter(),
+            discord,
+            quiet,
+            TestModes.registry());
+    when(matchRepo.findById(2L))
+        .thenReturn(Optional.of(MatchDomain.builder().id(2L).gameModeId(22L).build()));
+    when(statRepo.findAllByMatchId(2L))
+        .thenReturn(
+            List.of(
+                PlayerMatchStatisticDomain.builder()
+                    .matchId(2L)
+                    .playerSlot(0L)
+                    .playerId(5L)
+                    .build()));
+    when(threadRepo.findByMatchIdAndInstanceId(2L, "i1"))
+        .thenReturn(
+            Optional.of(
+                MatchReportThreadDomain.builder()
+                    .matchId(2L)
+                    .instanceId("i1")
+                    .threadId(9L)
+                    .build()));
+
+    service.deliver(2L);
+    verify(discord, never()).sendThreadMessageBlocking(any(), any());
+
+    service.deliver(1L);
+    verify(discord).sendThreadMessageBlocking(any(), any());
+  }
+
+  private static class AbilityDraftOnlySection extends ReplaySection {
+    @Override
+    public boolean supports(GameModeProfile mode) {
+      return mode.gameModeId() == 18L;
+    }
   }
 
   @Test

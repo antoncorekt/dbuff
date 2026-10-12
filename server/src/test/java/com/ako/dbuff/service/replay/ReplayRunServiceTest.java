@@ -10,6 +10,8 @@ import com.ako.dbuff.service.replay.analysis.ReplayAnalysisService;
 import com.ako.dbuff.service.replay.file.ReplayFile;
 import com.ako.dbuff.service.replay.file.ReplayFileProvider;
 import com.ako.dbuff.service.replay.map.MapLayouts;
+import com.ako.dbuff.service.replay.mode.GameModeRegistry;
+import com.ako.dbuff.service.replay.mode.TestModes;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -46,6 +48,7 @@ class ReplayRunServiceTest {
   private final ReplayProcessingProperties properties = new ReplayProcessingProperties();
   private final MapLayouts mapLayouts = mock(MapLayouts.class);
   private final ReplayAnalysisService analysis = mock(ReplayAnalysisService.class);
+  private final GameModeRegistry modes = TestModes.registry(properties);
   private ReplayRunService service;
 
   private final ReplayFacts facts =
@@ -63,12 +66,15 @@ class ReplayRunServiceTest {
               return run;
             });
     when(statRepo.findAllByMatchId(anyLong())).thenReturn(List.<PlayerMatchStatisticDomain>of());
-    when(analysis.analyze(anyLong(), any())).thenAnswer(i -> new java.util.ArrayList<String>());
+    when(analysis.analyze(anyLong(), any(), any()))
+        .thenAnswer(i -> new java.util.ArrayList<String>());
+    when(goodExtractor.supports(any())).thenReturn(true);
+    when(brokenExtractor.supports(any())).thenReturn(true);
     when(goodExtractor.name()).thenReturn("good");
     when(brokenExtractor.name()).thenReturn("broken");
     when(parser.version()).thenReturn("5.0.1");
     when(fileProvider.open(any())).thenReturn(new ReplayFile(Path.of("/nonexistent.dem"), 1234));
-    when(parser.parse(any(), any())).thenReturn(facts);
+    when(parser.parse(any(), any(), any())).thenReturn(facts);
     service = serviceWith(List.of(goodExtractor));
   }
 
@@ -113,7 +119,7 @@ class ReplayRunServiceTest {
 
   @Test
   void process_marksTheRunPartialWhenAnAnalyzerFails_andRunsTheAnalyzersOnlyAfterTheExtractors() {
-    when(analysis.analyze(eq(1L), any()))
+    when(analysis.analyze(eq(1L), any(), any()))
         .thenReturn(new java.util.ArrayList<>(List.of("activity")));
 
     assertThat(service.process(match())).isEqualTo(ReplayStatus.PARTIAL);
@@ -121,12 +127,12 @@ class ReplayRunServiceTest {
     assertThat(runs.get(1L).getError()).contains("activity");
     org.mockito.InOrder order = org.mockito.Mockito.inOrder(goodExtractor, analysis);
     order.verify(goodExtractor).extract(any(), any());
-    order.verify(analysis).analyze(eq(1L), any());
+    order.verify(analysis).analyze(eq(1L), any(), any());
   }
 
   @Test
   void process_givesTheParsePermitBackBeforeTheAnalyzersRun() {
-    when(analysis.analyze(anyLong(), any()))
+    when(analysis.analyze(anyLong(), any(), any()))
         .thenAnswer(
             invocation -> {
               assertThat(semaphore.availablePermits()).isEqualTo(1);
@@ -135,12 +141,12 @@ class ReplayRunServiceTest {
 
     assertThat(service.process(match())).isEqualTo(ReplayStatus.DONE);
 
-    verify(analysis).analyze(eq(1L), any());
+    verify(analysis).analyze(eq(1L), any(), any());
   }
 
   @Test
   void process_marksAReplayThatEndedWithAnErrorPartial_soTheCutShortDataIsNotTakenForWhole() {
-    when(parser.parse(any(), any()))
+    when(parser.parse(any(), any(), any()))
         .thenReturn(
             ReplayFacts.builder()
                 .clockStartTick(17136)
@@ -200,7 +206,7 @@ class ReplayRunServiceTest {
 
   @Test
   void process_turnsAnOutOfMemoryErrorIntoAResourceFailureAndFreesThePermit() {
-    when(parser.parse(any(), any())).thenThrow(new OutOfMemoryError("heap"));
+    when(parser.parse(any(), any(), any())).thenThrow(new OutOfMemoryError("heap"));
 
     assertThat(service.process(match())).isEqualTo(ReplayStatus.FAILED_RESOURCE);
 
@@ -209,7 +215,7 @@ class ReplayRunServiceTest {
 
   @Test
   void process_turnsALibraryLoadFailureIntoAResourceFailure() {
-    when(parser.parse(any(), any())).thenThrow(new UnsatisfiedLinkError("zstd-jni"));
+    when(parser.parse(any(), any(), any())).thenThrow(new UnsatisfiedLinkError("zstd-jni"));
 
     assertThat(service.process(match())).isEqualTo(ReplayStatus.FAILED_RESOURCE);
 
@@ -218,7 +224,7 @@ class ReplayRunServiceTest {
 
   @Test
   void process_turnsAnUnexpectedExceptionIntoAParserFailureInsteadOfThrowing() {
-    when(parser.parse(any(), any())).thenThrow(new IllegalStateException("surprise"));
+    when(parser.parse(any(), any(), any())).thenThrow(new IllegalStateException("surprise"));
 
     assertThat(service.process(match())).isEqualTo(ReplayStatus.FAILED_PARSER);
 
@@ -258,11 +264,37 @@ class ReplayRunServiceTest {
     assertThat(runs.get(1L).getAttempts()).isEqualTo(2);
   }
 
+  @Test
+  void process_handsTheModeToTheParserAndLeavesOutExtractorsThatDoNotApplyToIt() {
+    ReplayExtractor draftOnly = mock(ReplayExtractor.class);
+    when(draftOnly.supports(any())).thenReturn(false);
+    service = serviceWith(List.of(draftOnly, goodExtractor));
+    MatchDomain allPick = match();
+    allPick.setGameModeId(22L);
+
+    assertThat(service.process(allPick)).isEqualTo(ReplayStatus.DONE);
+
+    verify(parser).parse(any(), eq(TestModes.ALL_PICK), any());
+    verify(analysis).analyze(eq(1L), eq(TestModes.ALL_PICK), any());
+    verify(draftOnly, never()).extract(any(), any());
+    verify(goodExtractor).extract(any(), any());
+  }
+
+  @Test
+  void process_skipsAModeWithoutAnActiveProfileBeforeFetchingTheReplay() {
+    MatchDomain other = match();
+    other.setGameModeId(3L);
+
+    assertThat(service.process(other)).isEqualTo(ReplayStatus.SKIPPED_NOT_SUPPORTED);
+
+    verify(fileProvider, never()).open(any());
+  }
+
   private ReplayRunService serviceWith(List<ReplayExtractor> extractors) {
     return new ReplayRunService(
         runRepo,
         statRepo,
-        new ReplayEligibility(properties),
+        new ReplayEligibility(properties, modes),
         fileProvider,
         parser,
         verifier,
@@ -270,7 +302,8 @@ class ReplayRunServiceTest {
         properties,
         semaphore,
         mapLayouts,
-        analysis);
+        analysis,
+        modes);
   }
 
   private static MatchDomain match() {

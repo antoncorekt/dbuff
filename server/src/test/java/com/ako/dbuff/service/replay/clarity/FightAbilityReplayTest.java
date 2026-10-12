@@ -11,6 +11,7 @@ import com.ako.dbuff.service.replay.analysis.fight.FightDetector;
 import com.ako.dbuff.service.replay.analysis.fight.FightType;
 import com.ako.dbuff.service.replay.analysis.fight.NonCastReason;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
+import com.ako.dbuff.service.replay.mode.TestModes;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,7 +33,10 @@ class FightAbilityReplayTest {
   void theHeroIsSaidToHaveUsedTheAbilitiesOpenDotaCountsAndEveryMissedOneHasAReason() {
     ReplayFacts facts =
         new ClarityReplayParser()
-            .parse(Path.of(System.getenv("REPLAY_FIXTURE_DIR"), "9038725154.dem"), () -> false);
+            .parse(
+                Path.of(System.getenv("REPLAY_FIXTURE_DIR"), "9038725154.dem"),
+                TestModes.ABILITY_DRAFT,
+                () -> false);
     List<CombatEvent> events = facts.combatLog().events();
     Map<String, Integer> playerOf = new HashMap<>();
     var heroNames = CombatHeroes.names(events);

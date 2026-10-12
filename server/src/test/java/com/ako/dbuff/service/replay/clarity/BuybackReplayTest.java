@@ -8,6 +8,7 @@ import com.ako.dbuff.service.replay.HeroNames;
 import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.analysis.death.DeathAssessor;
 import com.ako.dbuff.service.replay.analysis.fight.FightAssessor;
+import com.ako.dbuff.service.replay.mode.TestModes;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Tag;
@@ -32,7 +33,10 @@ class BuybackReplayTest {
   void theSamplesStayInStepWithTheCombatLogThroughPausesOfTheGame() {
     ReplayFacts facts =
         new ClarityReplayParser()
-            .parse(Path.of(System.getenv("REPLAY_FIXTURE_DIR"), "9040889566.dem"), () -> false);
+            .parse(
+                Path.of(System.getenv("REPLAY_FIXTURE_DIR"), "9040889566.dem"),
+                TestModes.ALL_PICK,
+                () -> false);
 
     double lastSample =
         facts.samples().startSeconds()
@@ -54,7 +58,10 @@ class BuybackReplayTest {
   private static void assertDeaths(String file, int[] openDota) {
     ReplayFacts facts =
         new ClarityReplayParser()
-            .parse(Path.of(System.getenv("REPLAY_FIXTURE_DIR"), file), () -> false);
+            .parse(
+                Path.of(System.getenv("REPLAY_FIXTURE_DIR"), file),
+                TestModes.ALL_PICK,
+                () -> false);
     List<CombatEvent> events = facts.combatLog().events();
     var heroNames = CombatHeroes.names(events);
     int[] deaths = new int[10];
@@ -120,7 +127,10 @@ class BuybackReplayTest {
   private static void assertBuybacks(String file, double[][] openDota) {
     ReplayFacts facts =
         new ClarityReplayParser()
-            .parse(Path.of(System.getenv("REPLAY_FIXTURE_DIR"), file), () -> false);
+            .parse(
+                Path.of(System.getenv("REPLAY_FIXTURE_DIR"), file),
+                TestModes.ALL_PICK,
+                () -> false);
 
     List<Buybacks.Buyback> found = Buybacks.of(facts.combatLog().events());
 

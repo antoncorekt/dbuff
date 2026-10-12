@@ -20,6 +20,8 @@ import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.TextReport;
 import com.ako.dbuff.service.match.report.formatter.ReportFormatter;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
+import com.ako.dbuff.service.replay.mode.GameModeProfile;
+import com.ako.dbuff.service.replay.mode.GameModeRegistry;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -60,6 +62,7 @@ public class ReplayReportService {
   private final ReportFormatter formatter;
   private final DiscordMessageService discord;
   private final QuietHoursGuard quietHours;
+  private final GameModeRegistry modes;
 
   /** Delivers what is waiting for the matches whose replay run finished lately. */
   public void deliverPending() {
@@ -155,9 +158,14 @@ public class ReplayReportService {
       List<PlayerMatchStatisticDomain> stats,
       DbufInstanceConfigDomain instance,
       InstanceSettings settings) {
+    GameModeProfile mode = modes.activeFor(match.getGameModeId()).orElse(null);
+    if (mode == null) {
+      return List.of();
+    }
     ReplayReportInput input = input(match, stats, instance);
     List<Report> reports = new ArrayList<>();
     sections.stream()
+        .filter(s -> s.supports(mode))
         .filter(s -> settings.detail().includes(s.minimumDetail()))
         .sorted(Comparator.comparingInt(ReplayReportSection::order))
         .forEach(

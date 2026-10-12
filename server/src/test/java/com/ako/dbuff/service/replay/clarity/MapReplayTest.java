@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.SampleFacts;
 import com.ako.dbuff.service.replay.map.MapLayout;
 import com.ako.dbuff.service.replay.map.MapLayouts;
 import com.ako.dbuff.service.replay.map.Zone;
+import com.ako.dbuff.service.replay.mode.TestModes;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
 import java.util.EnumMap;
@@ -87,6 +88,9 @@ class MapReplayTest {
 
   private static ReplayFacts parse(String replay) {
     return new ClarityReplayParser()
-        .parse(Path.of(System.getenv("REPLAY_FIXTURE_DIR")).resolve(replay), () -> false);
+        .parse(
+            Path.of(System.getenv("REPLAY_FIXTURE_DIR")).resolve(replay),
+            TestModes.ABILITY_DRAFT,
+            () -> false);
   }
 }

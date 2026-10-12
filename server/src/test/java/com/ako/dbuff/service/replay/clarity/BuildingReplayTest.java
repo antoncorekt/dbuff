@@ -4,6 +4,7 @@ import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.analysis.building.BuildingName;
 import com.ako.dbuff.service.replay.map.MapLayout;
+import com.ako.dbuff.service.replay.mode.TestModes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
@@ -22,7 +23,9 @@ class BuildingReplayTest {
   void everyBuildingOpenDotaCountsIsFoundAndEachIsNamedByTheMap() throws Exception {
     for (String match : new String[] {"9040892342", "9040889566"}) {
       Path dir = Path.of(System.getenv("REPLAY_FIXTURE_DIR"));
-      ReplayFacts facts = new ClarityReplayParser().parse(dir.resolve(match + ".dem"), () -> false);
+      ReplayFacts facts =
+          new ClarityReplayParser()
+              .parse(dir.resolve(match + ".dem"), TestModes.ALL_PICK, () -> false);
       JsonNode objectives =
           new ObjectMapper().readTree(dir.resolve(match + ".json").toFile()).get("objectives");
       long openDota = 0;
