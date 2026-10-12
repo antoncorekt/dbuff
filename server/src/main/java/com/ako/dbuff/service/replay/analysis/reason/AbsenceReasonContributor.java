@@ -21,13 +21,14 @@ public class AbsenceReasonContributor implements ReasonContributor {
   @Override
   public List<Reason> contribute(FightContext context) {
     return context.players().stream()
-        .filter(p -> p.getAbsenceReason() != null)
+        .filter(p -> p.getPlayerSlot() != null && p.getPresence() != null)
+        .filter(p -> Enums.find(AbsenceReason.class, p.getAbsenceReason()) != null)
         .map(this::reason)
         .toList();
   }
 
   private Reason reason(FightPlayerDomain player) {
-    AbsenceReason absence = AbsenceReason.valueOf(player.getAbsenceReason());
+    AbsenceReason absence = Enums.find(AbsenceReason.class, player.getAbsenceReason());
     String evidence =
         player.getTeleportCooldownLeft() == null || player.getTeleportCooldownLeft() == 0
             ? player.getPresence()

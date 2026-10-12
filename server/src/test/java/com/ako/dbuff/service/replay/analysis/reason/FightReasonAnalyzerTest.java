@@ -12,6 +12,7 @@ import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
+import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.AllPickProfile;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
@@ -28,6 +29,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -61,10 +63,36 @@ class FightReasonAnalyzerTest {
 
         @Override
         public List<Reason> contribute(FightContext context) {
-          return List.of(Reason.player("ABILITY_DRAFT", "WEAK_COMBINATION", 0, 0.6, "test"));
+          return List.of(
+              Reason.player("ABILITY_DRAFT", "WEAK_COMBINATION", 0, 0.6, "test"),
+              Reason.team("ABILITY_DRAFT", "NO_INITIATOR", TeamSide.RADIANT, 0.5, "x".repeat(2000)),
+              Reason.team("ABILITY_DRAFT", "NO_INITIATOR", TeamSide.DIRE, 0.5, "x".repeat(2000)));
         }
       };
     }
+  }
+
+  @Test
+  void aTeamReasonOfEachTeamWithTheSameCodeIsKept_andLongEvidenceIsCutToTheColumn() {
+    stored(DRAFT_MATCH, 18);
+
+    analyzer.analyze(DRAFT_MATCH);
+
+    List<FightReasonDomain> team =
+        reasonRepo.findByMatchId(DRAFT_MATCH).stream()
+            .filter(r -> r.getCode().equals("NO_INITIATOR"))
+            .toList();
+    assertThat(team)
+        .extracting(FightReasonDomain::getFightIndex, FightReasonDomain::getTeam)
+        .containsExactlyInAnyOrder(
+            tuple(0, "RADIANT"), tuple(0, "DIRE"), tuple(1, "RADIANT"), tuple(1, "DIRE"));
+    assertThat(team)
+        .allSatisfy(
+            r -> {
+              assertThat(r.getSubjectSlot()).isNull();
+              assertThat(r.getScope()).isEqualTo("TEAM");
+              assertThat(r.getEvidence()).hasSize(1000).endsWith("...");
+            });
   }
 
   @Autowired private FightReasonAnalyzer analyzer;

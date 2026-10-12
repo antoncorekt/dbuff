@@ -87,7 +87,13 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
       for (ReasonContributor contributor : active) {
         for (Reason reason : contributor.contribute(context)) {
           byKey.merge(
-              reason.subjectSlot() + "/" + reason.code(),
+              reason.scope()
+                  + "/"
+                  + reason.team()
+                  + "/"
+                  + reason.subjectSlot()
+                  + "/"
+                  + reason.code(),
               reason,
               (a, b) -> a.severity() >= b.severity() ? a : b);
         }

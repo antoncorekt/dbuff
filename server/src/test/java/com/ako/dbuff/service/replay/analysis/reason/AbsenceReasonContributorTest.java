@@ -54,4 +54,22 @@ class AbsenceReasonContributorTest {
     assertThat(contributor.supports(TestModes.ABILITY_DRAFT)).isTrue();
     assertThat(contributor.supports(TestModes.ALL_PICK)).isTrue();
   }
+
+  @Test
+  void aRowWithoutPresenceOrSlotOrWithAnUnknownReasonIsSkipped() {
+    FightPlayerDomain noPresence = player(0, "NO_TP", null);
+    noPresence.setPresence(null);
+    FightPlayerDomain noSlot = player(1, "NO_TP", null);
+    noSlot.setPlayerSlot(null);
+    FightContext context =
+        new FightContext(
+            1,
+            TestModes.ALL_PICK,
+            null,
+            List.of(noPresence, noSlot, player(2, "TELEPORT_NEW", null), player(3, "NO_TP", null)),
+            List.of(),
+            List.of());
+
+    assertThat(contributor.contribute(context)).extracting(Reason::subjectSlot).containsExactly(3L);
+  }
 }

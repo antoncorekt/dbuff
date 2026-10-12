@@ -17,12 +17,12 @@ public record FightContext(
     List<FightAbilityUseDomain> abilityUses,
     List<DeathAnalysisDomain> deaths) {
 
-  /** Null when the player has no row in this fight. */
+  /** Null when the player has no row in this fight, or the row has no known presence. */
   public Presence presenceOf(long playerSlot) {
     return players.stream()
-        .filter(p -> p.getPlayerSlot() == playerSlot)
+        .filter(p -> p.getPlayerSlot() != null && p.getPlayerSlot() == playerSlot)
         .findFirst()
-        .map(p -> Presence.valueOf(p.getPresence()))
+        .map(p -> Enums.find(Presence.class, p.getPresence()))
         .orElse(null);
   }
 }

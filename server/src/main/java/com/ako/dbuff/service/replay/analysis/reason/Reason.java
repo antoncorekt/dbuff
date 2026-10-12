@@ -25,6 +25,7 @@ public record Reason(
 
   public Reason {
     severity = Math.max(0, Math.min(1, severity));
+    evidence = Evidence.fit(evidence);
   }
 
   public static Reason player(

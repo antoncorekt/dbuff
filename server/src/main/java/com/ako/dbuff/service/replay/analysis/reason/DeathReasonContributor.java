@@ -28,11 +28,14 @@ public class DeathReasonContributor implements ReasonContributor {
   @Override
   public List<Reason> contribute(FightContext context) {
     List<DeathAnalysisDomain> deaths =
-        context.deaths().stream().filter(d -> !Boolean.TRUE.equals(d.getReincarnated())).toList();
+        context.deaths().stream()
+            .filter(d -> d.getPlayerSlot() != null && d.getDeathSeconds() != null)
+            .filter(d -> !Boolean.TRUE.equals(d.getReincarnated()))
+            .toList();
     List<Reason> reasons = new ArrayList<>();
     for (DeathAnalysisDomain death : deaths) {
-      DeathReason reason = DeathReason.valueOf(death.getReason());
-      if (!NOT_A_REASON.contains(reason)) {
+      DeathReason reason = Enums.find(DeathReason.class, death.getReason());
+      if (reason != null && !NOT_A_REASON.contains(reason)) {
         reasons.add(
             Reason.player(
                 Reason.COMMON,

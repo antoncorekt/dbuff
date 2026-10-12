@@ -59,4 +59,21 @@ class DeathReasonContributorTest {
 
     assertThat(reasons).extracting(Reason::code).containsExactly("BURST");
   }
+
+  @Test
+  void aDeathWithoutTimeOrSlotOrWithAnUnknownReasonDoesNotAbortTheFight() {
+    DeathAnalysisDomain noTime = death(0, 0, "BURST");
+    noTime.setDeathSeconds(null);
+    DeathAnalysisDomain noSlot = death(0, 10, "BURST");
+    noSlot.setPlayerSlot(null);
+    DeathAnalysisDomain unknown = death(1, 20, "NEW_REASON");
+    DeathAnalysisDomain noReason = death(2, 30, null);
+
+    List<Reason> reasons =
+        contributor.contribute(context(noTime, noSlot, unknown, noReason, death(3, 40, "TOWER")));
+
+    assertThat(reasons)
+        .extracting(Reason::code, Reason::subjectSlot)
+        .containsExactlyInAnyOrder(tuple("TOWER", 3L), tuple("DIED_FIRST", 1L));
+  }
 }

@@ -79,4 +79,28 @@ class AbilityNonCastReasonContributorTest {
 
     assertThat(reasons.getFirst().severity()).isCloseTo(0.2, within(1e-9));
   }
+
+  @Test
+  void aRepeatedAbilityCountsOnce_aRowWithoutPlayerOrWithAnUnknownReasonIsSkipped() {
+    List<Reason> reasons =
+        contributor.contribute(
+            context(
+                "ACTIVE",
+                use(0, "a", "ABILITY", "ON_COOLDOWN"),
+                use(0, "a", "ABILITY", "ON_COOLDOWN"),
+                FightAbilityUseDomain.builder()
+                    .abilityName("x")
+                    .kind("ABILITY")
+                    .nonCastReason("ON_COOLDOWN")
+                    .build(),
+                use(0, "y", "ABILITY", "SOMETHING_NEW")));
+
+    assertThat(reasons)
+        .singleElement()
+        .satisfies(
+            r -> {
+              assertThat(r.evidence()).isEqualTo("a");
+              assertThat(r.severity()).isCloseTo(0.4, within(1e-9));
+            });
+  }
 }

@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -33,7 +32,7 @@ public class AbilityNonCastReasonContributor implements ReasonContributor {
     Map<String, Map<Long, List<FightAbilityUseDomain>>> byCodeAndPlayer = new LinkedHashMap<>();
     for (FightAbilityUseDomain use : context.abilityUses()) {
       String code = code(use);
-      if (code != null) {
+      if (code != null && use.getPlayerSlot() != null) {
         byCodeAndPlayer
             .computeIfAbsent(code, k -> new LinkedHashMap<>())
             .computeIfAbsent(use.getPlayerSlot(), k -> new ArrayList<>())
@@ -53,20 +52,21 @@ public class AbilityNonCastReasonContributor implements ReasonContributor {
         code.equals("NO_MANA")
             ? properties.getNoManaSeverity()
             : properties.getOnCooldownSeverity();
-    double severity = base + properties.getRepeatedUseStep() * (uses.size() - 1);
+    List<String> names =
+        uses.stream().map(FightAbilityUseDomain::getAbilityName).distinct().toList();
+    double severity = base + properties.getRepeatedUseStep() * (names.size() - 1);
     if (context.presenceOf(slot) == Presence.PRESENT_PASSIVE) {
       severity *= properties.getPassivePresenceFactor();
     }
-    String evidence =
-        uses.stream().map(FightAbilityUseDomain::getAbilityName).collect(Collectors.joining(", "));
-    return Reason.player(Reason.COMMON, code, slot, severity, evidence);
+    return Reason.player(Reason.COMMON, code, slot, severity, String.join(", ", names));
   }
 
   private static String code(FightAbilityUseDomain use) {
-    if (use.getNonCastReason() == null) {
+    NonCastReason reason = Enums.find(NonCastReason.class, use.getNonCastReason());
+    if (reason == null) {
       return null;
     }
-    return switch (NonCastReason.valueOf(use.getNonCastReason())) {
+    return switch (reason) {
       case NO_MANA -> "NO_MANA";
       case ON_COOLDOWN -> ITEM.equals(use.getKind()) ? "ITEM_ON_COOLDOWN" : "ABILITY_ON_COOLDOWN";
       case DEAD_EARLY, READY_NOT_CAST -> null;
