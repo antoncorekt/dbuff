@@ -6,6 +6,7 @@ import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -46,20 +47,31 @@ public class AllPickRoleResolver implements RoleResolver {
     return mode.gameModeId() == AllPickProfile.MODE_ID;
   }
 
+  /** All Pick is read from the match, so it has final roles only. */
   @Override
-  public List<RoleAssignment> resolve(List<RolePlayer> team) {
+  public Set<RoleStage> stages() {
+    return Set.of(RoleStage.FINAL);
+  }
+
+  @Override
+  public List<RoleAssignment> resolve(RoleContext context) {
+    return context.stage() == RoleStage.FINAL ? resolve(context.team()) : List.of();
+  }
+
+  List<RoleAssignment> resolve(List<RolePlayer> team) {
     if (team.size() != TEAM_SIZE) {
       return List.of();
     }
     int laningMinute = properties.getPhaseLaneEndMinutes();
     List<LaningActivity> activity =
         team.stream().map(p -> LaningActivity.of(p.activity(), laningMinute * 60)).toList();
-    double[] finalRank = ranks(team.stream().map(RolePlayer::finalWorth).toList());
-    double[] laningRank = ranks(team.stream().map(p -> p.worthAt(laningMinute)).toList());
+    double[] finalRank = NetWorthRanks.of(team.stream().map(RolePlayer::finalWorth).toList());
+    double[] laningRank =
+        NetWorthRanks.of(team.stream().map(p -> p.worthAt(laningMinute)).toList());
     double[][] score = new double[TEAM_SIZE][ROLES];
     double[] farmRank = new double[TEAM_SIZE];
     for (int i = 0; i < TEAM_SIZE; i++) {
-      farmRank[i] = farmRank(finalRank[i], laningRank[i]);
+      farmRank[i] = NetWorthRanks.farmRank(finalRank[i], laningRank[i], UNKNOWN_RANK);
       for (int role = 0; role < ROLES; role++) {
         score[i][role] =
             -FARM_WEIGHT * Math.abs(farmRank[i] - (role + 1))
@@ -78,16 +90,6 @@ public class AllPickRoleResolver implements RoleResolver {
               evidence(team.get(i), activity.get(i), finalRank[i], laningRank[i])));
     }
     return result;
-  }
-
-  private static double farmRank(double finalRank, double laningRank) {
-    if (Double.isNaN(finalRank) && Double.isNaN(laningRank)) {
-      return UNKNOWN_RANK;
-    }
-    if (Double.isNaN(laningRank)) {
-      return finalRank;
-    }
-    return Double.isNaN(finalRank) ? laningRank : (finalRank + laningRank) / 2;
   }
 
   /** Each missing net worth rank halves the confidence, as the player was placed on less. */
@@ -121,25 +123,6 @@ public class AllPickRoleResolver implements RoleResolver {
       bonus += ROAM[role];
     }
     return bonus;
-  }
-
-  /**
-   * Place by worth with 1 the highest and a tie sharing the average place; NaN when unknown, and
-   * then he is left out of the places of the others.
-   */
-  private static double[] ranks(List<Double> worth) {
-    double[] ranks = new double[worth.size()];
-    for (int i = 0; i < ranks.length; i++) {
-      if (worth.get(i) == null) {
-        ranks[i] = Double.NaN;
-        continue;
-      }
-      double own = worth.get(i);
-      long higher = worth.stream().filter(w -> w != null && w > own).count();
-      long equal = worth.stream().filter(w -> w != null && w == own).count();
-      ranks[i] = higher + (equal + 1) / 2.0;
-    }
-    return ranks;
   }
 
   private static String place(double rank) {

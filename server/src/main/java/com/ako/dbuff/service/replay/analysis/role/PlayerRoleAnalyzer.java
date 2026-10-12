@@ -1,9 +1,13 @@
 package com.ako.dbuff.service.replay.analysis.role;
 
+import com.ako.dbuff.dao.model.AbilityDraftPickDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerRoleDomain;
+import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
+import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
+import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleRepo;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
@@ -12,9 +16,12 @@ import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.StoredMatchModes;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -27,9 +34,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Stores the role (1 carry to 5 hard support) of each player, resolved per game mode by a {@link
- * RoleResolver}. It reads OpenDota's statistics and net worth and the activity stored before it, so
- * it runs after the activity and before the analyzers that will use roles. A mode without a
- * resolver gets no roles.
+ * RoleResolver}, and the function profile behind each role stage the resolver produces. The final
+ * role goes to {@code player_role}; every stage goes to {@code player_role_profile}. It reads
+ * OpenDota's statistics and net worth and the activity stored before it, so it runs after the
+ * activity and before the analyzers that will use roles. A mode without a resolver gets no roles.
  */
 @Slf4j
 @Order(15)
@@ -45,6 +53,10 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
   private final PlayerTimelineRepo timelineRepo;
   private final StoredActivity storedActivity;
   private final PlayerRoleRepo roleRepo;
+  private final PlayerRoleProfileRepo profileRepo;
+  private final AbilityDraftPickRepo draftPickRepo;
+  private final List<StageProfiler> profilers;
+  private final RoleFitter fitter;
 
   @Override
   public String name() {
@@ -53,7 +65,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 1;
+    return 2;
   }
 
   @Override
@@ -63,7 +75,9 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
 
   @Override
   public Set<String> requires() {
-    return Set.of("activity");
+    Set<String> required = new HashSet<>(Set.of("activity"));
+    resolvers.forEach(r -> required.addAll(r.requires()));
+    return required;
   }
 
   @Override
@@ -81,6 +95,8 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
     Map<Long, List<ActivitySegment>> activity = storedActivity.bySlot(matchId);
     List<PlayerMatchStatisticDomain> stats = statisticRepo.findAllByMatchId(matchId);
     Map<Long, double[]> series = netWorthSeries(matchId, stats);
+    Map<Long, List<DraftedAbility>> drafted =
+        resolver.stages().contains(RoleStage.INTENT) ? draftedAbilities(matchId) : Map.of();
     List<RolePlayer> players =
         stats.stream()
             .sorted(Comparator.comparing(PlayerMatchStatisticDomain::getPlayerSlot))
@@ -91,9 +107,12 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
                         s.getLaneRole(),
                         s.getNetWorth(),
                         series.get(s.getPlayerSlot()),
-                        activity.getOrDefault(s.getPlayerSlot(), List.of())))
+                        activity.getOrDefault(s.getPlayerSlot(), List.of()),
+                        s.getHeroId(),
+                        drafted.getOrDefault(s.getPlayerSlot(), List.of())))
             .toList();
     List<PlayerRoleDomain> rows = new ArrayList<>();
+    List<PlayerRoleProfileDomain> profiles = new ArrayList<>();
     for (boolean dire : new boolean[] {false, true}) {
       List<RolePlayer> team =
           players.stream().filter(p -> (p.slot() >= FIRST_DIRE_SLOT) == dire).toList();
@@ -105,15 +124,106 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
             dire ? "dire" : "radiant");
         continue;
       }
-      resolver.resolve(team).forEach(a -> rows.add(row(matchId, a)));
+      for (RoleStage stage : resolver.stages().stream().sorted().toList()) {
+        List<RoleAssignment> assignments = resolver.resolve(new RoleContext(stage, team));
+        if (assignments.isEmpty()) {
+          continue;
+        }
+        if (stage == RoleStage.FINAL) {
+          assignments.forEach(a -> rows.add(row(matchId, a)));
+        }
+        try {
+          profiles.addAll(profileRows(matchId, stage, team, assignments));
+        } catch (RuntimeException e) {
+          log.warn("Match {}: no {} profiles, the roles are kept", matchId, stage, e);
+        }
+      }
     }
     roleRepo.saveAll(rows);
+    profileRepo.saveAll(profiles);
   }
 
   @Override
   @Transactional
   public void deleteByMatchId(long matchId) {
     roleRepo.deleteByMatchId(matchId);
+    profileRepo.deleteByMatchId(matchId);
+  }
+
+  private List<PlayerRoleProfileDomain> profileRows(
+      long matchId, RoleStage stage, List<RolePlayer> team, List<RoleAssignment> assignments) {
+    StageProfiler profiler =
+        profilers.stream()
+            .filter(p -> p.stage() == stage)
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("No profiler for the stage " + stage));
+    Map<Long, RoleAssignment> bySlot = new HashMap<>();
+    assignments.forEach(a -> bySlot.put(a.slot(), a));
+    List<FunctionProfile> profiles = profiler.profile(team);
+    List<Long> slots = team.stream().map(RolePlayer::slot).toList();
+    List<Long> uncovered = slots.stream().filter(s -> !bySlot.containsKey(s)).toList();
+    List<Long> foreign = bySlot.keySet().stream().filter(s -> !slots.contains(s)).sorted().toList();
+    if (!uncovered.isEmpty() || !foreign.isEmpty()) {
+      log.info(
+          "Match {}, {}: the resolver gave no role for slots {} and roles for unknown slots {};"
+              + " those have no profile row",
+          matchId,
+          stage,
+          uncovered,
+          foreign);
+    }
+    List<PlayerRoleProfileDomain> rows = new ArrayList<>();
+    for (int i = 0; i < team.size(); i++) {
+      RoleAssignment assignment = bySlot.get(team.get(i).slot());
+      if (assignment == null) {
+        continue;
+      }
+      FunctionProfile p = profiles.get(i);
+      double[] scores = fitter.scores(p);
+      rows.add(
+          PlayerRoleProfileDomain.builder()
+              .matchId(matchId)
+              .playerSlot(assignment.slot())
+              .stage(stage.name())
+              .role(assignment.role())
+              .confidence(assignment.confidence())
+              .lane(p.lane() == null ? null : p.lane().name())
+              .farmPriority(p.farmPriority())
+              .jungle(p.jungle())
+              .roaming(p.roaming())
+              .visionDuty(p.visionDuty())
+              .initiation(p.initiation())
+              .disable(p.disable())
+              .saveHeal(p.saveHeal())
+              .damage(p.damage())
+              .durability(p.durability())
+              .fitRole(RoleFitter.bestRole(scores))
+              .roleScores(scoreText(scores))
+              .evidence(assignment.evidence())
+              .analysisVersion(version())
+              .build());
+    }
+    return rows;
+  }
+
+  private static String scoreText(double[] scores) {
+    return Arrays.stream(scores)
+        .mapToObj(s -> String.format(Locale.ROOT, "%.2f", s))
+        .collect(Collectors.joining(","));
+  }
+
+  private Map<Long, List<DraftedAbility>> draftedAbilities(long matchId) {
+    return draftPickRepo.findByMatchId(matchId).stream()
+        .filter(p -> p.getAbilityName() != null && p.getPlayerSlot() != null)
+        .sorted(Comparator.comparing(AbilityDraftPickDomain::getPickOrder))
+        .collect(
+            Collectors.groupingBy(
+                AbilityDraftPickDomain::getPlayerSlot,
+                Collectors.mapping(
+                    p ->
+                        new DraftedAbility(
+                            p.getAbilityName(), Boolean.TRUE.equals(p.getUltimate())),
+                    Collectors.toList())));
   }
 
   private PlayerRoleDomain row(long matchId, RoleAssignment assignment) {

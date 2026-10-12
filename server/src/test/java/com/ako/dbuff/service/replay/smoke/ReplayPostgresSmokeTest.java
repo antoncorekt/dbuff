@@ -16,6 +16,7 @@ import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerPhaseSummaryRepo;
+import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleRepo;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
 import com.ako.dbuff.dao.repo.ReplayCombatLogRepo;
@@ -24,9 +25,12 @@ import com.ako.dbuff.dao.repo.ReplayPlayerMinuteRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
+import com.ako.dbuff.service.constant.data.AbilityConstant;
+import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.replay.AbilityNames;
 import com.ako.dbuff.service.replay.ReplayDataService;
 import com.ako.dbuff.service.replay.ReplayRunService;
+import com.ako.dbuff.service.replay.analysis.role.HeroKits;
 import com.ako.dbuff.service.replay.report.DeathSection;
 import com.ako.dbuff.service.replay.report.DraftSection;
 import com.ako.dbuff.service.replay.report.FightSection;
@@ -92,7 +96,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         @ComponentScan.Filter(
             type = FilterType.REGEX,
             pattern =
-                ".*\\.(ReplayProcessingJob|ReplayRunJanitor|ReplayQueue|ReplayBatchService|ConstantAbilityNames|ReplayTempCleaner|ReplayReportService)|.*Test(\\$.*)?"))
+                ".*\\.(ReplayProcessingJob|ReplayRunJanitor|ReplayQueue|ReplayBatchService|ConstantAbilityNames|ConstantHeroKits|ReplayTempCleaner|ReplayReportService)|.*Test(\\$.*)?"))
 @Import({
   ReplayPostgresSmokeTest.Config.class,
   SwingSection.class,
@@ -154,6 +158,21 @@ class ReplayPostgresSmokeTest {
     AbilityNames abilityNames() {
       return id -> Optional.of("ability_" + id);
     }
+
+    @Bean
+    HeroKits heroKits() {
+      return new HeroKits() {
+        @Override
+        public Optional<HeroConstant> hero(long heroId) {
+          return Optional.empty();
+        }
+
+        @Override
+        public Optional<AbilityConstant> ability(String name) {
+          return Optional.empty();
+        }
+      };
+    }
   }
 
   @Autowired private AbilityDraftPickRepo draftPickRepo;
@@ -176,6 +195,7 @@ class ReplayPostgresSmokeTest {
   @Autowired private GameStateSegmentRepo stateSegmentRepo;
   @Autowired private PlayerTimelineRepo timelineRepo;
   @Autowired private PlayerRoleRepo roleRepo;
+  @Autowired private PlayerRoleProfileRepo roleProfileRepo;
   @Autowired private MatchRepo matchRepo;
   @Autowired private SwingSection swingSection;
   @Autowired private DeathSection deathSection;
@@ -218,6 +238,10 @@ class ReplayPostgresSmokeTest {
           .hasSize(10)
           .extracting(r -> r.getRole() + (r.getPlayerSlot() >= 128 ? 10 : 0))
           .containsExactlyInAnyOrder(1, 2, 3, 4, 5, 11, 12, 13, 14, 15);
+      assertThat(roleProfileRepo.findByMatchId(match.getId()))
+          .as("%s: one final profile per player", id)
+          .hasSize(10)
+          .allSatisfy(p -> assertThat(p.getStage()).isEqualTo("FINAL"));
       assertThat(buybackRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(spikeRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(stateSegmentRepo.findByMatchId(match.getId())).isNotEmpty();
