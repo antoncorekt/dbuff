@@ -1,7 +1,6 @@
 package com.ako.dbuff.service.replay.fightloop;
 
 import com.ako.dbuff.dao.repo.MatchRepo;
-import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.TeamfightPlayerRepo;
 import com.ako.dbuff.dao.repo.TeamfightRepo;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
@@ -10,6 +9,7 @@ import com.ako.dbuff.service.replay.looprunner.ReviewLoopDiff.Section;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopTopic;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.StoredMatchModes;
+import com.ako.dbuff.service.replay.report.ReportHeroNames;
 import java.nio.file.Path;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -20,12 +20,13 @@ class FightLoopTopic implements ReviewLoopTopic {
   static final Path MATCH_LIST = Path.of("src/test/resources/replay/fight-loop/matches.txt");
   static final List<Section> SECTIONS =
       List.of(
-          new Section(FightLoopReport.FIGHTS, "fight", 2),
-          new Section(FightLoopReport.REASONS, "reason", 4));
+          new Section(FightLoopReport.FIGHTS, "", 1),
+          new Section(FightLoopReport.REASONS, "", 2),
+          new Section(FightLoopReport.NOTES, "", 2));
 
   private final StoredMatchModes matchModes;
   private final MatchRepo matchRepo;
-  private final ReplayPlayerRepo replayPlayerRepo;
+  private final ReportHeroNames heroNames;
   private final TeamfightRepo teamfightRepo;
   private final TeamfightPlayerRepo teamfightPlayerRepo;
   private final FightExplanationReader reader;
@@ -33,13 +34,13 @@ class FightLoopTopic implements ReviewLoopTopic {
   FightLoopTopic(
       StoredMatchModes matchModes,
       MatchRepo matchRepo,
-      ReplayPlayerRepo replayPlayerRepo,
+      ReportHeroNames heroNames,
       TeamfightRepo teamfightRepo,
       TeamfightPlayerRepo teamfightPlayerRepo,
       FightExplanationReader reader) {
     this.matchModes = matchModes;
     this.matchRepo = matchRepo;
-    this.replayPlayerRepo = replayPlayerRepo;
+    this.heroNames = heroNames;
     this.teamfightRepo = teamfightRepo;
     this.teamfightPlayerRepo = teamfightPlayerRepo;
     this.reader = reader;
@@ -75,7 +76,7 @@ class FightLoopTopic implements ReviewLoopTopic {
             matchRepo.findById(matchId).orElseThrow(),
             mode,
             reader.read(matchId, Integer.MAX_VALUE, Integer.MAX_VALUE),
-            replayPlayerRepo.findByMatchId(matchId),
+            heroNames.bySlot(matchId),
             teamfightRepo.findByMatchId(matchId),
             teamfightPlayerRepo.findByMatchId(matchId)));
   }

@@ -5,12 +5,12 @@ import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerRoleDomain;
 import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
-import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.model.TeamCompositionDomain;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopDiff;
 import com.ako.dbuff.service.replay.roleloop.RoleLoopReport.MatchData;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,12 +54,7 @@ class RoleLoopReportTest {
         match,
         "Ability Draft",
         stats(),
-        List.of(
-            ReplayPlayerDomain.builder()
-                .matchId(MATCH)
-                .playerSlot(0L)
-                .heroEntityName("Sniper")
-                .build()),
+        Map.of(0L, "Sniper"),
         roles,
         profiles,
         compositions,
@@ -94,9 +89,14 @@ class RoleLoopReportTest {
   void aModeWithoutAResolverSaysSoInsteadOfPrintingBlanks() {
     String report = RoleLoopReport.render(data(List.of(), List.of(), List.of(), List.of()));
 
+    assertThat(report)
+        .contains(
+            "**Summary:** 10 players, no draft intent in this mode; 0 of 0 team verdicts have"
+                + " findings.")
+        .contains("**How to read this:**");
     assertThat(report).contains("No roles stored (no resolver for this mode).");
-    assertThat(report).contains("| 0 | Sniper | n/a | none | n/a | n/a |");
-    assertThat(report).contains("| RADIANT | PICK | none stored |");
+    assertThat(report).contains("| Sniper (Radiant) | none | n/a | n/a | n/a | | |");
+    assertThat(report).contains("| Radiant at the pick | none stored | | |");
   }
 
   @Test
@@ -124,8 +124,10 @@ class RoleLoopReportTest {
 
     assertThat(report).contains("No intent rows");
     assertThat(report).contains("- intent: n/a (none stored)");
-    assertThat(report).contains("| 0 | Sniper | n/a | 1 | n/a | 1(1.50) 2(0.20) 3(0.10) |");
-    assertThat(report).contains("| RADIANT | FINAL | no findings |");
+    assertThat(report)
+        .contains(
+            "| Sniper (Radiant) | 1 carry | n/a | carry 1.50, mid 0.20, offlane 0.10 | n/a | | |");
+    assertThat(report).contains("| Radiant final | no findings | | |");
     assertThat(report).contains("none stored (needs intent rows for all five players)");
     assertThat(report).contains("summary: Balanced.");
   }
@@ -166,18 +168,19 @@ class RoleLoopReportTest {
                         .build())));
 
     assertThat(report)
-        .contains("### RADIANT slot 0, Sniper")
-        .contains("| 0 | Sniper | 1 | 3 | 1(1.50) 2(0.20) 3(0.10) | 1(1.50) 2(0.20) 3(0.10) |")
-        .contains("- intent: role 1 (confidence 0.64), fitRole 1, lane SAFE")
-        .contains("farmPriority 0.90, jungle unknown")
-        .contains("farmPriority unknown")
-        .contains("roleScores 1.50,0.20,0.10,0.00,0.00")
-        .contains("evidence: nwRank=1")
-        .contains("- drafted skills: ability 5, sniper_shrapnel")
+        .contains("### Sniper (Radiant)")
         .contains(
-            "- OpenDota: position_est 1, lane_role 1, net worth rank 1 of 5 (net worth 20000)")
-        .contains("| DIRE | PICK | CARRIES_3,NO_INITIATOR |")
-        .contains("tokens: CARRIES_3,NO_INITIATOR");
+            "| Sniper (Radiant) | 3 offlane | 1 carry | carry 1.50, mid 0.20, offlane 0.10 | carry"
+                + " 1.50, mid 0.20, offlane 0.10 | | |")
+        .contains("- intent: role 1 carry (confidence 0.64), best fit 1 carry, lane safe")
+        .contains("farm priority 0.90, jungle unknown")
+        .contains("farm priority unknown")
+        .contains("scores, best first: carry 1.50, mid 0.20, offlane 0.10, soft support 0.00")
+        .contains("evidence: nwRank=1")
+        .contains("- drafted skills: ability 5, Sniper Shrapnel")
+        .contains("- OpenDota: position 1, safe lane, net worth rank 1 of 5 (net worth 20k)")
+        .contains("| Dire at the pick | 3 carries, no initiator | | |")
+        .contains("findings: 3 carries, no initiator");
   }
 
   @Test
@@ -188,15 +191,18 @@ class RoleLoopReportTest {
     String report = RoleLoopReport.render(data(List.of(), List.of(leftover), List.of(), List.of()));
 
     assertThat(report)
-        .contains("| slot | hero | intent | final | intent fit | final fit |")
-        .contains("| 0 | Sniper | n/a | 5 | n/a | 3(3.25) 2(2.00) 4(1.10) |");
+        .contains(
+            "| player | final role | intent role | final fit | intent fit | assistant | owner |")
+        .contains(
+            "| Sniper (Radiant) | 5 hard support | n/a | offlane 3.25, mid 2.00, soft support 1.10"
+                + " | n/a | | |");
   }
 
   @Test
-  void aHeroWithoutAReplayNameFallsBackToItsId() {
+  void aHeroWithoutAKnownNameIsNamedByItsTeamAndPlaceNotByItsId() {
     String report = RoleLoopReport.render(data(List.of(), List.of(), List.of(), List.of()));
 
-    assertThat(report).contains("| 1 | hero 11 |");
+    assertThat(report).contains("| Radiant player 2 (Radiant) |").doesNotContain("hero 11");
   }
 
   @Test
@@ -211,10 +217,11 @@ class RoleLoopReportTest {
     String withNull = RoleLoopReport.render(data(List.of(), List.of(noRole), List.of(), List.of()));
 
     assertThat(withNull)
-        .contains("| 0 | Sniper | n/a | unknown | n/a | 1(1.50) 2(0.20) 3(0.10) |")
+        .contains(
+            "| Sniper (Radiant) | unknown | n/a | carry 1.50, mid 0.20, offlane 0.10 | n/a | | |")
         .doesNotContain("null");
-    assertThat(withNull).contains("role unknown (confidence 0.64), fitRole unknown");
-    assertThat(report).contains("| 0 | Sniper | n/a | 1 | n/a | 1(1.50) 2(0.20) 3(0.10) |");
+    assertThat(withNull).contains("role unknown (confidence 0.64), best fit unknown");
+    assertThat(report).contains("| Sniper (Radiant) | 1 carry | n/a | carry 1.50");
   }
 
   @Test
@@ -233,7 +240,7 @@ class RoleLoopReportTest {
                         .build()),
                 List.of()));
 
-    assertThat(report).contains("| DIRE | FINAL | A\\|B C |");
+    assertThat(report).contains("| Dire final | a\\|b c | | |");
   }
 
   @Test
@@ -244,7 +251,7 @@ class RoleLoopReportTest {
             match,
             "All Pick",
             List.of(),
-            List.of(),
+            Map.of(),
             List.of(),
             List.of(),
             List.of(),
@@ -260,10 +267,10 @@ class RoleLoopReportTest {
     String before =
         RoleLoopReport.render(
             data(List.of(), List.of(profile(0, "FINAL", 1, 0.5)), List.of(), List.of()));
-    String after = before.replace("| 0 | Sniper | n/a | 1 |", "| 0 | Sniper | n/a | 2 |");
+    String after = before.replace("| Sniper (Radiant) | 1 carry |", "| Sniper (Radiant) | 2 mid |");
 
     assertThat(ReviewLoopDiff.changes(before, before, RoleLoopTopic.SECTIONS)).isEmpty();
     assertThat(ReviewLoopDiff.changes(before, after, RoleLoopTopic.SECTIONS))
-        .containsExactly("slot 0, final: 1 -> 2");
+        .containsExactly("Sniper (Radiant), final role: 1 carry -> 2 mid");
   }
 }

@@ -10,12 +10,12 @@
 
 ## Players
 
-| match | slot | hero | intent | final | expected | assistant | owner | comment |
-|---|---|---|---|---|---|---|---|---|
-| | | | | | | | | |
+| match | player | intent | final | expected | assistant | owner | comment |
+|---|---|---|---|---|---|---|---|
+| | | | | | | | |
 
 ## Team verdicts
 
-| match | team | stage | tokens | assistant | owner | comment |
-|---|---|---|---|---|---|---|
-| | | | | | | | |
+| match | team verdict | findings | assistant | owner | comment |
+|---|---|---|---|---|---|
+| | | | | | |

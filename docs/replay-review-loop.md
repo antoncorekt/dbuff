@@ -23,11 +23,23 @@ Use it when the question is "does this output look right to someone who knows Do
 - Unknown is not zero. A function with no data stays unknown, the report says so, and rules must not raise a verdict from unknown data.
 - Prefer a data fix over a threshold tweak: a missing override, a missing data source or a wrong input beats a new weight (round 1 of the roles showed a drafted attack-damage skill scored as no damage; the fix is an override entry, not a new weight).
 
+## Making a report easy to read
+
+Every topic's report is written for a person, with one shared formatter, `LoopWording` (same package as the runner), so all topics read the same:
+
+- Plain words, not codes: the hero's name (from `ReportHeroNames`; "Dire player 2" when unknown, never an id), a reason as a sentence from the production `ReasonWording` ("Mirana stood too far in front"), composition tokens and enum names in words, roles as "1 carry" to "5 hard support". No stored code, raw enum name or `npc_dota_hero_` id in a table cell; a code that someone may need to trace goes in a notes list under the tables, never in a cell.
+- Time as `m:ss` (`LoopWording.clock`), gold as `850` or `1.2k` (`gold`), teams as Radiant and Dire (`team`).
+- After the title line, `ReviewLoopReport.introduction(howToRead, summary)`: a "how to read this" line and a one-line summary (counts, the main finding).
+- One short table per question with few columns: the verdict or result first (it is also the diff key, so it must be unique per row), the numbers behind it, then the empty `assistant` and `owner` columns last.
+- The diff already shows only what changed between rounds; a round in a changed layout is reported once as "format changed", then compares normally.
+
+When a topic needs a new kind of value, add it to `LoopWording` with a test instead of formatting it in the topic.
+
 ## Adding a new topic
 
-The topic-free parts live in `server/src/test/java/com/ako/dbuff/service/replay/looprunner` (round numbering `ReviewLoopRound`, match list `ReviewLoopMatchList`, diff `ReviewLoopDiff`, the "not reported" stand-in `ReviewLoopReport`, the round itself `ReviewLoopTest`), the local database guard is `LocalDatabase` in the smoke package, and the Gradle task is `:server:reviewLoop` (JUnit tag `reviewloop`, topic picked with `-Ploop.topic=<name>`, default `roles`; `:server:roleLoop` is kept as an alias of the roles topic). Topics so far: `roles` (`docs/replay-role-loop/README.md`) and `fights` (`docs/replay-fight-loop/README.md`, `FightLoopTopic` in the `fightloop` package). A topic is one implementation of `ReviewLoopTopic`, a Spring `@Component` next to its renderer (roles: `RoleLoopTopic` and `RoleLoopReport` in the `roleloop` package). To add a topic:
+The topic-free parts live in `server/src/test/java/com/ako/dbuff/service/replay/looprunner` (round numbering `ReviewLoopRound`, match list `ReviewLoopMatchList`, diff `ReviewLoopDiff`, the "not reported" stand-in and report introduction `ReviewLoopReport`, the shared wording `LoopWording`, the round itself `ReviewLoopTest`), the local database guard is `LocalDatabase` in the smoke package, and the Gradle task is `:server:reviewLoop` (JUnit tag `reviewloop`, topic picked with `-Ploop.topic=<name>`, default `roles`; `:server:roleLoop` is kept as an alias of the roles topic). Topics so far: `roles` (`docs/replay-role-loop/README.md`) and `fights` (`docs/replay-fight-loop/README.md`, `FightLoopTopic` in the `fightloop` package). A topic is one implementation of `ReviewLoopTopic`, a Spring `@Component` next to its renderer (roles: `RoleLoopTopic` and `RoleLoopReport` in the `roleloop` package). To add a topic:
 
-1. Implement `ReviewLoopTopic`: its `name()` (the `-Ploop.topic` value), match list, output directory, the tables the diff compares (`ReviewLoopDiff.Section`: heading, key label, key columns) and `render(matchId)`, a renderer that reads its stored tables (for example fights: `fight`, `fight_player`, `fight_ability_use`; deaths: `death_analysis`; swings: `game_spike`, `game_spike_factor`) and prints, per row, the verdict next to the evidence behind it and the OpenDota fact to compare with. Do not copy the runner parts (DRY).
+1. Implement `ReviewLoopTopic`: its `name()` (the `-Ploop.topic` value), match list, output directory, the tables the diff compares (`ReviewLoopDiff.Section`: heading, key label, key columns) and `render(matchId)`, a renderer that reads its stored tables (for example fights: `fight`, `fight_player`, `fight_ability_use`; deaths: `death_analysis`; swings: `game_spike`, `game_spike_factor`) and prints, per row, the verdict next to the evidence behind it and the OpenDota fact to compare with, written with `LoopWording` as above. Do not copy the runner parts (DRY).
 2. Add a match list (or a section of the same list) under `server/src/test/resources/replay/<topic>-loop/`.
 3. Add `docs/<topic>-loop/README.md` (short: what to look at) and a round template.
 4. Make the rule's analyzer version bump part of every round that changes it, so the re-analysis replaces the old rows.

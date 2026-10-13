@@ -5,12 +5,12 @@ import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleRepo;
-import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopDiff.Section;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopTopic;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.StoredMatchModes;
+import com.ako.dbuff.service.replay.report.ReportHeroNames;
 import com.ako.dbuff.service.replay.roleloop.RoleLoopReport.MatchData;
 import java.nio.file.Path;
 import java.util.List;
@@ -22,13 +22,12 @@ class RoleLoopTopic implements ReviewLoopTopic {
   static final Path MATCH_LIST = Path.of("src/test/resources/replay/role-loop/matches.txt");
   static final List<Section> SECTIONS =
       List.of(
-          new Section(RoleLoopReport.ROLES, "slot", 1),
-          new Section(RoleLoopReport.VERDICTS, "", 2));
+          new Section(RoleLoopReport.ROLES, "", 1), new Section(RoleLoopReport.VERDICTS, "", 1));
 
   private final StoredMatchModes matchModes;
   private final MatchRepo matchRepo;
   private final PlayerGameStatisticRepo statRepo;
-  private final ReplayPlayerRepo replayPlayerRepo;
+  private final ReportHeroNames heroNames;
   private final PlayerRoleRepo roleRepo;
   private final PlayerRoleProfileRepo profileRepo;
   private final TeamCompositionRepo compositionRepo;
@@ -38,7 +37,7 @@ class RoleLoopTopic implements ReviewLoopTopic {
       StoredMatchModes matchModes,
       MatchRepo matchRepo,
       PlayerGameStatisticRepo statRepo,
-      ReplayPlayerRepo replayPlayerRepo,
+      ReportHeroNames heroNames,
       PlayerRoleRepo roleRepo,
       PlayerRoleProfileRepo profileRepo,
       TeamCompositionRepo compositionRepo,
@@ -46,7 +45,7 @@ class RoleLoopTopic implements ReviewLoopTopic {
     this.matchModes = matchModes;
     this.matchRepo = matchRepo;
     this.statRepo = statRepo;
-    this.replayPlayerRepo = replayPlayerRepo;
+    this.heroNames = heroNames;
     this.roleRepo = roleRepo;
     this.profileRepo = profileRepo;
     this.compositionRepo = compositionRepo;
@@ -83,7 +82,7 @@ class RoleLoopTopic implements ReviewLoopTopic {
             matchRepo.findById(matchId).orElseThrow(),
             mode,
             statRepo.findAllByMatchId(matchId),
-            replayPlayerRepo.findByMatchId(matchId),
+            heroNames.bySlot(matchId),
             roleRepo.findByMatchId(matchId),
             profileRepo.findByMatchId(matchId),
             compositionRepo.findByMatchId(matchId),

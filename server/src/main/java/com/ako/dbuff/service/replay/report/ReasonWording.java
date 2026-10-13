@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
  * reason with "the team". Most evidence is an internal note (a presence name, ability names), so
  * the phrase is chosen by code and the evidence only fills in what the code leaves open.
  */
-final class ReasonWording {
+public final class ReasonWording {
   private static final String TEAM = "the team";
   private static final String TEAM_REASON = "TEAM";
   private static final Pattern ABOUT_A_TEAM = Pattern.compile("^(Radiant|Dire) ");
@@ -46,7 +46,7 @@ final class ReasonWording {
 
   private ReasonWording() {}
 
-  static String phrase(FightReasonDomain reason, String hero) {
+  public static String phrase(FightReasonDomain reason, String hero) {
     if (TEAM_REASON.equals(reason.getScope())) {
       return teamPhrase(reason.getCode(), reason.getEvidence());
     }

@@ -19,4 +19,10 @@ class ReviewLoopReportTest {
     assertThat(ReviewLoopReport.reasonOf(report)).isEqualTo("skipped: a b");
     assertThat(ReviewLoopReport.isUnavailable("# Match 5\n\n## Roles\n")).isFalse();
   }
+
+  @Test
+  void theIntroductionIsTheHowToReadLineThenTheSummaryLine() {
+    assertThat(ReviewLoopReport.introduction("read it so", "3 things"))
+        .containsExactly("**How to read this:** read it so", "", "**Summary:** 3 things");
+  }
 }
