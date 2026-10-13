@@ -27,11 +27,13 @@ final class BehaviourSplitSections {
           + " minute of a team is labelled together (%d or more of its living heroes within %d"
           + " units of each other, or all of them when fewer are alive), split up (not together,"
           + " and %d or more living heroes each alone: nobody of his team within %d units, not"
-          + " farming the jungle) or mixed (anything else). Dead heroes are not counted. The table"
-          + " shows stretches of at least %d minutes, not single minutes; a shorter one is joined"
-          + " to its longer neighbour. \"what happened\" counts, inside the stretch, the towers the"
-          + " team lost and took, its heroes that died and the enemy heroes that died. Times are"
-          + " the game clock (m:ss). Write OK or REJECT in the owner verdict column.";
+          + " farming the jungle; so a group of three and two lone heroes is split up) or mixed"
+          + " (anything else, for example a group of three and a pair). A team with fewer than %d"
+          + " living heroes has no label. Dead heroes are not counted. The table shows stretches of"
+          + " at least %d minutes, not single minutes; a shorter one is joined to its longer"
+          + " neighbour. \"what happened\" counts, inside the stretch, the towers the team lost and"
+          + " took, its heroes that died and the enemy heroes that died, whatever the cause. Times"
+          + " are the game clock (m:ss). Write OK or REJECT in the owner verdict column.";
 
   private static final String SWAPS_HOW_TO_READ =
       "Lane swap: a hero whose stored lane differs from the lane he stood in for most of minutes"
@@ -49,6 +51,7 @@ final class BehaviourSplitSections {
         p.getClusterDistance(),
         p.getSplitMinAloneHeroes(),
         p.getClusterDistance(),
+        p.getPostureMinLivingHeroes(),
         p.getMinStretchMinutes());
   }
 
@@ -136,9 +139,9 @@ final class BehaviourSplitSections {
   private static String happened(TeamSplitStretchDomain s) {
     List<String> parts = new ArrayList<>();
     add(parts, s.getTowersLost(), "lost %d %s", "tower", "towers");
-    add(parts, s.getHeroesLost(), "%d of its %s died", "heroes", "heroes");
+    add(parts, s.getOwnHeroesDied(), "%d of its %s died", "heroes", "heroes");
     add(parts, s.getTowersTaken(), "took %d %s", "tower", "towers");
-    add(parts, s.getKills(), "%d %s died", "enemy hero", "enemy heroes");
+    add(parts, s.getEnemyHeroesDied(), "%d %s died", "enemy hero", "enemy heroes");
     return parts.isEmpty() ? "nothing" : String.join(", ", parts);
   }
 

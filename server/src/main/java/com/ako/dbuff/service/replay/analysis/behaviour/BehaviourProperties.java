@@ -40,6 +40,9 @@ public class BehaviourProperties {
   /** A team is split when this many living heroes each stand alone, away from every teammate. */
   private int splitMinAloneHeroes = 2;
 
+  /** A team with fewer living heroes than this at a sample gets no label for it. */
+  private int postureMinLivingHeroes = 4;
+
   /**
    * A stretch shorter than this many minutes is absorbed by its neighbour, so labels do not flap.
    */
@@ -63,6 +66,16 @@ public class BehaviourProperties {
     require(
         groupedMinHeroes >= 2 && groupedMinHeroes <= 5,
         "grouped-min-heroes must be 2 to 5, not " + groupedMinHeroes);
+    require(
+        groupedMinHeroes >= minClusterSize,
+        "grouped-min-heroes ("
+            + groupedMinHeroes
+            + ") must be at least min-cluster-size ("
+            + minClusterSize
+            + ")");
+    require(
+        postureMinLivingHeroes >= 2 && postureMinLivingHeroes <= 5,
+        "posture-min-living-heroes must be 2 to 5, not " + postureMinLivingHeroes);
     require(
         splitMinAloneHeroes >= 2 && splitMinAloneHeroes <= 5,
         "split-min-alone-heroes must be 2 to 5, not " + splitMinAloneHeroes);

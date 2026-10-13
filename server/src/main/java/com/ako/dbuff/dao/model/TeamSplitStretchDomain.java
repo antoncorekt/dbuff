@@ -51,9 +51,12 @@ public class TeamSplitStretchDomain {
 
   private Integer towersTaken;
 
-  /** Deaths of the team's heroes and of the enemy's heroes inside the stretch. */
-  private Integer heroesLost;
+  /**
+   * Deaths of the team's heroes and of the enemy's heroes inside the stretch, from the death rows,
+   * so any cause counts (a kill, a tower, a neutral, a denied hero).
+   */
+  private Integer ownHeroesDied;
 
-  private Integer kills;
+  private Integer enemyHeroesDied;
   private Integer analysisVersion;
 }

@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PostureClassifierTest {
   private final PostureClassifier classifier =
-      new PostureClassifier(new TeamClusters(2500, 2, ZONES), 2500, 4, 2);
+      new PostureClassifier(new TeamClusters(2500, 2, ZONES), 2500, 4, 2, 2);
 
   private static Map<Long, Point> at(int... xs) {
     Map<Long, Point> alive = new HashMap<>();
@@ -43,6 +43,26 @@ class PostureClassifierTest {
   }
 
   @Test
+  void classify_threeAndTwoLoneHeroesAreSplit() {
+    assertThat(classifier.classify(at(0, 100, 200, -5000, 9000), Set.of())).contains(Posture.SPLIT);
+  }
+
+  @Test
+  void classify_threeAndAPairAreMixedNotSplit() {
+    assertThat(classifier.classify(at(0, 100, 200, 8000, 8500), Set.of())).contains(Posture.MIXED);
+  }
+
+  @Test
+  void classify_aTeamWithFewerLivingHeroesThanTheMinimumHasNoLabel() {
+    PostureClassifier strict =
+        new PostureClassifier(new TeamClusters(2500, 2, ZONES), 2500, 4, 2, 4);
+
+    assertThat(strict.classify(at(0, 100, 200), Set.of())).isEmpty();
+    assertThat(strict.classify(at(0, 9000), Set.of())).isEmpty();
+    assertThat(strict.classify(at(0, 100, 200, 300), Set.of())).contains(Posture.GROUPED);
+  }
+
+  @Test
   void classify_oneHeroAloneIsNotASplit() {
     assertThat(classifier.classify(at(0, 100, 200, 400, -9000), Set.of()))
         .contains(Posture.GROUPED);
@@ -50,7 +70,7 @@ class PostureClassifierTest {
   }
 
   @Test
-  void classify_deadHeroesAreNotCounted() {
+  void classify_threeLivingHeroesTogetherAreGroupedWhenTheMinimumAllows() {
     assertThat(classifier.classify(at(0, 100, 200), Set.of())).contains(Posture.GROUPED);
   }
 

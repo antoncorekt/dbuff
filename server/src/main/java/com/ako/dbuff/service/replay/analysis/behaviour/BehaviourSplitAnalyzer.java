@@ -1,6 +1,5 @@
 package com.ako.dbuff.service.replay.analysis.behaviour;
 
-import com.ako.dbuff.dao.model.BuildingKillContextDomain;
 import com.ako.dbuff.dao.model.LaneResultDomain;
 import com.ako.dbuff.dao.model.TeamSplitStretchDomain;
 import com.ako.dbuff.dao.repo.BuildingKillContextRepo;
@@ -9,7 +8,6 @@ import com.ako.dbuff.dao.repo.TeamSplitStretchRepo;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
 import com.ako.dbuff.service.replay.analysis.fight.FightAssessor.Trace;
-import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.map.MapLayout;
 import com.ako.dbuff.service.replay.map.MatchMapLayout;
@@ -19,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -27,16 +26,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Stores one {@code team_split_stretch} row for each stretch in which a team kept one posture
- * (grouped, split or mixed) from the end of the last lane pair on, with the towers, heroes and
- * kills of the stretch. Reads tracks, activity, lane results, deaths and building kills.
+ * (grouped, split or mixed) from the end of the last lane pair on, with the towers and the hero
+ * deaths of the stretch. Reads tracks, activity, lane results, deaths and building kills.
  */
 @Slf4j
 @Order(91)
 @Component
 @RequiredArgsConstructor
 public class BehaviourSplitAnalyzer implements ReplayAnalyzer {
-  private static final String TOWER_KIND = "TOWER";
-
   private final MatchMapLayout matchMapLayout;
   private final SlotTraces slotTraces;
   private final StoredActivity activity;
@@ -98,38 +95,32 @@ public class BehaviourSplitAnalyzer implements ReplayAnalyzer {
   }
 
   private Map<TeamSide, TeamEvents> events(long matchId) {
-    Map<Long, List<Double>> deaths = eventTimes.deaths(matchId);
-    Map<TeamSide, List<Double>> lost = new EnumMap<>(TeamSide.class);
-    Map<TeamSide, List<Double>> towersLost = new EnumMap<>(TeamSide.class);
-    Map<TeamSide, List<Double>> towersTaken = new EnumMap<>(TeamSide.class);
-    for (TeamSide team : TeamSide.values()) {
-      lost.put(team, new ArrayList<>());
-      towersLost.put(team, new ArrayList<>());
-      towersTaken.put(team, new ArrayList<>());
-    }
-    deaths.forEach((slot, times) -> lost.get(TeamSide.ofSlot(slot)).addAll(times));
-    for (BuildingKillContextDomain b : buildingRepo.findByMatchId(matchId)) {
-      TeamSide owner = Enums.find(TeamSide.class, b.getOwnerTeam());
-      if (!TOWER_KIND.equals(b.getKind()) || b.getSeconds() == null || owner == null) {
-        continue;
-      }
-      towersLost.get(owner).add(b.getSeconds());
-      if (!Boolean.TRUE.equals(b.getDenied())) {
-        towersTaken.get(other(owner)).add(b.getSeconds());
-      }
-    }
+    List<TowerFall> falls = TowerFall.of(buildingRepo.findByMatchId(matchId));
+    Map<TeamSide, List<Double>> deaths = deathsByTeam(eventTimes.deaths(matchId));
     Map<TeamSide, TeamEvents> events = new EnumMap<>(TeamSide.class);
     for (TeamSide team : TeamSide.values()) {
       events.put(
           team,
           new TeamEvents(
-              towersLost.get(team), towersTaken.get(team), lost.get(team), lost.get(other(team))));
+              towerTimes(falls, f -> f.owner() == team),
+              towerTimes(falls, f -> f.owner() != team && !f.denied()),
+              deaths.get(team),
+              deaths.get(team.opponent())));
     }
     return events;
   }
 
-  private static TeamSide other(TeamSide team) {
-    return team == TeamSide.RADIANT ? TeamSide.DIRE : TeamSide.RADIANT;
+  private static List<Double> towerTimes(List<TowerFall> falls, Predicate<TowerFall> which) {
+    return falls.stream().filter(which).map(TowerFall::seconds).toList();
+  }
+
+  private static Map<TeamSide, List<Double>> deathsByTeam(Map<Long, List<Double>> bySlot) {
+    Map<TeamSide, List<Double>> byTeam = new EnumMap<>(TeamSide.class);
+    for (TeamSide team : TeamSide.values()) {
+      byTeam.put(team, new ArrayList<>());
+    }
+    bySlot.forEach((slot, times) -> byTeam.get(TeamSide.ofSlot(slot)).addAll(times));
+    return byTeam;
   }
 
   private TeamSplitStretchDomain row(long matchId, TeamSplit s) {
@@ -141,8 +132,8 @@ public class BehaviourSplitAnalyzer implements ReplayAnalyzer {
         .label(s.stretch().posture().name())
         .towersLost(s.towersLost())
         .towersTaken(s.towersTaken())
-        .heroesLost(s.heroesLost())
-        .kills(s.kills())
+        .ownHeroesDied(s.ownHeroesDied())
+        .enemyHeroesDied(s.enemyHeroesDied())
         .analysisVersion(version())
         .build();
   }

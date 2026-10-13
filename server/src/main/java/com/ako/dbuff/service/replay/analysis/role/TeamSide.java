@@ -7,6 +7,10 @@ public enum TeamSide {
 
   public static final long FIRST_DIRE_SLOT = 128;
 
+  public TeamSide opponent() {
+    return this == RADIANT ? DIRE : RADIANT;
+  }
+
   public static TeamSide ofSlot(long playerSlot) {
     return playerSlot >= FIRST_DIRE_SLOT ? DIRE : RADIANT;
   }

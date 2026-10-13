@@ -86,6 +86,10 @@ class BehaviourLoopTopic implements ReviewLoopTopic {
   private Map<Long, Integer> roles(long matchId) {
     return roleRepo.findByMatchId(matchId).stream()
         .filter(r -> r.getPlayerSlot() != null && r.getRole() != null)
-        .collect(Collectors.toMap(PlayerRoleDomain::getPlayerSlot, PlayerRoleDomain::getRole));
+        .collect(
+            Collectors.toMap(
+                PlayerRoleDomain::getPlayerSlot,
+                PlayerRoleDomain::getRole,
+                (first, second) -> first));
   }
 }

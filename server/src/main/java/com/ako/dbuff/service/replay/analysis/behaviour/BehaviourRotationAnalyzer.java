@@ -1,6 +1,5 @@
 package com.ako.dbuff.service.replay.analysis.behaviour;
 
-import com.ako.dbuff.dao.model.BuildingKillContextDomain;
 import com.ako.dbuff.dao.model.CreepKillDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
@@ -52,8 +51,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
-  private static final String ZONE_LANE = Zone.Kind.LANE.name();
   private static final String TOWER_KIND = "TOWER";
+  private static final String ZONE_LANE = Zone.Kind.LANE.name();
 
   private final MatchMapLayout matchMapLayout;
   private final SlotTraces slotTraces;
@@ -139,14 +138,10 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
       long matchId, List<CombatEvent> events, Map<String, Long> slotByHero) {
     List<PlayerTimelineDomain> timeline = timelineRepo.findByMatchId(matchId);
     Map<TeamSide, List<MidGameFacts.TowerLoss>> towerLosses = new HashMap<>();
-    for (BuildingKillContextDomain b : buildingRepo.findByMatchId(matchId)) {
-      TeamSide owner = Enums.find(TeamSide.class, b.getOwnerTeam());
-      if (TOWER_KIND.equals(b.getKind()) && b.getSeconds() != null && owner != null) {
-        Zone.Lane lane = b.getLane() == null ? null : Enums.find(Zone.Lane.class, b.getLane());
-        towerLosses
-            .computeIfAbsent(owner, t -> new ArrayList<>())
-            .add(new MidGameFacts.TowerLoss(b.getSeconds(), lane));
-      }
+    for (TowerFall fall : TowerFall.of(buildingRepo.findByMatchId(matchId))) {
+      towerLosses
+          .computeIfAbsent(fall.owner(), t -> new ArrayList<>())
+          .add(new MidGameFacts.TowerLoss(fall.seconds(), fall.lane()));
     }
     return new MidGameFacts(
         TimelineSeries.bySlot(timeline, PlayerTimelineDomain::getGold),

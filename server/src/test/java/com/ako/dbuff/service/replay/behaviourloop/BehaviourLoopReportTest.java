@@ -180,8 +180,8 @@ class BehaviourLoopReportTest {
                         .label("SPLIT")
                         .towersLost(2)
                         .towersTaken(0)
-                        .heroesLost(1)
-                        .kills(0)
+                        .ownHeroesDied(1)
+                        .enemyHeroesDied(0)
                         .build()),
                 List.of(),
                 Map.of()));

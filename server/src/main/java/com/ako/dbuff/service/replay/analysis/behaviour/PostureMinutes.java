@@ -13,8 +13,8 @@ import java.util.stream.Collectors;
 
 /**
  * Labels each whole game minute of one team: every track sample of the minute is classified, and
- * the label seen most often wins, a tie being MIXED. A minute with no sample of a team that has two
- * living heroes, or one the tracks do not cover completely, gets no label.
+ * the label seen most often wins, a tie being MIXED. A minute with no labelled sample (a team with
+ * too few living heroes has none), or one the tracks do not cover completely, gets no label.
  */
 public final class PostureMinutes {
   private static final int MINUTE = 60;

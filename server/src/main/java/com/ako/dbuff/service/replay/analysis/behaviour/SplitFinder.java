@@ -37,7 +37,8 @@ public final class SplitFinder {
                 clusters,
                 properties.getClusterDistance(),
                 properties.getGroupedMinHeroes(),
-                properties.getSplitMinAloneHeroes()));
+                properties.getSplitMinAloneHeroes(),
+                properties.getPostureMinLivingHeroes()));
     SplitStretches stretches = new SplitStretches(properties.getMinStretchMinutes());
     List<TeamSplit> splits = new ArrayList<>();
     for (TeamSide team : TeamSide.values()) {
@@ -53,8 +54,8 @@ public final class SplitFinder {
                 stretch,
                 count(events.towersLost(), stretch),
                 count(events.towersTaken(), stretch),
-                count(events.heroesLost(), stretch),
-                count(events.kills(), stretch)));
+                count(events.ownHeroesDied(), stretch),
+                count(events.enemyHeroesDied(), stretch)));
       }
     }
     return splits;

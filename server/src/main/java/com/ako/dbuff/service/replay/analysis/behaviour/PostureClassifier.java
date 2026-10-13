@@ -18,24 +18,32 @@ import java.util.Set;
  *   <li>MIXED: anything else, for example a group of three and a pair.
  * </ul>
  *
- * A team with fewer than two living heroes has no label.
+ * A team with fewer living heroes than {@code minLiving} has no label: two or three survivors are
+ * not a posture. A group of three and a pair is MIXED, while a group of three and two lone heroes
+ * is SPLIT.
  */
 public final class PostureClassifier {
   private final TeamClusters clusters;
   private final double distance;
   private final int groupedMinHeroes;
   private final int splitMinAlone;
+  private final int minLiving;
 
   public PostureClassifier(
-      TeamClusters clusters, double distance, int groupedMinHeroes, int splitMinAlone) {
+      TeamClusters clusters,
+      double distance,
+      int groupedMinHeroes,
+      int splitMinAlone,
+      int minLiving) {
     this.clusters = clusters;
     this.distance = distance;
     this.groupedMinHeroes = groupedMinHeroes;
     this.splitMinAlone = splitMinAlone;
+    this.minLiving = minLiving;
   }
 
   public Optional<Posture> classify(Map<Long, Point> alive, Set<Long> jungleFarmers) {
-    if (alive.size() < 2) {
+    if (alive.size() < minLiving) {
       return Optional.empty();
     }
     Set<Long> grouped = clusters.find(alive).map(TeamCluster::members).orElse(Set.of());

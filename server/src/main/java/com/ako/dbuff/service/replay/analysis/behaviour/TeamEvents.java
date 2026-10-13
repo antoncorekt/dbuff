@@ -6,5 +6,5 @@ import java.util.List;
 public record TeamEvents(
     List<Double> towersLost,
     List<Double> towersTaken,
-    List<Double> heroesLost,
-    List<Double> kills) {}
+    List<Double> ownHeroesDied,
+    List<Double> enemyHeroesDied) {}

@@ -28,6 +28,15 @@ class BehaviourPropertiesTest {
     rejects(p -> p.setSplitFallbackStartSeconds(-1), "split-fallback-start-seconds");
     rejects(p -> p.setGroupedMinHeroes(1), "grouped-min-heroes");
     rejects(p -> p.setGroupedMinHeroes(6), "grouped-min-heroes");
+    rejects(
+        p -> {
+          p.setMinClusterSize(3);
+          p.setGroupedMinHeroes(2);
+        },
+        "grouped-min-heroes");
+    rejects(p -> p.setPostureMinLivingHeroes(1), "posture-min-living-heroes");
+    rejects(p -> p.setPostureMinLivingHeroes(6), "posture-min-living-heroes");
+    rejects(p -> p.setSplitMinAloneHeroes(6), "split-min-alone-heroes");
     rejects(p -> p.setSplitMinAloneHeroes(1), "split-min-alone-heroes");
     rejects(p -> p.setMinStretchMinutes(0), "min-stretch-minutes");
     rejects(p -> p.setSwapToMinute(8), "swap-from-minute");
