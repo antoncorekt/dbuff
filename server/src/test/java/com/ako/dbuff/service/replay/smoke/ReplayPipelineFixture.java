@@ -20,9 +20,11 @@ import com.ako.dbuff.dotapi.invoker.JSON;
 import com.ako.dbuff.dotapi.model.MatchResponse;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import com.ako.dbuff.service.constant.data.ItemConstant;
 import com.ako.dbuff.service.match.data.RuneEventMapper;
 import com.ako.dbuff.service.match.data.WardEventMapper;
 import com.ako.dbuff.service.replay.AbilityNames;
+import com.ako.dbuff.service.replay.analysis.item.ItemKits;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -134,6 +136,20 @@ public abstract class ReplayPipelineFixture {
               .map(n -> lenient.convertValue(n, AbilityConstant.class));
         }
       };
+    }
+
+    /**
+     * The item constants of OpenDota's {@code /constants} answer, from {@code
+     * constants-items.json}.
+     */
+    @Bean
+    ItemKits itemKits() throws IOException {
+      ObjectMapper lenient =
+          new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+      JsonNode items = constants("constants-items.json");
+      return key ->
+          Optional.ofNullable(items == null ? null : items.get(key))
+              .map(n -> lenient.convertValue(n, ItemConstant.class));
     }
 
     private static JsonNode constants(String file) throws IOException {

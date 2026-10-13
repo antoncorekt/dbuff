@@ -12,6 +12,7 @@ import com.ako.dbuff.dao.model.OpeningSummaryDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
+import com.ako.dbuff.dao.model.ReplayStateChangeDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.model.RunePickupDomain;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
@@ -25,6 +26,7 @@ import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
 import com.ako.dbuff.dao.repo.GameStateSegmentRepo;
+import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
 import com.ako.dbuff.dao.repo.LaneAssignmentRepo;
 import com.ako.dbuff.dao.repo.LaneReasonRepo;
 import com.ako.dbuff.dao.repo.LaneResultRepo;
@@ -44,12 +46,15 @@ import com.ako.dbuff.dao.repo.RunePickupRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.ReplayDataService;
 import com.ako.dbuff.service.replay.ReplayRunService;
+import com.ako.dbuff.service.replay.StateChangeKind;
 import com.ako.dbuff.service.replay.analysis.activity.Activity;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionStage;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
 import com.ako.dbuff.service.replay.analysis.creep.CreepClass;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
+import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
+import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyJson;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.reason.Reason;
 import com.ako.dbuff.service.replay.analysis.reason.ReasonScope;
@@ -69,6 +74,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -119,6 +125,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private FightRepo fightRepo;
   @Autowired private CreepKillRepo creepKillRepo;
   @Autowired private RunePickupRepo runePickupRepo;
+  @Autowired private ItemEfficiencyRepo itemEfficiencyRepo;
   @Autowired private LaneAssignmentRepo laneAssignmentRepo;
   @Autowired private LaneResultRepo laneResultRepo;
   @Autowired private LaneReasonRepo laneReasonRepo;
@@ -194,6 +201,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertAllPickReasons(id, match.getId());
       assertCreepKills(id, match.getId());
       assertRunes(id, match.getId());
+      assertItemEfficiency(id, match.getId());
       assertLanes(id, match.getId());
       assertThat(buybackRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(spikeRepo.findByMatchId(match.getId())).isNotEmpty();
@@ -226,6 +234,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(creepKillRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
     assertThat(runePickupRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
     assertThat(openingSummaryRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
+    assertThat(itemEfficiencyRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
     assertThat(explanationRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
   }
 
@@ -258,6 +267,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertRoleAwareReasons(id, match.getId());
       assertCreepKills(id, match.getId());
       assertRunes(id, match.getId());
+      assertItemEfficiency(id, match.getId());
       assertLanes(id, match.getId());
       assertAbilityDraftReasons(id, match.getId());
       assertFightExplanations(id, match.getId());
@@ -416,6 +426,104 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
         bounty.size(),
         advantage.size(),
         opening.stream().map(o -> o.getTeam() + " " + o.getResult()).toList());
+  }
+
+  /**
+   * A row for every hero who held a listed item, and the numbers agree with the stored charges, the
+   * combat log and the creep kills they come from.
+   */
+  private void assertItemEfficiency(String id, long matchId) {
+    List<ItemEfficiency> rows =
+        itemEfficiencyRepo.findByMatchId(matchId).stream()
+            .map(ItemEfficiencyJson::fromRow)
+            .toList();
+    Map<String, Set<Long>> holders = new TreeMap<>();
+    Map<Long, List<ReplayStateChangeDomain>> changes = new HashMap<>();
+    for (ReplayStateChangeDomain c : stateRepo.findByMatchIdOrderByGameSeconds(matchId)) {
+      changes.computeIfAbsent(c.getPlayerSlot(), k -> new ArrayList<>()).add(c);
+      if (StateChangeKind.ITEM_ADDED.name().equals(c.getKind())) {
+        Map.of(
+                "magic_stick", "magic_stick",
+                "magic_wand", "magic_stick",
+                "hand_of_midas", "hand_of_midas",
+                "bfury", "farming_items",
+                "maelstrom", "farming_items",
+                "mjollnir", "farming_items")
+            .entrySet()
+            .stream()
+            .filter(e -> c.getName().equals("item_" + e.getKey()))
+            .forEach(
+                e ->
+                    holders
+                        .computeIfAbsent(e.getValue(), k -> new TreeSet<>())
+                        .add(c.getPlayerSlot()));
+      }
+    }
+    assertThat(holders.keySet()).as("%s: some listed item was bought", id).contains("magic_stick");
+    holders.forEach(
+        (entry, slots) ->
+            assertThat(
+                    rows.stream().filter(r -> r.entryKey().equals(entry)).map(ItemEfficiency::slot))
+                .as("%s: a row for every hero who held a %s item", id, entry)
+                .containsExactlyInAnyOrderElementsOf(slots));
+    for (ItemEfficiency r : rows) {
+      assertThat(r.cost()).as("%s slot %d: cost from the constants", id, r.slot()).isPositive();
+      if (r.ratio() != null) {
+        assertThat(r.ratio()).isEqualTo(r.gain() / r.cost());
+      }
+      assertThat(r.rows()).as("%s slot %d %s: rows", id, r.slot(), r.entryKey()).isNotNull();
+    }
+    List<ItemEfficiency> sticks =
+        rows.stream().filter(r -> r.kind().equals("magic-stick")).toList();
+    long uses = 0;
+    long followed = 0;
+    long withCharges = 0;
+    for (ItemEfficiency r : sticks) {
+      assertThat(r.figures().get("saves")).isLessThanOrEqualTo((double) r.count());
+      assertThat(r.figures().get("hp")).isLessThanOrEqualTo(r.figures().get("charges") * 15);
+      for (ItemEfficiency.Detail use : r.rows()) {
+        uses++;
+        if (use.figures().get("charges") > 0) {
+          withCharges++;
+          double before = use.figures().get("charges");
+          boolean dropped =
+              changes.get(r.slot()).stream()
+                  .anyMatch(
+                      c ->
+                          StateChangeKind.ITEM_CHARGES.name().equals(c.getKind())
+                              && c.getCharges() * 2 <= before
+                              && c.getGameSeconds() >= use.seconds() - 1
+                              && c.getGameSeconds() <= use.seconds() + 6);
+          followed += dropped ? 1 : 0;
+        }
+      }
+    }
+    assertThat(uses).as("%s: stick uses", id).isPositive();
+    assertThat(followed)
+        .as("%s: uses with charges followed by a drop to half or less (E3 verified)", id)
+        .isGreaterThanOrEqualTo(withCharges * 8 / 10);
+    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("hand-of-midas")).toList()) {
+      assertThat(r.figures().get("gold"))
+          .as("%s slot %d: every use pays the bonus gold", id, r.slot())
+          .isEqualTo(r.count() * 160.0);
+      assertThat(r.paybackSeconds() != null)
+          .as("paid back exactly when the gain reached the cost")
+          .isEqualTo(r.gain() >= r.cost());
+    }
+    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("farming-group")).toList()) {
+      assertThat(r.rows()).extracting(d -> d.label()).startsWith("BEFORE", "AFTER", "DAMAGE");
+      assertThat(r.figures().get("procDamage")).as("damage of the item's own effects").isPositive();
+      assertThat(r.figures().get("damageValue")).isGreaterThanOrEqualTo(0.0);
+    }
+    System.out.printf(
+        "ITEMS %s: %d rows (%d stick, %d midas, %d farming), %d stick uses, %.0f saves%n",
+        id,
+        rows.size(),
+        sticks.size(),
+        rows.stream().filter(r -> r.kind().equals("hand-of-midas")).count(),
+        rows.stream().filter(r -> r.kind().equals("farming-group")).count(),
+        uses,
+        sticks.stream().mapToDouble(r -> r.figures().get("saves")).sum());
   }
 
   private void assertFightExplanations(String id, long matchId) {
