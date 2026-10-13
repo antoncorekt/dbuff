@@ -54,6 +54,8 @@ interface Wording {
           "the replay shows no cooldown for it, so the ready time is the use plus the cooldown"
               + " guess";
       case "EXTRA_ESTIMATED" -> "what a normal kill pays is estimated from the creep values";
+      case "COST_UNKNOWN" -> "the item constants give no cost for it, so there is no ratio";
+      case "BONUS_GOLD_UNKNOWN" -> "the constants give no bonus gold, so no gold is counted";
       case "USE_WITHOUT_GOLD" -> "a use had no gold entry in the log";
       case "NO_BEFORE_WINDOW" -> "bought too early for a before window, not compared";
       case "SHORT_AFTER_WINDOW" -> "bought too late for an after window, not compared";
@@ -65,7 +67,10 @@ interface Wording {
     return count + " " + noun + (count == 1 ? "" : "s");
   }
 
-  static String number(double value) {
+  static String number(Double value) {
+    if (value == null) {
+      return "?";
+    }
     return String.format(Locale.ROOT, "%.1f", value);
   }
 

@@ -63,4 +63,17 @@ class ReplayItemEfficiencyAnalyzerChecksTest {
         .contains("players", "tracks", "state-changes", "combat-log", "activity", "creep-kills");
     verify(repo).deleteByMatchId(1L);
   }
+
+  @Test
+  void everyProblemOfTheFileIsReportedInOneError() {
+    ReplayItemEfficiencyAnalyzer analyzer =
+        analyzer(
+            "{\"key\": \"a\", \"kind\": \"nope\", \"items\": [\"x\"]},"
+                + "{\"key\": \"b\", \"kind\": \"magic-stick\", \"items\": [\"x\"],"
+                + " \"parameters\": {\"saveGolds\": 1}}");
+
+    assertThatThrownBy(() -> analyzer.analyze(1))
+        .hasMessageContaining("entry 'a': no evaluator for kind 'nope'")
+        .hasMessageContaining("entry 'b': unknown parameter 'saveGolds'");
+  }
 }

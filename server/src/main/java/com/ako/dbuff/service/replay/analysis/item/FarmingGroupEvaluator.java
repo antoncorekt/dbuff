@@ -23,6 +23,7 @@ public class FarmingGroupEvaluator implements ItemEfficiencyEvaluator {
 
   static final String NO_BEFORE_WINDOW = "NO_BEFORE_WINDOW";
   static final String SHORT_AFTER_WINDOW = "SHORT_AFTER_WINDOW";
+  static final String COST_UNKNOWN = "COST_UNKNOWN";
 
   private static final String BEFORE = "BEFORE";
   private static final String AFTER = "AFTER";
@@ -51,8 +52,12 @@ public class FarmingGroupEvaluator implements ItemEfficiencyEvaluator {
   }
 
   private record Window(String label, double from, double to, List<CreepKillDomain> kills) {
+    double seconds() {
+      return to - from;
+    }
+
     double minutes() {
-      return (to - from) / SECONDS_PER_MINUTE;
+      return seconds() / SECONDS_PER_MINUTE;
     }
   }
 
@@ -63,15 +68,17 @@ public class FarmingGroupEvaluator implements ItemEfficiencyEvaluator {
     double end = context.gameEndSeconds();
     double length = entry.parameter("windowMinutes", 5) * SECONDS_PER_MINUTE;
     double gap = entry.parameter("campGapSeconds", 30);
-    long cost = context.cost(List.of(first));
+    double ownedTo = Math.min(end, hero.ownedUntil(names, end));
+    Long cost = context.cost(hero.held(names));
     Window before = window(hero, BEFORE, Math.max(0, bought - length), bought);
-    Window after = window(hero, AFTER, bought, Math.min(end, bought + length));
+    Window after = window(hero, AFTER, bought, Math.min(ownedTo, bought + length));
     List<String> flags = new ArrayList<>();
-    boolean comparable = before.to() - before.from() >= entry.parameter("minBeforeSeconds", 120);
+    boolean comparable =
+        before.seconds() > 0 && before.seconds() >= entry.parameter("minBeforeSeconds", 120.0);
     if (!comparable) {
       flags.add(NO_BEFORE_WINDOW);
     }
-    if (after.to() - after.from() < entry.parameter("minAfterSeconds", 60)) {
+    if (after.seconds() <= 0 || after.seconds() < entry.parameter("minAfterSeconds", 60.0)) {
       flags.add(SHORT_AFTER_WINDOW);
       comparable = false;
     }
@@ -84,15 +91,21 @@ public class FarmingGroupEvaluator implements ItemEfficiencyEvaluator {
     Double payback = null;
     if (comparable) {
       double net = goldPerMinute(after) - goldPerMinute(before);
-      gain = net * (end - bought) / SECONDS_PER_MINUTE;
-      ratio = gain / cost;
+      gain = net * Math.max(0, ownedTo - bought) / SECONDS_PER_MINUTE;
       totals.put("netGoldPerMinute", net);
-      if (net > 0 && bought + cost / net * SECONDS_PER_MINUTE <= end) {
-        payback = bought + cost / net * SECONDS_PER_MINUTE;
-        rows.add(new Detail(PAYBACK, payback, null, Map.of("netGoldPerMinute", net)));
+      if (cost != null) {
+        ratio = gain / cost;
+        double paidAt = bought + cost / net * SECONDS_PER_MINUTE;
+        if (net > 0 && paidAt <= ownedTo) {
+          payback = paidAt;
+          rows.add(new Detail(PAYBACK, payback, null, Map.of("netGoldPerMinute", net)));
+        }
       }
     }
-    totals.put("minutesAfterPurchase", Math.max(0, end - bought) / SECONDS_PER_MINUTE);
+    if (cost == null) {
+      flags.add(COST_UNKNOWN);
+    }
+    totals.put("minutesOwned", Math.max(0, ownedTo - bought) / SECONDS_PER_MINUTE);
     return new ItemEfficiency(
         hero.slot(),
         entry.key(),
@@ -112,14 +125,14 @@ public class FarmingGroupEvaluator implements ItemEfficiencyEvaluator {
   private Window window(HeroInputs hero, String label, double from, double to) {
     List<CreepKillDomain> kills =
         hero.creepKills().stream()
-            .filter(k -> !Boolean.TRUE.equals(k.getDenied()))
+            .filter(k -> k.getSeconds() != null && !Boolean.TRUE.equals(k.getDenied()))
             .filter(k -> k.getSeconds() >= from && k.getSeconds() < to)
             .toList();
     return new Window(label, from, to, kills);
   }
 
   private static double goldPerMinute(Window w) {
-    return w.minutes() <= 0 ? 0 : gold(w) / w.minutes();
+    return gold(w) / w.minutes();
   }
 
   private static double gold(Window w) {
@@ -128,12 +141,13 @@ public class FarmingGroupEvaluator implements ItemEfficiencyEvaluator {
 
   private Detail detail(Window w, double campGapSeconds) {
     Map<String, Double> figures = new LinkedHashMap<>();
-    double minutes = Math.max(w.minutes(), 1e-9);
-    figures.put("minutes", w.minutes());
+    boolean measured = w.seconds() > 0;
+    double minutes = w.minutes();
+    figures.put("minutes", measured ? minutes : null);
     figures.put("kills", (double) w.kills().size());
-    figures.put("killsPerMinute", w.kills().size() / minutes);
-    figures.put("goldPerMinute", gold(w) / minutes);
-    figures.put("campsPerMinute", camps(w, campGapSeconds) / minutes);
+    figures.put("killsPerMinute", measured ? w.kills().size() / minutes : null);
+    figures.put("goldPerMinute", measured ? gold(w) / minutes : null);
+    figures.put("campsPerMinute", measured ? camps(w, campGapSeconds) / minutes : null);
     return new Detail(w.label(), w.from(), null, figures);
   }
 

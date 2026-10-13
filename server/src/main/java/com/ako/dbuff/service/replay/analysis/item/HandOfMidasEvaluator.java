@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.analysis.item;
 import com.ako.dbuff.service.constant.data.ItemConstant;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
+import com.ako.dbuff.service.replay.XpReason;
 import com.ako.dbuff.service.replay.analysis.creep.CreepClass;
 import com.ako.dbuff.service.replay.analysis.creep.CreepValues;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.Set;
+import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -29,6 +31,8 @@ public class HandOfMidasEvaluator implements ItemEfficiencyEvaluator {
   static final String COOLDOWN_ESTIMATED = "COOLDOWN_ESTIMATED";
   static final String USE_WITHOUT_GOLD = "USE_WITHOUT_GOLD";
   static final String EXTRA_ESTIMATED = "EXTRA_ESTIMATED";
+  static final String COST_UNKNOWN = "COST_UNKNOWN";
+  static final String BONUS_GOLD_UNKNOWN = "BONUS_GOLD_UNKNOWN";
 
   private static final String USE = "USE";
   private static final String PAYBACK = "PAYBACK";
@@ -64,10 +68,11 @@ public class HandOfMidasEvaluator implements ItemEfficiencyEvaluator {
     ItemEfficiencyEntry entry = context.entry();
     double weight = entry.parameter("xpWeight", 1.0);
     double cooldown = entry.parameter("cooldownSeconds", 90);
-    long cost = context.cost(hero.held(names));
+    Long cost = context.cost(hero.held(names));
     double bought = hero.firstAdded(names).orElse(0);
     double ownedTo = hero.ownedUntil(names, context.gameEndSeconds());
-    List<Use> uses = pairedUses(context, hero, names);
+    int bonus = bonusGold(context.kits(), entry.items().getFirst());
+    List<Use> uses = pairedUses(hero, names, bonus);
     List<Detail> rows = new ArrayList<>();
     Set<String> flags = new HashSet<>();
     double gold = 0;
@@ -99,7 +104,7 @@ public class HandOfMidasEvaluator implements ItemEfficiencyEvaluator {
         flags.add(USE_WITHOUT_GOLD);
       }
       rows.add(new Detail(USE, t, use.event().target(), figures));
-      if (payback == null && cumulative >= cost) {
+      if (payback == null && cost != null && cumulative >= cost) {
         payback = t;
         rows.add(new Detail(PAYBACK, t, null, Map.of("cumulative", cumulative)));
       }
@@ -128,16 +133,29 @@ public class HandOfMidasEvaluator implements ItemEfficiencyEvaluator {
         uses.size(),
         gain,
         cost,
-        gain / cost,
+        cost == null ? null : gain / cost,
         payback,
         totals,
-        flags.stream().sorted().toList(),
+        sortedFlags(flags, cost == null, bonus <= 0),
         rows);
   }
 
-  /** Each use with the gold entry of the bonus and the first experience entry right after it. */
-  private List<Use> pairedUses(EntryContext context, HeroInputs hero, List<String> names) {
-    int expected = bonusGold(context.kits(), context.entry().items().getFirst());
+  private static List<String> sortedFlags(Set<String> flags, boolean noCost, boolean noBonus) {
+    if (noCost) {
+      flags.add(COST_UNKNOWN);
+    }
+    if (noBonus) {
+      flags.add(BONUS_GOLD_UNKNOWN);
+    }
+    return flags.stream().sorted().toList();
+  }
+
+  /**
+   * Each use with the gold entry of the bonus (positive, equal to the constants' bonus; none is
+   * claimed when the constants give no bonus) and the experience entry for a creep kill nearest in
+   * time, each entry claimed once.
+   */
+  private List<Use> pairedUses(HeroInputs hero, List<String> names, int bonus) {
     List<CombatEvent> events = hero.events();
     Set<Integer> taken = new HashSet<>();
     List<Use> uses = new ArrayList<>();
@@ -148,27 +166,56 @@ public class HandOfMidasEvaluator implements ItemEfficiencyEvaluator {
           || !names.contains(use.inflictor())) {
         continue;
       }
-      int gold = take(events, taken, i, CombatEventKind.GOLD, expected);
-      int xp = take(events, taken, i, CombatEventKind.XP, 0);
-      uses.add(new Use(use, gold < 0 ? 0 : gold, xp < 0 ? 0 : xp));
+      int gold =
+          bonus <= 0
+              ? 0
+              : nearest(events, taken, i, e -> e.kind() == CombatEventKind.GOLD && e.value() == bonus);
+      int xp =
+          nearest(
+              events,
+              taken,
+              i,
+              e ->
+                  e.kind() == CombatEventKind.XP
+                      && e.value() > 0
+                      && e.xpReason() == XpReason.CREEP_KILL);
+      uses.add(new Use(use, gold, xp));
     }
     return uses;
   }
 
-  /** The value of the first unclaimed entry of the kind after the use within the pairing window. */
-  private static int take(
-      List<CombatEvent> events, Set<Integer> taken, int use, CombatEventKind kind, int wanted) {
+  /** The value of the unclaimed matching entry nearest in time to the use within the window; 0. */
+  private static int nearest(
+      List<CombatEvent> events, Set<Integer> taken, int use, Predicate<CombatEvent> wanted) {
     double t = events.get(use).gameSecond();
-    for (int j = use + 1;
-        j < events.size() && events.get(j).gameSecond() - t <= PAIR_SECONDS;
-        j++) {
-      CombatEvent e = events.get(j);
-      if (e.kind() == kind && !taken.contains(j) && (wanted == 0 || e.value() == wanted)) {
-        taken.add(j);
-        return e.value();
-      }
+    int best = -1;
+    double bestGap = PAIR_SECONDS + 1e-9;
+    for (int j = use + 1; j < events.size() && events.get(j).gameSecond() - t <= PAIR_SECONDS; j++) {
+      best = closer(events, taken, wanted, j, t, best, bestGap);
+      bestGap = best == j ? Math.abs(events.get(j).gameSecond() - t) : bestGap;
     }
-    return -1;
+    for (int j = use - 1; j >= 0 && t - events.get(j).gameSecond() <= PAIR_SECONDS; j--) {
+      best = closer(events, taken, wanted, j, t, best, bestGap);
+      bestGap = best == j ? Math.abs(events.get(j).gameSecond() - t) : bestGap;
+    }
+    if (best < 0) {
+      return 0;
+    }
+    taken.add(best);
+    return events.get(best).value();
+  }
+
+  private static int closer(
+      List<CombatEvent> events,
+      Set<Integer> taken,
+      Predicate<CombatEvent> wanted,
+      int j,
+      double t,
+      int best,
+      double bestGap) {
+    CombatEvent e = events.get(j);
+    boolean nearer = Math.abs(e.gameSecond() - t) < bestGap;
+    return !taken.contains(j) && wanted.test(e) && nearer ? j : best;
   }
 
   private static int bonusGold(ItemKits kits, String key) {

@@ -22,6 +22,7 @@ public class MagicStickEvaluator implements ItemEfficiencyEvaluator {
   static final String HP_UNCAPPED = "HP_UNCAPPED";
   static final String MANA_UNCAPPED = "MANA_UNCAPPED";
   static final String NO_CHARGES_SEEN = "NO_CHARGES_SEEN";
+  static final String COST_UNKNOWN = "COST_UNKNOWN";
 
   private static final String USE = "USE";
   private static final Set<String> PARAMETERS =
@@ -95,8 +96,11 @@ public class MagicStickEvaluator implements ItemEfficiencyEvaluator {
     double gain =
         hp * entry.parameter("goldPerHp", 0.3)
             + mana * entry.parameter("goldPerMana", 0.3)
-            + saves * entry.parameter("saveGold", 300);
-    long cost = context.cost(hero.held(names));
+            + saves * entry.parameter("saveGold", 300.0);
+    Long cost = context.cost(hero.held(names));
+    if (cost == null) {
+      flags.add(COST_UNKNOWN);
+    }
     return new ItemEfficiency(
         hero.slot(),
         entry.key(),
@@ -106,7 +110,7 @@ public class MagicStickEvaluator implements ItemEfficiencyEvaluator {
         uses.size(),
         gain,
         cost,
-        gain / cost,
+        cost == null ? null : gain / cost,
         null,
         totals,
         flags,
@@ -123,9 +127,9 @@ public class MagicStickEvaluator implements ItemEfficiencyEvaluator {
     OptionalInt seen = hero.chargesAt(names, t);
     int charges = seen.orElse(0);
     double restored = charges * entry.parameter("restorePerCharge", 15.0);
-    int window = entry.parameter("maxHpWindowSeconds", 120);
+    double window = entry.parameter("maxHpWindowSeconds", 120.0);
     OptionalInt maxHp = health.maxHealth(t, window);
-    OptionalInt hpNow = health.health(t, entry.parameter("hpLookbackSeconds", 3), window);
+    OptionalInt hpNow = health.health(t, entry.parameter("hpLookbackSeconds", 3.0), window);
     boolean hpKnown = maxHp.isPresent() && hpNow.isPresent();
     double hp =
         hpKnown ? Math.min(restored, Math.max(0, maxHp.getAsInt() - hpNow.getAsInt())) : restored;
@@ -165,15 +169,15 @@ public class MagicStickEvaluator implements ItemEfficiencyEvaluator {
     double lowHp =
         maxHp.isPresent()
             ? maxHp.getAsInt() * entry.parameter("lowHpFraction", 0.35)
-            : entry.parameter("lowHpAbsolute", 300);
+            : entry.parameter("lowHpAbsolute", 300.0);
     double heavy =
         maxHp.isPresent()
             ? maxHp.getAsInt() * entry.parameter("heavyDamageFraction", 0.3)
-            : entry.parameter("heavyDamageAbsolute", 300);
+            : entry.parameter("heavyDamageAbsolute", 300.0);
     double damage =
         health.damage(
-            second - entry.parameter("damageBeforeSeconds", 3),
-            second + entry.parameter("damageAfterSeconds", 3));
+            second - entry.parameter("damageBeforeSeconds", 3.0),
+            second + entry.parameter("damageAfterSeconds", 3.0));
     return hpNow.getAsInt() <= lowHp && damage >= heavy;
   }
 }

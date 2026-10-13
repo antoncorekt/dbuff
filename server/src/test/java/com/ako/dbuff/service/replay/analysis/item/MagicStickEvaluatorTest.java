@@ -71,7 +71,7 @@ class MagicStickEvaluatorTest {
         .containsEntry("diedSoon", 0.0)
         .containsEntry("laning", 1.0);
     assertThat(result.figures()).containsEntry("saves", 1.0).containsEntry("hp", 150.0);
-    assertThat(result.cost()).isEqualTo(200);
+    assertThat(result.cost()).isEqualTo(200L);
     assertThat(result.purchaseSeconds()).isEqualTo(-60.0);
     assertThat(result.itemKey()).isEqualTo("magic_stick");
     assertThat(result.flags()).isEmpty();
@@ -131,7 +131,7 @@ class MagicStickEvaluatorTest {
     ItemEfficiency result = evaluate(hero(changes, events, null, List.of(), List.of()));
 
     assertThat(result.count()).isEqualTo(2);
-    assertThat(result.cost()).isEqualTo(460);
+    assertThat(result.cost()).isEqualTo(460L);
     assertThat(result.rows())
         .extracting(r -> r.figures().get("charges"))
         .containsExactly(4.0, 12.0);
@@ -172,5 +172,75 @@ class MagicStickEvaluatorTest {
             .getFirst();
 
     assertThat(result.figures()).containsEntry("saves", 0.0);
+  }
+
+  @Test
+  void aFractionalParameterIsNotRounded() {
+    ItemEfficiencyEntry fractional =
+        ItemTestData.entry(
+            "magic_stick",
+            MagicStickEvaluator.KIND,
+            List.of("magic_stick", "magic_wand"),
+            Map.of("damageBeforeSeconds", 0.5, "damageAfterSeconds", 0.4));
+    List<CombatEvent> events =
+        List.of(hit(120.2, 450, 300), use(121.0, STICK, ""), hit(121.3, 100, 200), hit(122.0, 50, 150));
+
+    ItemEfficiency result =
+        evaluator
+            .evaluate(
+                new EntryContext(
+                    fractional,
+                    KITS,
+                    600,
+                    List.of(hero(sticks(), events, track(), List.of(), List.of()))))
+            .getFirst();
+
+    assertThat(result.rows().getFirst().figures()).containsEntry("damageAround", 100.0);
+  }
+
+  @Test
+  void aCostTheConstantsLackGivesTheRowAFlagAndNoRatio() {
+    List<CombatEvent> events = List.of(use(121.0, STICK, ""));
+
+    ItemEfficiency result =
+        evaluator
+            .evaluate(
+                new EntryContext(
+                    ENTRY,
+                    ItemTestData.kits(Map.of()),
+                    600,
+                    List.of(hero(sticks(), events, null, List.of(), List.of()))))
+            .getFirst();
+
+    assertThat(result.cost()).isNull();
+    assertThat(result.ratio()).isNull();
+    assertThat(result.flags()).contains(MagicStickEvaluator.COST_UNKNOWN);
+    assertThat(result.count()).isEqualTo(1);
+  }
+
+  @Test
+  void emptyManaIsAValidReadingAndTheWholeRestoreIsUseful() {
+    ReplayPlayerTrackDomain track = track();
+    track.getManaPercent()[sampleOf(120)] = 0;
+    track.getMana()[sampleOf(120)] = 0;
+
+    ItemEfficiency result =
+        evaluate(hero(sticks(), List.of(use(121.0, STICK, "")), track, List.of(), List.of()));
+
+    assertThat(result.figures()).containsEntry("mana", 150.0);
+    assertThat(result.flags()).doesNotContain(MagicStickEvaluator.MANA_UNCAPPED);
+  }
+
+  @Test
+  void aTrackWithoutAStepIsNoDataAndNoFailure() {
+    ReplayPlayerTrackDomain track = track();
+    track.setStepSeconds(null);
+    List<CombatEvent> events = List.of(hit(120.2, 450, 300), use(121.0, STICK, ""));
+
+    ItemEfficiency result = evaluate(hero(sticks(), events, track, List.of(), List.of()));
+
+    assertThat(result.flags())
+        .contains(MagicStickEvaluator.HP_UNCAPPED, MagicStickEvaluator.MANA_UNCAPPED);
+    assertThat(result.figures()).containsEntry("hp", 150.0);
   }
 }

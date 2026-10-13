@@ -19,8 +19,4 @@ public record ItemEfficiencyEntry(
   public double parameter(String name, double fallback) {
     return parameters.getOrDefault(name, fallback);
   }
-
-  public int parameter(String name, int fallback) {
-    return (int) Math.round(parameter(name, (double) fallback));
-  }
 }

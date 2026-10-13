@@ -140,4 +140,95 @@ class HandOfMidasEvaluatorTest {
 
     assertThat(result.figures()).containsEntry("heroGold", 1366.0);
   }
+
+  @Test
+  void withoutABonusInTheConstantsNoGoldIsClaimedAndTheRowSaysSo() {
+    List<CombatEvent> events =
+        List.of(
+            use(200, MIDAS, HELLCALLER),
+            paid(CombatEventKind.GOLD, 200, -160),
+            paid(CombatEventKind.GOLD, 200, 160),
+            paid(CombatEventKind.XP, 200, 95));
+    ItemEfficiencyEntry entry =
+        ItemTestData.entry(
+            "hand_of_midas", HandOfMidasEvaluator.KIND, List.of("hand_of_midas"), Map.of());
+    ItemKits noBonus =
+        key ->
+            java.util.Optional.of(
+                com.ako.dbuff.service.constant.data.ItemConstant.builder().cost(300L).build());
+
+    ItemEfficiency result =
+        evaluator
+            .evaluate(
+                new EntryContext(
+                    entry,
+                    noBonus,
+                    400,
+                    List.of(hero(owned(), events, null, List.of(), List.of()))))
+            .getFirst();
+
+    assertThat(result.figures()).containsEntry("gold", 0.0).containsEntry("xp", 95.0);
+    assertThat(result.flags()).contains(HandOfMidasEvaluator.BONUS_GOLD_UNKNOWN);
+  }
+
+  @Test
+  void aNegativeGoldEntryIsNeverTakenForTheBonus() {
+    List<CombatEvent> events =
+        List.of(
+            use(200, MIDAS, HELLCALLER),
+            paid(CombatEventKind.GOLD, 200, -300),
+            paid(CombatEventKind.XP, 200, 95));
+
+    ItemEfficiency result =
+        evaluate(300, hero(owned(), events, null, List.of(), List.of()), Map.of());
+
+    assertThat(result.figures()).containsEntry("gold", 0.0);
+    assertThat(result.flags()).contains(HandOfMidasEvaluator.USE_WITHOUT_GOLD);
+  }
+
+  @Test
+  void twoUsesWithinTheSameWindowEachTakeTheirOwnNearestExperienceOfACreepKill() {
+    CombatEvent heroKillXp =
+        new CombatEvent(
+            CombatEventKind.XP, 200.0, "", ItemTestData.HERO, "", 0, 999, 0, 1, 0, 0, 0, 0);
+    List<CombatEvent> events =
+        List.of(
+            use(200.0, MIDAS, HELLCALLER),
+            use(200.1, MIDAS, HELLCALLER),
+            heroKillXp,
+            paid(CombatEventKind.GOLD, 200.0, 160),
+            paid(CombatEventKind.XP, 200.0, 50),
+            paid(CombatEventKind.GOLD, 200.1, 160),
+            paid(CombatEventKind.XP, 200.1, 70));
+
+    ItemEfficiency result =
+        evaluate(5000, hero(owned(), events, null, List.of(), List.of()), Map.of());
+
+    assertThat(result.rows())
+        .extracting(d -> d.figures().get("xp"))
+        .containsExactly(50.0, 70.0);
+    assertThat(result.figures()).containsEntry("gold", 320.0).containsEntry("xp", 120.0);
+  }
+
+  @Test
+  void aCostTheConstantsLackGivesAFlagAndNoRatioOrPayback() {
+    ItemEfficiencyEntry entry =
+        ItemTestData.entry(
+            "hand_of_midas", HandOfMidasEvaluator.KIND, List.of("hand_of_midas"), Map.of());
+
+    ItemEfficiency result =
+        evaluator
+            .evaluate(
+                new EntryContext(
+                    entry,
+                    ItemTestData.kits(Map.of()),
+                    400,
+                    List.of(hero(owned(), twoUses(), null, List.of(), List.of()))))
+            .getFirst();
+
+    assertThat(result.cost()).isNull();
+    assertThat(result.ratio()).isNull();
+    assertThat(result.paybackSeconds()).isNull();
+    assertThat(result.flags()).contains(HandOfMidasEvaluator.COST_UNKNOWN);
+  }
 }

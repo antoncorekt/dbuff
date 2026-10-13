@@ -21,7 +21,7 @@ class FarmingGroupEvaluatorTest {
           List.of("bfury", "maelstrom", "mjollnir"),
           Map.of());
   private static final ItemKits KITS =
-      ItemTestData.kits(Map.of("bfury", 500L, "maelstrom", 500L, "mjollnir", 5500L));
+      ItemTestData.kits(Map.of("bfury", 500L, "maelstrom", 500L, "mjollnir", 700L));
 
   private final FarmingGroupEvaluator evaluator = new FarmingGroupEvaluator();
 
@@ -54,7 +54,7 @@ class FarmingGroupEvaluatorTest {
 
     assertThat(result.itemKey()).isEqualTo("maelstrom");
     assertThat(result.purchaseSeconds()).isEqualTo(600.0);
-    assertThat(result.cost()).isEqualTo(500);
+    assertThat(result.cost()).isEqualTo(700L);
     assertThat(result.count()).isEqualTo(23);
     assertThat(result.rows())
         .extracting(ItemEfficiency.Detail::label)
@@ -68,8 +68,8 @@ class FarmingGroupEvaluatorTest {
         .containsEntry("campsPerMinute", 2 / 5.0);
     assertThat(result.figures()).containsEntry("netGoldPerMinute", 66.0);
     assertThat(result.gain()).isEqualTo(66.0 * 15);
-    assertThat(result.paybackSeconds()).isEqualTo(600 + 500 / 66.0 * 60);
-    assertThat(result.ratio()).isEqualTo(66.0 * 15 / 500);
+    assertThat(result.paybackSeconds()).isEqualTo(600 + 700 / 66.0 * 60);
+    assertThat(result.ratio()).isEqualTo(66.0 * 15 / 700);
   }
 
   @Test
@@ -114,5 +114,70 @@ class FarmingGroupEvaluatorTest {
         evaluate(hero(changes, List.of(), null, List.of(denied), List.of()), 1500);
 
     assertThat(result.count()).isZero();
+  }
+
+  @Test
+  void theGainStopsWhenTheHeroNoLongerOwnsTheItem() {
+    List<CreepKillDomain> kills = new ArrayList<>();
+    kills.addAll(kills(10, 300, 600, 30));
+    kills.addAll(kills(20, 600, 900, 30));
+    var changes =
+        List.of(
+            change(600, StateChangeKind.ITEM_ADDED, "item_bfury"),
+            change(900, StateChangeKind.ITEM_REMOVED, "item_bfury"));
+
+    ItemEfficiency result = evaluate(hero(changes, List.of(), null, kills, List.of()), 1500);
+
+    assertThat(result.figures()).containsEntry("minutesOwned", 5.0);
+    assertThat(result.gain()).isEqualTo(60.0 * 5);
+  }
+
+  @Test
+  void anItemBoughtBeforeTheHornHasNoBeforeFiguresRatherThanHugeOnes() {
+    var changes = List.of(change(-70, StateChangeKind.ITEM_ADDED, "item_bfury"));
+
+    ItemEfficiency result =
+        evaluate(hero(changes, List.of(), null, kills(5, 0, 200, 30), List.of()), 900);
+
+    ItemEfficiency.Detail before = result.rows().getFirst();
+    assertThat(before.label()).isEqualTo("BEFORE");
+    assertThat(before.figures().get("killsPerMinute")).isNull();
+    assertThat(before.figures().get("goldPerMinute")).isNull();
+    assertThat(result.flags()).contains(FarmingGroupEvaluator.NO_BEFORE_WINDOW);
+    assertThat(result.ratio()).isNull();
+  }
+
+  @Test
+  void aKillWithoutASecondIsLeftOut() {
+    CreepKillDomain nameless = kill(0, "npc_dota_creep_goodguys_melee", 30, null);
+    nameless.setSeconds(null);
+    var changes = List.of(change(600, StateChangeKind.ITEM_ADDED, "item_bfury"));
+    List<CreepKillDomain> kills = new ArrayList<>(kills(10, 300, 600, 30));
+    kills.add(nameless);
+
+    ItemEfficiency result = evaluate(hero(changes, List.of(), null, kills, List.of()), 1500);
+
+    assertThat(result.rows().getFirst().figures()).containsEntry("kills", 10.0);
+  }
+
+  @Test
+  void aCostTheConstantsLackGivesAFlagAndNoRatio() {
+    var changes = List.of(change(600, StateChangeKind.ITEM_ADDED, "item_bfury"));
+    List<CreepKillDomain> kills = kills(10, 300, 600, 30);
+
+    ItemEfficiency result =
+        evaluator
+            .evaluate(
+                new EntryContext(
+                    ENTRY,
+                    ItemTestData.kits(Map.of()),
+                    1500,
+                    List.of(hero(changes, List.of(), null, kills, List.of()))))
+            .getFirst();
+
+    assertThat(result.cost()).isNull();
+    assertThat(result.ratio()).isNull();
+    assertThat(result.paybackSeconds()).isNull();
+    assertThat(result.flags()).contains(FarmingGroupEvaluator.COST_UNKNOWN);
   }
 }

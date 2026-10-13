@@ -17,6 +17,8 @@ final class HeroHealth {
   private static final double SAMPLE_TOLERANCE_SECONDS = 1.0;
   private static final int LOWEST_USABLE_PERCENT = 15;
   private static final int FULL_PERCENT = 100;
+  /** At 0 percent the maximum cannot be read, but everything restored is useful. */
+  private static final int EMPTY_MAX = Integer.MAX_VALUE;
 
   private record Hit(double second, int amount, int healthAfter) {}
 
@@ -51,7 +53,7 @@ final class HeroHealth {
   }
 
   private void collectEstimates() {
-    if (track == null || track.getHpPercent() == null) {
+    if (!hasGrid() || track.getHpPercent() == null) {
       return;
     }
     for (int k = 0; k < hits.size(); k++) {
@@ -85,7 +87,7 @@ final class HeroHealth {
   }
 
   /** The median estimate within {@code windowSeconds} of the second; empty when there is none. */
-  OptionalInt maxHealth(double second, int windowSeconds) {
+  OptionalInt maxHealth(double second, double windowSeconds) {
     double[] near =
         estimates.stream()
             .filter(e -> Math.abs(e.second() - second) <= windowSeconds)
@@ -99,7 +101,7 @@ final class HeroHealth {
    * His health at the second: the one the last hit left when it was at most {@code lookbackSeconds}
    * ago, else the track percentage of the sample before times his max health.
    */
-  OptionalInt health(double second, int lookbackSeconds, int maxHealthWindowSeconds) {
+  OptionalInt health(double second, double lookbackSeconds, double maxHealthWindowSeconds) {
     Hit last = null;
     for (Hit hit : hits) {
       if (hit.second() > second) {
@@ -112,7 +114,10 @@ final class HeroHealth {
     }
     OptionalInt max = maxHealth(second, maxHealthWindowSeconds);
     int index = sampleBefore(second);
-    if (max.isEmpty() || index < 0 || track.getHpPercent() == null) {
+    if (max.isEmpty()
+        || index < 0
+        || track.getHpPercent() == null
+        || index >= track.getHpPercent().length) {
       return OptionalInt.empty();
     }
     return OptionalInt.of(track.getHpPercent()[index] * max.getAsInt() / 100);
@@ -121,12 +126,18 @@ final class HeroHealth {
   /** The mana of the track sample at or before the second; null when the track has no mana. */
   Mana mana(double second) {
     int index = sampleBefore(second);
-    if (index < 0 || track.getMana() == null || track.getManaPercent() == null) {
+    if (index < 0
+        || track.getMana() == null
+        || track.getManaPercent() == null
+        || index >= track.getMana().length
+        || index >= track.getManaPercent().length) {
       return null;
     }
     int percent = track.getManaPercent()[index];
     int current = track.getMana()[index];
-    return percent <= 0 ? null : new Mana(current, (int) Math.round(current * 100.0 / percent));
+    return percent <= 0
+        ? new Mana(current, EMPTY_MAX)
+        : new Mana(current, (int) Math.round(current * 100.0 / percent));
   }
 
   /** Damage the hero took from others in {@code (from, to]}. */
@@ -142,11 +153,18 @@ final class HeroHealth {
   }
 
   private int sampleBefore(double second) {
-    if (track == null || track.getStepSeconds() == null || track.getSampleCount() == null) {
+    if (!hasGrid() || track.getSampleCount() == null) {
       return -1;
     }
     int index = (int) Math.floor((second - track.getStartSeconds()) / step());
     return index < 0 || index >= track.getSampleCount() ? -1 : index;
+  }
+
+  private boolean hasGrid() {
+    return track != null
+        && track.getStartSeconds() != null
+        && track.getStepSeconds() != null
+        && track.getStepSeconds() > 0;
   }
 
   private int step() {

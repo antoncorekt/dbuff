@@ -108,7 +108,8 @@ final class ItemTestData {
   }
 
   static CombatEvent paid(CombatEventKind kind, double second, int value) {
-    return new CombatEvent(kind, second, "", HERO, "", 0, value, 0, 0, 0, 0, 0, 0);
+    int reason = kind == CombatEventKind.XP ? 2 : 0;
+    return new CombatEvent(kind, second, "", HERO, "", 0, value, 0, reason, 0, 0, 0, 0);
   }
 
   /** A track from -90 s with {@code samples} samples, full health, 400 mana of 400. */

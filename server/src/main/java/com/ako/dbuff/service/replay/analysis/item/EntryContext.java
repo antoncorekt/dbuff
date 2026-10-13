@@ -15,11 +15,16 @@ public record EntryContext(
     return entry.items().stream().map(HeroInputs::replayName).toList();
   }
 
-  /** The most an item of the entry costs among those this hero held; the first item without one. */
-  public long cost(List<String> held) {
+  /**
+   * The most an item among those the hero held costs, the final item of an upgrade chain; null when
+   * the constants know none of them.
+   */
+  public Long cost(List<String> held) {
     return held.stream()
-        .mapToLong(name -> kits.cost(HeroInputs.itemKey(name)))
-        .max()
-        .orElseGet(() -> kits.cost(entry.items().getFirst()));
+        .map(name -> kits.cost(HeroInputs.itemKey(name)))
+        .filter(java.util.OptionalLong::isPresent)
+        .map(java.util.OptionalLong::getAsLong)
+        .max(Long::compare)
+        .orElse(null);
   }
 }

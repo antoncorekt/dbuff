@@ -11,7 +11,7 @@ import java.util.Map;
  * @param purchaseSeconds when he first held it
  * @param count the uses (a farming group: creeps killed in the window after the purchase)
  * @param gain the gain in gold, the experience counted at the entry's weight
- * @param cost the gold the item cost
+ * @param cost the gold the item cost; null when the constants do not say
  * @param ratio gain divided by cost; null when it cannot be told
  * @param paybackSeconds when the gain passed the cost; null when it never did
  * @param figures named totals of the kind, for example hp, mana, saves, gold, xp
@@ -26,7 +26,7 @@ public record ItemEfficiency(
     Double purchaseSeconds,
     int count,
     double gain,
-    long cost,
+    Long cost,
     Double ratio,
     Double paybackSeconds,
     Map<String, Double> figures,

@@ -52,6 +52,7 @@ public class ItemEfficiencyInputs {
         .forEach(c -> changes.computeIfAbsent(c.getPlayerSlot(), k -> new ArrayList<>()).add(c));
     Map<Long, List<CreepKillDomain>> kills = new HashMap<>();
     creepKillRepo.findByMatchId(matchId).stream()
+        .filter(k -> k.getSeconds() != null)
         .sorted(Comparator.comparing(CreepKillDomain::getSeconds))
         .forEach(k -> kills.computeIfAbsent(k.getPlayerSlot(), s -> new ArrayList<>()).add(k));
     Map<Long, List<ActivitySegment>> segments = activity.bySlot(matchId);
