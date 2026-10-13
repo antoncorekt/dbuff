@@ -38,7 +38,7 @@ So a hero kill, a lane creep, a camp creep, a bounty rune, Roshan and a building
 
 ### Old stored matches
 
-The blob layout did not change, so `CombatLogCodec.VERSION` stays 1 and every stored blob still decodes. A blob written before this change holds 0 in `aux` of its GOLD and XP events, which reads as `UNSPECIFIED`. Analyses that need the reasons (the creep kills do) then store the kills with no gold and no experience; a match gets its reasons by being parsed again from the replay (the replay file must still exist, about 3 months).
+The blob layout did not change, but its meaning did, so `CombatLogCodec.VERSION` is 2 and the decoder still reads version 1. A version 1 blob holds 0 in `aux` of its GOLD and XP events, which reads as `UNSPECIFIED`. `CombatLogReader.codecVersion` gives the version, and `CreepKillAnalyzer` skips a match with a version 1 blob (it keeps the rows it has and logs one INFO line); the match gets its reasons by being parsed again from the replay (the replay file must still exist, about 3 months).
 
 ## Siege creeps and the other names
 
@@ -90,3 +90,10 @@ Heroes without summons are within about 10 percent, the denies are mostly exact.
 ## Linking limits
 
 About 99 percent of the last hits get their gold, and 96 percent their experience (most of the rest are kills with two gold entries before one DEATH row, left empty on purpose). The place of a kill comes from the gold or experience entry (the log's DEATH rows carry no position), so a deny has none and the zone is null; 120 of the stored kills fall in a BASE zone, which is where creeps are killed near the high ground.
+
+## Known limits
+
+- The experience recipients are counted from the entries between the previous DEATH row and this one, so another creep dying in the same moment can raise `xpRecipients` and make a value read from it too low.
+- Entries and DEATH rows are matched by order inside one centisecond; two kills of one hero in that moment with two gold entries before one DEATH row leave the gold empty.
+- The ancient camp list in `CreepClass` is a first guess, set from names and the measured values.
+- Kills by a hero's summons are not in the log (see above).

@@ -10,8 +10,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class CreepValuesTest {
 
   private static CreepValues parse(String json) {
+    CreepValues values = lazy(json);
+    values.of(CreepClass.LANE_MELEE);
+    return values;
+  }
+
+  private static CreepValues lazy(String json) {
     return new CreepValues(
-        new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)), "test.json");
+        () -> new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)), "test.json");
   }
 
   @Test
@@ -89,14 +95,22 @@ class CreepValuesTest {
   }
 
   @Test
-  void aDuplicateKeyAndAnUnknownFieldAreRejected() {
+  void aDuplicateKeyIsRejected_andAnUnknownFieldIsIgnored() {
     assertThatThrownBy(() -> parse("{\"status\": \"s\", \"status\": \"t\", \"classes\": {}}"))
         .isInstanceOf(IllegalStateException.class);
-    assertThatThrownBy(
-            () ->
-                parse(
+    assertThat(
+            parse(
                     "{\"status\": \"s\", \"classes\": {\"LANE_MELEE\": {\"gold\": 1,"
-                        + " \"goldSamples\": 1, \"golt\": 2}}}"))
+                        + " \"goldSamples\": 1, \"golt\": 2}}}")
+                .of(CreepClass.LANE_MELEE))
+        .isPresent();
+  }
+
+  @Test
+  void aBadFileIsNotReadUntilTheFirstUse() {
+    CreepValues values = lazy("not json");
+
+    assertThatThrownBy(() -> values.of(CreepClass.LANE_MELEE))
         .isInstanceOf(IllegalStateException.class);
   }
 }

@@ -11,6 +11,7 @@ import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
+import com.ako.dbuff.service.replay.CombatLogBlobs;
 import com.ako.dbuff.service.replay.CombatLogCodec;
 import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
@@ -85,6 +86,25 @@ class CreepKillAnalyzerTest {
 
     assertThat(repo.findByMatchId(MATCH)).hasSize(3).allMatch(r -> r.getZone() == null);
     assertThat(row(repo.findByMatchId(MATCH), "LANE_MELEE").getGold()).isEqualTo(38);
+  }
+
+  @Test
+  void analyze_skipsAMatchWhoseCombatLogWasStoredWithoutReasons_andKeepsItsOldRows() {
+    stored(layouts.frozenVersion());
+    analyzer.analyze(MATCH);
+    combatLogRepo.deleteAll();
+    combatLogRepo.flush();
+    combatLogRepo.saveAndFlush(
+        ReplayCombatLogDomain.builder()
+            .matchId(MATCH)
+            .codecVersion(1)
+            .eventCount(0)
+            .data(CombatLogBlobs.versionOne())
+            .build());
+
+    analyzer.analyze(MATCH);
+
+    assertThat(repo.findByMatchId(MATCH)).hasSize(3);
   }
 
   @Test

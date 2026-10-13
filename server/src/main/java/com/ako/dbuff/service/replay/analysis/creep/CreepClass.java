@@ -54,7 +54,7 @@ public enum CreepClass {
   }
 
   public boolean isNeutral() {
-    return !isLane();
+    return this == NEUTRAL || this == NEUTRAL_ANCIENT;
   }
 
   /** The class of a unit name, or null when it is no lane or camp creep. */
@@ -96,6 +96,9 @@ public enum CreepClass {
 
   /** The half of the map a creep fights for, or null for a camp creep or a name without a side. */
   public static Zone.Half sideOf(String unit) {
+    if (unit == null) {
+      return null;
+    }
     if (unit.contains("goodguys")) {
       return Zone.Half.RADIANT;
     }

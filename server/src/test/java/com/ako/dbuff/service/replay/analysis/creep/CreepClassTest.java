@@ -59,6 +59,8 @@ class CreepClassTest {
     assertThat(CreepClass.LANE_SIEGE.isLane()).isTrue();
     assertThat(CreepClass.LANE_SIEGE.isNeutral()).isFalse();
     assertThat(CreepClass.NEUTRAL_ANCIENT.isNeutral()).isTrue();
+    assertThat(CreepClass.NEUTRAL.isNeutral()).isTrue();
+    assertThat(CreepClass.LANE_OTHER.isNeutral()).isFalse();
     assertThat(CreepClass.LANE_FLAGBEARER_UPGRADED.isFlagbearer()).isTrue();
     assertThat(CreepClass.LANE_MELEE.isFlagbearer()).isFalse();
   }
@@ -68,5 +70,6 @@ class CreepClassTest {
     assertThat(CreepClass.sideOf("npc_dota_creep_goodguys_melee")).isEqualTo(Zone.Half.RADIANT);
     assertThat(CreepClass.sideOf("npc_dota_badguys_siege")).isEqualTo(Zone.Half.DIRE);
     assertThat(CreepClass.sideOf("npc_dota_neutral_kobold")).isNull();
+    assertThat(CreepClass.sideOf(null)).isNull();
   }
 }

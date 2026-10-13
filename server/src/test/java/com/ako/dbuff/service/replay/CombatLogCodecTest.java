@@ -127,6 +127,16 @@ class CombatLogCodecTest {
   }
 
   @Test
+  void decode_stillReadsAVersionOneBlob_andVersionTellsThemApart() throws Exception {
+    byte[] old = CombatLogBlobs.versionOne();
+
+    assertThat(CombatLogCodec.decode(old)).isEmpty();
+    assertThat(CombatLogCodec.version(old)).isEqualTo(1);
+    assertThat(CombatLogCodec.version(CombatLogCodec.encode(List.of())))
+        .isEqualTo(CombatLogCodec.VERSION);
+  }
+
+  @Test
   void whitelist_keepsNamedModifiersAndAnythingThatStuns() {
     assertThat(ModifierWhitelist.keeps("modifier_black_king_bar_immune", 0)).isTrue();
     assertThat(ModifierWhitelist.keeps("modifier_teleporting", 0)).isTrue();

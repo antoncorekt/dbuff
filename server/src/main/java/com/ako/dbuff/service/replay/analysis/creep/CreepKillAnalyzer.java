@@ -6,6 +6,7 @@ import com.ako.dbuff.dao.repo.CreepKillRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatHeroes;
+import com.ako.dbuff.service.replay.CombatLogCodec;
 import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.map.MapLayout;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,11 +27,13 @@ import org.springframework.transaction.annotation.Transactional;
  * experience received and, when the map layout is known, the zone it happened in. Reads only the
  * stored combat log and roster.
  */
+@Slf4j
 @Order(12)
 @Component
 @RequiredArgsConstructor
 public class CreepKillAnalyzer implements ReplayAnalyzer {
   private static final int RADIANT_TEAM = 2;
+  private static final int REASONS_FROM_VERSION = 2;
 
   private final CreepKillRepo repo;
   private final ReplayPlayerRepo playerRepo;
@@ -54,6 +58,10 @@ public class CreepKillAnalyzer implements ReplayAnalyzer {
   @Override
   @Transactional
   public void analyze(long matchId) {
+    if (combatLog.codecVersion(matchId).orElse(CombatLogCodec.VERSION) < REASONS_FROM_VERSION) {
+      log.info("creep kills skipped: combat log stored without gold reasons, re-parse the replay");
+      return;
+    }
     deleteByMatchId(matchId);
     List<CombatEvent> events = combatLog.events(matchId);
     if (events.isEmpty()) {
