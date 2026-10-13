@@ -29,7 +29,7 @@ class RotationFinderTest {
 
   private static RotationFinder.Inputs inputs(
       Trace hero, List<LaneSlot> lanes, TripOutcomes.Events events) {
-    return new RotationFinder.Inputs(radiant(hero), Map.of(), Map.of(), lanes, events);
+    return new RotationFinder.Inputs(radiant(hero), Map.of(), Map.of(), Map.of(), lanes, events);
   }
 
   private static final Trace TO_TOP = trace(i -> i >= 4 ? -4000 : 0, i -> 0);
@@ -86,5 +86,14 @@ class RotationFinderTest {
     Trace stayingTop = trace(i -> -4000, i -> 0);
 
     assertThat(finder.find(inputs(stayingTop, lanes, events))).isEmpty();
+  }
+
+  @Test
+  void find_theLaneCoveringTheTripStartIsTheHerosOwn() {
+    List<LaneSlot> lanes = List.of(new LaneSlot(4, TeamSide.RADIANT, Zone.Lane.TOP, 0, 10));
+    TripOutcomes.Events events =
+        new TripOutcomes.Events(Map.of(4L, List.of(60.0)), List.of(), List.of());
+
+    assertThat(finder.find(inputs(TO_TOP, lanes, events))).hasSize(1);
   }
 }

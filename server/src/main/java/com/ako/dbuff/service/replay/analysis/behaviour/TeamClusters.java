@@ -11,9 +11,6 @@ import java.util.Optional;
  * distance. On a tie the tighter group wins, then the lower slots, so the answer is stable.
  */
 public final class TeamClusters {
-  /** A team has five heroes; the subset search is exponential and refuses more than this. */
-  private static final int MAX_HEROES = 12;
-
   public record Point(double x, double y) {}
 
   private final double distance;
@@ -22,12 +19,15 @@ public final class TeamClusters {
 
   public TeamClusters(double distance, int minSize, ZoneLookup zones) {
     this.distance = distance;
-    this.minSize = Math.max(2, minSize);
+    if (minSize < 2) {
+      throw new IllegalArgumentException("A cluster needs at least 2 heroes, not " + minSize);
+    }
+    this.minSize = minSize;
     this.zones = zones;
   }
 
   public Optional<TeamCluster> find(Map<Long, Point> alive) {
-    List<Long> slots = alive.keySet().stream().sorted().limit(MAX_HEROES).toList();
+    List<Long> slots = alive.keySet().stream().sorted().toList();
     List<Long> best = List.of();
     double bestSpread = Double.MAX_VALUE;
     for (int mask = 1; mask < 1 << slots.size(); mask++) {

@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -86,7 +87,8 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
         "deaths",
         "buybacks",
         "fights",
-        "lanes");
+        "lanes",
+        "important-fights");
   }
 
   @Override
@@ -124,30 +126,34 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
     return new RotationFinder.Inputs(
         traces,
         activity.bySlot(matchId),
-        endings(matchId),
+        deaths(matchId),
+        buybacks(matchId),
         lanes(matchId),
         new TripOutcomes.Events(kills(events, slotByHero), creeps(matchId), fights(matchId)));
   }
 
-  private Map<Long, List<Double>> endings(long matchId) {
-    Map<Long, List<Double>> endings = new HashMap<>();
-    deathRepo.findByMatchId(matchId).stream()
-        .filter(d -> d.getPlayerSlot() != null && d.getDeathSeconds() != null)
-        .filter(d -> !Boolean.TRUE.equals(d.getReincarnated()))
-        .forEach(
-            d ->
-                endings
-                    .computeIfAbsent(d.getPlayerSlot(), s -> new ArrayList<>())
-                    .add(d.getDeathSeconds()));
-    buybackRepo.findByMatchId(matchId).stream()
-        .filter(b -> b.getPlayerSlot() != null && b.getSeconds() != null)
-        .forEach(
-            b ->
-                endings
-                    .computeIfAbsent(b.getPlayerSlot(), s -> new ArrayList<>())
-                    .add(b.getSeconds()));
-    endings.values().forEach(list -> list.sort(Double::compare));
-    return endings;
+  private Map<Long, List<Double>> deaths(long matchId) {
+    return timesBySlot(
+        deathRepo.findByMatchId(matchId).stream()
+            .filter(d -> !Boolean.TRUE.equals(d.getReincarnated()))
+            .map(d -> new SlotTime(d.getPlayerSlot(), d.getDeathSeconds())));
+  }
+
+  private Map<Long, List<Double>> buybacks(long matchId) {
+    return timesBySlot(
+        buybackRepo.findByMatchId(matchId).stream()
+            .map(b -> new SlotTime(b.getPlayerSlot(), b.getSeconds())));
+  }
+
+  private record SlotTime(Long slot, Double seconds) {}
+
+  private static Map<Long, List<Double>> timesBySlot(Stream<SlotTime> times) {
+    Map<Long, List<Double>> bySlot = new HashMap<>();
+    times
+        .filter(t -> t.slot() != null && t.seconds() != null)
+        .forEach(t -> bySlot.computeIfAbsent(t.slot(), s -> new ArrayList<>()).add(t.seconds()));
+    bySlot.values().forEach(list -> list.sort(Double::compare));
+    return bySlot;
   }
 
   private List<LaneSlot> lanes(long matchId) {
@@ -225,7 +231,11 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
       }
     }
     return fightRepo.findByMatchId(matchId).stream()
-        .filter(f -> f.getFightIndex() != null)
+        .filter(
+            f ->
+                f.getFightIndex() != null
+                    && f.getStartSeconds() != null
+                    && f.getEndSeconds() != null)
         .map(
             f ->
                 new FightFact(

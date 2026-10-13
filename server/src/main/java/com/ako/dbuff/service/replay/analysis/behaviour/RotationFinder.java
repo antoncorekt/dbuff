@@ -13,13 +13,15 @@ import java.util.stream.Collectors;
 /** Turns the stored facts of a match into its rotations. */
 public final class RotationFinder {
   /**
-   * @param endings when each hero died (an Aegis revival excluded) or bought back, by slot
+   * @param deaths when each hero died (an Aegis revival excluded), by slot
+   * @param buybacks when each hero bought back, by slot
    * @param lanes the stored lanes of the heroes that have one
    */
   public record Inputs(
       Map<Long, Trace> traces,
       Map<Long, List<ActivitySegment>> activity,
-      Map<Long, List<Double>> endings,
+      Map<Long, List<Double>> deaths,
+      Map<Long, List<Double>> buybacks,
       List<LaneSlot> lanes,
       TripOutcomes.Events events) {}
 
@@ -43,8 +45,10 @@ public final class RotationFinder {
           in.traces().entrySet().stream()
               .filter(e -> TeamSide.ofSlot(e.getKey()) == team)
               .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-      for (AwayTrip trip : trips.find(new AwayTrips.Inputs(traces, in.activity(), in.endings()))) {
-        if (!RotationRules.isRotation(trip, ownLane(in.lanes(), trip.slot()))) {
+      for (AwayTrip trip :
+          trips.find(new AwayTrips.Inputs(traces, in.activity(), in.deaths(), in.buybacks()))) {
+        Zone.Lane laneLeft = laneLeft(in.lanes(), trip);
+        if (!RotationRules.isRotation(trip, laneLeft)) {
           continue;
         }
         TripOutcome outcome = outcomes.of(trip, team, in.events());
@@ -55,7 +59,7 @@ public final class RotationFinder {
               new Rotation(
                   team,
                   trip,
-                  laneLeft(in.lanes(), trip),
+                  laneLeft,
                   outcome,
                   result,
                   RotationRules.verdict(trip, outcome, result)));
@@ -63,14 +67,6 @@ public final class RotationFinder {
       }
     }
     return rotations;
-  }
-
-  private static Zone.Lane ownLane(List<LaneSlot> lanes, long slot) {
-    return lanes.stream()
-        .filter(l -> l.slot() == slot)
-        .map(LaneSlot::lane)
-        .findFirst()
-        .orElse(null);
   }
 
   private static Zone.Lane laneLeft(List<LaneSlot> lanes, AwayTrip trip) {

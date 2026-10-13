@@ -16,7 +16,7 @@ class RotationRulesTest {
   private static final Optional<LaneProxy.Result> HELD = Optional.of(new LaneProxy.Result(4, 4));
 
   private static AwayTrip trip(Zone to, End end) {
-    return new AwayTrip(0L, 600, 650, MID, to, MID, false, end);
+    return new AwayTrip(0L, 600, 620, 650, MID, to, MID, false, end);
   }
 
   private static TripOutcome outcome(int kills, int fights, int won) {
@@ -33,7 +33,7 @@ class RotationRulesTest {
 
   @Test
   void isRotation_stayingInTheLaneHeLeftIsNotOne() {
-    AwayTrip stayed = new AwayTrip(0L, 600, 650, TOP, TOP, MID, false, End.REJOINED);
+    AwayTrip stayed = new AwayTrip(0L, 600, 620, 650, TOP, TOP, MID, false, End.REJOINED);
 
     assertThat(RotationRules.isRotation(stayed, null)).isFalse();
   }

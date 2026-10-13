@@ -71,4 +71,10 @@ class TeamClustersTest {
   void find_noHeroesHaveNoGroup() {
     assertThat(clusters.find(Map.of())).isEmpty();
   }
+
+  @Test
+  void constructor_refusesAGroupOfLessThanTwo() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> new TeamClusters(2500, 1, ZONES))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
 }

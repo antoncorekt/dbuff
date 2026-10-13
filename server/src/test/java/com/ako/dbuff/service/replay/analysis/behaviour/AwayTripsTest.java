@@ -31,7 +31,7 @@ class AwayTripsTest {
   }
 
   private List<AwayTrip> find(Trace rotating) {
-    return finder.find(new AwayTrips.Inputs(team(rotating), Map.of(), Map.of()));
+    return finder.find(new AwayTrips.Inputs(team(rotating), Map.of(), Map.of(), Map.of()));
   }
 
   @Test
@@ -60,7 +60,7 @@ class AwayTripsTest {
     traces.put(2L, trace(i -> i >= 10 ? -4000 : 0, i -> 0));
     traces.put(3L, trace(i -> i >= 10 ? -4000 : 0, i -> 0));
 
-    List<AwayTrip> trips = finder.find(new AwayTrips.Inputs(traces, Map.of(), Map.of()));
+    List<AwayTrip> trips = finder.find(new AwayTrips.Inputs(traces, Map.of(), Map.of(), Map.of()));
 
     assertThat(trips).hasSize(1);
     assertThat(trips.getFirst().to()).isEqualTo(TOP);
@@ -85,7 +85,8 @@ class AwayTripsTest {
             List.of(
                 new ActivitySegment(0, 200, Activity.JUNGLE_FARM, Zone.Kind.JUNGLE, null, null)));
 
-    List<AwayTrip> trips = finder.find(new AwayTrips.Inputs(team(hero), activity, Map.of()));
+    List<AwayTrip> trips =
+        finder.find(new AwayTrips.Inputs(team(hero), activity, Map.of(), Map.of()));
 
     assertThat(trips).isEmpty();
   }
@@ -95,7 +96,8 @@ class AwayTripsTest {
     Trace hero = trace(i -> -4000, i -> i >= 9 ? 1 : 0);
 
     List<AwayTrip> trips =
-        finder.find(new AwayTrips.Inputs(team(hero), Map.of(), Map.of(4L, List.of(42.0))));
+        finder.find(
+            new AwayTrips.Inputs(team(hero), Map.of(), Map.of(4L, List.of(42.0)), Map.of()));
 
     assertThat(trips).hasSize(1);
     assertThat(trips.getFirst().end()).isEqualTo(End.DIED);
@@ -104,13 +106,14 @@ class AwayTripsTest {
   }
 
   @Test
-  void find_aBuybackWithNoDeadSampleEndsTheTrip() {
+  void find_aBuybackWithNoDeadSampleEndsTheTripAsBoughtBack() {
     Trace hero = trace(i -> -4000, i -> 0);
 
     List<AwayTrip> trips =
-        finder.find(new AwayTrips.Inputs(team(hero), Map.of(), Map.of(4L, List.of(60.0))));
+        finder.find(
+            new AwayTrips.Inputs(team(hero), Map.of(), Map.of(), Map.of(4L, List.of(60.0))));
 
-    assertThat(trips.getFirst().end()).isEqualTo(End.DIED);
+    assertThat(trips.getFirst().end()).isEqualTo(End.BOUGHT_BACK);
     assertThat(trips.getFirst().endSeconds()).isEqualTo(60);
   }
 
@@ -124,7 +127,8 @@ class AwayTripsTest {
                 new ActivitySegment(
                     14, 26, Activity.TELEPORTING, Zone.Kind.BASE, null, ActivitySegment.Side.OWN)));
 
-    List<AwayTrip> trips = finder.find(new AwayTrips.Inputs(team(hero), activity, Map.of()));
+    List<AwayTrip> trips =
+        finder.find(new AwayTrips.Inputs(team(hero), activity, Map.of(), Map.of()));
 
     assertThat(trips.getFirst().teleported()).isTrue();
   }
@@ -145,6 +149,54 @@ class AwayTripsTest {
     traces.put(1L, stayingAt(0));
     traces.put(2L, stayingAt(8000));
 
-    assertThat(finder.find(new AwayTrips.Inputs(traces, Map.of(), Map.of()))).isEmpty();
+    assertThat(finder.find(new AwayTrips.Inputs(traces, Map.of(), Map.of(), Map.of()))).isEmpty();
+  }
+
+  @Test
+  void find_aDeathKeepsAShortTripThatTheThresholdWouldDrop() {
+    Trace hero = trace(i -> i >= 4 ? -4000 : 0, i -> i >= 6 ? 1 : 0);
+
+    List<AwayTrip> trips =
+        finder.find(
+            new AwayTrips.Inputs(team(hero), Map.of(), Map.of(4L, List.of(28.0)), Map.of()));
+
+    assertThat(trips).hasSize(1);
+    assertThat(trips.getFirst().end()).isEqualTo(End.DIED);
+    assertThat(trips.getFirst().endSeconds()).isEqualTo(28);
+  }
+
+  @Test
+  void find_aTrackThatStopsEarlyIsNotADeath() {
+    int[] xs = new int[10];
+    java.util.Arrays.fill(xs, -4000);
+    int[] ones = new int[10];
+    java.util.Arrays.fill(ones, 1);
+    Trace shortTrack = new Trace(0, 5, xs, new int[10], ones, ones);
+
+    List<AwayTrip> trips =
+        finder.find(new AwayTrips.Inputs(team(shortTrack), Map.of(), Map.of(), Map.of()));
+
+    assertThat(trips).hasSize(1);
+    assertThat(trips.getFirst().end()).isEqualTo(End.TRACK_ENDED);
+  }
+
+  @Test
+  void find_aHeroWhoRespawnsInBaseAndWalksOutHasNoTrip() {
+    Trace hero = trace(i -> i >= 12 ? -4000 : -9000, i -> i < 8 ? 1 : 0);
+
+    List<AwayTrip> trips =
+        finder.find(new AwayTrips.Inputs(team(hero), Map.of(), Map.of(4L, List.of(2.0)), Map.of()));
+
+    assertThat(trips).isEmpty();
+  }
+
+  @Test
+  void find_theArrivalIsWhenHeFirstStoodInTheDestinationLane() {
+    Trace hero = trace(i -> i < 4 ? 0 : i < 8 ? 7000 : -4000, i -> 0);
+
+    List<AwayTrip> trips = find(hero);
+
+    assertThat(trips.getFirst().to()).isEqualTo(TOP);
+    assertThat(trips.getFirst().arrivalSeconds()).isEqualTo(40);
   }
 }

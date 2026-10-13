@@ -48,21 +48,12 @@ public final class LaneProxy {
           || hit.seconds() >= leftSeconds + windowSeconds) {
         continue;
       }
-      TeamSide side = laneTeam(lanes, hit.slot(), lane);
-      if (side == lane.team()) {
+      if (TeamSide.ofSlot(hit.slot()) == lane.team()) {
         own++;
-      } else if (side != null) {
+      } else {
         enemy++;
       }
     }
     return Optional.of(new Result(own, enemy));
-  }
-
-  private static TeamSide laneTeam(List<LaneSlot> lanes, long slot, LaneSlot lane) {
-    return lanes.stream()
-        .filter(l -> l.slot() == slot && l.lane() == lane.lane())
-        .map(LaneSlot::team)
-        .findFirst()
-        .orElse(null);
   }
 }

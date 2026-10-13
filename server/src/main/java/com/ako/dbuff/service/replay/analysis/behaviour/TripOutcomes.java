@@ -4,7 +4,10 @@ import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import java.util.List;
 import java.util.Map;
 
-/** Tells what happened during a trip and shortly after it: kills, creeps, fights. */
+/**
+ * Tells what happened once a hero was at the destination of his trip, up to its end (and a few
+ * seconds after it when it did not end in the group or a death): kills, creeps, fights.
+ */
 public final class TripOutcomes {
   /**
    * @param kills the times each hero killed or helped to kill an enemy hero, by slot
@@ -19,8 +22,8 @@ public final class TripOutcomes {
   }
 
   public TripOutcome of(AwayTrip trip, TeamSide team, Events events) {
-    double from = trip.startSeconds();
-    double to = trip.endSeconds() + lingerSeconds;
+    double from = trip.arrivalSeconds();
+    double to = trip.endSeconds() + linger(trip);
     int kills =
         (int)
             events.kills().getOrDefault(trip.slot(), List.of()).stream()
@@ -38,6 +41,14 @@ public final class TripOutcomes {
             .toList();
     List<FightFact> won = taken.stream().filter(f -> team.name().equals(f.winner())).toList();
     return new TripOutcome(kills, creeps, taken.size(), won.size(), keyFight(taken, won));
+  }
+
+  /** A trip that joined the group or ended in a death has no tail: what follows is the group's. */
+  private int linger(AwayTrip trip) {
+    return switch (trip.end()) {
+      case REJOINED, DIED, BOUGHT_BACK -> 0;
+      default -> lingerSeconds;
+    };
   }
 
   private static Integer keyFight(List<FightFact> taken, List<FightFact> won) {

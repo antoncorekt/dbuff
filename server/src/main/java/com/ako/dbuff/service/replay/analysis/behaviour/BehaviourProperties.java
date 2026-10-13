@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis.behaviour;
 
+import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -23,4 +24,12 @@ public class BehaviourProperties {
 
   /** A kill or fight this long after a trip ended still belongs to it. */
   private int outcomeLingerSeconds = 15;
+
+  @PostConstruct
+  void validate() {
+    if (minClusterSize < 2) {
+      throw new IllegalStateException(
+          "replay.analysis.behaviour.min-cluster-size must be at least 2, not " + minClusterSize);
+    }
+  }
 }

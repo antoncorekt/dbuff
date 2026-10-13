@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class TripOutcomesTest {
   private final TripOutcomes outcomes = new TripOutcomes(15);
-  private final AwayTrip trip = new AwayTrip(4L, 700, 740, MID, TOP, MID, false, End.REJOINED);
+  private final AwayTrip trip = new AwayTrip(4L, 700, 700, 740, MID, TOP, MID, false, End.FARMING);
 
   @Test
   void of_countsKillsCreepsAndFightsInsideTheTripAndTheLinger() {
@@ -33,6 +33,15 @@ class TripOutcomesTest {
     TripOutcome outcome = outcomes.of(trip, TeamSide.RADIANT, events);
 
     assertThat(outcome).isEqualTo(new TripOutcome(2, 1, 2, 1, 3));
+  }
+
+  @Test
+  void of_countsOnlyWhatHappenedAfterArrivalAndNoTailAfterRejoining() {
+    AwayTrip late = new AwayTrip(4L, 700, 720, 740, MID, TOP, MID, false, End.REJOINED);
+    TripOutcomes.Events events =
+        new TripOutcomes.Events(Map.of(4L, List.of(710.0, 730.0, 745.0)), List.of(), List.of());
+
+    assertThat(outcomes.of(late, TeamSide.RADIANT, events).kills()).isEqualTo(1);
   }
 
   @Test

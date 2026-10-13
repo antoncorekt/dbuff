@@ -54,4 +54,12 @@ class LaneProxyTest {
     assertThat(proxy.of(5, 300, LANES, List.of())).isEmpty();
     assertThat(proxy.of(0, 700, LANES, List.of())).isEmpty();
   }
+
+  @Test
+  void of_aKillerWithNoLaneAssignmentCountsBySlotTeam() {
+    List<CreepHit> creeps =
+        List.of(hit(3, 310, Zone.Lane.BOTTOM, false), hit(131, 320, Zone.Lane.BOTTOM, false));
+
+    assertThat(proxy.of(0, 300, LANES, creeps)).contains(new LaneProxy.Result(1, 1));
+  }
 }
