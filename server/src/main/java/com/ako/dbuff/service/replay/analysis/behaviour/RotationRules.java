@@ -30,10 +30,10 @@ public final class RotationRules {
 
   /**
    * Death first, then a kill or a won fight; else wasted when the lane he left was lost, when he
-   * did nothing and his income dropped, or when a tower fell while he was away.
+   * did nothing and his income dropped, or when a tower of the lane he left fell while he was away.
    */
   public static RotationVerdict verdict(
-      AwayTrip trip, TripOutcome outcome, List<RotationReason> reasons) {
+      AwayTrip trip, TripOutcome outcome, List<RotationReason> reasons, boolean towerInHisLane) {
     if (trip.end() == End.DIED) {
       return RotationVerdict.DIED;
     }
@@ -41,7 +41,7 @@ public final class RotationRules {
       return RotationVerdict.GOOD;
     }
     if (reasons.contains(RotationReason.LEFT_LANE_UNDEFENDED)
-        || reasons.contains(RotationReason.TOWER_LOST_WHILE_AWAY)
+        || (towerInHisLane && reasons.contains(RotationReason.TOWER_LOST_WHILE_AWAY))
         || (reasons.contains(RotationReason.DID_NOTHING)
             && reasons.contains(RotationReason.INCOME_DROP))) {
       return RotationVerdict.WASTED;

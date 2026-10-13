@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.analysis.behaviour;
 
 import com.ako.dbuff.service.replay.analysis.lane.MinuteSeries;
 import java.util.Optional;
+import java.util.function.BiPredicate;
 
 /**
  * What the trip cost in income: gold and experience per minute over the trip and a tail after it,
@@ -18,17 +19,21 @@ public final class IncomeProxy {
 
   /**
    * Empty when a series is missing, or does not reach from the stretch before the trip (which would
-   * start before 0:00) to the end of the tail.
+   * start before 0:00) to the end of the tail, or when that stretch before is not {@code
+   * undisturbed} (another trip of his, or time he was dead), which would give a false low
+   * reference.
    */
-  public Optional<Income> of(AwayTrip trip, MinuteSeries gold, MinuteSeries xp) {
+  public Optional<Income> of(
+      AwayTrip trip, MinuteSeries gold, MinuteSeries xp, BiPredicate<Double, Double> undisturbed) {
     if (gold == null || xp == null) {
       return Optional.empty();
     }
-    double end = trip.endSeconds() + (trip.end() == AwayTrip.End.DIED ? 0 : tailSeconds);
+    double end = trip.endSeconds() + (trip.end().hasTail() ? tailSeconds : 0);
     double length = end - trip.startSeconds();
     double referenceStart = trip.startSeconds() - length;
     if (length <= 0
         || referenceStart < 0
+        || !undisturbed.test(referenceStart, (double) trip.startSeconds())
         || !gold.covers(referenceStart, end)
         || !xp.covers(referenceStart, end)) {
       return Optional.empty();

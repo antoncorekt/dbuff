@@ -48,12 +48,8 @@ public final class TripOutcomes {
     return trip.endSeconds() + linger(trip);
   }
 
-  /** A trip that joined the group or ended in a death has no tail: what follows is the group's. */
   private int linger(AwayTrip trip) {
-    return switch (trip.end()) {
-      case REJOINED, DIED, BOUGHT_BACK -> 0;
-      default -> lingerSeconds;
-    };
+    return trip.end().hasTail() ? lingerSeconds : 0;
   }
 
   private static Integer keyFight(List<FightFact> taken, List<FightFact> won) {

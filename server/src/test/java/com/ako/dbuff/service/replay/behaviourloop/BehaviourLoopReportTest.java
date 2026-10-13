@@ -125,7 +125,9 @@ class BehaviourLoopReportTest {
                         .build())));
 
     assertThat(report)
-        .contains("Axe did nothing there (no damage to heroes or towers, no kill, no creeps)")
+        .contains(
+            "Axe did nothing there (no fight, no damage to enemy heroes or towers, no kill, no"
+                + " creeps)")
         .contains(
             "Axe's farm dropped from 1.2k to 410 gold per minute (experience from 620 to 300 per"
                 + " minute)")

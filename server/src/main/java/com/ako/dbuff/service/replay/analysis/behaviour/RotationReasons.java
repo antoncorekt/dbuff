@@ -14,7 +14,8 @@ public final class RotationReasons {
           new Rule(
               RotationReason.DID_NOTHING,
               f ->
-                  f.heroHits() == 0
+                  f.outcome().fights() == 0
+                      && f.heroHits() == 0
                       && f.towerHits() == 0
                       && f.outcome().kills() == 0
                       && f.outcome().creepKills() == 0),

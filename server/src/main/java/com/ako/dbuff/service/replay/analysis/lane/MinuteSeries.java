@@ -1,20 +1,14 @@
 package com.ako.dbuff.service.replay.analysis.lane;
 
-import com.ako.dbuff.dao.model.PlayerTimelineDomain;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.function.Function;
 
 /** A total that is known at each full minute, read at any second by a straight line between. */
 public final class MinuteSeries {
-  private final TreeMap<Integer, Long> byMinute = new TreeMap<>();
+  private final TreeMap<Integer, Long> byMinute;
 
-  public void put(Integer minute, Long value) {
-    if (minute != null && value != null) {
-      byMinute.put(minute, value);
-    }
+  public MinuteSeries(Map<Integer, Long> totals) {
+    this.byMinute = new TreeMap<>(totals);
   }
 
   public boolean isEmpty() {
@@ -45,19 +39,5 @@ public final class MinuteSeries {
    */
   public boolean covers(double from, double to) {
     return !isEmpty() && byMinute.firstKey() * 60.0 <= from && byMinute.lastKey() * 60.0 >= to;
-  }
-
-  /** One series per player slot out of the stored timeline, by the value picked. */
-  public static Map<Long, MinuteSeries> bySlot(
-      List<PlayerTimelineDomain> timeline, Function<PlayerTimelineDomain, Long> value) {
-    Map<Long, MinuteSeries> bySlot = new HashMap<>();
-    for (PlayerTimelineDomain t : timeline) {
-      if (t.getPlayerSlot() != null) {
-        bySlot
-            .computeIfAbsent(t.getPlayerSlot(), k -> new MinuteSeries())
-            .put(t.getGameMinute(), value.apply(t));
-      }
-    }
-    return bySlot;
   }
 }

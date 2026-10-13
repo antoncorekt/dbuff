@@ -35,12 +35,12 @@ final class BehaviourLoopReport {
           + " he left, where he got and how it ended; \"what came of it\" counts kills (or helped"
           + " kills), creeps and fights in the trip and the few seconds after it. Verdict: good (a"
           + " kill or a won fight came out of it), wasted (neither, and his lane lost the creep"
-          + " count, or he did nothing there while his farm dropped, or an own tower fell while he"
-          + " was away), died (he died before the trip ended), neutral (anything else). \"why\""
-          + " lists every reason that applies; his farm is his gold per minute over the trip and %d"
-          + " s after it against the same stretch before the trip, and it dropped when it fell to"
-          + " %d%% of that or lower. Times are the game clock (m:ss). Write OK or REJECT in the"
-          + " owner verdict column.";
+          + " count, or he did nothing there while his farm dropped, or a tower of the lane he left"
+          + " fell while he was away), died (he died before the trip ended), neutral (anything"
+          + " else). \"why\" lists every reason that applies; his farm is his gold per minute over"
+          + " the trip and %d s after it against the same stretch before the trip, and it dropped"
+          + " when it fell to %d%% of that or lower. Times are the game clock (m:ss). Write OK or"
+          + " REJECT in the owner verdict column.";
 
   record MatchData(
       long matchId,
@@ -203,7 +203,7 @@ final class BehaviourLoopReport {
     return switch (reason) {
       case DIED -> "%s died on the trip".formatted(hero);
       case DID_NOTHING ->
-          "%s did nothing there (no damage to heroes or towers, no kill, no creeps)"
+          "%s did nothing there (no fight, no damage to enemy heroes or towers, no kill, no creeps)"
               .formatted(hero);
       case INCOME_DROP -> incomeDrop(hero, r);
       case ARRIVED_AFTER_FIGHT_ENDED ->

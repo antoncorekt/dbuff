@@ -43,13 +43,14 @@ class RotationRulesTest {
             RotationRules.verdict(
                 trip(TOP, End.REJOINED),
                 outcome(1, 0, 0),
-                List.of(RotationReason.LEFT_LANE_UNDEFENDED, RotationReason.TOWER_LOST_WHILE_AWAY)))
+                List.of(RotationReason.LEFT_LANE_UNDEFENDED, RotationReason.TOWER_LOST_WHILE_AWAY),
+                true))
         .isEqualTo(RotationVerdict.GOOD);
   }
 
   @Test
   void verdict_aWonFightIsGood() {
-    assertThat(RotationRules.verdict(trip(TOP, End.REJOINED), outcome(0, 1, 1), NONE))
+    assertThat(RotationRules.verdict(trip(TOP, End.REJOINED), outcome(0, 1, 1), NONE, false))
         .isEqualTo(RotationVerdict.GOOD);
   }
 
@@ -59,7 +60,8 @@ class RotationRulesTest {
             RotationRules.verdict(
                 trip(TOP, End.REJOINED),
                 outcome(0, 1, 0),
-                List.of(RotationReason.LEFT_LANE_UNDEFENDED)))
+                List.of(RotationReason.LEFT_LANE_UNDEFENDED),
+                false))
         .isEqualTo(RotationVerdict.WASTED);
   }
 
@@ -69,8 +71,20 @@ class RotationRulesTest {
             RotationRules.verdict(
                 trip(TOP, End.REJOINED),
                 outcome(0, 0, 0),
-                List.of(RotationReason.TOWER_LOST_WHILE_AWAY)))
+                List.of(RotationReason.TOWER_LOST_WHILE_AWAY),
+                true))
         .isEqualTo(RotationVerdict.WASTED);
+  }
+
+  @Test
+  void verdict_aTowerLostInAnotherLaneIsListedButDoesNotDecide() {
+    assertThat(
+            RotationRules.verdict(
+                trip(TOP, End.REJOINED),
+                outcome(0, 0, 0),
+                List.of(RotationReason.TOWER_LOST_WHILE_AWAY),
+                false))
+        .isEqualTo(RotationVerdict.NEUTRAL);
   }
 
   @Test
@@ -79,7 +93,8 @@ class RotationRulesTest {
             RotationRules.verdict(
                 trip(TOP, End.REJOINED),
                 outcome(0, 0, 0),
-                List.of(RotationReason.DID_NOTHING, RotationReason.INCOME_DROP)))
+                List.of(RotationReason.DID_NOTHING, RotationReason.INCOME_DROP),
+                false))
         .isEqualTo(RotationVerdict.WASTED);
   }
 
@@ -90,11 +105,13 @@ class RotationRulesTest {
             RotationReason.DID_NOTHING,
             RotationReason.INCOME_DROP,
             RotationReason.ARRIVED_AFTER_FIGHT_ENDED)) {
-      assertThat(RotationRules.verdict(trip(TOP, End.REJOINED), outcome(0, 0, 0), List.of(reason)))
+      assertThat(
+              RotationRules.verdict(
+                  trip(TOP, End.REJOINED), outcome(0, 0, 0), List.of(reason), false))
           .as(reason.name())
           .isEqualTo(RotationVerdict.NEUTRAL);
     }
-    assertThat(RotationRules.verdict(trip(TOP, End.REJOINED), outcome(0, 1, 0), NONE))
+    assertThat(RotationRules.verdict(trip(TOP, End.REJOINED), outcome(0, 1, 0), NONE, false))
         .isEqualTo(RotationVerdict.NEUTRAL);
   }
 
@@ -102,7 +119,7 @@ class RotationRulesTest {
   void verdict_aDeathBeatsEverything() {
     assertThat(
             RotationRules.verdict(
-                trip(TOP, End.DIED), outcome(2, 1, 1), List.of(RotationReason.DIED)))
+                trip(TOP, End.DIED), outcome(2, 1, 1), List.of(RotationReason.DIED), false))
         .isEqualTo(RotationVerdict.DIED);
   }
 

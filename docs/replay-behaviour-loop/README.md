@@ -16,9 +16,9 @@ How the teams moved as a group, and who rotated, is shaped by review rounds on a
 
 **Creep-kill proxy** (`LaneProxy`). Wave position is not stored, so for a hero who was laning when he left, the creeps (not denies) his lane partners killed in that lane in the `proxy-window-seconds` (60) after he left, against the creeps the enemy heroes of that lane killed. The lane is lost when the enemy killed more. No proxy for a hero with no lane or one whose laning had ended.
 
-**Income** (`IncomeProxy`). The hero's gold and experience per minute over the trip plus `income-tail-seconds` (60) after it (no tail after a death), against the stretch of the same length just before the trip start, read off the per-minute totals (`player_timeline`) with a straight line between minutes. No reading when the stretch before would start before 0:00, when the totals do not reach the end of the tail, or when a total is missing. His farm dropped when the gold per minute fell to `income-share` (0.7) of the one before, or lower.
+**Income** (`IncomeProxy`). The hero's gold and experience per minute over the trip plus `income-tail-seconds` (60) after it (no tail after a rejoin, a death or a buyback, the same rule as the outcome linger), against the stretch of the same length just before the trip start, read off the per-minute totals (`player_timeline`) with a straight line between minutes. No reading when the stretch before would start before 0:00, when the totals do not reach the end of the tail, or when a total is missing. His farm dropped when the gold per minute fell to `income-share` (0.7) of the one before, or lower.
 
-**Reasons** (`RotationReasons`, one rule each, all that apply are stored in `team_rotation.reasons`): DIED; DID_NOTHING (no hit on an enemy hero or a tower, no kill, no creeps from arrival to the end of the trip and the linger); INCOME_DROP; ARRIVED_AFTER_FIGHT_ENDED (a fight in the lane he got to ended after he left and before he arrived, and he took part in none there); LEFT_LANE_UNDEFENDED (the creep-kill proxy was lost); TOWER_LOST_WHILE_AWAY (an own tower, from `building_kill_context`, fell during the trip).
+**Reasons** (`RotationReasons`, one rule each, all that apply are stored in `team_rotation.reasons`): DIED; DID_NOTHING (no fight taken part in, no hit on an enemy hero or tower, no kill, no creeps from arrival to the end of the trip and the linger); INCOME_DROP; ARRIVED_AFTER_FIGHT_ENDED (a fight in the lane he got to ended after he left and before he arrived, and he took part in none there); LEFT_LANE_UNDEFENDED (the creep-kill proxy was lost); TOWER_LOST_WHILE_AWAY (an own tower, from `building_kill_context`, fell during the trip; it decides the verdict only when it is in the lane he left).
 
 **Verdict** (`RotationVerdict`). DIED (he died before the trip ended; a buyback ends the trip too), else GOOD (a kill or assist, or a won fight), else WASTED (the lane he left was lost, or DID_NOTHING together with INCOME_DROP, or a tower fell while he was away), else NEUTRAL. A trip is stored when he died, fought, got a kill, or it is WASTED.
 
@@ -26,7 +26,11 @@ How the teams moved as a group, and who rotated, is shaped by review rounds on a
 
 - A kill is any enemy hero death the hero killed or assisted in; it is not necessarily the target of the rotation.
 - The creep-kill proxy exists in the laning stage only; later WASTED comes from the income drop or a lost tower. The income reads gold from OpenDota's totals and is also moved by kills, buybacks and item purchases of the heroes of the group, so it is a hint, not a proof.
-- "Did nothing" counts hits, kills and creeps only: a hero who stood in a won fight without hitting is listed as having done nothing there.
+- "Did nothing" means no fight taken part in (active or present passive), no hit on an enemy hero or tower, no kill and no creeps at the destination.
+- ARRIVED_AFTER_FIGHT_ENDED looks at the lane and the time of the fight only, not at which team was in it.
+- Experience is stored and shown but does not decide INCOME_DROP; only gold does.
+- The reasons are stored as one comma-separated string in `team_rotation.reasons`.
+- A tower lost makes a trip WASTED only when it is in the lane he left; a tower of another lane is listed as a reason and does not decide. No income is read when the stretch before the trip overlaps another trip of his or any time he was dead.
 - The group is a geometric group, not the team's intent: a hero who walks to the group's lane is a rotation even if the group moved there first.
 - The cluster is of living heroes only, so a team with one hero alive has nobody away.
 

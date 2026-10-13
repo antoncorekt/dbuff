@@ -41,7 +41,7 @@ class RotationFinderTest {
         new TripOutcomes.Events(
             Map.of(4L, List.of(62.0)),
             List.of(),
-            List.of(new FightFact(7, 55, 70, "RADIANT", Set.of(4L))));
+            List.of(new FightFact(7, 55, 70, "RADIANT", Set.of(4L), null)));
 
     List<Rotation> rotations = finder.find(inputs(TO_TOP, List.of(), events));
 
@@ -98,26 +98,38 @@ class RotationFinderTest {
     assertThat(finder.find(inputs(TO_TOP, lanes, events))).hasSize(1);
   }
 
-  @Test
-  void find_anOwnTowerFallingWhileAwayWithNoResultMakesItWasted() {
+  private List<Rotation> withTower(Zone.Lane towerLane) {
     MidGameFacts mid =
-        new MidGameFacts(Map.of(), Map.of(), List.of(), Map.of(TeamSide.RADIANT, List.of(50.0)));
-    RotationFinder.Inputs in =
+        new MidGameFacts(
+            Map.of(),
+            Map.of(),
+            List.of(),
+            Map.of(TeamSide.RADIANT, List.of(new MidGameFacts.TowerLoss(50.0, towerLane))));
+    List<LaneSlot> lanes = List.of(new LaneSlot(4, TeamSide.RADIANT, Zone.Lane.MID, 0, 600));
+    return finder.find(
         new RotationFinder.Inputs(
             radiant(TO_TOP),
             Map.of(),
             Map.of(),
             Map.of(),
-            List.of(),
+            lanes,
             new TripOutcomes.Events(Map.of(), List.of(), List.of()),
-            mid);
+            mid));
+  }
 
-    List<Rotation> rotations = finder.find(in);
+  @Test
+  void find_aTowerOfTheLaneHeLeftFallingWhileAwayMakesItWasted() {
+    List<Rotation> rotations = withTower(Zone.Lane.MID);
 
     assertThat(rotations).hasSize(1);
     assertThat(rotations.getFirst().verdict()).isEqualTo(RotationVerdict.WASTED);
     assertThat(rotations.getFirst().reasons())
         .containsExactly(RotationReason.DID_NOTHING, RotationReason.TOWER_LOST_WHILE_AWAY);
     assertThat(rotations.getFirst().income()).isEmpty();
+  }
+
+  @Test
+  void find_aTowerOfAnotherLaneFallingDoesNotDecideAndNothingIsReported() {
+    assertThat(withTower(Zone.Lane.BOTTOM)).isEmpty();
   }
 }

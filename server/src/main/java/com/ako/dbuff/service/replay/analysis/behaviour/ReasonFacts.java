@@ -10,6 +10,7 @@ import java.util.Optional;
  * @param missedFight a fight in the lane he got to was over before he arrived, and he took part in
  *     none there
  * @param towerLost an own tower fell during the trip
+ * @param towerInHisLane one of them was in the lane he left
  */
 public record ReasonFacts(
     AwayTrip trip,
@@ -20,4 +21,5 @@ public record ReasonFacts(
     int heroHits,
     int towerHits,
     boolean missedFight,
-    boolean towerLost) {}
+    boolean towerLost,
+    boolean towerInHisLane) {}

@@ -11,8 +11,4 @@ import java.util.Set;
  * @param lane the lane the fight was in; null when it was not in one
  */
 public record FightFact(
-    int index, double start, double end, String winner, Set<Long> present, Zone.Lane lane) {
-  public FightFact(int index, double start, double end, String winner, Set<Long> present) {
-    this(index, start, end, winner, present, null);
-  }
-}
+    int index, double start, double end, String winner, Set<Long> present, Zone.Lane lane) {}

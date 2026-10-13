@@ -15,6 +15,8 @@ import com.ako.dbuff.dao.repo.ReplayCombatLogRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.dao.repo.TeamRotationRepo;
+import com.ako.dbuff.service.replay.CombatEvent;
+import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.CombatLogCodec;
 import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
@@ -25,6 +27,7 @@ import com.ako.dbuff.service.replay.map.MatchMapLayout;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,7 +83,7 @@ class BehaviourRotationAnalyzerTest {
     assertThat(row.getFights()).isEqualTo(1);
     assertThat(row.getFightsWon()).isEqualTo(1);
     assertThat(row.getVerdict()).isEqualTo("GOOD");
-    assertThat(row.getReasons()).isEqualTo("DID_NOTHING");
+    assertThat(row.getReasons()).isEmpty();
     assertThat(row.getAnalysisVersion()).isEqualTo(2);
   }
 
@@ -97,8 +100,36 @@ class BehaviourRotationAnalyzerTest {
 
     analyzer.analyze(MATCH);
 
-    assertThat(rotationRepo.findAll().getFirst().getReasons())
-        .isEqualTo("DID_NOTHING,TOWER_LOST_WHILE_AWAY");
+    assertThat(rotationRepo.findAll().getFirst().getReasons()).isEqualTo("TOWER_LOST_WHILE_AWAY");
+  }
+
+  @Test
+  void hits_countOnlyDamageToEnemyHeroesAndEnemyTowers() {
+    Map<String, Long> slots =
+        Map.of("npc_dota_hero_axe", 0L, "npc_dota_hero_lion", 1L, "npc_dota_hero_mirana", 128L);
+    int hero = CombatEvent.ATTACKER_HERO | CombatEvent.TARGET_HERO;
+    List<CombatEvent> events =
+        List.of(
+            damage("npc_dota_hero_axe", "npc_dota_hero_mirana", hero, 10),
+            damage("npc_dota_hero_axe", "npc_dota_hero_lion", hero, 11),
+            damage("npc_dota_hero_axe", "npc_dota_hero_axe", hero, 12),
+            damage(
+                "npc_dota_hero_axe", "npc_dota_badguys_tower1_top", CombatEvent.ATTACKER_HERO, 13),
+            damage(
+                "npc_dota_hero_axe", "npc_dota_goodguys_tower1_top", CombatEvent.ATTACKER_HERO, 14),
+            damage(
+                "npc_dota_hero_axe",
+                "npc_dota_creep_badguys_melee",
+                CombatEvent.ATTACKER_HERO,
+                15));
+
+    assertThat(BehaviourRotationAnalyzer.hits(events, slots))
+        .containsExactly(new DamageHit(0L, 10, false), new DamageHit(0L, 13, true));
+  }
+
+  private static CombatEvent damage(String attacker, String target, int flags, double second) {
+    return new CombatEvent(
+        CombatEventKind.DAMAGE, second, attacker, target, "", flags, 50, 0, 0, 0, 0, 0, 0);
   }
 
   @Test

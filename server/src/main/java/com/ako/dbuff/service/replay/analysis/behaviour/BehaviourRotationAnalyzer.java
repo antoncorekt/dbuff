@@ -23,10 +23,11 @@ import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.PlayerSlots;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
+import com.ako.dbuff.service.replay.analysis.building.BuildingName;
 import com.ako.dbuff.service.replay.analysis.fight.FightAssessor.Trace;
 import com.ako.dbuff.service.replay.analysis.fight.PlayerTraces;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
-import com.ako.dbuff.service.replay.analysis.lane.MinuteSeries;
+import com.ako.dbuff.service.replay.analysis.lane.TimelineSeries;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.map.MapLayout;
@@ -38,7 +39,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
+import java.util.function.ToDoubleFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -58,7 +59,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
   private static final String ZONE_LANE = Zone.Kind.LANE.name();
-  private static final Pattern TOWER = Pattern.compile("^dota_(goodguys|badguys)_tower[1-4]_.*");
   private static final String TOWER_KIND = "TOWER";
 
   private final MatchMapLayout matchMapLayout;
@@ -148,37 +148,42 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
   private MidGameFacts midGame(
       long matchId, List<CombatEvent> events, Map<String, Long> slotByHero) {
     List<PlayerTimelineDomain> timeline = timelineRepo.findByMatchId(matchId);
-    Map<TeamSide, List<Double>> towerLosses =
-        buildingRepo.findByMatchId(matchId).stream()
-            .filter(
-                b ->
-                    TOWER_KIND.equals(b.getKind())
-                        && b.getSeconds() != null
-                        && b.getOwnerTeam() != null)
-            .collect(
-                Collectors.groupingBy(
-                    b -> TeamSide.valueOf(b.getOwnerTeam()),
-                    Collectors.mapping(
-                        BuildingKillContextDomain::getSeconds, Collectors.toList())));
+    Map<TeamSide, List<MidGameFacts.TowerLoss>> towerLosses = new HashMap<>();
+    for (BuildingKillContextDomain b : buildingRepo.findByMatchId(matchId)) {
+      TeamSide owner = Enums.find(TeamSide.class, b.getOwnerTeam());
+      if (TOWER_KIND.equals(b.getKind()) && b.getSeconds() != null && owner != null) {
+        Zone.Lane lane = b.getLane() == null ? null : Enums.find(Zone.Lane.class, b.getLane());
+        towerLosses
+            .computeIfAbsent(owner, t -> new ArrayList<>())
+            .add(new MidGameFacts.TowerLoss(b.getSeconds(), lane));
+      }
+    }
     return new MidGameFacts(
-        MinuteSeries.bySlot(timeline, PlayerTimelineDomain::getGold),
-        MinuteSeries.bySlot(timeline, PlayerTimelineDomain::getXp),
+        TimelineSeries.bySlot(timeline, PlayerTimelineDomain::getGold),
+        TimelineSeries.bySlot(timeline, PlayerTimelineDomain::getXp),
         hits(events, slotByHero),
         towerLosses);
   }
 
-  private static List<DamageHit> hits(List<CombatEvent> events, Map<String, Long> slotByHero) {
+  /** Hits on enemy heroes and enemy towers; damage to a hero's own team does not count. */
+  static List<DamageHit> hits(List<CombatEvent> events, Map<String, Long> slotByHero) {
     List<DamageHit> hits = new ArrayList<>();
     for (CombatEvent e : events) {
       Long slot = slotByHero.get(e.attacker());
       if (e.kind() != CombatEventKind.DAMAGE || slot == null || !e.attackerIsRealHero()) {
         continue;
       }
-      if (e.targetIsRealHero()) {
-        hits.add(new DamageHit(slot, e.gameSecond(), false));
-      } else if (TOWER.matcher(e.target()).matches()) {
-        hits.add(new DamageHit(slot, e.gameSecond(), true));
+      TeamSide own = TeamSide.ofSlot(slot);
+      Long victim = e.targetIsRealHero() ? slotByHero.get(e.target()) : null;
+      if (victim != null) {
+        if (TeamSide.ofSlot(victim) != own) {
+          hits.add(new DamageHit(slot, e.gameSecond(), false));
+        }
+        continue;
       }
+      BuildingName.parse(e.target())
+          .filter(b -> TOWER_KIND.equals(b.kind()) && !own.name().equals(b.team()))
+          .ifPresent(b -> hits.add(new DamageHit(slot, e.gameSecond(), true)));
     }
     return hits;
   }
@@ -327,13 +332,17 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
         .proxyOwnKills(r.proxy().map(LaneProxy.Result::own).orElse(null))
         .proxyEnemyKills(r.proxy().map(LaneProxy.Result::enemy).orElse(null))
         .reasons(r.reasons().stream().map(Enum::name).collect(Collectors.joining(",")))
-        .incomeBefore(r.income().map(i -> (int) Math.round(i.goldBefore())).orElse(null))
-        .incomeDuring(r.income().map(i -> (int) Math.round(i.goldDuring())).orElse(null))
-        .xpBefore(r.income().map(i -> (int) Math.round(i.xpBefore())).orElse(null))
-        .xpDuring(r.income().map(i -> (int) Math.round(i.xpDuring())).orElse(null))
+        .incomeBefore(rounded(r, Income::goldBefore))
+        .incomeDuring(rounded(r, Income::goldDuring))
+        .xpBefore(rounded(r, Income::xpBefore))
+        .xpDuring(rounded(r, Income::xpDuring))
         .verdict(r.verdict().name())
         .analysisVersion(version())
         .build();
+  }
+
+  private static Integer rounded(Rotation r, ToDoubleFunction<Income> value) {
+    return r.income().map(i -> (int) Math.round(value.applyAsDouble(i))).orElse(null);
   }
 
   private static String laneName(Zone zone) {

@@ -4,6 +4,7 @@ import com.ako.dbuff.service.replay.analysis.behaviour.AwayTrip.End;
 import com.ako.dbuff.service.replay.analysis.lane.MinuteSeries;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.map.Zone;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -26,14 +27,14 @@ class RotationReasonsTest {
   }
 
   private static MinuteSeries slowing() {
-    MinuteSeries series = new MinuteSeries();
+    Map<Integer, Long> totals = new HashMap<>();
     for (int minute = 0; minute <= 20; minute++) {
-      series.put(minute, minute <= 10 ? 500L * minute : 5000 + 100L * (minute - 10));
+      totals.put(minute, minute <= 10 ? 500L * minute : 5000 + 100L * (minute - 10));
     }
-    return series;
+    return new MinuteSeries(totals);
   }
 
-  private static MidGameFacts mid(List<DamageHit> hits, List<Double> towers) {
+  private static MidGameFacts mid(List<DamageHit> hits, List<MidGameFacts.TowerLoss> towers) {
     return new MidGameFacts(
         Map.of(4L, slowing()), Map.of(4L, slowing()), hits, Map.of(TeamSide.RADIANT, towers));
   }
@@ -44,7 +45,25 @@ class RotationReasonsTest {
       Optional<LaneProxy.Result> proxy,
       MidGameFacts mid,
       List<FightFact> fights) {
-    return RotationReasons.of(evidence.of(trip, TeamSide.RADIANT, outcome, proxy, mid, fights));
+    return RotationReasons.of(facts(trip, outcome, proxy, mid, fights, Zone.Lane.MID));
+  }
+
+  private ReasonFacts facts(
+      AwayTrip trip,
+      TripOutcome outcome,
+      Optional<LaneProxy.Result> proxy,
+      MidGameFacts mid,
+      List<FightFact> fights,
+      Zone.Lane laneLeft) {
+    return evidence.of(
+        trip,
+        TeamSide.RADIANT,
+        laneLeft,
+        outcome,
+        proxy,
+        mid,
+        fights,
+        new HeroPast(null, List.of(trip)));
   }
 
   @Test
@@ -171,7 +190,7 @@ class RotationReasonsTest {
                 trip(End.REJOINED),
                 NOTHING,
                 Optional.empty(),
-                mid(List.of(), List.of(640.0)),
+                mid(List.of(), List.of(new MidGameFacts.TowerLoss(640.0, Zone.Lane.TOP))),
                 List.of()))
         .contains(RotationReason.TOWER_LOST_WHILE_AWAY);
     assertThat(
@@ -179,8 +198,57 @@ class RotationReasonsTest {
                 trip(End.REJOINED),
                 NOTHING,
                 Optional.empty(),
-                mid(List.of(), List.of(590.0, 661.0)),
+                mid(
+                    List.of(),
+                    List.of(
+                        new MidGameFacts.TowerLoss(590.0, null),
+                        new MidGameFacts.TowerLoss(661.0, null))),
                 List.of()))
         .doesNotContain(RotationReason.TOWER_LOST_WHILE_AWAY);
+  }
+
+  @Test
+  void of_standingInAFightAtTheDestinationIsNotDoingNothing() {
+    assertThat(
+            reasons(
+                trip(End.REJOINED),
+                new TripOutcome(0, 0, 1, 1, 4),
+                Optional.empty(),
+                MidGameFacts.NONE,
+                List.of()))
+        .doesNotContain(RotationReason.DID_NOTHING);
+  }
+
+  @Test
+  void facts_aTowerCountsForTheVerdictOnlyInTheLaneHeLeft() {
+    MidGameFacts mid = mid(List.of(), List.of(new MidGameFacts.TowerLoss(640.0, Zone.Lane.MID)));
+
+    assertThat(facts(trip(End.REJOINED), NOTHING, Optional.empty(), mid, List.of(), Zone.Lane.MID))
+        .extracting(ReasonFacts::towerInHisLane)
+        .isEqualTo(true);
+    assertThat(facts(trip(End.REJOINED), NOTHING, Optional.empty(), mid, List.of(), Zone.Lane.TOP))
+        .extracting(ReasonFacts::towerInHisLane)
+        .isEqualTo(false);
+    assertThat(facts(trip(End.REJOINED), NOTHING, Optional.empty(), mid, List.of(), null))
+        .extracting(ReasonFacts::towerInHisLane)
+        .isEqualTo(false);
+  }
+
+  @Test
+  void facts_noIncomeReadingWhenAnotherTripOfHisOverlapsTheStretchBefore() {
+    AwayTrip earlier = new AwayTrip(4L, 520, 530, 560, MID, TOP, MID, false, End.REJOINED);
+    AwayTrip trip = trip(End.REJOINED);
+    ReasonFacts facts =
+        evidence.of(
+            trip,
+            TeamSide.RADIANT,
+            Zone.Lane.MID,
+            NOTHING,
+            Optional.empty(),
+            mid(List.of(), List.of()),
+            List.of(),
+            new HeroPast(null, List.of(earlier, trip)));
+
+    assertThat(facts.income()).isEmpty();
   }
 }
