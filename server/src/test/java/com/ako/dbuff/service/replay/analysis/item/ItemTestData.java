@@ -32,8 +32,10 @@ final class ItemTestData {
                         .cost(cost)
                         .attrib(
                             "hand_of_midas".equals(key)
-                                ? List.of(Map.of("key", "bonus_gold", "value", "160"))
-                                : List.of())
+                                ? List.of(
+                                    Map.of("key", "bonus_gold", "value", "160"),
+                                    Map.of("key", "bonus_attack_speed", "value", "35"))
+                                : List.of(Map.of("key", "bonus_damage", "value", "25")))
                         .build());
   }
 
@@ -83,6 +85,24 @@ final class ItemTestData {
         CombatEvent.ATTACKER_HERO | CombatEvent.TARGET_HERO,
         damage,
         healthAfter,
+        0,
+        0,
+        0,
+        0,
+        0);
+  }
+
+  /** Damage the hero dealt to an enemy hero; {@code inflictor} is empty for an attack. */
+  static CombatEvent dealt(double second, int damage, String inflictor) {
+    return new CombatEvent(
+        CombatEventKind.DAMAGE,
+        second,
+        HERO,
+        "npc_dota_hero_lion",
+        inflictor,
+        CombatEvent.ATTACKER_HERO | CombatEvent.TARGET_HERO,
+        damage,
+        1000,
         0,
         0,
         0,

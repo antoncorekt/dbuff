@@ -39,7 +39,8 @@ public class HandOfMidasEvaluator implements ItemEfficiencyEvaluator {
   private static final String BONUS_GOLD = "bonus_gold";
   private static final double PAIR_SECONDS = 0.3;
   private static final double COOLDOWN_LOOKAHEAD_SECONDS = 6;
-  private static final Set<String> PARAMETERS = Set.of("cooldownSeconds", "xpWeight");
+  private static final Set<String> PARAMETERS =
+      Set.of("cooldownSeconds", "xpWeight", "includeAttackSpeed");
 
   private final CreepValues creepValues;
 
@@ -123,6 +124,12 @@ public class HandOfMidasEvaluator implements ItemEfficiencyEvaluator {
     totals.put("farmingSeconds", hero.farmingSeconds(bought, ownedTo));
     totals.put("heroGold", total(hero, CombatEventKind.GOLD));
     totals.put("heroXp", total(hero, CombatEventKind.XP));
+    if (entry.parameter("includeAttackSpeed", 0.0) > 0) {
+      context
+          .kits()
+          .attribute(entry.items().getFirst(), "bonus_attack_speed")
+          .ifPresent(v -> totals.put("bonusAttackSpeed", v));
+    }
     double gain = gold + weight * xp;
     return new ItemEfficiency(
         hero.slot(),

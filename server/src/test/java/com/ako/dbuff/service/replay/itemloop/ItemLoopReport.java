@@ -28,9 +28,13 @@ final class ItemLoopReport {
           + " per point, and a save is a use at low health under heavy damage after which he lived"
           + " 10 more seconds. Hand of Midas counts the gold and experience of its uses. The"
           + " farming items (Battle Fury, Maelstrom, Mjollnir) compare creep kills, creep gold and"
-          + " camps per minute in the minutes before and after the first purchase. \"Item details\""
-          + " lists every use, payback and measured stretch. Times are the game clock (m:ss)."
-          + " Write OK or REJECT in the assistant and owner columns.";
+          + " camps per minute in the minutes before and after the first purchase, and add the"
+          + " damage to enemy heroes: the item's own damage (chain lightning, cleave, static"
+          + " charge) and the rise of the hero's damage per minute from its stats, at a price per"
+          + " 1000 damage; the result gives the creeps part and the damage part of the ratio"
+          + " separately, then the total. \"Item details\" lists every use, payback and measured"
+          + " stretch. Times are the game clock (m:ss). Write OK or REJECT in the assistant and"
+          + " owner columns.";
 
   record MatchData(
       long matchId,

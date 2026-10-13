@@ -81,7 +81,9 @@ public class ItemEfficiencyInputs {
             e ->
                 e.kind() == CombatEventKind.ITEM
                     ? hero.equals(e.attacker())
-                    : ABOUT_THE_TARGET.contains(e.kind()) && hero.equals(e.target()))
+                    : e.kind() == CombatEventKind.DAMAGE && hero.equals(e.attacker())
+                        ? e.targetIsRealHero()
+                        : ABOUT_THE_TARGET.contains(e.kind()) && hero.equals(e.target()))
         .toList();
   }
 

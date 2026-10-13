@@ -228,4 +228,82 @@ class ItemLoopReportTest {
 
     assertThat(report).contains("no whitelisted item bought by any hero");
   }
+
+  @Test
+  void render_givesTheCreepPartTheDamagePartAndTheTotalOfAFarmingItem() {
+    ItemEfficiency item =
+        new ItemEfficiency(
+            0,
+            "farming_items",
+            "mjollnir",
+            "farming-group",
+            600.0,
+            23,
+            3800,
+            5500L,
+            0.7,
+            null,
+            figures("netGoldPerMinute", 66, "creepGain", 2200, "damageValue", 1650),
+            List.of(),
+            List.of(
+                new Detail(
+                    "BEFORE",
+                    300,
+                    null,
+                    figures(
+                        "minutes",
+                        5,
+                        "kills",
+                        10,
+                        "killsPerMinute",
+                        2,
+                        "goldPerMinute",
+                        60,
+                        "campsPerMinute",
+                        0)),
+                new Detail(
+                    "AFTER",
+                    600,
+                    null,
+                    figures(
+                        "minutes",
+                        5,
+                        "kills",
+                        23,
+                        "killsPerMinute",
+                        4.6,
+                        "goldPerMinute",
+                        126,
+                        "campsPerMinute",
+                        0.4)),
+                new Detail(
+                    "DAMAGE",
+                    600,
+                    null,
+                    figures(
+                        "procDamage",
+                        6000,
+                        "passiveDamage",
+                        10500,
+                        "damageValue",
+                        1650,
+                        "damagePrice",
+                        100,
+                        "beforePerMinute",
+                        600,
+                        "afterPerMinute",
+                        1200,
+                        "bonusDamage",
+                        25,
+                        "bonusAttackSpeed",
+                        90))));
+
+    String report = ItemLoopReport.render(data(List.of(item)));
+
+    assertThat(report)
+        .contains("creeps +0.4x its cost, damage +0.3x, 0.7x in total, not paid back")
+        .contains("| Windrunner: mjollnir, damage at 10:00 | 10:00 | enemy heroes | 6k damage")
+        .contains("worth 1.7k gold at 100 per 1k damage")
+        .doesNotContain("DAMAGE");
+  }
 }

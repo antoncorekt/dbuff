@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
 import com.ako.dbuff.dao.model.CreepKillDomain;
+import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.StateChangeKind;
 import java.util.ArrayList;
 import java.util.List;
@@ -179,5 +180,93 @@ class FarmingGroupEvaluatorTest {
     assertThat(result.ratio()).isNull();
     assertThat(result.paybackSeconds()).isNull();
     assertThat(result.flags()).contains(FarmingGroupEvaluator.COST_UNKNOWN);
+  }
+
+  private static ItemEfficiencyEntry withDamage() {
+    return ItemTestData.entry(
+        "farming_items",
+        FarmingGroupEvaluator.KIND,
+        List.of("bfury", "maelstrom", "mjollnir"),
+        Map.of("includeDamage", 1.0, "damagePrice", 100.0, "damageWindowMinutes", 5.0));
+  }
+
+  private static List<CombatEvent> damageEvents() {
+    return List.of(
+        ItemTestData.dealt(350, 1000, ""),
+        ItemTestData.dealt(450, 1000, ""),
+        ItemTestData.dealt(550, 1000, ""),
+        ItemTestData.dealt(650, 1500, ""),
+        ItemTestData.dealt(700, 750, "item_maelstrom"),
+        ItemTestData.dealt(750, 1500, ""),
+        ItemTestData.dealt(800, 750, "item_maelstrom"),
+        ItemTestData.dealt(850, 1500, ""));
+  }
+
+  @Test
+  void theDamagePartAddsTheItemsOwnDamageAndTheUpliftOfItsStatsToTheGoldPart() {
+    List<CreepKillDomain> kills = new ArrayList<>();
+    kills.addAll(kills(10, 300, 600, 30));
+    kills.addAll(kills(20, 600, 900, 30));
+    var changes = List.of(change(600, StateChangeKind.ITEM_ADDED, "item_maelstrom"));
+
+    ItemEfficiency result =
+        evaluator
+            .evaluate(
+                new EntryContext(
+                    withDamage(),
+                    KITS,
+                    1500,
+                    List.of(hero(changes, damageEvents(), null, kills, List.of()))))
+            .getFirst();
+
+    assertThat(result.figures())
+        .containsEntry("procDamage", 1500.0)
+        .containsEntry("passiveDamage", 4500.0)
+        .containsEntry("damageValue", 600.0)
+        .containsEntry("creepGain", 60.0 * 15);
+    assertThat(result.gain()).isEqualTo(60.0 * 15 + 600);
+    assertThat(result.ratio()).isEqualTo((60.0 * 15 + 600) / 500);
+    ItemEfficiency.Detail damage =
+        result.rows().stream().filter(d -> d.label().equals("DAMAGE")).findFirst().orElseThrow();
+    assertThat(damage.figures())
+        .containsEntry("beforePerMinute", 600.0)
+        .containsEntry("afterPerMinute", 1200.0)
+        .containsEntry("damagePrice", 100.0)
+        .containsEntry("bonusDamage", 25.0);
+    assertThat(result.paybackSeconds()).isEqualTo(600 + 500 / ((60.0 * 15 + 600) / 15) * 60);
+  }
+
+  @Test
+  void withoutTheParameterTheDamagePartIsOffAndTheResultIsTheGoldOnly() {
+    List<CreepKillDomain> kills = new ArrayList<>();
+    kills.addAll(kills(10, 300, 600, 30));
+    kills.addAll(kills(20, 600, 900, 30));
+    var changes = List.of(change(600, StateChangeKind.ITEM_ADDED, "item_maelstrom"));
+
+    ItemEfficiency result = evaluate(hero(changes, damageEvents(), null, kills, List.of()), 1500);
+
+    assertThat(result.figures()).doesNotContainKey("damageValue");
+    assertThat(result.gain()).isEqualTo(60.0 * 15);
+  }
+
+  @Test
+  void anItemBoughtBeforeTheHornCountsItsOwnDamageButNoUplift() {
+    var changes = List.of(change(-70, StateChangeKind.ITEM_ADDED, "item_maelstrom"));
+
+    ItemEfficiency result =
+        evaluator
+            .evaluate(
+                new EntryContext(
+                    withDamage(),
+                    KITS,
+                    900,
+                    List.of(hero(changes, damageEvents(), null, List.of(), List.of()))))
+            .getFirst();
+
+    assertThat(result.figures())
+        .containsEntry("procDamage", 1500.0)
+        .containsEntry("passiveDamage", 0.0);
+    assertThat(result.flags()).contains(FarmingGroupEvaluator.NO_DAMAGE_COMPARISON);
+    assertThat(result.ratio()).isNull();
   }
 }

@@ -451,7 +451,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .isEqualTo(r.gain() >= r.cost());
     }
     for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("farming-group")).toList()) {
-      assertThat(r.rows()).extracting(d -> d.label()).startsWith("BEFORE", "AFTER");
+      assertThat(r.rows()).extracting(d -> d.label()).startsWith("BEFORE", "AFTER", "DAMAGE");
+      assertThat(r.figures().get("procDamage")).as("damage of the item's own effects").isPositive();
+      assertThat(r.figures().get("damageValue")).isGreaterThanOrEqualTo(0.0);
     }
     System.out.printf(
         "ITEMS %s: %d rows (%d stick, %d midas, %d farming), %d stick uses, %.0f saves%n",

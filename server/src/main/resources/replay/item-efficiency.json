@@ -28,7 +28,8 @@
       "items": ["hand_of_midas"],
       "parameters": {
         "cooldownSeconds": 90,
-        "xpWeight": 1
+        "xpWeight": 1,
+        "includeAttackSpeed": 1
       }
     },
     {
@@ -39,7 +40,10 @@
         "windowMinutes": 5,
         "minBeforeSeconds": 120,
         "minAfterSeconds": 60,
-        "campGapSeconds": 30
+        "campGapSeconds": 30,
+        "includeDamage": 1,
+        "damagePrice": 100,
+        "damageWindowMinutes": 5
       }
     }
   ]

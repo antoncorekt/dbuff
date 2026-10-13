@@ -24,13 +24,22 @@ public class FarmingGroupEvaluator implements ItemEfficiencyEvaluator {
   static final String NO_BEFORE_WINDOW = "NO_BEFORE_WINDOW";
   static final String SHORT_AFTER_WINDOW = "SHORT_AFTER_WINDOW";
   static final String COST_UNKNOWN = "COST_UNKNOWN";
+  static final String NO_DAMAGE_COMPARISON = "NO_DAMAGE_COMPARISON";
 
   private static final String BEFORE = "BEFORE";
   private static final String AFTER = "AFTER";
   private static final String PAYBACK = "PAYBACK";
+  private static final String DAMAGE = "DAMAGE";
   private static final double SECONDS_PER_MINUTE = 60;
   private static final Set<String> PARAMETERS =
-      Set.of("windowMinutes", "minBeforeSeconds", "minAfterSeconds", "campGapSeconds");
+      Set.of(
+          "windowMinutes",
+          "minBeforeSeconds",
+          "minAfterSeconds",
+          "campGapSeconds",
+          "includeDamage",
+          "damagePrice",
+          "damageWindowMinutes");
 
   @Override
   public boolean supports(ItemEfficiencyEntry entry) {
@@ -86,26 +95,45 @@ public class FarmingGroupEvaluator implements ItemEfficiencyEvaluator {
     List<Detail> rows = new ArrayList<>();
     rows.add(detail(before, gap));
     rows.add(detail(after, gap));
+    DamageComponent damage =
+        entry.parameter("includeDamage", 0.0) > 0
+            ? DamageComponent.estimate(entry, hero, names, bought, ownedTo)
+            : null;
+    double ownedMinutes = Math.max(0, ownedTo - bought) / SECONDS_PER_MINUTE;
     double gain = 0;
     Double ratio = null;
     Double payback = null;
+    if (damage != null) {
+      double value = damage.value(entry.parameter("damagePrice", 100.0));
+      totals.put("procDamage", damage.procDamage());
+      totals.put("passiveDamage", damage.passiveDamage());
+      totals.put("damageValue", value);
+      rows.add(damageRow(context, hero, first, bought, damage));
+      if (!damage.compared()) {
+        flags.add(NO_DAMAGE_COMPARISON);
+      }
+    }
     if (comparable) {
       double net = goldPerMinute(after) - goldPerMinute(before);
-      gain = net * Math.max(0, ownedTo - bought) / SECONDS_PER_MINUTE;
+      double creepGain = net * ownedMinutes;
+      double damageValue = damage == null ? 0 : totals.get("damageValue");
+      gain = creepGain + damageValue;
+      double rate = net + (ownedMinutes > 0 ? damageValue / ownedMinutes : 0);
       totals.put("netGoldPerMinute", net);
+      totals.put("creepGain", creepGain);
       if (cost != null) {
         ratio = gain / cost;
-        double paidAt = bought + cost / net * SECONDS_PER_MINUTE;
-        if (net > 0 && paidAt <= ownedTo) {
+        double paidAt = bought + cost / rate * SECONDS_PER_MINUTE;
+        if (rate > 0 && paidAt <= ownedTo) {
           payback = paidAt;
-          rows.add(new Detail(PAYBACK, payback, null, Map.of("netGoldPerMinute", net)));
+          rows.add(new Detail(PAYBACK, payback, null, Map.of("netGoldPerMinute", rate)));
         }
       }
     }
     if (cost == null) {
       flags.add(COST_UNKNOWN);
     }
-    totals.put("minutesOwned", Math.max(0, ownedTo - bought) / SECONDS_PER_MINUTE);
+    totals.put("minutesOwned", ownedMinutes);
     return new ItemEfficiency(
         hero.slot(),
         entry.key(),
@@ -120,6 +148,24 @@ public class FarmingGroupEvaluator implements ItemEfficiencyEvaluator {
         totals,
         flags,
         rows);
+  }
+
+  private Detail damageRow(
+      EntryContext context, HeroInputs hero, String first, double bought, DamageComponent damage) {
+    Map<String, Double> figures = new LinkedHashMap<>();
+    String key = HeroInputs.itemKey(first);
+    figures.put("procDamage", damage.procDamage());
+    figures.put("passiveDamage", damage.passiveDamage());
+    figures.put("beforePerMinute", damage.beforePerMinute());
+    figures.put("afterPerMinute", damage.afterPerMinute());
+    figures.put("damagePrice", context.entry().parameter("damagePrice", 100.0));
+    figures.put("damageValue", damage.value(context.entry().parameter("damagePrice", 100.0)));
+    context.kits().attribute(key, "bonus_damage").ifPresent(v -> figures.put("bonusDamage", v));
+    context
+        .kits()
+        .attribute(key, "bonus_attack_speed")
+        .ifPresent(v -> figures.put("bonusAttackSpeed", v));
+    return new Detail(DAMAGE, bought, null, figures);
   }
 
   private Window window(HeroInputs hero, String label, double from, double to) {

@@ -123,4 +123,24 @@ public record HeroInputs(
             s -> Math.max(0, Math.min(to, s.endSeconds()) - Math.max(from, s.startSeconds())))
         .sum();
   }
+
+  /** Damage the hero dealt to enemy heroes in {@code (from, to]}, from the combat log. */
+  public double heroDamage(double from, double to) {
+    return dealt(from, to, null);
+  }
+
+  /** The part of it that came from the named items (their procs and cleave). */
+  public double itemDamage(Collection<String> names, double from, double to) {
+    return dealt(from, to, names);
+  }
+
+  private double dealt(double from, double to, Collection<String> inflictors) {
+    return events.stream()
+        .filter(e -> e.kind() == CombatEventKind.DAMAGE && hero.equals(e.attacker()))
+        .filter(e -> e.targetIsRealHero() && !hero.equals(e.target()))
+        .filter(e -> e.gameSecond() > from && e.gameSecond() <= to)
+        .filter(e -> inflictors == null || inflictors.contains(e.inflictor()))
+        .mapToDouble(CombatEvent::value)
+        .sum();
+  }
 }

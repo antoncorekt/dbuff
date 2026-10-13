@@ -229,4 +229,19 @@ class HandOfMidasEvaluatorTest {
     assertThat(result.paybackSeconds()).isNull();
     assertThat(result.flags()).contains(HandOfMidasEvaluator.COST_UNKNOWN);
   }
+
+  @Test
+  void theAttackSpeedOfTheItemIsNamedWhenAskedForAndNeverCountedAsGain() {
+    ItemEfficiency without =
+        evaluate(300, hero(owned(), twoUses(), null, List.of(), List.of()), Map.of());
+    ItemEfficiency with =
+        evaluate(
+            300,
+            hero(owned(), twoUses(), null, List.of(), List.of()),
+            Map.of("includeAttackSpeed", 1.0));
+
+    assertThat(without.figures()).doesNotContainKey("bonusAttackSpeed");
+    assertThat(with.figures()).containsEntry("bonusAttackSpeed", 35.0);
+    assertThat(with.gain()).isEqualTo(without.gain());
+  }
 }

@@ -32,7 +32,15 @@ final class MidasWording implements Wording {
             LoopWording.clock(f.get("idleSeconds")),
             LoopWording.clock(f.get("farmingSeconds")),
             ItemLoopReport.ratio(row.ratio()),
-            Wording.limits(row.flags()));
+            Wording.limits(row.flags()) + attackSpeed(f));
+  }
+
+  /** The attack speed it also gives is named, not counted. */
+  private static String attackSpeed(Map<String, Double> f) {
+    return f.containsKey("bonusAttackSpeed")
+        ? " (it also gives +%s attack speed, not counted)"
+            .formatted(LoopWording.gold(f.get("bonusAttackSpeed")))
+        : "";
   }
 
   @Override
