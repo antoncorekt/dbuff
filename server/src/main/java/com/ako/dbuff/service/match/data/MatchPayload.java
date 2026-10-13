@@ -32,6 +32,18 @@ final class MatchPayload {
     return value instanceof Number number ? number.longValue() : null;
   }
 
+  static Integer asInt(String value) {
+    try {
+      return value == null ? null : Integer.valueOf(value.trim());
+    } catch (NumberFormatException e) {
+      return null;
+    }
+  }
+
+  static Double asDouble(Object value) {
+    return value instanceof Number number ? number.doubleValue() : null;
+  }
+
   static String asString(Object value) {
     return value instanceof String string ? string : null;
   }

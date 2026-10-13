@@ -1,0 +1,271 @@
+{
+ "players": [
+  {
+   "player_slot": 2,
+   "account_id": 208611215,
+   "runes_log": [
+    {
+     "time": 142,
+     "key": "7"
+    },
+    {
+     "time": 212,
+     "key": "7"
+    },
+    {
+     "time": 253,
+     "key": "7"
+    },
+    {
+     "time": 438,
+     "key": "5"
+    },
+    {
+     "time": 543,
+     "key": "5"
+    },
+    {
+     "time": 1072,
+     "key": "0"
+    },
+    {
+     "time": 1424,
+     "key": "2"
+    },
+    {
+     "time": 1699,
+     "key": "1"
+    }
+   ],
+   "obs_log": [
+    {
+     "time": -17,
+     "type": "obs_log",
+     "key": "[120,121]",
+     "slot": 2,
+     "player_slot": 2,
+     "x": 120,
+     "y": 120.7,
+     "z": 129,
+     "entityleft": false,
+     "ehandle": 13992889
+    },
+    {
+     "time": 970,
+     "type": "obs_log",
+     "key": "[121,122]",
+     "slot": 2,
+     "player_slot": 2,
+     "x": 120.8,
+     "y": 121.8,
+     "z": 129,
+     "entityleft": false,
+     "ehandle": 10618908
+    }
+   ],
+   "sen_log": [
+    {
+     "time": -13,
+     "type": "sen_log",
+     "key": "[124,126]",
+     "slot": 2,
+     "player_slot": 2,
+     "x": 124.3,
+     "y": 126.1,
+     "z": 128,
+     "entityleft": false,
+     "ehandle": 1672137
+    },
+    {
+     "time": 314,
+     "type": "sen_log",
+     "key": "[129,126]",
+     "slot": 2,
+     "player_slot": 2,
+     "x": 129,
+     "y": 126,
+     "z": 129,
+     "entityleft": false,
+     "ehandle": 11995611
+    }
+   ],
+   "obs_left_log": [
+    {
+     "time": 343,
+     "type": "obs_left_log",
+     "key": "[120,121]",
+     "slot": 2,
+     "player_slot": 2,
+     "attackername": "npc_dota_hero_windrunner",
+     "x": 120,
+     "y": 120.7,
+     "z": 129,
+     "entityleft": true,
+     "ehandle": 13992889
+    }
+   ],
+   "sen_left_log": [
+    {
+     "time": 174,
+     "type": "sen_left_log",
+     "key": "[124,126]",
+     "slot": 2,
+     "player_slot": 2,
+     "attackername": "npc_dota_hero_mirana",
+     "x": 124.3,
+     "y": 126.1,
+     "z": 128,
+     "entityleft": true,
+     "ehandle": 1672137
+    },
+    {
+     "time": 734,
+     "type": "sen_left_log",
+     "key": "[129,126]",
+     "slot": 2,
+     "player_slot": 2,
+     "attackername": "npc_dota_hero_windrunner",
+     "x": 129,
+     "y": 126,
+     "z": 129,
+     "entityleft": true,
+     "ehandle": 11995611
+    }
+   ],
+   "killed": {
+    "npc_dota_neutral_mud_golem": 2,
+    "npc_dota_neutral_ogre_mauler": 5,
+    "npc_dota_creep_badguys_ranged": 23,
+    "npc_dota_creep_goodguys_flagbearer": 1
+   }
+  },
+  {
+   "player_slot": 4,
+   "account_id": 201613150,
+   "runes_log": [
+    {
+     "time": 1571,
+     "key": "4"
+    },
+    {
+     "time": 1904,
+     "key": "6"
+    }
+   ],
+   "obs_log": [
+    {
+     "time": 825,
+     "type": "obs_log",
+     "key": "[100,134]",
+     "slot": 4,
+     "player_slot": 4,
+     "x": 100,
+     "y": 133.6,
+     "z": 130,
+     "entityleft": false,
+     "ehandle": 2279622
+    },
+    {
+     "time": 1343,
+     "type": "obs_log",
+     "key": "[116,144]",
+     "slot": 4,
+     "player_slot": 4,
+     "x": 115.7,
+     "y": 144.1,
+     "z": 130,
+     "entityleft": false,
+     "ehandle": 2689607
+    }
+   ],
+   "sen_log": [
+    {
+     "time": 880,
+     "type": "sen_log",
+     "key": "[84,157]",
+     "slot": 4,
+     "player_slot": 4,
+     "x": 83.5,
+     "y": 156.7,
+     "z": 129,
+     "entityleft": false,
+     "ehandle": 12404521
+    },
+    {
+     "time": 1093,
+     "type": "sen_log",
+     "key": "[145,89]",
+     "slot": 4,
+     "player_slot": 4,
+     "x": 145.3,
+     "y": 89.2,
+     "z": 130,
+     "entityleft": false,
+     "ehandle": 5360545
+    }
+   ],
+   "obs_left_log": [
+    {
+     "time": 1185,
+     "type": "obs_left_log",
+     "key": "[100,134]",
+     "slot": 4,
+     "player_slot": 4,
+     "attackername": "npc_dota_hero_ancient_apparition",
+     "x": 100,
+     "y": 133.6,
+     "z": 130,
+     "entityleft": true,
+     "ehandle": 2279622
+    },
+    {
+     "time": 1703,
+     "type": "obs_left_log",
+     "key": "[116,144]",
+     "slot": 4,
+     "player_slot": 4,
+     "attackername": "npc_dota_hero_ancient_apparition",
+     "x": 115.7,
+     "y": 144.1,
+     "z": 130,
+     "entityleft": true,
+     "ehandle": 2689607
+    }
+   ],
+   "sen_left_log": [
+    {
+     "time": 1100,
+     "type": "sen_left_log",
+     "key": "[145,89]",
+     "slot": 4,
+     "player_slot": 4,
+     "attackername": "npc_dota_hero_lycan",
+     "x": 145.3,
+     "y": 89.2,
+     "z": 130,
+     "entityleft": true,
+     "ehandle": 5360545
+    },
+    {
+     "time": 1300,
+     "type": "sen_left_log",
+     "key": "[84,157]",
+     "slot": 4,
+     "player_slot": 4,
+     "attackername": "npc_dota_hero_ancient_apparition",
+     "x": 83.5,
+     "y": 156.7,
+     "z": 129,
+     "entityleft": true,
+     "ehandle": 12404521
+    }
+   ],
+   "killed": {
+    "npc_dota_neutral_polar_furbolg_ursa_warrior": 1,
+    "npc_dota_creep_badguys_melee": 53,
+    "npc_dota_creep_goodguys_melee": 3,
+    "npc_dota_neutral_grown_frog_mage": 1
+   }
+  }
+ ]
+}
