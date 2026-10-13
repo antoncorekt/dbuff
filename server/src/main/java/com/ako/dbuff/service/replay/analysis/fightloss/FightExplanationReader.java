@@ -14,6 +14,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -109,6 +110,24 @@ public class FightExplanationReader {
   @Transactional(readOnly = true)
   public MatchExplanation read(long matchId, int topReasons, int maxFightsPerSwing) {
     return read(matchId, topReasons, maxFightsPerSwing, true);
+  }
+
+  /**
+   * The lost fights whose importance is stored and says important, in time order. A match with no
+   * importance stored has none, unlike {@link #read}, which then tells every fight.
+   */
+  @Transactional(readOnly = true)
+  public List<LostFight> importantFights(long matchId) {
+    MatchExplanation all = readAll(matchId, 0, Integer.MAX_VALUE);
+    return Stream.concat(
+            all.swings().stream().flatMap(s -> s.fights().stream()), all.otherFights().stream())
+        .filter(l -> l.importance() != null && l.importance().isImportant())
+        .collect(
+            Collectors.toMap(
+                l -> l.fight().getFightIndex(), Function.identity(), (a, b) -> a, TreeMap::new))
+        .values()
+        .stream()
+        .toList();
   }
 
   /** Every lost fight, each with its importance; for readers that list the unimportant ones. */

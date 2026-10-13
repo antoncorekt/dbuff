@@ -191,6 +191,19 @@ class FightExplanationReaderTest {
   }
 
   @Test
+  void importantFightsAreTheFlaggedOnesInTimeOrder_andNoneWithoutStoredImportance() {
+    stored();
+    assertThat(reader.importantFights(MATCH)).isEmpty();
+    importance(3, true);
+    importance(0, true);
+    importance(1, false);
+
+    assertThat(reader.importantFights(MATCH))
+        .extracting(f -> f.fight().getFightIndex())
+        .containsExactly(0, 3);
+  }
+
+  @Test
   void aMatchWithNoImportanceStoredReadsEveryLostFight() {
     stored();
 
