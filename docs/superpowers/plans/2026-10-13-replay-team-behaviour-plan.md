@@ -9,11 +9,13 @@ Say, in plain words, how each team played the middle game: where the heroes were
 ## 2. Data that exists (no new extraction needed)
 
 - Hero track every 5 s: position, hp, mana, level, alive.
-- `MapLayout.zone`: base, lane (top, mid, bottom), river, jungle, camp, per half of the map.
-- `ActivitySegmenter`: lane farm, jungle farm, teleport, traveling.
-- Combat log: DEATH, DAMAGE, ABILITY, ITEM, BUILDING_KILL, BUYBACK; the modifier whitelist already holds `modifier_smoke_of_deceit` and `modifier_teleporting`.
+- `MapLayout.zone`: kind BASE, LANE (bottom, mid, top), RIVER or JUNGLE, per half of the map; a camp is an index inside a JUNGLE zone, not a kind.
+- `ActivitySegmenter`: lane farm, jungle farm, `TELEPORTING`, traveling.
+- Combat log: DEATH, DAMAGE, ABILITY, ITEM (hero users only, e.g. `item_smoke_of_deceit`), BUILDING_KILL, BUYBACK; the modifier whitelist already holds `modifier_smoke_of_deceit` and `modifier_teleporting`.
+- Also: `LaneAssignmentDomain` (one lane per hero from the first minutes, with `startSeconds`, `endSeconds`, `endReason`), `LaneResultDomain`, `GameStateSegmentDomain` (team ahead, even, behind), `BuildingKillContextDomain`, `creep_kill` (kills by heroes only).
+- Not stored and not invented here: wave position and creep counts per lane, tower health, who stood at Roshan. Where a topic needs them it uses the proxy named in that topic.
 - `ObjectiveEventDomain` (OpenDota objectives: Roshan kills, tower and barracks kills, time, team) and the important fights from A1.
-- Not needed: any new replay entity parse. Nothing in A6 costs parse memory.
+- Gate: B2 and B4 read the A4 and A1 outputs and start only after the owner accepted those rounds (merged is not enough); B1 reads tracks and zones only.
 
 ## 3. Building blocks (shared by every topic)
 
@@ -27,41 +29,43 @@ One class per building block, one analyzer per topic below, so a topic is replac
 
 ### 4.1 Rotation
 
-- A rotation is an away trip that ends in another lane's zone, where it either (a) takes part in a fight, or (b) kills something, or (c) changes the lane's creep balance for at least 30 s.
+- A rotation is an away trip that ends in another lane's zone, where it either (a) takes part in a fight, or (b) kills something, or (c) the hero's lane partner got more creep kills in the 60 s after he left than the enemy pair did (proxy: `creep_kill` per lane, since wave position is not stored).
 - Per rotation: hero, from where to where, start and end as m:ss, result in words ("Mirana left mid at 12:10, helped win a fight in the top lane at 12:40, 2 kills").
-- Verdict: GOOD (a kill or a won fight came out of it), WASTED (no kill, the lane it left lost the creep balance), NEUTRAL.
+- Verdict: GOOD (a kill or a won fight came out of it), WASTED (no kill and the lane he left lost the creep-kill proxy), DIED (the hero died before the trip ended; the death is shown and the trip is not scored as a success), NEUTRAL.
 - Why it matters: an empty lane lost to farm; this joins the lane story from A4 (a lane partner absent).
 
 ### 4.2 Group or split
 
-- For each minute after the lanes ended (A4 gives the end time): how many of the five heroes are in the biggest cluster, and how many are pushing a lane alone.
+- For each minute after the last lane pair ended (`LaneResultDomain` end of the latest pair; a game with no lane result starts at the cap, 12:00 as a guess): how many of the five heroes are in the biggest cluster, and how many are pushing a lane alone.
 - Label per minute: GROUPED (4 or 5 together), SPLIT (2 or more heroes alone in different lanes or far apart), MIXED.
 - The report shows the stretches, not every minute ("Radiant split 18:00 to 23:30, lost 2 towers and 1 hero to a catch").
 - Link to results: towers taken and heroes lost in each stretch, per team.
 
 ### 4.3 Smoke
 
-- Use is read from the ITEM combat-log events and the smoke modifier.
+- Use is read from the ITEM event `item_smoke_of_deceit`; group and duration come from `modifier_smoke_of_deceit` added and removed on each hero. Smoke breaks when a hero comes near an enemy, so the end of the modifier is "expired or broken", not always expiry; a use with no modifier logged is dropped with one INFO line.
 - For each use: who was in the smoke group, where it went, how long, and the outcome inside 60 s after it ended: a gank (kill of an enemy hero), a tower, Roshan, nothing, or the group died.
-- Verdict: PAID OFF (kill, tower or Roshan), NOTHING, BACKFIRED (lost heroes without a kill). Also "smoke used but no one was caught" counts as NOTHING.
+- Verdict: PAID OFF (kill, tower or Roshan), NOTHING, BACKFIRED (lost heroes without a kill; a hero dying inside the smoke window counts here, whatever section 7 says about ending trips). Also "smoke used but no one was caught" counts as NOTHING.
 - Note: smoke is a "reason" candidate for the fight reasons too (an enemy came out of smoke); that comes after this table is accepted.
 
 ### 4.4 Objectives after a fight
 
-- For each important fight a team won (A1 gives the winner): within 90 s did the winner take a tower, barracks or Roshan, or did the clock pass with nothing?
+- For each important fight a team won (A1 gives the winner): within 90 s did the winner take a tower, barracks or Roshan, or did the clock pass with nothing? Towers come from `BuildingKillContextDomain`; "undefended" is not known, so "missed" names only the nearest enemy tower still standing by the building kills. Roshan: the killing team from `ObjectiveEventDomain`; who was present is taken from the tracks near the pit at that time; "ahead before" from `GameStateSegmentDomain`.
 - Result: "converted" (took an objective), "missed" (nothing, with the nearest undefended tower noted), and the time it took.
 - Roshan: who was there, the time of the kill, whether the team was ahead in the fight before it (a Roshan after a won fight is expected; a Roshan while behind is a gamble).
 
 ### 4.5 The lane swap
 
-- Compare the lane assignment of the first 4 minutes (A4) with the assignment at 8 to 12 minutes; a hero who moved lanes is a swap.
+- Compare the stored assignment (`LaneAssignmentDomain`, first minutes) with the lane zone where the hero spent most of minutes 8 to 12 (computed here from tracks and zones, a small new step in B2, no new extraction); a hero whose main lane changed is a swap. A hero in the jungle or in base most of that time has no lane and is not a swap.
 - Output only when the team changed the lane pairing; one line each ("Dire moved the off-lane carry to mid at 9:00").
 
 ## 5. Output
 
-- Tables (new): `team_rotation`, `team_split_stretch`, `smoke_use`, `objective_conversion`. Each row has match, team, times, hero slots, a short code for the verdict (the code stays in the database; reports show plain words).
+- Tables (new): `team_rotation`, `team_split_stretch`, `smoke_use`, `objective_conversion`. Each row has match, team, times, hero slots, `analysisVersion`, a short code for the verdict (the code stays in the database; reports show plain words).
 - Review-loop topic `behaviour`, readable by the rules of the plan (hero names, m:ss, Radiant and Dire, few columns, verdict last, a how-to-read header and a one-line summary).
 - Discord: nothing at first. A line may join the swing line after the owner accepts each table.
+
+Each analyzer gets an `@Order` after `lanes` and `important-fights`, names them in `requires()` (so a failed one makes it unavailable, never a run on missing input) and replaces its rows per match, like the other analyzers. Every threshold below is a property in `ReplayAnalysisProperties` (`replay.analysis.behaviour.*`).
 
 ## 6. PR order
 
@@ -72,14 +76,14 @@ Each PR has tests, a review-loop section, and gets the `code-review` run before 
 3. **B3** smoke (4.3).
 4. **B4** objectives after a fight (4.4).
 
-B1 can start as soon as the plan is accepted. B2 needs the lane end from A4 (merged). B4 needs the important fights from A1 (merged).
+B1 can start as soon as the plan is accepted. B2 needs the accepted A4 lanes; B4 needs the accepted A1 important fights.
 
 ## 7. Risks and known limits
 
-- Cluster distance and the 20 s away threshold are guesses; the loop is how they are tuned.
-- Teleport arrivals look like an instant rotation; the activity segment `teleport` marks them so they are not counted as walking.
+- Guesses, all tuned in the loop and all properties: cluster distance 2500, away 20 s, the 60 s creep-kill proxy window, GROUPED at 4 or more and SPLIT at 2 or more heroes alone, the 12:00 fallback, lane window minutes 8 to 12, smoke outcome 60 s, objectives window 90 s.
+- Teleport arrivals look like an instant rotation; the activity `TELEPORTING` marks them so they are not counted as walking.
 - OpenDota objectives are coarse for towers (no tower health); the replay BUILDING_KILL rows are the exact source and are preferred when present.
-- A hero who dies or uses buyback during a trip ends the trip.
+- A hero who dies or uses buyback during a trip ends the trip; a rotation then gets the verdict DIED (4.1), a smoke the BACKFIRED case (4.3).
 
 ## 8. Questions for the owner (default in brackets)
 
