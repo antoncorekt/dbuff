@@ -10,9 +10,6 @@ public interface ItemKits {
 
   /** The gold cost of the item; empty when the constants lack the item or give it no cost. */
   default OptionalLong cost(String key) {
-    return item(key)
-        .map(ItemConstant::getCost)
-        .map(OptionalLong::of)
-        .orElse(OptionalLong.empty());
+    return item(key).map(ItemConstant::getCost).map(OptionalLong::of).orElse(OptionalLong.empty());
   }
 }

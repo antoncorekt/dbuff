@@ -169,7 +169,8 @@ public class HandOfMidasEvaluator implements ItemEfficiencyEvaluator {
       int gold =
           bonus <= 0
               ? 0
-              : nearest(events, taken, i, e -> e.kind() == CombatEventKind.GOLD && e.value() == bonus);
+              : nearest(
+                  events, taken, i, e -> e.kind() == CombatEventKind.GOLD && e.value() == bonus);
       int xp =
           nearest(
               events,
@@ -190,7 +191,9 @@ public class HandOfMidasEvaluator implements ItemEfficiencyEvaluator {
     double t = events.get(use).gameSecond();
     int best = -1;
     double bestGap = PAIR_SECONDS + 1e-9;
-    for (int j = use + 1; j < events.size() && events.get(j).gameSecond() - t <= PAIR_SECONDS; j++) {
+    for (int j = use + 1;
+        j < events.size() && events.get(j).gameSecond() - t <= PAIR_SECONDS;
+        j++) {
       best = closer(events, taken, wanted, j, t, best, bestGap);
       bestGap = best == j ? Math.abs(events.get(j).gameSecond() - t) : bestGap;
     }

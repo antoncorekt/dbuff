@@ -17,6 +17,7 @@ final class HeroHealth {
   private static final double SAMPLE_TOLERANCE_SECONDS = 1.0;
   private static final int LOWEST_USABLE_PERCENT = 15;
   private static final int FULL_PERCENT = 100;
+
   /** At 0 percent the maximum cannot be read, but everything restored is useful. */
   private static final int EMPTY_MAX = Integer.MAX_VALUE;
 

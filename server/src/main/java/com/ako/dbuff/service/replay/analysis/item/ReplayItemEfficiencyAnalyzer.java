@@ -103,8 +103,7 @@ public class ReplayItemEfficiencyAnalyzer implements ReplayAnalyzer {
                       item));
     }
     if (!problems.isEmpty()) {
-      throw new IllegalStateException(
-          "Item efficiency file: " + String.join("; ", problems));
+      throw new IllegalStateException("Item efficiency file: " + String.join("; ", problems));
     }
     return chosen;
   }

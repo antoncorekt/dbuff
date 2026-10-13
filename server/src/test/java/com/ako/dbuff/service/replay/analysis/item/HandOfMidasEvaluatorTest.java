@@ -204,9 +204,7 @@ class HandOfMidasEvaluatorTest {
     ItemEfficiency result =
         evaluate(5000, hero(owned(), events, null, List.of(), List.of()), Map.of());
 
-    assertThat(result.rows())
-        .extracting(d -> d.figures().get("xp"))
-        .containsExactly(50.0, 70.0);
+    assertThat(result.rows()).extracting(d -> d.figures().get("xp")).containsExactly(50.0, 70.0);
     assertThat(result.figures()).containsEntry("gold", 320.0).containsEntry("xp", 120.0);
   }
 

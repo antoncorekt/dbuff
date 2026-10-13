@@ -183,7 +183,8 @@ class MagicStickEvaluatorTest {
             List.of("magic_stick", "magic_wand"),
             Map.of("damageBeforeSeconds", 0.5, "damageAfterSeconds", 0.4));
     List<CombatEvent> events =
-        List.of(hit(120.2, 450, 300), use(121.0, STICK, ""), hit(121.3, 100, 200), hit(122.0, 50, 150));
+        List.of(
+            hit(120.2, 450, 300), use(121.0, STICK, ""), hit(121.3, 100, 200), hit(122.0, 50, 150));
 
     ItemEfficiency result =
         evaluator
