@@ -5,6 +5,8 @@ import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightExplanationDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.FightReasonDomain;
+import com.ako.dbuff.dao.model.LaneAssignmentDomain;
+import com.ako.dbuff.dao.model.LaneResultDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.OpeningSummaryDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
@@ -23,6 +25,9 @@ import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
 import com.ako.dbuff.dao.repo.GameStateSegmentRepo;
+import com.ako.dbuff.dao.repo.LaneAssignmentRepo;
+import com.ako.dbuff.dao.repo.LaneReasonRepo;
+import com.ako.dbuff.dao.repo.LaneResultRepo;
 import com.ako.dbuff.dao.repo.OpeningSummaryRepo;
 import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
@@ -81,6 +86,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 /**
  * Runs a real replay through the whole pipeline against a real PostgreSQL: a local HTTP server
@@ -113,6 +119,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private FightRepo fightRepo;
   @Autowired private CreepKillRepo creepKillRepo;
   @Autowired private RunePickupRepo runePickupRepo;
+  @Autowired private LaneAssignmentRepo laneAssignmentRepo;
+  @Autowired private LaneResultRepo laneResultRepo;
+  @Autowired private LaneReasonRepo laneReasonRepo;
   @Autowired private OpeningSummaryRepo openingSummaryRepo;
   @Autowired private DeathAnalysisRepo deathRepo;
   @Autowired private FightReasonRepo reasonRepo;
@@ -185,6 +194,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertAllPickReasons(id, match.getId());
       assertCreepKills(id, match.getId());
       assertRunes(id, match.getId());
+      assertLanes(id, match.getId());
       assertThat(buybackRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(spikeRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(stateSegmentRepo.findByMatchId(match.getId())).isNotEmpty();
@@ -248,6 +258,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertRoleAwareReasons(id, match.getId());
       assertCreepKills(id, match.getId());
       assertRunes(id, match.getId());
+      assertLanes(id, match.getId());
       assertAbilityDraftReasons(id, match.getId());
       assertFightExplanations(id, match.getId());
       printAbilityDraft(id, match.getId(), profiles);
@@ -300,6 +311,55 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(ours)
         .as("%s: last hits of all heroes against OpenDota's %d", id, theirs)
         .isGreaterThanOrEqualTo(Math.round(theirs * 0.75));
+  }
+
+  /**
+   * Every player has an assignment, every lane has a window inside the cap and a result for each
+   * side with opposite margins, and every side's reasons are ranked from 1.
+   */
+  private void assertLanes(String id, long matchId) {
+    List<LaneAssignmentDomain> assignments = laneAssignmentRepo.findByMatchId(matchId);
+    assertThat(assignments).as("%s: an assignment per player", id).hasSize(10);
+    List<LaneAssignmentDomain> laning =
+        assignments.stream().filter(a -> a.getLane() != null).toList();
+    assertThat(laning.size()).as("%s: most heroes have a lane", id).isGreaterThanOrEqualTo(6);
+    assertThat(laning)
+        .as("%s: windows inside the cap", id)
+        .allSatisfy(
+            a -> {
+              assertThat(a.getStartSeconds()).isBetween(0, a.getEndSeconds());
+              assertThat(a.getEndSeconds()).isLessThanOrEqualTo(900);
+              assertThat(a.getEndReason()).isNotBlank();
+            });
+    List<LaneResultDomain> results = laneResultRepo.findByMatchId(matchId);
+    assertThat(results.stream().map(LaneResultDomain::getPairId).distinct().count())
+        .as("%s: three lanes", id)
+        .isEqualTo(3);
+    results.stream()
+        .filter(r -> !"UNCONTESTED".equals(r.getResult()))
+        .forEach(
+            r ->
+                assertThat(results)
+                    .as("%s lane %d: the other side has the opposite margin", id, r.getPairId())
+                    .anySatisfy(
+                        o -> {
+                          assertThat(o.getPairId()).isEqualTo(r.getPairId());
+                          assertThat(o.getTeam()).isNotEqualTo(r.getTeam());
+                          assertThat(o.getMargin()).isCloseTo(-r.getMargin(), within(1e-9));
+                        }));
+    assertThat(laneReasonRepo.findByMatchId(matchId))
+        .as("%s: reasons are ranked from 1", id)
+        .isNotEmpty()
+        .anyMatch(r -> r.getRank() == 1);
+    System.out.printf(
+        "LANES %s: %s%n",
+        id,
+        results.stream()
+            .map(
+                r ->
+                    "%d %s %s %.2f"
+                        .formatted(r.getPairId(), r.getTeam(), r.getResult(), r.getMargin()))
+            .toList());
   }
 
   /**
