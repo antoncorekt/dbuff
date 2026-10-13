@@ -107,4 +107,54 @@ class ReasonWordingTest {
                 "Sven"))
         .isEqualTo("Sven was drafted as offlane and played hard support");
   }
+
+  @Test
+  void phrase_wordsARuneAdvantageWithTheLeadAndAnArticle() {
+    String evidence =
+        "double damage rune taken at 5:20 by Windrunner, 40 s from the fight start, active in the"
+            + " fight";
+
+    assertThat(ReasonWording.phrase(player("RUNE_ADVANTAGE", evidence), "Windrunner"))
+        .isEqualTo("Windrunner took a double damage rune 40 s before the fight");
+    assertThat(
+            ReasonWording.phrase(
+                player(
+                    "RUNE_ADVANTAGE",
+                    evidence.replace("double damage", "arcane").replace("40 s", "-12 s")),
+                "Windrunner"))
+        .isEqualTo("Windrunner took an arcane rune 12 s into the fight");
+    assertThat(ReasonWording.phrase(player("RUNE_ADVANTAGE", "odd"), "Windrunner"))
+        .isEqualTo("Windrunner had a rune effect");
+  }
+
+  @Test
+  void phrase_wordsTheEnemyRuneAdvantageAsATeamReason() {
+    String evidence =
+        "haste rune taken at 5:20 by Windrunner, 10 s from the fight start, active in the fight";
+
+    assertThat(ReasonWording.phrase(teamWith("ENEMY_RUNE_ADVANTAGE", evidence), "ignored"))
+        .isEqualTo("the enemy Windrunner took a haste rune 10 s before the fight");
+    assertThat(ReasonWording.phrase(teamWith("ENEMY_RUNE_ADVANTAGE", "odd"), "ignored"))
+        .isEqualTo("the team: the enemy had a rune effect");
+  }
+
+  @Test
+  void phrase_listsEveryRuneOfOneReason() {
+    String first =
+        "haste rune taken at 5:20 by Windrunner, 10 s from the fight start, active in the fight";
+    String second =
+        "arcane rune taken at 5:25 by Axe, 5 s from the fight start, active in the fight";
+
+    assertThat(
+            ReasonWording.phrase(
+                player("RUNE_ADVANTAGE", first + "; " + first.replace("haste", "shield")),
+                "Windrunner"))
+        .isEqualTo(
+            "Windrunner took a haste rune 10 s before the fight and a shield rune 10 s before the"
+                + " fight");
+    assertThat(ReasonWording.phrase(teamWith("ENEMY_RUNE_ADVANTAGE", first + "; " + second), "x"))
+        .isEqualTo(
+            "the enemy Windrunner took a haste rune 10 s before the fight, Axe took an arcane rune"
+                + " 5 s before the fight");
+  }
 }

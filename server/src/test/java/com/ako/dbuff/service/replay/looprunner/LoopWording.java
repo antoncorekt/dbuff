@@ -2,7 +2,9 @@ package com.ako.dbuff.service.replay.looprunner;
 
 import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
+import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.analysis.rune.RuneType;
 import com.ako.dbuff.service.replay.report.Prettify;
 import com.ako.dbuff.service.replay.report.ReasonWording;
 import java.util.Arrays;
@@ -176,6 +178,20 @@ public final class LoopWording {
       case 4 -> "jungle";
       default -> "lane role " + laneRole;
     };
+  }
+
+  /** A stored rune type in words: {@code DOUBLE_DAMAGE} as {@code double damage}. */
+  public static String rune(String stored) {
+    RuneType type = Enums.find(RuneType.class, stored);
+    return type == null ? UNKNOWN : type.words();
+  }
+
+  /** Where a hero stood: {@code mid lane}, {@code river}, {@code jungle}, {@code base}. */
+  public static String place(String zone, String lane) {
+    if (zone == null) {
+      return "unknown";
+    }
+    return "LANE".equals(zone) && lane != null ? words(lane) + " lane" : words(zone);
   }
 
   /** A drafted or used ability by its readable name. */

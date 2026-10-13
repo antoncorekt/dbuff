@@ -90,4 +90,14 @@ class LoopWordingTest {
     assertThat(LoopWording.change("DIRE", 1800L)).isEqualTo("Dire +1.8k");
     assertThat(LoopWording.change("RADIANT", -400L)).isEqualTo("Radiant -400");
   }
+
+  @Test
+  void runeAndPlace_areWordsNeverCodes() {
+    assertThat(LoopWording.rune("DOUBLE_DAMAGE")).isEqualTo("double damage");
+    assertThat(LoopWording.rune("SHIELD")).isEqualTo("shield");
+    assertThat(LoopWording.rune("nonsense")).isEqualTo("?");
+    assertThat(LoopWording.place("LANE", "MID")).isEqualTo("mid lane");
+    assertThat(LoopWording.place("RIVER", null)).isEqualTo("river");
+    assertThat(LoopWording.place(null, null)).isEqualTo("unknown");
+  }
 }

@@ -107,9 +107,13 @@ class FightReasonAnalyzerTest {
   @Test
   void requiresEveryAnalyzerItReads_andTheDraftExtractorOnlyForTheDraftMode() {
     assertThat(analyzer.requires())
-        .containsExactlyInAnyOrder("fights", "fight-abilities", "deaths", "roles", "composition");
-    assertThat(analyzer.requires(new AllPickProfile())).doesNotContain("ability-draft");
-    assertThat(analyzer.requires(new AbilityDraftProfile())).contains("ability-draft", "roles");
+        .containsExactlyInAnyOrder(
+            "fights", "fight-abilities", "deaths", "roles", "composition", "runes");
+    assertThat(analyzer.requires(new AllPickProfile()))
+        .contains("runes")
+        .doesNotContain("ability-draft");
+    assertThat(analyzer.requires(new AbilityDraftProfile()))
+        .contains("ability-draft", "roles", "runes");
   }
 
   @Test
@@ -210,7 +214,7 @@ class FightReasonAnalyzerTest {
             r -> {
               assertThat(r.getScope()).isEqualTo("PLAYER");
               assertThat(r.getSource()).isEqualTo("COMMON");
-              assertThat(r.getAnalysisVersion()).isEqualTo(3);
+              assertThat(r.getAnalysisVersion()).isEqualTo(4);
             });
     assertThat(rows)
         .filteredOn(r -> r.getSubjectSlot() == 128L)
