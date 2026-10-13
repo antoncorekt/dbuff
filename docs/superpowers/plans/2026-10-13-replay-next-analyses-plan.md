@@ -49,8 +49,8 @@ Small docs PR in parallel: roles round 3 accepted (recorded in PR #68, owner ver
 | E3 item data | none | S | none |
 | A1 important fights | L1 | M | `fights` (reworked) and `advantage` (new table) |
 | A2 vision | A1, E2 | M | `vision` |
-| A3 runes and opening | E1, E2 (E1 for the gold and XP balance in the opening window); the `RUNE_ADVANTAGE` fight reason also needs A1 | M | `runes` |
-| A4 laning stage | E1, E2, L1 | L | `lanes` |
+| A3 runes and opening | E1 (bounty rune gold, gold and XP balance in the opening), E2 (rune log); the `RUNE_ADVANTAGE` fight reason also needs A1 and the reasons work (merged) | M | `runes` |
+| A4 laning stage | E1, E2, L1, A3 (mid lane rune effect reads `rune_pickup`) | L | `lanes` |
 | A5 item efficiency | E1, E3 | L | `items` |
 | A6 team behaviour | A1, A4 reviewed | L | `behaviour` (outline only) |
 | A7 others | by item | M each | by item |
@@ -128,15 +128,16 @@ Two parts of the first draft of this plan were wrong and are fixed here: per-min
 
 ## 9. A3: runes and the pre-game fight
 
-- **Goal:** who takes the first runes, who takes the contested ones, and the first fight around 0:00: the bounty runes at the start, kills in a window around the rune spawn (pre-horn kills count; first guess -30 s to +90 s, a property). Which team came out ahead is decided from kills, gold and XP, not from rune weights.
-- **Data:** `rune_event` (time, type, slot) from OpenDota `runes_log`; the hero position at the pickup from the track; kills from the DEATH rows in the window; gold and XP per team in the window.
+- **Goal:** who takes the first runes and the contested ones, the first fight around 0:00 (kills in a window around the rune spawn, pre-horn kills count; first guess -30 s to +90 s, a property), the rune value for the mid lane, and runes as a fight factor.
+- **Opening winner (one rule, first guess):** the team with the higher gold plus XP balance in the opening window wins the opening; kills are shown beside it and break a tie. Rune weights are not used.
+- **Data:** `rune_event` (time, type, slot) from OpenDota `runes_log` (E2); the hero position at the pickup from the track; kills from the DEATH rows in the window; gold and XP per team in the window; the gold of a bounty rune from the GOLD event with the bounty-rune reason (E1), not from the per-minute "bounty" counter, which can mix other bounty gold.
 - **Rune meaning (owner decision, 2026-10-13):**
-  - **Bounty runes** mean gold: they count as team gold in the statistics (gold per team and per hero from runes, in the opening and over the game).
-  - **Power runes** matter for the mid lane analysis: they often give the mid laner an advantage (the rune type, who took it, the time, and what the mid lane gold, XP and kills did in the next minutes).
-  - **Water runes** likewise: the heal and mana they give is an advantage for the mid laner in the lane analysis.
-  - **A power rune taken just before a fight** (for example double damage, haste, arcane, invisibility) can be an advantage in that fight and one of the reasons a fight was won: the rune pickup inside the important-fight window (the vision window of A2, first guess 90 s before) becomes a fight factor and a reason code `RUNE_ADVANTAGE` with the rune type and the hero, for the winning side, and `RUNE_DENIED` for the side that missed it. The rune pickup is read from the same `rune_event` rows; the active effect window comes from the rune modifier on the hero when the combat log has it, otherwise a per-rune duration property (first guesses).
-- **Tables:** `rune_pickup` (who, which rune, time, zone) and `opening_summary` per match (runes per team, first taker, kills and gold balance, winner of the opening).
-- **Topic `runes`:** one row per rune and one per opening.
+  - **Bounty runes** mean gold: they count as gold in the statistics, per hero and per team (`rune_pickup.gold`, summed in `opening_summary` and over the game).
+  - **Power and water runes** feed the mid lane analysis: a rune taken by the mid laner (the hero of the mid lane in the A4 assignment, or any hero while in the mid lane window) is recorded with its type and time; A4 reads these `rune_pickup` rows for the mid lane result (the mid hero's gold, XP and kills in the next minutes; a water rune gives heal and mana). A rune taken by another hero is not counted as a mid advantage.
+  - **A power rune before a fight** can be one of the reasons a fight was won. The rule: a hero of team T took a power rune (double damage, haste, arcane, invisibility, shield if present) and its effect was still active when the fight started or during it. Team T gets the fight factor `RUNE_ADVANTAGE` (rune type, hero) whatever the fight result; if T lost anyway it is only shown as a factor, and the other side's list says `ENEMY_RUNE_ADVANTAGE`. `RUNE_DENIED` is not a separate code: a rune the enemy took and your team did not is `ENEMY_RUNE_ADVANTAGE`. The reasons are written as fight reasons by a `ReasonContributor` (the extension point of the reasons work) into `fight_reason`, for important fights only (A1 decides which).
+  - **Effect window:** a per-rune duration property, first guesses: double damage 45 s, haste 22 s, arcane 50 s, invisibility 45 s, shield 40 s (to verify on the rune modifiers; the modifier events are not stored today, so these durations are the source until a later PR stores them). A pickup whose effect ended before the fight is not a factor.
+- **Tables:** `rune_pickup` (who, which rune, time, zone, gold for bounty runes, mid-lane flag) and `opening_summary` per match (runes per team, first taker, bounty gold per team, kills and gold and XP balance, winner of the opening). Fight reasons live in `fight_reason` (A1 and the reasons work), the mid lane effect in A4's lane result.
+- **Topic `runes`:** one row per rune (taker, type, time, gold, mid lane or not, followed by a fight or not) and one row per opening (winner, balance, kills), then the verdict columns.
 
 ## 10. A4: the laning stage
 
@@ -144,10 +145,10 @@ Steps, each with its own table in the topic `lanes`:
 
 1. **Lane assignment:** a hero's lane is the lane zone where he spent most time in the first 2 to 4 minutes (first guess, a property; activity segments plus `MapLayout.zone`). Pair the lanes of the two teams (Radiant safe lane against Dire off lane). Roamers and junglers get "no lane". OpenDota `lane_role` is a cross-check.
 2. **Laning start:** the hero reaches his lane zone (first guess: 0:00 to 1:00, a property).
-3. **Laning end, per hero:** the first time after the start that he is outside his lane for at least 30 s (first guess; jungle, another lane, teleport), or his lane tower falls, or a cap (owner decision: default 15 minutes, a property). The 15 minutes is only a safety cap: the end is found from signals (leaving the lane for 30 s, the tower falling, teleports and jungle farming, the partner leaving, both heroes of the pair outside the lane), typically at about 7 to 9 minutes, so there is no fixed time. The lane ends when all heroes of the pair have left. The signal thresholds are first guesses (properties) tuned in the loop. `PhaseWindows` stays the coarse game phase and is not reused for this.
+3. **Laning end:** per hero first, then per lane pair. A hero's lane ends at the first of: he is outside his lane for at least 30 s (jungle farm, another lane; first guess), or his lane tower falls, or the cap (owner decision: default 15 minutes, a property). The cap is only a safety limit; the end is found from these signals, typically at about 7 to 9 minutes. A teleport counts only when he does not return to the lane within 60 s (first guess), so a fountain trip is not the end. The pair's lane ends when all heroes of the pair have left; one hero leaving does not end the other's laning, but the partner's absence is recorded as a reason for the lane result. The thresholds are first guesses (properties) tuned in the loop. `PhaseWindows` stays the coarse game phase and is not reused for this.
 4. **Creep stats by value:** a typed creep kill per hero (`creep_kill`: time, unit class, own or enemy side, deny flag, lane or camp). A class value is measured from the GOLD and XP events once the reason is stored (siege gives more than melee or ranged; ancient and large camps differ from small ones). The values live in one validated JSON file, not in code. A deny is scored by the experience it takes from the enemy.
 5. **Lane result:** compare the pair on weighted creep score, denies, XP, level at lane end, kills and deaths inside the lane window, tower damage and tower state. Per lane: WON, LOST or EVEN with the margin; per hero: his share.
-6. **Why** (contributors, the same extension idea as the fight reasons): partner absent or roaming, enemy gank or dive, enemy harassment (hero damage in the lane), a level lead from a rune, a pull or stack, supports present, role and hero matchup (hero constants), item start (Magic Stick, see A5), and how the hero's stats compare with his lane partner.
+6. **Why** (contributors, the same extension idea as the fight reasons): partner absent or roaming, enemy gank or dive, enemy harassment (hero damage in the lane), a level lead or a power or water rune taken by the mid hero (from A3 `rune_pickup`), a pull or stack, supports present, role and hero matchup (hero constants), item start (Magic Stick, see A5), and how the hero's stats compare with his lane partner.
 
 ## 11. A5: item efficiency, a whitelist
 
@@ -188,7 +189,7 @@ Each with the default the plan assumes. The owner accepted all defaults on 2026-
 3. Lag after a fight when measuring the advantage change: 60 s. Default: 60 s.
 4. Vision window: 90 s before to 15 s after the fight. Default: as written.
 5. Opening window around the rune spawn: -30 s to +90 s. Default: as written.
-6. Do power and water runes count the same as bounty runes? **Owner answer:** bounty runes are gold (team gold in the statistics); power and water runes feed the mid lane analysis (they often give the mid laner an advantage: damage, haste, heal and mana); a power rune taken in the window before a fight can be one of the reasons the fight was won (`RUNE_ADVANTAGE`).
+6. Do power and water runes count the same as bounty runes? **Owner answer:** no weights. Bounty runes are gold (team gold in the statistics). Power and water runes are inputs for the mid lane analysis (they often give the mid laner an advantage: damage, haste, heal and mana). A power rune whose effect is active in a fight is a fight factor (`RUNE_ADVANTAGE`, and `ENEMY_RUNE_ADVANTAGE` for the other side). Details in section 9.
 7. How to rate an opening won only by kills? Default: kills count, but a gold and XP balance is shown beside them.
 8. Where does a tri-lane count, and how is solo mid treated? Default: a tri-lane is one lane with three heroes, solo mid is a lane of one against one.
 9. Which creep classes are weighted first? Default: siege, then ranged, then melee, then camps.
