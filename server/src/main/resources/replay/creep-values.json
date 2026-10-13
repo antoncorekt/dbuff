@@ -1,0 +1,331 @@
+{
+  "status": "Measured on matches 9040892342, 9040889566, 9038725154 and 9037038717 from the replays own GOLD and XP entries; a first guess, not final. Gold is the median received by the killer, xp the median of kills where the killer was the only hero to receive experience. Lane creep gold and ranged xp rise with game time, see docs/replay-creep-values.md.",
+  "classes": {
+    "LANE_FLAGBEARER": {
+      "gold": 38,
+      "goldSamples": 242,
+      "xp": 60,
+      "xpSamples": 143,
+      "bonusGold": 47
+    },
+    "LANE_FLAGBEARER_UPGRADED": {
+      "gold": 24,
+      "goldSamples": 1,
+      "bonusGold": 33
+    },
+    "LANE_MELEE": {
+      "gold": 38,
+      "goldSamples": 1483,
+      "xp": 57,
+      "xpSamples": 823
+    },
+    "LANE_MELEE_UPGRADED": {
+      "gold": 23,
+      "goldSamples": 24,
+      "xp": 25,
+      "xpSamples": 7
+    },
+    "LANE_RANGED": {
+      "gold": 52,
+      "goldSamples": 593,
+      "xp": 85,
+      "xpSamples": 353
+    },
+    "LANE_RANGED_UPGRADED": {
+      "gold": 35,
+      "goldSamples": 8,
+      "xp": 22,
+      "xpSamples": 2
+    },
+    "LANE_SIEGE": {
+      "gold": 64,
+      "goldSamples": 47,
+      "xp": 88,
+      "xpSamples": 29
+    },
+    "NEUTRAL": {
+      "gold": 23,
+      "goldSamples": 1383,
+      "xp": 47,
+      "xpSamples": 1107
+    },
+    "NEUTRAL_ANCIENT": {
+      "gold": 49,
+      "goldSamples": 147,
+      "xp": 110,
+      "xpSamples": 117
+    }
+  },
+  "neutralUnits": {
+    "npc_dota_neutral_alpha_wolf": {
+      "gold": 35,
+      "goldSamples": 40,
+      "xp": 70,
+      "xpSamples": 31
+    },
+    "npc_dota_neutral_ancient_frog": {
+      "gold": 58,
+      "goldSamples": 14,
+      "xp": 119,
+      "xpSamples": 10
+    },
+    "npc_dota_neutral_ancient_frog_mage": {
+      "gold": 58,
+      "goldSamples": 15,
+      "xp": 119,
+      "xpSamples": 11
+    },
+    "npc_dota_neutral_big_thunder_lizard": {
+      "gold": 83,
+      "goldSamples": 7,
+      "xp": 134,
+      "xpSamples": 6
+    },
+    "npc_dota_neutral_black_dragon": {
+      "gold": 80,
+      "goldSamples": 7,
+      "xp": 139,
+      "xpSamples": 5
+    },
+    "npc_dota_neutral_black_drake": {
+      "gold": 44,
+      "goldSamples": 18,
+      "xp": 110,
+      "xpSamples": 14
+    },
+    "npc_dota_neutral_centaur_khan": {
+      "gold": 60,
+      "goldSamples": 55,
+      "xp": 100,
+      "xpSamples": 46
+    },
+    "npc_dota_neutral_centaur_outrunner": {
+      "gold": 20,
+      "goldSamples": 80,
+      "xp": 42,
+      "xpSamples": 64
+    },
+    "npc_dota_neutral_dark_troll": {
+      "gold": 21,
+      "goldSamples": 40,
+      "xp": 52,
+      "xpSamples": 32
+    },
+    "npc_dota_neutral_dark_troll_warlord": {
+      "gold": 45,
+      "goldSamples": 22,
+      "xp": 100,
+      "xpSamples": 19
+    },
+    "npc_dota_neutral_enraged_wildkin": {
+      "gold": 64,
+      "goldSamples": 21,
+      "xp": 100,
+      "xpSamples": 15
+    },
+    "npc_dota_neutral_fel_beast": {
+      "gold": 19,
+      "goldSamples": 26,
+      "xp": 36,
+      "xpSamples": 20
+    },
+    "npc_dota_neutral_forest_troll_berserker": {
+      "gold": 22,
+      "goldSamples": 55,
+      "xp": 38,
+      "xpSamples": 48
+    },
+    "npc_dota_neutral_forest_troll_high_priest": {
+      "gold": 21,
+      "goldSamples": 13,
+      "xp": 38,
+      "xpSamples": 11
+    },
+    "npc_dota_neutral_froglet": {
+      "gold": 29,
+      "goldSamples": 39,
+      "xp": 52,
+      "xpSamples": 38
+    },
+    "npc_dota_neutral_froglet_mage": {
+      "gold": 29,
+      "goldSamples": 18,
+      "xp": 52,
+      "xpSamples": 17
+    },
+    "npc_dota_neutral_frostbitten_golem": {
+      "gold": 42,
+      "goldSamples": 17,
+      "xp": 105,
+      "xpSamples": 13
+    },
+    "npc_dota_neutral_ghost": {
+      "gold": 26,
+      "goldSamples": 13,
+      "xp": 52,
+      "xpSamples": 9
+    },
+    "npc_dota_neutral_giant_wolf": {
+      "gold": 23,
+      "goldSamples": 79,
+      "xp": 50,
+      "xpSamples": 62
+    },
+    "npc_dota_neutral_gnoll_assassin": {
+      "gold": 20,
+      "goldSamples": 36,
+      "xp": 40,
+      "xpSamples": 25
+    },
+    "npc_dota_neutral_granite_golem": {
+      "gold": 80,
+      "goldSamples": 5,
+      "xp": 139,
+      "xpSamples": 5
+    },
+    "npc_dota_neutral_grown_frog": {
+      "gold": 42,
+      "goldSamples": 79,
+      "xp": 65,
+      "xpSamples": 72
+    },
+    "npc_dota_neutral_grown_frog_mage": {
+      "gold": 41,
+      "goldSamples": 37,
+      "xp": 65,
+      "xpSamples": 30
+    },
+    "npc_dota_neutral_harpy_scout": {
+      "gold": 16,
+      "goldSamples": 16,
+      "xp": 31,
+      "xpSamples": 13
+    },
+    "npc_dota_neutral_harpy_storm": {
+      "gold": 28,
+      "goldSamples": 7,
+      "xp": 52,
+      "xpSamples": 5
+    },
+    "npc_dota_neutral_ice_shaman": {
+      "gold": 80,
+      "goldSamples": 8,
+      "xp": 134,
+      "xpSamples": 6
+    },
+    "npc_dota_neutral_kobold": {
+      "gold": 7,
+      "goldSamples": 26,
+      "xp": 24,
+      "xpSamples": 17
+    },
+    "npc_dota_neutral_kobold_taskmaster": {
+      "gold": 23,
+      "goldSamples": 25,
+      "xp": 40,
+      "xpSamples": 15
+    },
+    "npc_dota_neutral_kobold_tunneler": {
+      "gold": 16,
+      "goldSamples": 9,
+      "xp": 32,
+      "xpSamples": 3
+    },
+    "npc_dota_neutral_mud_golem": {
+      "gold": 22,
+      "goldSamples": 60,
+      "xp": 42,
+      "xpSamples": 46
+    },
+    "npc_dota_neutral_mud_golem_split": {
+      "gold": 9,
+      "goldSamples": 124,
+      "xp": 28,
+      "xpSamples": 99
+    },
+    "npc_dota_neutral_ogre_magi": {
+      "gold": 33,
+      "goldSamples": 28,
+      "xp": 58,
+      "xpSamples": 23
+    },
+    "npc_dota_neutral_ogre_mauler": {
+      "gold": 28,
+      "goldSamples": 59,
+      "xp": 42,
+      "xpSamples": 51
+    },
+    "npc_dota_neutral_polar_furbolg_champion": {
+      "gold": 34,
+      "goldSamples": 20,
+      "xp": 76,
+      "xpSamples": 14
+    },
+    "npc_dota_neutral_polar_furbolg_ursa_warrior": {
+      "gold": 66,
+      "goldSamples": 21,
+      "xp": 100,
+      "xpSamples": 14
+    },
+    "npc_dota_neutral_prowler_acolyte": {
+      "gold": 40,
+      "goldSamples": 16,
+      "xp": 105,
+      "xpSamples": 14
+    },
+    "npc_dota_neutral_prowler_shaman": {
+      "gold": 80,
+      "goldSamples": 8,
+      "xp": 134,
+      "xpSamples": 7
+    },
+    "npc_dota_neutral_rock_golem": {
+      "gold": 43,
+      "goldSamples": 16,
+      "xp": 110,
+      "xpSamples": 13
+    },
+    "npc_dota_neutral_satyr_hellcaller": {
+      "gold": 65,
+      "goldSamples": 30,
+      "xp": 100,
+      "xpSamples": 24
+    },
+    "npc_dota_neutral_satyr_soulstealer": {
+      "gold": 23,
+      "goldSamples": 97,
+      "xp": 56,
+      "xpSamples": 83
+    },
+    "npc_dota_neutral_satyr_trickster": {
+      "gold": 15,
+      "goldSamples": 98,
+      "xp": 34,
+      "xpSamples": 83
+    },
+    "npc_dota_neutral_small_thunder_lizard": {
+      "gold": 49,
+      "goldSamples": 16,
+      "xp": 105,
+      "xpSamples": 13
+    },
+    "npc_dota_neutral_tadpole": {
+      "gold": 20,
+      "goldSamples": 10,
+      "xp": 35,
+      "xpSamples": 10
+    },
+    "npc_dota_neutral_warpine_raider": {
+      "gold": 51,
+      "goldSamples": 53,
+      "xp": 91,
+      "xpSamples": 38
+    },
+    "npc_dota_neutral_wildkin": {
+      "gold": 20,
+      "goldSamples": 47,
+      "xp": 41,
+      "xpSamples": 30
+    }
+  }
+}

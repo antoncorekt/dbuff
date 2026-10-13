@@ -18,8 +18,25 @@ import java.util.Map;
  * events with names as indexes. A game's 20 to 30 thousand events take a few hundred kilobytes.
  */
 public final class CombatLogCodec {
-  /** Bumped whenever the layout changes, so an old blob is never read as a new one. */
-  public static final int VERSION = 1;
+  /**
+   * Bumped whenever the layout or the meaning of a field changes. Version 2 has the same layout as
+   * 1, but {@code aux} of GOLD and XP events holds the reason; a version 1 blob still decodes, with
+   * 0 (the stun duration it held) in those events, and is told apart by {@link #version}.
+   */
+  public static final int VERSION = 2;
+
+  /** The oldest version {@link #decode} still reads. */
+  public static final int FIRST_VERSION = 1;
+
+  /** The version a stored blob was written with. */
+  public static int version(byte[] blob) {
+    try (DataInputStream in =
+        new DataInputStream(new ZstdInputStream(new ByteArrayInputStream(blob)))) {
+      return in.readInt();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
 
   private static final int MAX_NAMES = 65_535;
   private static final int MAX_ASSIST_MASK = 0xFFFF;
@@ -93,7 +110,7 @@ public final class CombatLogCodec {
     try (DataInputStream in =
         new DataInputStream(new ZstdInputStream(new ByteArrayInputStream(blob)))) {
       int version = in.readInt();
-      if (version != VERSION) {
+      if (version < FIRST_VERSION || version > VERSION) {
         throw new IllegalArgumentException("Combat log blob has version " + version);
       }
       String[] table = new String[in.readInt()];

@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.analysis.activity;
 
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
+import com.ako.dbuff.service.replay.analysis.creep.CreepClass;
 import com.ako.dbuff.service.replay.map.MapLayout;
 import com.ako.dbuff.service.replay.map.Zone;
 import java.util.ArrayList;
@@ -15,8 +16,6 @@ import java.util.Objects;
  */
 public final class ActivitySegmenter {
   private static final String TELEPORTING = "modifier_teleporting";
-  private static final String NEUTRAL = "npc_dota_neutral_";
-  private static final String LANE_CREEP = "npc_dota_creep_";
 
   private final ActivityTuning tuning;
 
@@ -152,7 +151,6 @@ public final class ActivitySegmenter {
 
   /** Last hits on neutrals and on the enemy's lane creeps; an own creep is a deny, not farm. */
   private static List<FarmHit> farmHits(String hero, Zone.Half ownHalf, List<CombatEvent> events) {
-    String enemyCreeps = ownHalf == Zone.Half.RADIANT ? "badguys" : "goodguys";
     List<FarmHit> hits = new ArrayList<>();
     for (CombatEvent e : events) {
       if (e.kind() != CombatEventKind.DEATH
@@ -161,9 +159,13 @@ public final class ActivitySegmenter {
           || (e.flags() & CombatEvent.TARGET_HERO) != 0) {
         continue;
       }
-      if (e.target().startsWith(NEUTRAL)) {
+      CreepClass creep = CreepClass.of(e.target());
+      if (creep == null) {
+        continue;
+      }
+      if (creep.isNeutral()) {
         hits.add(new FarmHit(e.gameSecond(), true));
-      } else if (e.target().startsWith(LANE_CREEP) && e.target().contains(enemyCreeps)) {
+      } else if (CreepClass.sideOf(e.target()) != ownHalf) {
         hits.add(new FarmHit(e.gameSecond(), false));
       }
     }
