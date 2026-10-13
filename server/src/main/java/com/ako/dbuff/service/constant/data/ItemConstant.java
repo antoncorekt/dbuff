@@ -37,6 +37,8 @@ public class ItemConstant implements ConstantData {
 
   public void setComponents(List<String> components) {
     this.components =
-        components == null ? null : components.stream().filter(c -> !c.isBlank()).toList();
+        components == null
+            ? null
+            : components.stream().filter(c -> c != null && !c.isBlank()).toList();
   }
 }

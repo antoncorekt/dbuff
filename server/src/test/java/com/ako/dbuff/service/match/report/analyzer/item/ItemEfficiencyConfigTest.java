@@ -20,7 +20,7 @@ class ItemEfficiencyConfigTest {
   static class Binding {}
 
   @Test
-  void everyGroupInApplicationProperties_isLoadedUnderItsOwnIndex() {
+  void theLiveReportKeepsExactlyTheMidasGroupsUnderDistinctIndexes() {
     runner.run(
         context -> {
           List<ItemEfficiencyConfig.ItemGroup> groups =
@@ -30,10 +30,9 @@ class ItemEfficiencyConfigTest {
               .extracting(
                   ItemEfficiencyConfig.ItemGroup::getName,
                   ItemEfficiencyConfig.ItemGroup::getItemIds)
-              .containsExactlyInAnyOrder(
+              .containsExactly(
                   tuple("Hand of Midas", List.of(65L)),
-                  tuple("Hand of Midas + Octarine Core", List.of(65L, 235L)),
-                  tuple("Magic Stick", List.of(34L)));
+                  tuple("Hand of Midas + Octarine Core", List.of(65L, 235L)));
         });
   }
 }

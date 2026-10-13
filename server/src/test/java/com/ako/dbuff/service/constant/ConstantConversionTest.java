@@ -143,6 +143,15 @@ class ConstantConversionTest {
   }
 
   @Test
+  void itemComponents_dropNullAndBlankElements() throws Exception {
+    Map<String, Object> raw =
+        reader.readValue(
+            "{\"a\":{\"id\":1,\"components\":[\"a\",null,\"\"]}}", new TypeReference<>() {});
+
+    assertEquals(List.of("a"), itemService.convert(raw).get("a").getComponents());
+  }
+
+  @Test
   void storedRoundTrip_keepsEveryField() throws Exception {
     Map<String, AbilityConstant> abilities =
         abilityService.convert(load("constants_abilities.json"));
