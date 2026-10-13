@@ -1,0 +1,18 @@
+{
+  "heroes": {
+    "npc_dota_hero_riki": {"ability": "riki_permanent_invisibility", "mode": "PASSIVE"},
+    "npc_dota_hero_clinkz": {"ability": "clinkz_wind_walk", "mode": "ACTIVE"},
+    "npc_dota_hero_weaver": {"ability": "weaver_shukuchi", "mode": "ACTIVE"},
+    "npc_dota_hero_nyx_assassin": {"ability": "nyx_assassin_vendetta", "mode": "ACTIVE"},
+    "npc_dota_hero_bounty_hunter": {"ability": "bounty_hunter_wind_walk", "mode": "ACTIVE"},
+    "npc_dota_hero_mirana": {"ability": "mirana_invis", "mode": "ACTIVE"},
+    "npc_dota_hero_invoker": {"ability": "invoker_ghost_walk", "mode": "ACTIVE"},
+    "npc_dota_hero_slark": {"ability": "slark_shadow_dance", "mode": "ACTIVE"}
+  },
+  "items": [
+    "item_invis_sword",
+    "item_silver_edge",
+    "item_glimmer_cape",
+    "item_shadow_amulet"
+  ]
+}

@@ -1,0 +1,7 @@
+# The matches the vision review loop reads: match ids only, one per line.
+# A match is stored once from its replay (REPLAY_FIXTURE_DIR); after that the loop re-analyses it
+# from the stored data. See docs/replay-vision-loop/README.md.
+
+# Ability Draft (the same two as the fights loop)
+9038725154
+9037038717
