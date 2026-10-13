@@ -4,7 +4,6 @@ import com.ako.dbuff.dao.model.DeathEventDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
-import com.ako.dbuff.dao.model.RuneEventDomain;
 import com.ako.dbuff.dao.model.TeamTimelineDomain;
 import com.ako.dbuff.dao.model.TeamfightDomain;
 import com.ako.dbuff.dao.model.TeamfightPlayerDomain;
@@ -16,8 +15,13 @@ import com.ako.dbuff.dao.repo.RuneEventRepo;
 import com.ako.dbuff.dao.repo.TeamTimelineRepo;
 import com.ako.dbuff.dao.repo.TeamfightPlayerRepo;
 import com.ako.dbuff.dao.repo.TeamfightRepo;
+import com.ako.dbuff.dao.repo.WardEventRepo;
+import com.ako.dbuff.dotapi.invoker.JSON;
+import com.ako.dbuff.dotapi.model.MatchResponse;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import com.ako.dbuff.service.match.data.RuneEventMapper;
+import com.ako.dbuff.service.match.data.WardEventMapper;
 import com.ako.dbuff.service.replay.AbilityNames;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -146,6 +150,7 @@ public abstract class ReplayPipelineFixture {
   @Autowired private TeamfightPlayerRepo teamfightPlayerRepo;
   @Autowired private TeamTimelineRepo teamTimelineRepo;
   @Autowired private RuneEventRepo runeEventRepo;
+  @Autowired private WardEventRepo wardEventRepo;
 
   protected static Path fixture(String fileName) {
     return Path.of(System.getenv("REPLAY_FIXTURE_DIR"), fileName);
@@ -203,27 +208,18 @@ public abstract class ReplayPipelineFixture {
     }
     seedOpenDotaFights(match.getId(), json);
     seedTeamTimeline(match.getId(), json);
-    seedRunes(match.getId(), json);
+    seedMatchLogs(match, id);
     return match;
   }
 
-  /** OpenDota's rune log of each player, as the match data mapper stores it. */
-  private void seedRunes(long matchId, JsonNode json) {
-    runeEventRepo.deleteByMatchId(matchId);
-    for (JsonNode p : json.path("players")) {
-      int index = 0;
-      for (JsonNode rune : p.path("runes_log")) {
-        runeEventRepo.save(
-            RuneEventDomain.builder()
-                .matchId(matchId)
-                .playerSlot(p.path("player_slot").asLong())
-                .playerId(optLong(p, "account_id"))
-                .runeIndex(index++)
-                .eventTime(optLong(rune, "time"))
-                .runeType(rune.path("key").asInt())
-                .build());
-      }
-    }
+  /** The ward and rune logs of OpenDota's match data, as the match detail import stores them. */
+  private void seedMatchLogs(MatchDomain match, String id) throws IOException {
+    wardEventRepo.deleteByMatchId(match.getId());
+    runeEventRepo.deleteByMatchId(match.getId());
+    MatchResponse response =
+        new JSON().getMapper().readValue(fixture(id + ".json").toFile(), MatchResponse.class);
+    new WardEventMapper(wardEventRepo).map(response, match);
+    new RuneEventMapper(runeEventRepo).map(response, match);
   }
 
   /** OpenDota's per-minute Radiant gold and experience advantage. */
