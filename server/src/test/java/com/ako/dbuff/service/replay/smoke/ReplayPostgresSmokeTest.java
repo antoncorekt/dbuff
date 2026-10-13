@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.smoke;
 
+import com.ako.dbuff.dao.model.CreepKillDomain;
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightExplanationDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
@@ -12,6 +13,7 @@ import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.dao.repo.AbilityDraftPoolRepo;
 import com.ako.dbuff.dao.repo.BuybackEventRepo;
+import com.ako.dbuff.dao.repo.CreepKillRepo;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightExplanationRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
@@ -36,6 +38,7 @@ import com.ako.dbuff.service.replay.ReplayRunService;
 import com.ako.dbuff.service.replay.analysis.activity.Activity;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionStage;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
+import com.ako.dbuff.service.replay.analysis.creep.CreepClass;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
@@ -51,6 +54,8 @@ import com.ako.dbuff.service.replay.report.FightSection;
 import com.ako.dbuff.service.replay.report.MovementSection;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.SwingSection;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -101,6 +106,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private ReplayCombatLogRepo combatLogRepo;
   @Autowired private PlayerActivitySegmentRepo activityRepo;
   @Autowired private FightRepo fightRepo;
+  @Autowired private CreepKillRepo creepKillRepo;
   @Autowired private DeathAnalysisRepo deathRepo;
   @Autowired private FightReasonRepo reasonRepo;
   @Autowired private FightExplanationRepo explanationRepo;
@@ -170,6 +176,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .extracting(c -> c.getTeam())
           .containsExactlyInAnyOrder("RADIANT", "DIRE");
       assertAllPickReasons(id, match.getId());
+      assertCreepKills(id, match.getId());
       assertThat(buybackRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(spikeRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(stateSegmentRepo.findByMatchId(match.getId())).isNotEmpty();
@@ -198,6 +205,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     dataService.deleteByMatchId(Long.parseLong(MATCHES[0]));
     assertThat(deathRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
     assertThat(reasonRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
+    assertThat(creepKillRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
     assertThat(explanationRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
   }
 
@@ -228,10 +236,59 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .extracting(c -> c.getTeam() + " " + c.getStage())
           .containsExactlyInAnyOrder("RADIANT PICK", "RADIANT FINAL", "DIRE PICK", "DIRE FINAL");
       assertRoleAwareReasons(id, match.getId());
+      assertCreepKills(id, match.getId());
       assertAbilityDraftReasons(id, match.getId());
       assertFightExplanations(id, match.getId());
       printAbilityDraft(id, match.getId(), profiles);
     }
+  }
+
+  /** Per hero, the last hits and denies the stored creep kills give against OpenDota's totals. */
+  private void assertCreepKills(String id, long matchId) throws Exception {
+    List<CreepKillDomain> kills = creepKillRepo.findByMatchId(matchId);
+    assertThat(kills).as("%s: creep kills", id).isNotEmpty();
+    assertThat(kills)
+        .extracting(CreepKillDomain::getCreepClass)
+        .as("%s: every class is a known one", id)
+        .allSatisfy(c -> assertThat(CreepClass.valueOf(c)).isNotNull());
+    long linked = kills.stream().filter(k -> !k.getDenied() && k.getGold() != null).count();
+    long paid = kills.stream().filter(k -> !k.getDenied()).count();
+    assertThat(linked).as("%s: kills with their gold", id).isGreaterThan(paid * 8 / 10);
+    JsonNode players = new ObjectMapper().readTree(fixture(id + ".json").toFile()).get("players");
+    long ours = 0;
+    long theirs = 0;
+    for (JsonNode p : players) {
+      long slot = p.get("player_slot").asLong();
+      List<CreepKillDomain> own = kills.stream().filter(k -> k.getPlayerSlot() == slot).toList();
+      long lastHits = own.stream().filter(k -> !k.getDenied()).count();
+      long denies = own.stream().filter(CreepKillDomain::getDenied).count();
+      int openDotaLastHits = p.get("last_hits").asInt();
+      System.out.printf(
+          "CREEP KILLS %s slot %d: last hits %d (OpenDota %d), denies %d (OpenDota %d), lane %d,"
+              + " camp %d, siege %d%n",
+          id,
+          slot,
+          lastHits,
+          openDotaLastHits,
+          denies,
+          p.get("denies").asInt(),
+          own.stream().filter(k -> k.getCreepClass().startsWith("LANE_") && !k.getDenied()).count(),
+          own.stream().filter(k -> k.getCreepClass().startsWith("NEUTRAL")).count(),
+          own.stream().filter(k -> k.getCreepClass().startsWith("LANE_SIEGE")).count());
+      assertThat(lastHits)
+          .as(
+              "%s slot %d: the log has no kill by a hero's summon, never more than OpenDota",
+              id, slot)
+          .isLessThanOrEqualTo(openDotaLastHits + 3L);
+      assertThat(denies)
+          .as("%s slot %d denies", id, slot)
+          .isLessThanOrEqualTo(p.get("denies").asInt() + 2L);
+      ours += lastHits;
+      theirs += openDotaLastHits;
+    }
+    assertThat(ours)
+        .as("%s: last hits of all heroes against OpenDota's %d", id, theirs)
+        .isGreaterThanOrEqualTo(Math.round(theirs * 0.75));
   }
 
   private void assertFightExplanations(String id, long matchId) {

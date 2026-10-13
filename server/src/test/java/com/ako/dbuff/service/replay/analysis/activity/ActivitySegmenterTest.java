@@ -49,6 +49,20 @@ class ActivitySegmenterTest {
   }
 
   @Test
+  void segment_countsAnEnemySiegeCreepAsLaneFarm_whoseNameHasNoCreepPart() {
+    var track =
+        track(5, new int[][] {{BOT_LANE_X, BOT_LANE_Y, 5, 1}, {BOT_LANE_X, BOT_LANE_Y, 5, 1}});
+
+    List<ActivitySegment> enemy =
+        segmenter.segment(track, HERO, List.of(kill(0, "npc_dota_badguys_siege")), layout);
+    List<ActivitySegment> own =
+        segmenter.segment(track, HERO, List.of(kill(0, "npc_dota_goodguys_siege")), layout);
+
+    assertThat(enemy.getFirst().activity()).isEqualTo(Activity.LANE_FARM);
+    assertThat(own.getFirst().activity()).isEqualTo(Activity.POSITIONED);
+  }
+
+  @Test
   void segment_doesNotCountADenyOrALastHitThatComesAfterTheSample() {
     var track =
         track(5, new int[][] {{BOT_LANE_X, BOT_LANE_Y, 5, 1}, {BOT_LANE_X, BOT_LANE_Y, 5, 1}});

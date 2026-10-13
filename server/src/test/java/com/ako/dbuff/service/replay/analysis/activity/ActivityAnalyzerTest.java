@@ -66,7 +66,7 @@ class ActivityAnalyzerTest {
     assertThat(rows)
         .extracting(PlayerActivitySegmentDomain::getActivity)
         .containsExactly("IN_BASE", "LANE_FARM");
-    assertThat(rows).allMatch(r -> r.getPlayerSlot() == 0L && r.getAnalysisVersion() == 1);
+    assertThat(rows).allMatch(r -> r.getPlayerSlot() == 0L && r.getAnalysisVersion() == 2);
     assertThat(rows.getFirst().getStartSeconds()).isEqualTo(-90);
   }
 

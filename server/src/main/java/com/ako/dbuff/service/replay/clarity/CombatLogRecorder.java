@@ -34,7 +34,7 @@ final class CombatLogRecorder {
             flags(entry),
             entry.getValue(),
             entry.getHealth(),
-            (int) Math.round(entry.getStunDuration() * CENTISECONDS),
+            aux(kind, entry),
             (int) Math.round(entry.getModifierDuration() * CENTISECONDS),
             (int) entry.getLocationX(),
             (int) entry.getLocationY(),
@@ -62,6 +62,15 @@ final class CombatLogRecorder {
               e.assistMask()));
     }
     return new CombatLogFacts(shifted);
+  }
+
+  /** The gold or experience reason for those kinds, the stun duration in hundredths otherwise. */
+  private static int aux(CombatEventKind kind, CombatLogEntry c) {
+    return switch (kind) {
+      case GOLD -> c.getGoldReason();
+      case XP -> c.getXpReason();
+      default -> (int) Math.round(c.getStunDuration() * CENTISECONDS);
+    };
   }
 
   private static boolean keeps(CombatEventKind kind, CombatLogEntry c) {

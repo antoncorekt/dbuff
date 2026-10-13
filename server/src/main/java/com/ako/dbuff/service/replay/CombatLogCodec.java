@@ -18,7 +18,12 @@ import java.util.Map;
  * events with names as indexes. A game's 20 to 30 thousand events take a few hundred kilobytes.
  */
 public final class CombatLogCodec {
-  /** Bumped whenever the layout changes, so an old blob is never read as a new one. */
+  /**
+   * Bumped whenever the layout changes, so an old blob is never read as a new one. Keeping the gold
+   * and experience reason in {@code aux} did not change the layout, so the version stayed: a blob
+   * written earlier still decodes, with 0 (the stun duration it held) as the reason of every GOLD
+   * and XP event. Such a match gets its reasons by being parsed again from the replay.
+   */
   public static final int VERSION = 1;
 
   private static final int MAX_NAMES = 65_535;
