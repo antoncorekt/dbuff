@@ -2,7 +2,7 @@ package com.ako.dbuff.service.replay.analysis.behaviour;
 
 import com.ako.dbuff.service.replay.analysis.behaviour.AwayTrip.End;
 import com.ako.dbuff.service.replay.map.Zone;
-import java.util.Optional;
+import java.util.List;
 
 /** Which away trips are rotations, which are worth reporting, and how they turned out. */
 public final class RotationRules {
@@ -21,22 +21,29 @@ public final class RotationRules {
 
   /** Plain walking between lanes is not reported: something must have come of it. */
   public static boolean worthReporting(
-      AwayTrip trip, TripOutcome outcome, Optional<LaneProxy.Result> proxy) {
+      AwayTrip trip, TripOutcome outcome, RotationVerdict verdict) {
     return trip.end() == End.DIED
         || outcome.kills() > 0
         || outcome.fights() > 0
-        || proxy.map(LaneProxy.Result::lost).orElse(false);
+        || verdict == RotationVerdict.WASTED;
   }
 
+  /**
+   * Death first, then a kill or a won fight; else wasted when the lane he left was lost, when he
+   * did nothing and his income dropped, or when a tower of the lane he left fell while he was away.
+   */
   public static RotationVerdict verdict(
-      AwayTrip trip, TripOutcome outcome, Optional<LaneProxy.Result> proxy) {
+      AwayTrip trip, TripOutcome outcome, List<RotationReason> reasons, boolean towerInHisLane) {
     if (trip.end() == End.DIED) {
       return RotationVerdict.DIED;
     }
     if (outcome.kills() > 0 || outcome.fightsWon() > 0) {
       return RotationVerdict.GOOD;
     }
-    if (proxy.map(LaneProxy.Result::lost).orElse(false)) {
+    if (reasons.contains(RotationReason.LEFT_LANE_UNDEFENDED)
+        || (towerInHisLane && reasons.contains(RotationReason.TOWER_LOST_WHILE_AWAY))
+        || (reasons.contains(RotationReason.DID_NOTHING)
+            && reasons.contains(RotationReason.INCOME_DROP))) {
       return RotationVerdict.WASTED;
     }
     return RotationVerdict.NEUTRAL;

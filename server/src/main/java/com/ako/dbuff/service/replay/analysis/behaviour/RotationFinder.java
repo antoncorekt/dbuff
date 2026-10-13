@@ -23,7 +23,8 @@ public final class RotationFinder {
       Map<Long, List<Double>> deaths,
       Map<Long, List<Double>> buybacks,
       List<LaneSlot> lanes,
-      TripOutcomes.Events events) {}
+      TripOutcomes.Events events,
+      MidGameFacts mid) {}
 
   private final BehaviourProperties properties;
   private final ZoneLookup zones;
@@ -38,6 +39,7 @@ public final class RotationFinder {
         new TeamClusters(properties.getClusterDistance(), properties.getMinClusterSize(), zones);
     AwayTrips trips = new AwayTrips(clusters, zones, properties.getAwaySeconds());
     TripOutcomes outcomes = new TripOutcomes(properties.getOutcomeLingerSeconds());
+    ReasonEvidence evidence = new ReasonEvidence(properties, outcomes);
     LaneProxy proxy = new LaneProxy(properties.getProxyWindowSeconds());
     List<Rotation> rotations = new ArrayList<>();
     for (TeamSide team : TeamSide.values()) {
@@ -45,8 +47,11 @@ public final class RotationFinder {
           in.traces().entrySet().stream()
               .filter(e -> TeamSide.ofSlot(e.getKey()) == team)
               .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-      for (AwayTrip trip :
-          trips.find(new AwayTrips.Inputs(traces, in.activity(), in.deaths(), in.buybacks()))) {
+      List<AwayTrip> teamTrips =
+          trips.find(new AwayTrips.Inputs(traces, in.activity(), in.deaths(), in.buybacks()));
+      Map<Long, List<AwayTrip>> tripsBySlot =
+          teamTrips.stream().collect(Collectors.groupingBy(AwayTrip::slot));
+      for (AwayTrip trip : teamTrips) {
         Zone.Lane laneLeft = laneLeft(in.lanes(), trip);
         if (!RotationRules.isRotation(trip, laneLeft)) {
           continue;
@@ -54,15 +59,23 @@ public final class RotationFinder {
         TripOutcome outcome = outcomes.of(trip, team, in.events());
         Optional<LaneProxy.Result> result =
             proxy.of(trip.slot(), trip.startSeconds(), in.lanes(), in.events().creeps());
-        if (RotationRules.worthReporting(trip, outcome, result)) {
+        ReasonFacts facts =
+            evidence.of(
+                trip,
+                team,
+                laneLeft,
+                outcome,
+                result,
+                in.mid(),
+                in.events().fights(),
+                new HeroPast(in.traces().get(trip.slot()), tripsBySlot.get(trip.slot())));
+        List<RotationReason> reasons = RotationReasons.of(facts);
+        RotationVerdict verdict =
+            RotationRules.verdict(trip, outcome, reasons, facts.towerInHisLane());
+        if (RotationRules.worthReporting(trip, outcome, verdict)) {
           rotations.add(
               new Rotation(
-                  team,
-                  trip,
-                  laneLeft,
-                  outcome,
-                  result,
-                  RotationRules.verdict(trip, outcome, result)));
+                  team, trip, laneLeft, outcome, result, facts.income(), reasons, verdict));
         }
       }
     }

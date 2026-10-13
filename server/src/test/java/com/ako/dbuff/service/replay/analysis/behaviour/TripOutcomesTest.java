@@ -25,10 +25,10 @@ class TripOutcomesTest {
                 new CreepHit(4L, 900, null, false),
                 new CreepHit(1L, 705, null, false)),
             List.of(
-                new FightFact(2, 745, 770, "DIRE", Set.of(4L)),
-                new FightFact(3, 745, 770, "RADIANT", Set.of(4L)),
-                new FightFact(4, 745, 770, "RADIANT", Set.of(1L)),
-                new FightFact(5, 780, 800, "RADIANT", Set.of(4L))));
+                new FightFact(2, 745, 770, "DIRE", Set.of(4L), null),
+                new FightFact(3, 745, 770, "RADIANT", Set.of(4L), null),
+                new FightFact(4, 745, 770, "RADIANT", Set.of(1L), null),
+                new FightFact(5, 780, 800, "RADIANT", Set.of(4L), null)));
 
     TripOutcome outcome = outcomes.of(trip, TeamSide.RADIANT, events);
 

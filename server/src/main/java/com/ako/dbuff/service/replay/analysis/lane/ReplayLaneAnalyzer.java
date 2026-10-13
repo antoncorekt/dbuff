@@ -189,9 +189,9 @@ public class ReplayLaneAnalyzer implements ReplayAnalyzer {
         buildingRepo.findByMatchId(matchId),
         creepRepo.findByMatchId(matchId),
         tracks,
-        series(timeline, PlayerTimelineDomain::getXp),
-        series(timeline, PlayerTimelineDomain::getGold),
-        series(timeline, PlayerTimelineDomain::getCampsStacked),
+        TimelineSeries.bySlot(timeline, PlayerTimelineDomain::getXp),
+        TimelineSeries.bySlot(timeline, PlayerTimelineDomain::getGold),
+        TimelineSeries.bySlot(timeline, PlayerTimelineDomain::getCampsStacked),
         events,
         slotByHero,
         deathRepo.findByMatchId(matchId),
@@ -213,18 +213,5 @@ public class ReplayLaneAnalyzer implements ReplayAnalyzer {
       }
     }
     return byHero;
-  }
-
-  private static Map<Long, MinuteSeries> series(
-      List<PlayerTimelineDomain> timeline, Function<PlayerTimelineDomain, Long> value) {
-    Map<Long, MinuteSeries> bySlot = new HashMap<>();
-    for (PlayerTimelineDomain t : timeline) {
-      if (t.getPlayerSlot() != null) {
-        bySlot
-            .computeIfAbsent(t.getPlayerSlot(), k -> new MinuteSeries())
-            .put(t.getGameMinute(), value.apply(t));
-      }
-    }
-    return bySlot;
   }
 }

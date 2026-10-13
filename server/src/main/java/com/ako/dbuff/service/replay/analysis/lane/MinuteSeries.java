@@ -4,20 +4,18 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /** A total that is known at each full minute, read at any second by a straight line between. */
-final class MinuteSeries {
-  private final TreeMap<Integer, Long> byMinute = new TreeMap<>();
+public final class MinuteSeries {
+  private final TreeMap<Integer, Long> byMinute;
 
-  void put(Integer minute, Long value) {
-    if (minute != null && value != null) {
-      byMinute.put(minute, value);
-    }
+  public MinuteSeries(Map<Integer, Long> totals) {
+    this.byMinute = new TreeMap<>(totals);
   }
 
-  boolean isEmpty() {
+  public boolean isEmpty() {
     return byMinute.isEmpty();
   }
 
-  double at(double second) {
+  public double at(double second) {
     double minute = second / 60.0;
     Map.Entry<Integer, Long> before = byMinute.floorEntry((int) Math.floor(minute));
     Map.Entry<Integer, Long> after = byMinute.ceilingEntry((int) Math.ceil(minute));
@@ -32,7 +30,14 @@ final class MinuteSeries {
   }
 
   /** The gain between two seconds; null for a series with no points. */
-  Double gain(double from, double to) {
+  public Double gain(double from, double to) {
     return isEmpty() ? null : Math.max(0, at(to) - at(from));
+  }
+
+  /**
+   * True when the minutes known reach from {@code from} to {@code to}, so no reading is a guess.
+   */
+  public boolean covers(double from, double to) {
+    return !isEmpty() && byMinute.firstKey() * 60.0 <= from && byMinute.lastKey() * 60.0 >= to;
   }
 }

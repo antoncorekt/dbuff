@@ -2,7 +2,7 @@ package com.ako.dbuff.service.replay.analysis.behaviour;
 
 import com.ako.dbuff.service.replay.analysis.behaviour.AwayTrip.End;
 import com.ako.dbuff.service.replay.map.Zone;
-import java.util.Optional;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static com.ako.dbuff.service.replay.analysis.behaviour.BehaviourTestData.BASE;
@@ -11,9 +11,6 @@ import static com.ako.dbuff.service.replay.analysis.behaviour.BehaviourTestData.
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RotationRulesTest {
-  private static final Optional<LaneProxy.Result> NO_PROXY = Optional.empty();
-  private static final Optional<LaneProxy.Result> LOST = Optional.of(new LaneProxy.Result(1, 4));
-  private static final Optional<LaneProxy.Result> HELD = Optional.of(new LaneProxy.Result(4, 4));
 
   private static AwayTrip trip(Zone to, End end) {
     return new AwayTrip(0L, 600, 620, 650, MID, to, MID, false, end);
@@ -38,57 +35,119 @@ class RotationRulesTest {
     assertThat(RotationRules.isRotation(stayed, null)).isFalse();
   }
 
+  private static final List<RotationReason> NONE = List.of();
+
   @Test
-  void verdict_aKillIsGood() {
-    assertThat(RotationRules.verdict(trip(TOP, End.REJOINED), outcome(1, 0, 0), LOST))
+  void verdict_aKillIsGoodEvenWithBadReasons() {
+    assertThat(
+            RotationRules.verdict(
+                trip(TOP, End.REJOINED),
+                outcome(1, 0, 0),
+                List.of(RotationReason.LEFT_LANE_UNDEFENDED, RotationReason.TOWER_LOST_WHILE_AWAY),
+                true))
         .isEqualTo(RotationVerdict.GOOD);
   }
 
   @Test
   void verdict_aWonFightIsGood() {
-    assertThat(RotationRules.verdict(trip(TOP, End.REJOINED), outcome(0, 1, 1), NO_PROXY))
+    assertThat(RotationRules.verdict(trip(TOP, End.REJOINED), outcome(0, 1, 1), NONE, false))
         .isEqualTo(RotationVerdict.GOOD);
   }
 
   @Test
-  void verdict_noKillAndALostLaneIsWasted() {
-    assertThat(RotationRules.verdict(trip(TOP, End.REJOINED), outcome(0, 0, 0), LOST))
-        .isEqualTo(RotationVerdict.WASTED);
-    assertThat(RotationRules.verdict(trip(TOP, End.REJOINED), outcome(0, 1, 0), LOST))
+  void verdict_aLostLaneIsWasted() {
+    assertThat(
+            RotationRules.verdict(
+                trip(TOP, End.REJOINED),
+                outcome(0, 1, 0),
+                List.of(RotationReason.LEFT_LANE_UNDEFENDED),
+                false))
         .isEqualTo(RotationVerdict.WASTED);
   }
 
   @Test
-  void verdict_aHeldOrUnknownLaneWithNothingElseIsNeutral() {
-    assertThat(RotationRules.verdict(trip(TOP, End.REJOINED), outcome(0, 1, 0), HELD))
+  void verdict_aTowerLostWhileAwayWithNoResultIsWasted() {
+    assertThat(
+            RotationRules.verdict(
+                trip(TOP, End.REJOINED),
+                outcome(0, 0, 0),
+                List.of(RotationReason.TOWER_LOST_WHILE_AWAY),
+                true))
+        .isEqualTo(RotationVerdict.WASTED);
+  }
+
+  @Test
+  void verdict_aTowerLostInAnotherLaneIsListedButDoesNotDecide() {
+    assertThat(
+            RotationRules.verdict(
+                trip(TOP, End.REJOINED),
+                outcome(0, 0, 0),
+                List.of(RotationReason.TOWER_LOST_WHILE_AWAY),
+                false))
         .isEqualTo(RotationVerdict.NEUTRAL);
-    assertThat(RotationRules.verdict(trip(TOP, End.REJOINED), outcome(0, 1, 0), NO_PROXY))
+  }
+
+  @Test
+  void verdict_doingNothingWhileTheFarmDroppedIsWasted() {
+    assertThat(
+            RotationRules.verdict(
+                trip(TOP, End.REJOINED),
+                outcome(0, 0, 0),
+                List.of(RotationReason.DID_NOTHING, RotationReason.INCOME_DROP),
+                false))
+        .isEqualTo(RotationVerdict.WASTED);
+  }
+
+  @Test
+  void verdict_oneWeakReasonAloneIsNeutral() {
+    for (RotationReason reason :
+        List.of(
+            RotationReason.DID_NOTHING,
+            RotationReason.INCOME_DROP,
+            RotationReason.ARRIVED_AFTER_FIGHT_ENDED)) {
+      assertThat(
+              RotationRules.verdict(
+                  trip(TOP, End.REJOINED), outcome(0, 0, 0), List.of(reason), false))
+          .as(reason.name())
+          .isEqualTo(RotationVerdict.NEUTRAL);
+    }
+    assertThat(RotationRules.verdict(trip(TOP, End.REJOINED), outcome(0, 1, 0), NONE, false))
         .isEqualTo(RotationVerdict.NEUTRAL);
   }
 
   @Test
   void verdict_aDeathBeatsEverything() {
-    assertThat(RotationRules.verdict(trip(TOP, End.DIED), outcome(2, 1, 1), HELD))
+    assertThat(
+            RotationRules.verdict(
+                trip(TOP, End.DIED), outcome(2, 1, 1), List.of(RotationReason.DIED), false))
         .isEqualTo(RotationVerdict.DIED);
   }
 
   @Test
   void worthReporting_plainWalkingIsNotReported() {
-    assertThat(RotationRules.worthReporting(trip(TOP, End.REJOINED), outcome(0, 0, 0), HELD))
-        .isFalse();
-    assertThat(RotationRules.worthReporting(trip(TOP, End.REJOINED), outcome(0, 0, 0), NO_PROXY))
+    assertThat(
+            RotationRules.worthReporting(
+                trip(TOP, End.REJOINED), outcome(0, 0, 0), RotationVerdict.NEUTRAL))
         .isFalse();
   }
 
   @Test
-  void worthReporting_aFightAKillADeathOrALostLaneIs() {
-    assertThat(RotationRules.worthReporting(trip(TOP, End.REJOINED), outcome(0, 1, 0), NO_PROXY))
+  void worthReporting_aFightAKillADeathOrAWastedTripIs() {
+    assertThat(
+            RotationRules.worthReporting(
+                trip(TOP, End.REJOINED), outcome(0, 1, 0), RotationVerdict.NEUTRAL))
         .isTrue();
-    assertThat(RotationRules.worthReporting(trip(TOP, End.REJOINED), outcome(1, 0, 0), NO_PROXY))
+    assertThat(
+            RotationRules.worthReporting(
+                trip(TOP, End.REJOINED), outcome(1, 0, 0), RotationVerdict.GOOD))
         .isTrue();
-    assertThat(RotationRules.worthReporting(trip(TOP, End.DIED), outcome(0, 0, 0), NO_PROXY))
+    assertThat(
+            RotationRules.worthReporting(
+                trip(TOP, End.DIED), outcome(0, 0, 0), RotationVerdict.DIED))
         .isTrue();
-    assertThat(RotationRules.worthReporting(trip(TOP, End.REJOINED), outcome(0, 0, 0), LOST))
+    assertThat(
+            RotationRules.worthReporting(
+                trip(TOP, End.REJOINED), outcome(0, 0, 0), RotationVerdict.WASTED))
         .isTrue();
   }
 }

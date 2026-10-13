@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis.behaviour;
 
+import com.ako.dbuff.service.replay.map.Zone;
 import java.util.Set;
 
 /**
@@ -7,5 +8,7 @@ import java.util.Set;
  *
  * @param winner RADIANT, DIRE or DRAW
  * @param present the slots that took part (active or close and passive)
+ * @param lane the lane the fight was in; null when it was not in one
  */
-public record FightFact(int index, double start, double end, String winner, Set<Long> present) {}
+public record FightFact(
+    int index, double start, double end, String winner, Set<Long> present, Zone.Lane lane) {}

@@ -1,15 +1,19 @@
 package com.ako.dbuff.service.replay.analysis.behaviour;
 
+import com.ako.dbuff.dao.model.BuildingKillContextDomain;
 import com.ako.dbuff.dao.model.CreepKillDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.LaneAssignmentDomain;
+import com.ako.dbuff.dao.model.PlayerTimelineDomain;
 import com.ako.dbuff.dao.model.TeamRotationDomain;
+import com.ako.dbuff.dao.repo.BuildingKillContextRepo;
 import com.ako.dbuff.dao.repo.BuybackEventRepo;
 import com.ako.dbuff.dao.repo.CreepKillRepo;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.LaneAssignmentRepo;
+import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.TeamRotationRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
@@ -19,9 +23,11 @@ import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.PlayerSlots;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
+import com.ako.dbuff.service.replay.analysis.building.BuildingName;
 import com.ako.dbuff.service.replay.analysis.fight.FightAssessor.Trace;
 import com.ako.dbuff.service.replay.analysis.fight.PlayerTraces;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
+import com.ako.dbuff.service.replay.analysis.lane.TimelineSeries;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.map.MapLayout;
@@ -33,6 +39,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.ToDoubleFunction;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +59,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
   private static final String ZONE_LANE = Zone.Kind.LANE.name();
+  private static final String TOWER_KIND = "TOWER";
 
   private final MatchMapLayout matchMapLayout;
   private final PlayerTraces playerTraces;
@@ -61,6 +70,8 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
   private final BuybackEventRepo buybackRepo;
   private final LaneAssignmentRepo laneRepo;
   private final CreepKillRepo creepRepo;
+  private final PlayerTimelineRepo timelineRepo;
+  private final BuildingKillContextRepo buildingRepo;
   private final FightRepo fightRepo;
   private final FightPlayerRepo fightPlayerRepo;
   private final BehaviourProperties properties;
@@ -73,7 +84,7 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 1;
+    return 2;
   }
 
   @Override
@@ -88,7 +99,8 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
         "buybacks",
         "fights",
         "lanes",
-        "important-fights");
+        "important-fights",
+        "building-kills");
   }
 
   @Override
@@ -129,7 +141,51 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
         deaths(matchId),
         buybacks(matchId),
         lanes(matchId),
-        new TripOutcomes.Events(kills(events, slotByHero), creeps(matchId), fights(matchId)));
+        new TripOutcomes.Events(kills(events, slotByHero), creeps(matchId), fights(matchId)),
+        midGame(matchId, events, slotByHero));
+  }
+
+  private MidGameFacts midGame(
+      long matchId, List<CombatEvent> events, Map<String, Long> slotByHero) {
+    List<PlayerTimelineDomain> timeline = timelineRepo.findByMatchId(matchId);
+    Map<TeamSide, List<MidGameFacts.TowerLoss>> towerLosses = new HashMap<>();
+    for (BuildingKillContextDomain b : buildingRepo.findByMatchId(matchId)) {
+      TeamSide owner = Enums.find(TeamSide.class, b.getOwnerTeam());
+      if (TOWER_KIND.equals(b.getKind()) && b.getSeconds() != null && owner != null) {
+        Zone.Lane lane = b.getLane() == null ? null : Enums.find(Zone.Lane.class, b.getLane());
+        towerLosses
+            .computeIfAbsent(owner, t -> new ArrayList<>())
+            .add(new MidGameFacts.TowerLoss(b.getSeconds(), lane));
+      }
+    }
+    return new MidGameFacts(
+        TimelineSeries.bySlot(timeline, PlayerTimelineDomain::getGold),
+        TimelineSeries.bySlot(timeline, PlayerTimelineDomain::getXp),
+        hits(events, slotByHero),
+        towerLosses);
+  }
+
+  /** Hits on enemy heroes and enemy towers; damage to a hero's own team does not count. */
+  static List<DamageHit> hits(List<CombatEvent> events, Map<String, Long> slotByHero) {
+    List<DamageHit> hits = new ArrayList<>();
+    for (CombatEvent e : events) {
+      Long slot = slotByHero.get(e.attacker());
+      if (e.kind() != CombatEventKind.DAMAGE || slot == null || !e.attackerIsRealHero()) {
+        continue;
+      }
+      TeamSide own = TeamSide.ofSlot(slot);
+      Long victim = e.targetIsRealHero() ? slotByHero.get(e.target()) : null;
+      if (victim != null) {
+        if (TeamSide.ofSlot(victim) != own) {
+          hits.add(new DamageHit(slot, e.gameSecond(), false));
+        }
+        continue;
+      }
+      BuildingName.parse(e.target())
+          .filter(b -> TOWER_KIND.equals(b.kind()) && !own.name().equals(b.team()))
+          .ifPresent(b -> hits.add(new DamageHit(slot, e.gameSecond(), true)));
+    }
+    return hits;
   }
 
   private Map<Long, List<Double>> deaths(long matchId) {
@@ -243,7 +299,10 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
                     f.getStartSeconds(),
                     f.getEndSeconds(),
                     f.getWinner(),
-                    present.getOrDefault(f.getFightIndex(), Set.of())))
+                    present.getOrDefault(f.getFightIndex(), Set.of()),
+                    ZONE_LANE.equals(f.getZone()) && f.getLane() != null
+                        ? Enums.find(Zone.Lane.class, f.getLane())
+                        : null))
         .toList();
   }
 
@@ -272,9 +331,18 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
         .fightIndex(r.outcome().fightIndex())
         .proxyOwnKills(r.proxy().map(LaneProxy.Result::own).orElse(null))
         .proxyEnemyKills(r.proxy().map(LaneProxy.Result::enemy).orElse(null))
+        .reasons(r.reasons().stream().map(Enum::name).collect(Collectors.joining(",")))
+        .incomeBefore(rounded(r, Income::goldBefore))
+        .incomeDuring(rounded(r, Income::goldDuring))
+        .xpBefore(rounded(r, Income::xpBefore))
+        .xpDuring(rounded(r, Income::xpDuring))
         .verdict(r.verdict().name())
         .analysisVersion(version())
         .build();
+  }
+
+  private static Integer rounded(Rotation r, ToDoubleFunction<Income> value) {
+    return r.income().map(i -> (int) Math.round(value.applyAsDouble(i))).orElse(null);
   }
 
   private static String laneName(Zone zone) {

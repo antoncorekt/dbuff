@@ -84,6 +84,19 @@ public class TeamRotationDomain {
 
   private Integer proxyEnemyKills;
 
+  /** The RotationReason values that applied, comma separated; empty for none. */
+  private String reasons;
+
+  /**
+   * Gold and experience per minute over the trip and a tail after it (during), and over the stretch
+   * of the same length before it (before); null when the totals did not reach.
+   */
+  private Integer incomeBefore;
+
+  private Integer incomeDuring;
+  private Integer xpBefore;
+  private Integer xpDuring;
+
   /** One of the RotationVerdict values. */
   private String verdict;
 

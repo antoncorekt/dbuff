@@ -5,10 +5,12 @@ import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.TeamRotationDomain;
 import com.ako.dbuff.service.replay.analysis.behaviour.AwayTrip;
 import com.ako.dbuff.service.replay.analysis.behaviour.BehaviourProperties;
+import com.ako.dbuff.service.replay.analysis.behaviour.RotationReason;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -26,16 +28,19 @@ final class BehaviourLoopReport {
   private static final String HOW_TO_READ =
       "A rotation is a hero who was away from his team's group for at least %d s and got to a lane"
           + " that is not his own, where a fight, a kill or his death came of it, or the lane he"
-          + " left lost the creep count. The group is the biggest bunch of the team's living"
-          + " heroes within %d units of each other; farming the jungle is not away. The creep"
-          + " count compares what his lane partners and the enemy heroes of that lane killed in"
-          + " the %d s after he left, which says little once the laning stage is over. \"trip\""
-          + " says where he left, where he got and how it ended; \"what came of it\" counts kills"
-          + " (or helped kills), creeps and fights in the trip and the few seconds after it."
-          + " Verdict: good (a kill or a won fight came out of it), wasted (neither, and his lane"
-          + " lost the creep count), died (he died before the trip ended), neutral (anything"
-          + " else). Times are the game clock (m:ss). Write OK or REJECT in the owner verdict"
-          + " column.";
+          + " left lost the creep count. The group is the biggest bunch of the team's living heroes"
+          + " within %d units of each other; farming the jungle is not away. The creep count"
+          + " compares what his lane partners and the enemy heroes of that lane killed in the %d s"
+          + " after he left, which says little once the laning stage is over. \"trip\" says where"
+          + " he left, where he got and how it ended; \"what came of it\" counts kills (or helped"
+          + " kills), creeps and fights in the trip and the few seconds after it. Verdict: good (a"
+          + " kill or a won fight came out of it), wasted (neither, and his lane lost the creep"
+          + " count, or he did nothing there while his farm dropped, or a tower of the lane he left"
+          + " fell while he was away), died (he died before the trip ended), neutral (anything"
+          + " else). \"why\" lists every reason that applies; his farm is his gold per minute over"
+          + " the trip and %d s after it against the same stretch before the trip, and it dropped"
+          + " when it fell to %d%% of that or lower. Times are the game clock (m:ss). Write OK or"
+          + " REJECT in the owner verdict column.";
 
   record MatchData(
       long matchId,
@@ -57,7 +62,9 @@ final class BehaviourLoopReport {
             HOW_TO_READ.formatted(
                 d.properties().getAwaySeconds(),
                 d.properties().getClusterDistance(),
-                d.properties().getProxyWindowSeconds()),
+                d.properties().getProxyWindowSeconds(),
+                d.properties().getIncomeTailSeconds(),
+                Math.round(d.properties().getIncomeShare() * 100)),
             summary(d)));
     out.add("");
     out.addAll(table(d));
@@ -84,13 +91,34 @@ final class BehaviourLoopReport {
             .map(v -> "%d %s".formatted(byVerdict.getOrDefault(v, 0L), LoopWording.words(v)))
             .collect(Collectors.joining(", "));
     Map<String, Long> byTeam = teams(d);
-    return "rotations %d (Radiant %d, Dire %d): %s; %d arrived by teleport."
+    return "rotations %d (Radiant %d, Dire %d): %s; %d arrived by teleport; reasons: %s."
         .formatted(
             d.rotations().size(),
             byTeam.getOrDefault("RADIANT", 0L),
             byTeam.getOrDefault("DIRE", 0L),
             verdicts,
-            d.rotations().stream().filter(TeamRotationDomain::isTeleported).count());
+            d.rotations().stream().filter(TeamRotationDomain::isTeleported).count(),
+            reasonCounts(d));
+  }
+
+  private static String reasonCounts(MatchData d) {
+    Map<RotationReason, Long> counts =
+        d.rotations().stream()
+            .flatMap(r -> reasons(r).stream())
+            .collect(Collectors.groupingBy(reason -> reason, Collectors.counting()));
+    return Arrays.stream(RotationReason.values())
+        .map(reason -> "%s %d".formatted(reason.words(), counts.getOrDefault(reason, 0L)))
+        .collect(Collectors.joining(", "));
+  }
+
+  private static List<RotationReason> reasons(TeamRotationDomain r) {
+    if (r.getReasons() == null || r.getReasons().isBlank()) {
+      return List.of();
+    }
+    return Arrays.stream(r.getReasons().split(","))
+        .map(code -> Enums.find(RotationReason.class, code))
+        .filter(Objects::nonNull)
+        .toList();
   }
 
   private static Map<String, Long> teams(MatchData d) {
@@ -104,18 +132,19 @@ final class BehaviourLoopReport {
             List.of(
                 "## " + ROTATIONS,
                 "",
-                "| rotation | trip | what came of it | the lane he left | verdict | owner verdict"
-                    + " |",
-                "|---|---|---|---|---|---|"));
+                "| rotation | trip | what came of it | the lane he left | verdict | why | owner"
+                    + " verdict |",
+                "|---|---|---|---|---|---|---|"));
     for (TeamRotationDomain r : sorted(d)) {
       out.add(
-          "| %s | %s | %s | %s | %s | |"
+          "| %s | %s | %s | %s | %s | %s | |"
               .formatted(
                   ReviewLoopReport.tableCell(label(d, r)),
                   ReviewLoopReport.tableCell(trip(r)),
                   ReviewLoopReport.tableCell(outcome(d, r)),
                   ReviewLoopReport.tableCell(laneLeft(r)),
-                  LoopWording.words(r.getVerdict())));
+                  LoopWording.words(r.getVerdict()),
+                  ReviewLoopReport.tableCell(why(d, r))));
     }
     return out;
   }
@@ -162,6 +191,38 @@ final class BehaviourLoopReport {
       parts.add("%d creeps".formatted(r.getCreepKills()));
     }
     return parts.isEmpty() ? "nothing" : String.join(", ", parts);
+  }
+
+  private static String why(MatchData d, TeamRotationDomain r) {
+    List<String> sentences = reasons(r).stream().map(reason -> sentence(d, r, reason)).toList();
+    return sentences.isEmpty() ? "nothing to add" : String.join("; ", sentences);
+  }
+
+  private static String sentence(MatchData d, TeamRotationDomain r, RotationReason reason) {
+    String hero = LoopWording.hero(d.heroNames(), r.getPlayerSlot());
+    return switch (reason) {
+      case DIED -> "%s died on the trip".formatted(hero);
+      case DID_NOTHING ->
+          "%s did nothing there (no fight, no damage to enemy heroes or towers, no kill, no creeps)"
+              .formatted(hero);
+      case INCOME_DROP -> incomeDrop(hero, r);
+      case ARRIVED_AFTER_FIGHT_ENDED ->
+          "%s arrived after the fight in that lane was over".formatted(hero);
+      case LEFT_LANE_UNDEFENDED ->
+          "the lane %s left lost the creep count (his partners %d, the enemy %d)"
+              .formatted(hero, r.getProxyOwnKills(), r.getProxyEnemyKills());
+      case TOWER_LOST_WHILE_AWAY -> "an own tower fell while %s was away".formatted(hero);
+    };
+  }
+
+  private static String incomeDrop(String hero, TeamRotationDomain r) {
+    return "%s's farm dropped from %s to %s gold per minute (experience from %s to %s per minute)"
+        .formatted(
+            hero,
+            LoopWording.gold(r.getIncomeBefore()),
+            LoopWording.gold(r.getIncomeDuring()),
+            LoopWording.gold(r.getXpBefore()),
+            LoopWording.gold(r.getXpDuring()));
   }
 
   private static String plural(int n) {

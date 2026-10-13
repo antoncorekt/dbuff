@@ -25,6 +25,12 @@ public class BehaviourProperties {
   /** A kill or fight this long after a trip ended still belongs to it. */
   private int outcomeLingerSeconds = 15;
 
+  /** The income of a trip is read this long after it ended too, to catch the walk back. */
+  private int incomeTailSeconds = 60;
+
+  /** A trip whose income per minute fell to this share of the one before it, or lower, dropped. */
+  private double incomeShare = 0.7;
+
   @PostConstruct
   void validate() {
     if (minClusterSize < 2) {

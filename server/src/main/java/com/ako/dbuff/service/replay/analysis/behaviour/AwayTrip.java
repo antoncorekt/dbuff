@@ -23,18 +23,28 @@ public record AwayTrip(
     End end) {
 
   public enum End {
-    REJOINED("joined the group there"),
-    FARMING("went to farm the jungle"),
-    DIED("died before the trip ended"),
-    BOUGHT_BACK("bought back before the trip ended"),
-    TRACK_ENDED("his track ended"),
-    NO_GROUP("the group broke up"),
-    GAME_END("was still away when the game ended");
+    REJOINED("joined the group there", false),
+    FARMING("went to farm the jungle", true),
+    DIED("died before the trip ended", false),
+    BOUGHT_BACK("bought back before the trip ended", false),
+    TRACK_ENDED("his track ended", true),
+    NO_GROUP("the group broke up", true),
+    GAME_END("was still away when the game ended", true);
 
     private final String words;
+    private final boolean hasTail;
 
-    End(String words) {
+    End(String words, boolean hasTail) {
       this.words = words;
+      this.hasTail = hasTail;
+    }
+
+    /**
+     * Whether what follows the trip still belongs to it; after a rejoin, a death or a buyback it is
+     * the group's, or nobody's.
+     */
+    public boolean hasTail() {
+      return hasTail;
     }
 
     public String words() {
