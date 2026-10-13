@@ -49,7 +49,7 @@ Small docs PR in parallel: roles round 3 accepted (recorded in PR #68, owner ver
 | E3 item data | none | S | none |
 | A1 important fights | L1 | M | `fights` (reworked) and `advantage` (new table) |
 | A2 vision | A1, E2 | M | `vision` |
-| A3 runes and opening | E1, E2 (E1 for the gold and XP balance in the opening window) | M | `runes` |
+| A3 runes and opening | E1, E2 (E1 for the gold and XP balance in the opening window); the `RUNE_ADVANTAGE` fight reason also needs A1 | M | `runes` |
 | A4 laning stage | E1, E2, L1 | L | `lanes` |
 | A5 item efficiency | E1, E3 | L | `items` |
 | A6 team behaviour | A1, A4 reviewed | L | `behaviour` (outline only) |
@@ -128,8 +128,13 @@ Two parts of the first draft of this plan were wrong and are fixed here: per-min
 
 ## 9. A3: runes and the pre-game fight
 
-- **Goal:** who takes the first runes, who takes the contested ones, and the first fight around 0:00: the bounty runes at the start, kills in a window around the rune spawn (pre-horn kills count; first guess -30 s to +90 s, a property). Rune weights are first guesses: bounty 1.0, power and water 0.5, and which team came out ahead.
+- **Goal:** who takes the first runes, who takes the contested ones, and the first fight around 0:00: the bounty runes at the start, kills in a window around the rune spawn (pre-horn kills count; first guess -30 s to +90 s, a property). Which team came out ahead is decided from kills, gold and XP, not from rune weights.
 - **Data:** `rune_event` (time, type, slot) from OpenDota `runes_log`; the hero position at the pickup from the track; kills from the DEATH rows in the window; gold and XP per team in the window.
+- **Rune meaning (owner decision, 2026-10-13):**
+  - **Bounty runes** mean gold: they count as team gold in the statistics (gold per team and per hero from runes, in the opening and over the game).
+  - **Power runes** matter for the mid lane analysis: they often give the mid laner an advantage (the rune type, who took it, the time, and what the mid lane gold, XP and kills did in the next minutes).
+  - **Water runes** likewise: the heal and mana they give is an advantage for the mid laner in the lane analysis.
+  - **A power rune taken just before a fight** (for example double damage, haste, arcane, invisibility) can be an advantage in that fight and one of the reasons a fight was won: the rune pickup inside the important-fight window (the vision window of A2, first guess 90 s before) becomes a fight factor and a reason code `RUNE_ADVANTAGE` with the rune type and the hero, for the winning side, and `RUNE_DENIED` for the side that missed it. The rune pickup is read from the same `rune_event` rows; the active effect window comes from the rune modifier on the hero when the combat log has it, otherwise a per-rune duration property (first guesses).
 - **Tables:** `rune_pickup` (who, which rune, time, zone) and `opening_summary` per match (runes per team, first taker, kills and gold balance, winner of the opening).
 - **Topic `runes`:** one row per rune and one per opening.
 
@@ -139,7 +144,7 @@ Steps, each with its own table in the topic `lanes`:
 
 1. **Lane assignment:** a hero's lane is the lane zone where he spent most time in the first 2 to 4 minutes (first guess, a property; activity segments plus `MapLayout.zone`). Pair the lanes of the two teams (Radiant safe lane against Dire off lane). Roamers and junglers get "no lane". OpenDota `lane_role` is a cross-check.
 2. **Laning start:** the hero reaches his lane zone (first guess: 0:00 to 1:00, a property).
-3. **Laning end, per hero:** the first time after the start that he is outside his lane for at least 30 s (first guess; jungle, another lane, teleport), or his lane tower falls, or a cap (first guess 9 minutes). The lane ends when all heroes of the pair have left. The 9 minute cap and the 7 to 9 minute typical values are first guesses (properties), so there is no fixed 10 minutes. `PhaseWindows` stays the coarse game phase and is not reused for this.
+3. **Laning end, per hero:** the first time after the start that he is outside his lane for at least 30 s (first guess; jungle, another lane, teleport), or his lane tower falls, or a cap (owner decision: default 15 minutes, a property). The 15 minutes is only a safety cap: the end is found from signals (leaving the lane for 30 s, the tower falling, teleports and jungle farming, the partner leaving, both heroes of the pair outside the lane), typically at about 7 to 9 minutes, so there is no fixed time. The lane ends when all heroes of the pair have left. The signal thresholds are first guesses (properties) tuned in the loop. `PhaseWindows` stays the coarse game phase and is not reused for this.
 4. **Creep stats by value:** a typed creep kill per hero (`creep_kill`: time, unit class, own or enemy side, deny flag, lane or camp). A class value is measured from the GOLD and XP events once the reason is stored (siege gives more than melee or ranged; ancient and large camps differ from small ones). The values live in one validated JSON file, not in code. A deny is scored by the experience it takes from the enemy.
 5. **Lane result:** compare the pair on weighted creep score, denies, XP, level at lane end, kills and deaths inside the lane window, tower damage and tower state. Per lane: WON, LOST or EVEN with the margin; per hero: his share.
 6. **Why** (contributors, the same extension idea as the fight reasons): partner absent or roaming, enemy gank or dive, enemy harassment (hero damage in the lane), a level lead from a rune, a pull or stack, supports present, role and hero matchup (hero constants), item start (Magic Stick, see A5), and how the hero's stats compare with his lane partner.
@@ -176,22 +181,22 @@ The loop runner (`ReviewLoopTopic` with `name()`, `matchList()`, `outputDir()`, 
 
 ## 15. Questions for the owner
 
-Each with the default the plan assumes.
+Each with the default the plan assumes. The owner accepted all defaults on 2026-10-13 except 6, 10 and 14, which carry the owner's answer.
 
 1. Fight importance threshold: a fight is important when the advantage change reaches either 3 percent of the team net worth or 1500 gold (both properties). Default: as written.
 2. Can XP alone make a fight important? Default: no, only together with a gold change.
 3. Lag after a fight when measuring the advantage change: 60 s. Default: 60 s.
 4. Vision window: 90 s before to 15 s after the fight. Default: as written.
 5. Opening window around the rune spawn: -30 s to +90 s. Default: as written.
-6. Do power and water runes count the same as bounty runes? Default: no, bounty 1.0, power and water 0.5 (first guesses).
+6. Do power and water runes count the same as bounty runes? **Owner answer:** bounty runes are gold (team gold in the statistics); power and water runes feed the mid lane analysis (they often give the mid laner an advantage: damage, haste, heal and mana); a power rune taken in the window before a fight can be one of the reasons the fight was won (`RUNE_ADVANTAGE`).
 7. How to rate an opening won only by kills? Default: kills count, but a gold and XP balance is shown beside them.
 8. Where does a tri-lane count, and how is solo mid treated? Default: a tri-lane is one lane with three heroes, solo mid is a lane of one against one.
 9. Which creep classes are weighted first? Default: siege, then ranged, then melee, then camps.
-10. Lane end cap: 9 minutes. Default: 9.
+10. Lane end cap. **Owner answer:** default 15 minutes, but find the end approximately from signals (the cap is only the safety limit).
 11. Item whitelist first entries: Magic Stick, Hand of Midas, one farming group (Battle Fury, Maelstrom, Mjollnir). Default: as written, extended later by JSON.
 12. Is a per-minute advantage series enough for A1, or should a 30 s series be extracted later? Default: per minute.
 13. Order of A3, A4 and A5 after A2. Default: runes, lanes, items.
-14. After the plan is accepted: start Step 0 and E1 to E3 in parallel? Default: yes.
+14. After the plan is accepted: start Step 0 and E1 to E3 in parallel? **Owner answer:** yes, in parallel.
 
 ## 16. Verification
 
