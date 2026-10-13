@@ -17,4 +17,9 @@ public class ItemConstantService extends BaseApiConstantService<ItemConstant> {
   public DotaApiConstant getConstantId() {
     return DotaApiConstant.ITEMS;
   }
+
+  @Override
+  protected int schemaVersion() {
+    return 1;
+  }
 }

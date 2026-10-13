@@ -6,10 +6,12 @@ import com.ako.dbuff.service.replay.ReplayException;
 import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.ReplayParser;
 import com.ako.dbuff.service.replay.ReplayPlayerFact;
+import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -41,7 +43,11 @@ public class ClarityReplayParser implements ReplayParser {
 
   private final Map<Long, DraftReaderFactory> draftReaders;
 
-  public ClarityReplayParser(List<DraftReaderFactory> draftReaders) {
+  private final Set<String> chargeItems;
+
+  public ClarityReplayParser(
+      List<DraftReaderFactory> draftReaders, ReplayProcessingProperties properties) {
+    this.chargeItems = Set.copyOf(properties.getChargeItems());
     this.draftReaders =
         draftReaders.stream()
             .collect(Collectors.toMap(DraftReaderFactory::gameModeId, Function.identity()));
@@ -56,7 +62,7 @@ public class ClarityReplayParser implements ReplayParser {
   public ReplayFacts parse(Path demoFile, GameModeProfile mode, BooleanSupplier cancelled) {
     DraftReaderFactory factory = draftReaders.get(mode.gameModeId());
     DraftReader draftReader = factory == null ? new NoDraftReader() : factory.create();
-    Collector collector = new Collector(cancelled, draftReader);
+    Collector collector = new Collector(cancelled, draftReader, chargeItems);
     try {
       new SimpleRunner(new MappedFileSource(demoFile.toString())).runWith(collector);
     } catch (Exception e) {
@@ -131,12 +137,14 @@ public class ClarityReplayParser implements ReplayParser {
     private MapFacts map;
     private StateRecorder stateRecorder;
     private final DraftReader draftReader;
+    private final Set<String> chargeItems;
     private long ticksSeen;
     private long gameOverTick = -1;
     private final GameClock clock = new GameClock();
 
-    Collector(BooleanSupplier cancelled, DraftReader draftReader) {
+    Collector(BooleanSupplier cancelled, DraftReader draftReader, Set<String> chargeItems) {
       this.cancelled = cancelled;
+      this.chargeItems = chargeItems;
       this.draftReader = draftReader;
     }
 
@@ -198,7 +206,7 @@ public class ClarityReplayParser implements ReplayParser {
     private SampleRecorder recorder() {
       if (recorder == null) {
         recorder = new SampleRecorder(entities);
-        stateRecorder = new StateRecorder(entities, stringTables);
+        stateRecorder = new StateRecorder(entities, stringTables, chargeItems);
         recorder.observe(stateRecorder);
       }
       return recorder;

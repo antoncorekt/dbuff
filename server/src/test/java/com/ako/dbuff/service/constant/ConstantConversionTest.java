@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.converter.ConstantConverter;
 import com.ako.dbuff.dao.repo.ConstantDomainRepo;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import com.ako.dbuff.service.constant.data.ItemConstant;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
@@ -22,6 +23,8 @@ class ConstantConversionTest {
   private final ObjectMapper reader = new ObjectMapper();
   private final HeroConstantService heroService =
       new HeroConstantService(mock(ConstantDomainRepo.class), mock(ConstantFetcherService.class));
+  private final ItemConstantService itemService =
+      new ItemConstantService(mock(ConstantDomainRepo.class), mock(ConstantFetcherService.class));
   private final AbilitiesConstantService abilityService =
       new AbilitiesConstantService(
           mock(ConstantDomainRepo.class), mock(ConstantFetcherService.class));
@@ -118,11 +121,35 @@ class ConstantConversionTest {
   }
 
   @Test
+  void item_keepsRecipeCooldownAndChargesAndReadsFalseAsNoValue() throws Exception {
+    Map<String, ItemConstant> items = itemService.convert(load("constants_items.json"));
+
+    ItemConstant wand = items.get("magic_wand");
+    assertEquals(460L, wand.getCost());
+    assertEquals(List.of("magic_stick", "branches", "branches"), wand.getComponents());
+    assertEquals(true, wand.getCreated());
+    assertEquals(List.of(15.0), wand.getCd());
+    assertNull(wand.getCharges());
+    assertNull(items.get("magic_stick").getComponents());
+    assertEquals(List.of(1.0), items.get("hand_of_midas").getCharges());
+    assertNull(items.get("hand_of_midas").getCd());
+    assertEquals(List.of("gloves"), items.get("hand_of_midas").getComponents());
+    assertEquals(List.of(50.0), items.get("mjollnir").getMc());
+    assertEquals(
+        List.of("pers", "broadsword", "broadsword", "quelling_blade"),
+        items.get("bfury").getComponents());
+    assertEquals(
+        List.of("soul_booster", "tiara_of_selemene"), items.get("octarine_core").getComponents());
+  }
+
+  @Test
   void storedRoundTrip_keepsEveryField() throws Exception {
     Map<String, AbilityConstant> abilities =
         abilityService.convert(load("constants_abilities.json"));
     Map<String, HeroConstant> heroes = heroService.convert(load("constants_heroes.json"));
+    Map<String, ItemConstant> items = itemService.convert(load("constants_items.json"));
 
+    assertEquals(items, itemService.convert(roundTrip(items)));
     assertEquals(abilities, abilityService.convert(roundTrip(abilities)));
     assertEquals(heroes, heroService.convert(roundTrip(heroes)));
   }
@@ -146,6 +173,13 @@ class ConstantConversionTest {
     assertEquals("Blink", ability.getDname());
     assertNull(ability.getCd());
     assertNull(ability.getAttrib());
+
+    Map<String, Object> legacyItems =
+        reader.readValue(
+            "{\"blink\":{\"id\":1,\"dname\":\"Blink Dagger\"}}", new TypeReference<>() {});
+    ItemConstant item = itemService.convert(legacyItems).get("blink");
+    assertNull(item.getComponents());
+    assertNull(item.getCd());
   }
 
   private Map<String, Object> roundTrip(Map<String, ?> converted) {
