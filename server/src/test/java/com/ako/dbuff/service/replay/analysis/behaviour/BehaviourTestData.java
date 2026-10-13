@@ -32,6 +32,17 @@ final class BehaviourTestData {
     return new Trace(0, STEP, xs, new int[SAMPLES], level, flags);
   }
 
+  /** Like {@link #trace} with {@code samples} samples, one every {@link #STEP} seconds. */
+  static Trace trace(int samples, IntUnaryOperator x, IntUnaryOperator dead) {
+    int[] xs = new int[samples];
+    int[] flags = new int[samples];
+    int[] level = new int[samples];
+    Arrays.setAll(xs, x::applyAsInt);
+    Arrays.setAll(flags, i -> dead.applyAsInt(i) == 1 ? 0 : 1);
+    Arrays.fill(level, 6);
+    return new Trace(0, STEP, xs, new int[samples], level, flags);
+  }
+
   static Trace stayingAt(int x) {
     return trace(i -> x, i -> 0);
   }

@@ -2,7 +2,9 @@ package com.ako.dbuff.service.replay.behaviourloop;
 
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
+import com.ako.dbuff.dao.model.TeamLaneSwapDomain;
 import com.ako.dbuff.dao.model.TeamRotationDomain;
+import com.ako.dbuff.dao.model.TeamSplitStretchDomain;
 import com.ako.dbuff.service.replay.analysis.behaviour.BehaviourProperties;
 import com.ako.dbuff.service.replay.behaviourloop.BehaviourLoopReport.MatchData;
 import java.util.List;
@@ -52,6 +54,9 @@ class BehaviourLoopReportTest {
                 .zone("LANE")
                 .lane("TOP")
                 .build()),
+        List.of(),
+        List.of(),
+        Map.of(),
         new BehaviourProperties());
   }
 
@@ -142,5 +147,77 @@ class BehaviourLoopReportTest {
   void render_noRotationsIsASummaryLine() {
     assertThat(BehaviourLoopReport.render(data(List.of())))
         .contains("**Summary:** no rotations stored");
+  }
+
+  private static MatchData withSections(
+      List<TeamSplitStretchDomain> stretches,
+      List<TeamLaneSwapDomain> swaps,
+      Map<Long, Integer> roles) {
+    MatchData base = data(List.of());
+    return new MatchData(
+        base.matchId(),
+        base.match(),
+        base.modeName(),
+        base.heroNames(),
+        base.rotations(),
+        base.fights(),
+        stretches,
+        swaps,
+        roles,
+        base.properties());
+  }
+
+  @Test
+  void render_tellsAStretchInPlainWordsWithTheVerdictColumnEmptyAndLast() {
+    String report =
+        BehaviourLoopReport.render(
+            withSections(
+                List.of(
+                    TeamSplitStretchDomain.builder()
+                        .team("RADIANT")
+                        .startSeconds(1080)
+                        .endSeconds(1410)
+                        .label("SPLIT")
+                        .towersLost(2)
+                        .towersTaken(0)
+                        .heroesLost(1)
+                        .kills(0)
+                        .build()),
+                List.of(),
+                Map.of()));
+
+    assertThat(report)
+        .contains("## Group or split")
+        .contains("| stretch | how the team stood | what happened | owner verdict |")
+        .contains("| Radiant 18:00 to 23:30 | split up | lost 2 towers, 1 of its heroes died | |")
+        .contains("**Summary:** no rotations stored")
+        .contains("1 stretches (0 together, 1 split up, 0 mixed); no lane swaps.")
+        .doesNotContain("SPLIT");
+  }
+
+  @Test
+  void render_tellsALaneSwapWithTheHeroTheRoleAndTheClock() {
+    String report =
+        BehaviourLoopReport.render(
+            withSections(
+                List.of(),
+                List.of(
+                    TeamLaneSwapDomain.builder()
+                        .team("DIRE")
+                        .playerSlot(128L)
+                        .laneBefore("TOP")
+                        .laneAfter("MID")
+                        .fromSeconds(540)
+                        .toSeconds(715)
+                        .build()),
+                Map.of(128L, 3)));
+
+    assertThat(report)
+        .contains("## Lane swaps")
+        .contains(
+            "| Dire Mirana at 9:00 | Dire moved Mirana (3 offlane) from the top lane to the mid"
+                + " lane at 9:00 (in it until 11:55) | |")
+        .contains("1 lane swap.")
+        .doesNotContain("TOP");
   }
 }

@@ -26,8 +26,6 @@ import java.util.stream.Stream;
  * rotation, and is dropped.
  */
 public final class AwayTrips {
-  private static final int ALIVE_BIT = 1;
-
   /**
    * @param traces the team's samples by player slot
    * @param activity the stored activity segments by slot, in time order
@@ -90,8 +88,8 @@ public final class AwayTrips {
     Set<Long> respawning = new HashSet<>();
     List<Long> slots = in.traces().keySet().stream().sorted().toList();
     for (int t = from; t <= to; t += step) {
-      Map<Long, Point> alive = alivePositions(in.traces(), t);
-      Set<Long> present = presentSlots(in.traces(), t);
+      Map<Long, Point> alive = TraceSamples.alive(in.traces(), t);
+      Set<Long> present = TraceSamples.present(in.traces(), t);
       Optional<TeamCluster> cluster = clusters.find(alive);
       for (Long slot : slots) {
         Point at = alive.get(slot);
@@ -102,7 +100,7 @@ public final class AwayTrips {
             cluster.isPresent()
                 && at != null
                 && !cluster.get().members().contains(slot)
-                && !farmingJungle(in.activity().get(slot), t);
+                && !TraceSamples.farmingJungle(in.activity().get(slot), t);
         Open o = open.get(slot);
         if (away) {
           Zone here = zones.at(at.x(), at.y());
@@ -158,7 +156,7 @@ public final class AwayTrips {
     if (cluster.isEmpty()) {
       return End.NO_GROUP;
     }
-    return farmingJungle(activity, time) ? End.FARMING : End.REJOINED;
+    return TraceSamples.farmingJungle(activity, time) ? End.FARMING : End.REJOINED;
   }
 
   private void close(
@@ -208,46 +206,6 @@ public final class AwayTrips {
       }
     }
     return endSeconds;
-  }
-
-  private Set<Long> presentSlots(Map<Long, Trace> traces, int time) {
-    Set<Long> present = new HashSet<>();
-    traces.forEach(
-        (slot, trace) -> {
-          int i = Math.round((float) (time - trace.startSeconds()) / trace.stepSeconds());
-          if (i >= 0 && i < trace.x().length && trace.level()[i] > 0) {
-            present.add(slot);
-          }
-        });
-    return present;
-  }
-
-  private Map<Long, Point> alivePositions(Map<Long, Trace> traces, int time) {
-    Map<Long, Point> alive = new HashMap<>();
-    traces.forEach(
-        (slot, trace) -> {
-          int i = Math.round((float) (time - trace.startSeconds()) / trace.stepSeconds());
-          if (i >= 0
-              && i < trace.x().length
-              && trace.level()[i] > 0
-              && (trace.flags()[i] & ALIVE_BIT) != 0) {
-            alive.put(slot, new Point(trace.x()[i], trace.y()[i]));
-          }
-        });
-    return alive;
-  }
-
-  private static boolean farmingJungle(List<ActivitySegment> segments, int time) {
-    return segmentAt(segments, time).map(s -> s.activity() == Activity.JUNGLE_FARM).orElse(false);
-  }
-
-  private static Optional<ActivitySegment> segmentAt(List<ActivitySegment> segments, int time) {
-    if (segments == null) {
-      return Optional.empty();
-    }
-    return segments.stream()
-        .filter(s -> s.startSeconds() <= time && time < s.endSeconds())
-        .findFirst();
   }
 
   private static boolean teleportEnded(List<ActivitySegment> segments, int start, int end) {

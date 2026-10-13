@@ -3,16 +3,12 @@ package com.ako.dbuff.service.replay.analysis.behaviour;
 import com.ako.dbuff.dao.model.BuildingKillContextDomain;
 import com.ako.dbuff.dao.model.CreepKillDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
-import com.ako.dbuff.dao.model.LaneAssignmentDomain;
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
 import com.ako.dbuff.dao.model.TeamRotationDomain;
 import com.ako.dbuff.dao.repo.BuildingKillContextRepo;
-import com.ako.dbuff.dao.repo.BuybackEventRepo;
 import com.ako.dbuff.dao.repo.CreepKillRepo;
-import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
-import com.ako.dbuff.dao.repo.LaneAssignmentRepo;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.TeamRotationRepo;
@@ -25,7 +21,6 @@ import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
 import com.ako.dbuff.service.replay.analysis.building.BuildingName;
 import com.ako.dbuff.service.replay.analysis.fight.FightAssessor.Trace;
-import com.ako.dbuff.service.replay.analysis.fight.PlayerTraces;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
 import com.ako.dbuff.service.replay.analysis.lane.TimelineSeries;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
@@ -41,7 +36,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.ToDoubleFunction;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -62,13 +56,12 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
   private static final String TOWER_KIND = "TOWER";
 
   private final MatchMapLayout matchMapLayout;
-  private final PlayerTraces playerTraces;
+  private final SlotTraces slotTraces;
   private final StoredActivity activity;
   private final ReplayPlayerRepo playerRepo;
   private final CombatLogReader combatLog;
-  private final DeathAnalysisRepo deathRepo;
-  private final BuybackEventRepo buybackRepo;
-  private final LaneAssignmentRepo laneRepo;
+  private final StoredEventTimes eventTimes;
+  private final StoredLaneSlots laneSlots;
   private final CreepKillRepo creepRepo;
   private final PlayerTimelineRepo timelineRepo;
   private final BuildingKillContextRepo buildingRepo;
@@ -112,10 +105,7 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
       log.info("Match {} was not played on the frozen map layout, no rotations stored", matchId);
       return;
     }
-    Map<Long, Trace> traces = new HashMap<>();
-    playerTraces
-        .load(matchId)
-        .forEach((index, trace) -> traces.put(PlayerSlots.slot(index), trace));
+    Map<Long, Trace> traces = slotTraces.of(matchId);
     if (traces.isEmpty()) {
       return;
     }
@@ -138,9 +128,9 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
     return new RotationFinder.Inputs(
         traces,
         activity.bySlot(matchId),
-        deaths(matchId),
-        buybacks(matchId),
-        lanes(matchId),
+        eventTimes.deaths(matchId),
+        eventTimes.buybacks(matchId),
+        laneSlots.of(matchId),
         new TripOutcomes.Events(kills(events, slotByHero), creeps(matchId), fights(matchId)),
         midGame(matchId, events, slotByHero));
   }
@@ -186,50 +176,6 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
           .ifPresent(b -> hits.add(new DamageHit(slot, e.gameSecond(), true)));
     }
     return hits;
-  }
-
-  private Map<Long, List<Double>> deaths(long matchId) {
-    return timesBySlot(
-        deathRepo.findByMatchId(matchId).stream()
-            .filter(d -> !Boolean.TRUE.equals(d.getReincarnated()))
-            .map(d -> new SlotTime(d.getPlayerSlot(), d.getDeathSeconds())));
-  }
-
-  private Map<Long, List<Double>> buybacks(long matchId) {
-    return timesBySlot(
-        buybackRepo.findByMatchId(matchId).stream()
-            .map(b -> new SlotTime(b.getPlayerSlot(), b.getSeconds())));
-  }
-
-  private record SlotTime(Long slot, Double seconds) {}
-
-  private static Map<Long, List<Double>> timesBySlot(Stream<SlotTime> times) {
-    Map<Long, List<Double>> bySlot = new HashMap<>();
-    times
-        .filter(t -> t.slot() != null && t.seconds() != null)
-        .forEach(t -> bySlot.computeIfAbsent(t.slot(), s -> new ArrayList<>()).add(t.seconds()));
-    bySlot.values().forEach(list -> list.sort(Double::compare));
-    return bySlot;
-  }
-
-  private List<LaneSlot> lanes(long matchId) {
-    List<LaneSlot> lanes = new ArrayList<>();
-    for (LaneAssignmentDomain a : laneRepo.findByMatchId(matchId)) {
-      Zone.Lane lane = a.getLane() == null ? null : Enums.find(Zone.Lane.class, a.getLane());
-      if (lane != null
-          && a.getPlayerSlot() != null
-          && a.getStartSeconds() != null
-          && a.getEndSeconds() != null) {
-        lanes.add(
-            new LaneSlot(
-                a.getPlayerSlot(),
-                TeamSide.ofSlot(a.getPlayerSlot()),
-                lane,
-                a.getStartSeconds(),
-                a.getEndSeconds()));
-      }
-    }
-    return lanes;
   }
 
   private static Map<Long, List<Double>> kills(
