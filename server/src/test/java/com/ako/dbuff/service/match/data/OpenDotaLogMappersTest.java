@@ -12,6 +12,7 @@ import com.ako.dbuff.dao.repo.WardEventRepo;
 import com.ako.dbuff.dotapi.invoker.JSON;
 import com.ako.dbuff.dotapi.model.MatchResponse;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInner;
+import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerRunesLogInner;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -191,6 +192,53 @@ class OpenDotaLogMappersTest {
     service.replace(bare, match);
 
     assertThat(runeRepo.count() + wardRepo.count() + killRepo.count()).isZero();
+  }
+
+  @Test
+  void anObserverAndASentryWithTheSameHandleAndSecondAreKeptApart() {
+    MatchResponsePlayersInner player = new MatchResponsePlayersInner().playerSlot(0L);
+    player.setObsLog(List.of(placement(100, 7)));
+    player.setSenLog(List.of(placement(100, 7)));
+    player.setSenLeftLog(List.of(removal(130, 7, "npc_dota_hero_a")));
+    MatchResponse response = new MatchResponse();
+    response.setPlayers(List.of(player));
+
+    service.replace(response, match);
+
+    assertThat(wardRepo.findByMatchId(MATCH_ID))
+        .extracting(
+            WardEventDomain::getWardIndex,
+            WardEventDomain::getWardKind,
+            WardEventDomain::getRemovedTime,
+            WardEventDomain::getRemovalKind)
+        .containsExactlyInAnyOrder(
+            tuple(0, WardKind.OBSERVER, null, WardRemovalKind.UNKNOWN),
+            tuple(1, WardKind.SENTRY, 130L, WardRemovalKind.KILLED));
+  }
+
+  @Test
+  void entriesWithoutATimeOrANumericKeyOrCountAreSkipped() {
+    MatchResponsePlayersInner player = new MatchResponsePlayersInner().playerSlot(0L);
+    player.setRunesLog(List.of(rune(10L, "5"), rune(null, "5"), rune(20L, "x"), rune(30L, "8")));
+    player.setKilled(Map.of("npc_dota_creep_a", 3, "npc_dota_creep_b", "many"));
+    MatchResponse response = new MatchResponse();
+    response.setPlayers(List.of(player));
+
+    service.replace(response, match);
+
+    assertThat(runeRepo.findByMatchId(MATCH_ID))
+        .extracting(RuneEventDomain::getRuneIndex, RuneEventDomain::getRuneType)
+        .containsExactlyInAnyOrder(tuple(0, 5), tuple(1, 8));
+    assertThat(killRepo.findByMatchId(MATCH_ID))
+        .extracting(UnitKillDomain::getUnitName)
+        .containsExactly("npc_dota_creep_a");
+  }
+
+  private static MatchResponsePlayersInnerRunesLogInner rune(Long time, String key) {
+    MatchResponsePlayersInnerRunesLogInner rune = new MatchResponsePlayersInnerRunesLogInner();
+    rune.setTime(time);
+    rune.setKey(key);
+    return rune;
   }
 
   private static Map<String, Object> placement(long time, long handle) {

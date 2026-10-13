@@ -3,47 +3,40 @@ package com.ako.dbuff.service.match.data;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.RuneEventDomain;
 import com.ako.dbuff.dao.repo.RuneEventRepo;
-import com.ako.dbuff.dotapi.model.MatchResponse;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInner;
 import com.ako.dbuff.dotapi.model.MatchResponsePlayersInnerRunesLogInner;
 import java.util.ArrayList;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.stereotype.Component;
 
+/** Entries without a time or a numeric rune code are skipped and do not use up an index. */
 @Component
-@RequiredArgsConstructor
-public class RuneEventMapper implements MatchDetailMapper {
+public class RuneEventMapper extends PlayerLogMapper<RuneEventDomain> {
 
-  private final RuneEventRepo repo;
-
-  @Override
-  public void map(MatchResponse response, MatchDomain match) {
-    List<RuneEventDomain> rows = new ArrayList<>();
-    for (MatchResponsePlayersInner player : CollectionUtils.emptyIfNull(response.getPlayers())) {
-      if (player.getPlayerSlot() == null) {
-        continue;
-      }
-      List<MatchResponsePlayersInnerRunesLogInner> runes = player.getRunesLog();
-      for (int i = 0; runes != null && i < runes.size(); i++) {
-        MatchResponsePlayersInnerRunesLogInner rune = runes.get(i);
-        rows.add(
-            RuneEventDomain.builder()
-                .matchId(match.getId())
-                .playerSlot(player.getPlayerSlot())
-                .playerId(MatchPayload.playerIdOf(player))
-                .runeIndex(i)
-                .eventTime(rune.getTime())
-                .runeType(MatchPayload.asInt(rune.getKey()))
-                .build());
-      }
-    }
-    repo.saveAll(rows);
+  public RuneEventMapper(RuneEventRepo repo) {
+    super(repo);
   }
 
   @Override
-  public void deleteByMatchId(long matchId) {
-    repo.deleteByMatchId(matchId);
+  List<RuneEventDomain> rowsOf(MatchResponsePlayersInner player, MatchDomain match) {
+    List<RuneEventDomain> rows = new ArrayList<>();
+    for (MatchResponsePlayersInnerRunesLogInner rune :
+        CollectionUtils.emptyIfNull(player.getRunesLog())) {
+      Integer type = MatchPayload.asInt(rune.getKey());
+      if (rune.getTime() == null || type == null) {
+        continue;
+      }
+      rows.add(
+          RuneEventDomain.builder()
+              .matchId(match.getId())
+              .playerSlot(player.getPlayerSlot())
+              .playerId(MatchPayload.playerIdOf(player))
+              .runeIndex(rows.size())
+              .eventTime(rune.getTime())
+              .runeType(type)
+              .build());
+    }
+    return rows;
   }
 }
