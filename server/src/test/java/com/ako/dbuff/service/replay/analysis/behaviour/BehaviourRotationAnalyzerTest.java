@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis.behaviour;
 
+import com.ako.dbuff.dao.model.BuildingKillContextDomain;
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.ReplayCombatLogDomain;
@@ -7,6 +8,7 @@ import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.model.TeamRotationDomain;
+import com.ako.dbuff.dao.repo.BuildingKillContextRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.ReplayCombatLogRepo;
@@ -60,6 +62,7 @@ class BehaviourRotationAnalyzerTest {
   @Autowired private FightRepo fightRepo;
   @Autowired private FightPlayerRepo fightPlayerRepo;
   @Autowired private TeamRotationRepo rotationRepo;
+  @Autowired private BuildingKillContextRepo buildingRepo;
 
   @Test
   void analyze_storesTheRotationOfAHeroWhoLeftTheGroupAndTookPartInAWonFight() {
@@ -77,7 +80,25 @@ class BehaviourRotationAnalyzerTest {
     assertThat(row.getFights()).isEqualTo(1);
     assertThat(row.getFightsWon()).isEqualTo(1);
     assertThat(row.getVerdict()).isEqualTo("GOOD");
-    assertThat(row.getAnalysisVersion()).isEqualTo(1);
+    assertThat(row.getReasons()).isEqualTo("DID_NOTHING");
+    assertThat(row.getAnalysisVersion()).isEqualTo(2);
+  }
+
+  @Test
+  void analyze_storesAnOwnTowerLostWhileAwayAsAReason() {
+    stored(layouts.frozenVersion());
+    buildingRepo.saveAndFlush(
+        BuildingKillContextDomain.builder()
+            .matchId(MATCH)
+            .kind("TOWER")
+            .ownerTeam("RADIANT")
+            .seconds(50.0)
+            .build());
+
+    analyzer.analyze(MATCH);
+
+    assertThat(rotationRepo.findAll().getFirst().getReasons())
+        .isEqualTo("DID_NOTHING,TOWER_LOST_WHILE_AWAY");
   }
 
   @Test

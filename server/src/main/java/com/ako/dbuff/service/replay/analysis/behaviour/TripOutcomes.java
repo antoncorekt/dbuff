@@ -23,7 +23,7 @@ public final class TripOutcomes {
 
   public TripOutcome of(AwayTrip trip, TeamSide team, Events events) {
     double from = trip.arrivalSeconds();
-    double to = trip.endSeconds() + linger(trip);
+    double to = tailEnd(trip);
     int kills =
         (int)
             events.kills().getOrDefault(trip.slot(), List.of()).stream()
@@ -41,6 +41,11 @@ public final class TripOutcomes {
             .toList();
     List<FightFact> won = taken.stream().filter(f -> team.name().equals(f.winner())).toList();
     return new TripOutcome(kills, creeps, taken.size(), won.size(), keyFight(taken, won));
+  }
+
+  /** The second up to which what he did still belongs to the trip. */
+  public double tailEnd(AwayTrip trip) {
+    return trip.endSeconds() + linger(trip);
   }
 
   /** A trip that joined the group or ended in a death has no tail: what follows is the group's. */

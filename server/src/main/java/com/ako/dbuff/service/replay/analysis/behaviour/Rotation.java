@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.analysis.behaviour;
 
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.map.Zone;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -15,4 +16,6 @@ public record Rotation(
     Zone.Lane laneLeft,
     TripOutcome outcome,
     Optional<LaneProxy.Result> proxy,
+    Optional<Income> income,
+    List<RotationReason> reasons,
     RotationVerdict verdict) {}
