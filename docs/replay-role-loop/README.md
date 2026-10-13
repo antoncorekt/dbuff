@@ -36,10 +36,10 @@ Replay processing and the Discord report stay off in the application; the task n
 
 `server/build/role-loop/round-NN/` has one `<matchId>.md` per match and a `summary.md`:
 
-- header: match, mode, date, score, winner;
-- the `Roles` table (slot, hero, intent role, final role) and the `Verdicts` table (team, stage PICK or FINAL, tokens), which are what the diff compares;
-- per player: hero, drafted skills, the intent and final stage (role, confidence, `fitRole`, lane, `roleScores`, the nine functions with `unknown` where nothing tells them, evidence), and OpenDota's `position_est`, `lane_role` and net worth rank for comparison;
-- per team: the PICK and FINAL verdict, tokens and summary.
+- header: match, mode, date, score, winner; then a "how to read this" line and a one-line summary (players, how many ended in another role than the draft meant, team verdicts with findings), in the layout of `docs/replay-review-loop.md` ("Making a report easy to read");
+- the `Roles` table (player as "Mirana (Radiant)", final role, intent role, the best fits of the final and of the intent stage as "carry 1.50, mid 0.20, offlane 0.10", and empty `assistant` and `owner` columns) and the `Verdicts` table ("Radiant at the pick" or "Radiant final", findings in words such as "3 carries, no initiator", and the empty verdict columns), which are what the diff compares; roles are written as "1 carry", "2 mid", "3 offlane", "4 soft support", "5 hard support";
+- per player: drafted skills by name, the intent and final stage (role, confidence, best fit, lane, all five scores, the nine functions in words with `unknown` where nothing tells them, evidence), and OpenDota's position, lane role and net worth rank for comparison;
+- per team: the pick and final verdict, findings and summary.
 
 A match of a mode with no resolver says "No roles stored (no resolver for this mode)". An All Pick match has only FINAL rows and says there is no intent and no PICK verdict, instead of printing blanks.
 
@@ -49,7 +49,7 @@ One match that cannot be reported (no fixture, a failed replay run, an error) ge
 
 ## Recording a round
 
-Copy `round-template.md` to `docs/replay-role-loop/round-NN.md` (same NN as the reports) and commit it. One row per player, `match | slot | hero | intent | final | expected | assistant | owner | comment`, and a second table for the team verdicts. `assistant` and `owner` are `OK` or `REJECT`; `expected` is filled for a reject.
+Copy `round-template.md` to `docs/replay-role-loop/round-NN.md` (same NN as the reports) and commit it. One row per player, `match | player | intent | final | expected | assistant | owner | comment`, and a second table for the team verdicts. `assistant` and `owner` are `OK` or `REJECT`; `expected` is filled for a reject.
 
 1. Run the task. The assistant reviews the reports and fills the `assistant` column.
 2. The assistant changes weights, rules or tags to fix the rejects, notes the change in the round file, and runs again (the next round number).

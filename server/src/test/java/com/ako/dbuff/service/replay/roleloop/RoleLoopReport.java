@@ -5,8 +5,8 @@ import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerRoleDomain;
 import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
-import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.model.TeamCompositionDomain;
+import com.ako.dbuff.service.replay.looprunner.LoopWording;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -16,12 +16,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * The review report of one stored match, as markdown. It only lays out what the tables hold; the
  * two tables headed {@link #ROLES} and {@link #VERDICTS} are what {@link RoleLoopTopic} lets the
- * loop compare between rounds.
+ * loop compare between rounds. The verdict columns are left empty for the reviewers.
  */
 final class RoleLoopReport {
   static final String ROLES = "Roles";
@@ -31,14 +30,19 @@ final class RoleLoopReport {
   private static final List<String> TEAMS = List.of("RADIANT", "DIRE");
   private static final List<String> VERDICT_STAGES = List.of("PICK", "FINAL");
   private static final int FIRST_DIRE_SLOT = 5;
-  private static final int BEST_FITS = 3;
+  private static final String HOW_TO_READ =
+      "\"Roles\" gives each player's role in the game (final) and the role the draft meant"
+          + " (intent, n/a where the mode has none), then the roles that suited the player best by"
+          + " score. Roles are the usual positions: 1 carry, 2 mid, 3 offlane, 4 soft support, 5"
+          + " hard support. \"Verdicts\" says what each team lacked or had too much of, at the"
+          + " pick and at the end. Write OK or REJECT in the assistant and owner columns.";
 
   record MatchData(
       long matchId,
       MatchDomain match,
       String modeName,
       List<PlayerMatchStatisticDomain> stats,
-      List<ReplayPlayerDomain> replayPlayers,
+      Map<Long, String> heroNames,
       List<PlayerRoleDomain> roles,
       List<PlayerRoleProfileDomain> profiles,
       List<TeamCompositionDomain> compositions,
@@ -54,17 +58,20 @@ final class RoleLoopReport {
       out.add("**No player statistics stored.**");
       return String.join("\n", out) + "\n";
     }
+    out.addAll(ReviewLoopReport.introduction(HOW_TO_READ, summary(d)));
+    out.add("");
     boolean noProfiles = d.profiles().isEmpty() && d.roles().isEmpty();
     boolean noIntent = d.profiles().stream().noneMatch(p -> "INTENT".equals(p.getStage()));
     if (noProfiles) {
       out.add("**No roles stored (no resolver for this mode).**");
+      out.add("");
     } else if (noIntent) {
       out.add(
           "**No intent rows: this mode's resolver gives final roles only, so intent shows "
               + NO_INTENT
-              + " and there is no PICK verdict.**");
+              + " and there is no pick verdict.**");
+      out.add("");
     }
-    out.add("");
     out.addAll(rolesTable(d));
     out.add("");
     out.addAll(verdictsTable(d));
@@ -87,61 +94,94 @@ final class RoleLoopReport {
     return String.join("\n", out) + "\n";
   }
 
+  private static String summary(MatchData d) {
+    long different =
+        d.stats().stream()
+            .filter(
+                s -> {
+                  Optional<Integer> intent =
+                      stage(d, s.getPlayerSlot(), "INTENT").map(PlayerRoleProfileDomain::getRole);
+                  Optional<Integer> last =
+                      stage(d, s.getPlayerSlot(), "FINAL").map(PlayerRoleProfileDomain::getRole);
+                  return intent.isPresent() && last.isPresent() && !intent.equals(last);
+                })
+            .count();
+    long withFindings =
+        d.compositions().stream()
+            .filter(c -> c.getTokens() != null && !c.getTokens().isBlank())
+            .count();
+    boolean noIntent = d.profiles().stream().noneMatch(p -> "INTENT".equals(p.getStage()));
+    return "%d players, %s; %d of %d team verdicts have findings."
+        .formatted(
+            d.stats().size(),
+            noIntent
+                ? "no draft intent in this mode"
+                : different + " of them ended in another role than the draft meant",
+            withFindings,
+            d.compositions().size());
+  }
+
   private static List<String> rolesTable(MatchData d) {
     List<String> rows =
         new ArrayList<>(
             List.of(
-                "## " + ROLES, "", "| slot | hero | intent | final | intent fit | final fit |"));
-    rows.add("|---|---|---|---|---|---|");
+                "## " + ROLES,
+                "",
+                "| player | final role | intent role | final fit | intent fit | assistant | owner"
+                    + " |",
+                "|---|---|---|---|---|---|---|"));
     for (String team : TEAMS) {
       for (PlayerMatchStatisticDomain stat : team(d, team)) {
         long slot = stat.getPlayerSlot();
         rows.add(
-            "| %d | %s | %s | %s | %s | %s |"
+            "| %s | %s | %s | %s | %s | | |"
                 .formatted(
-                    slot,
-                    ReviewLoopReport.tableCell(hero(d, stat)),
-                    stage(d, slot, "INTENT")
-                        .map(p -> String.valueOf(p.getRole()))
-                        .orElse(NO_INTENT),
+                    ReviewLoopReport.tableCell(playerLabel(d, team, slot)),
                     finalRole(d, slot).orElse("none"),
-                    bestFits(stage(d, slot, "INTENT")),
-                    bestFits(stage(d, slot, "FINAL"))));
+                    stage(d, slot, "INTENT")
+                        .map(p -> LoopWording.role(p.getRole()))
+                        .orElse(NO_INTENT),
+                    fit(stage(d, slot, "FINAL")),
+                    fit(stage(d, slot, "INTENT"))));
       }
     }
     return rows;
   }
 
-  /**
-   * The three roles with the best scores of a stage, so a role left over by the assignment shows.
-   */
-  private static String bestFits(Optional<PlayerRoleProfileDomain> profile) {
+  private static String playerLabel(MatchData d, String team, long slot) {
+    return "%s (%s)".formatted(LoopWording.hero(d.heroNames(), slot), LoopWording.team(team));
+  }
+
+  /** The best scores of a stage, so a role left over by the assignment shows. */
+  private static String fit(Optional<PlayerRoleProfileDomain> profile) {
     String scores = profile.map(PlayerRoleProfileDomain::getRoleScores).orElse(null);
-    if (scores == null || scores.isBlank()) {
-      return NO_INTENT;
-    }
-    String[] parts = scores.split(",");
-    return IntStream.range(0, parts.length)
-        .boxed()
-        .sorted(Comparator.comparingDouble((Integer i) -> -Double.parseDouble(parts[i])))
-        .limit(BEST_FITS)
-        .map(i -> "%d(%s)".formatted(i + 1, parts[i].strip()))
-        .collect(Collectors.joining(" "));
+    return scores == null || scores.isBlank() ? NO_INTENT : LoopWording.bestFits(scores);
+  }
+
+  private static String stageName(String stage) {
+    return "PICK".equals(stage) ? "at the pick" : "final";
   }
 
   private static List<String> verdictsTable(MatchData d) {
     List<String> rows =
         new ArrayList<>(
-            List.of("## " + VERDICTS, "", "| team | stage | tokens |", "|---|---|---|"));
+            List.of(
+                "## " + VERDICTS,
+                "",
+                "| team verdict | findings | assistant | owner |",
+                "|---|---|---|---|"));
     for (String team : TEAMS) {
       for (String stage : VERDICT_STAGES) {
         rows.add(
-            "| %s | %s | %s |"
+            "| %s %s | %s | | |"
                 .formatted(
-                    team,
-                    stage,
+                    LoopWording.team(team),
+                    stageName(stage),
                     composition(d, team, stage)
-                        .map(c -> ReviewLoopReport.tableCell(blankAs(c.getTokens(), "no findings")))
+                        .map(
+                            c ->
+                                ReviewLoopReport.tableCell(
+                                    LoopWording.tokens(c.getTokens(), "no findings")))
                         .orElse("none stored")));
       }
     }
@@ -151,7 +191,7 @@ final class RoleLoopReport {
   private static List<String> player(MatchData d, String team, PlayerMatchStatisticDomain stat) {
     long slot = stat.getPlayerSlot();
     List<String> out = new ArrayList<>();
-    out.add("### %s slot %d, %s".formatted(team, slot, hero(d, stat)));
+    out.add("### %s".formatted(playerLabel(d, team, slot)));
     out.add(
         "- intent: "
             + stage(d, slot, "INTENT")
@@ -167,40 +207,52 @@ final class RoleLoopReport {
       out.add("- drafted skills: " + String.join(", ", skills));
     }
     out.add(
-        "- OpenDota: position_est %s, lane_role %s, net worth rank %s of %d (net worth %s)"
+        "- OpenDota: position %s, %s, net worth rank %s of %d (net worth %s)"
             .formatted(
                 orQuestion(stat.getPositionEst()),
-                orQuestion(stat.getLaneRole()),
+                LoopWording.laneRole(stat.getLaneRole()),
                 netWorthRank(d, team, stat),
                 team(d, team).size(),
-                orQuestion(stat.getNetWorth())));
+                LoopWording.gold(stat.getNetWorth())));
     return out;
   }
 
   private static String stageLine(PlayerRoleProfileDomain p) {
-    return "role %s (confidence %s), fitRole %s, lane %s%n  - roleScores %s%n  - %s%n  - evidence: %s"
+    return "role %s (confidence %s), best fit %s, lane %s%n  - scores: %s%n  - %s%n  - evidence: %s"
         .formatted(
-            roleText(p.getRole()),
+            LoopWording.role(p.getRole()),
             number(p.getConfidence()),
-            roleText(p.getFitRole()),
-            p.getLane() == null ? "unknown" : p.getLane(),
-            blankAs(p.getRoleScores(), "unknown"),
+            LoopWording.role(p.getFitRole()),
+            p.getLane() == null ? "unknown" : LoopWording.words(p.getLane()),
+            allScores(p.getRoleScores()),
             functions(p),
             blankAs(p.getEvidence(), "none"));
   }
 
+  private static String allScores(String roleScores) {
+    if (roleScores == null || roleScores.isBlank()) {
+      return "unknown";
+    }
+    String[] parts = roleScores.split(",");
+    List<String> scores = new ArrayList<>();
+    for (int i = 0; i < parts.length; i++) {
+      scores.add("%s %s".formatted(LoopWording.role(i + 1), parts[i].strip()));
+    }
+    return String.join(", ", scores);
+  }
+
   private static String functions(PlayerRoleProfileDomain p) {
     Map<String, Double> values = new LinkedHashMap<>();
-    values.put("farmPriority", p.getFarmPriority());
+    values.put("farm priority", p.getFarmPriority());
     values.put("jungle", p.getJungle());
     values.put("roaming", p.getRoaming());
-    values.put("visionDuty", p.getVisionDuty());
+    values.put("vision duty", p.getVisionDuty());
     values.put("initiation", p.getInitiation());
     values.put("disable", p.getDisable());
-    values.put("saveHeal", p.getSaveHeal());
+    values.put("save or heal", p.getSaveHeal());
     values.put("damage", p.getDamage());
     values.put("durability", p.getDurability());
-    return "functions: "
+    return "what the hero does: "
         + values.entrySet().stream()
             .map(e -> e.getKey() + " " + (e.getValue() == null ? "unknown" : number(e.getValue())))
             .collect(Collectors.joining(", "));
@@ -209,13 +261,13 @@ final class RoleLoopReport {
   private static List<String> verdictText(MatchData d, String team, String stage) {
     Optional<TeamCompositionDomain> c = composition(d, team, stage);
     List<String> out = new ArrayList<>();
-    out.add("### %s %s".formatted(team, stage));
+    out.add("### %s %s".formatted(LoopWording.team(team), stageName(stage)));
     if (c.isEmpty()) {
       out.add(
           "none stored"
               + ("PICK".equals(stage) ? " (needs intent rows for all five players)" : ""));
     } else {
-      out.add("tokens: " + blankAs(c.get().getTokens(), "no findings"));
+      out.add("findings: " + LoopWording.tokens(c.get().getTokens(), "no findings"));
       out.add("summary: " + blankAs(c.get().getSummary(), "none"));
     }
     return out;
@@ -236,24 +288,24 @@ final class RoleLoopReport {
 
   private static Optional<String> finalRole(MatchData d, long slot) {
     return stage(d, slot, "FINAL")
-        .map(p -> roleText(p.getRole()))
+        .map(p -> LoopWording.role(p.getRole()))
         .or(
             () ->
                 d.roles().stream()
                     .filter(r -> r.getPlayerSlot() == slot)
                     .findFirst()
-                    .map(r -> roleText(r.getRole())));
-  }
-
-  private static String roleText(Integer role) {
-    return role == null ? "unknown" : String.valueOf(role);
+                    .map(r -> LoopWording.role(r.getRole())));
   }
 
   private static List<String> skills(MatchData d, long slot) {
     return d.picks().stream()
         .filter(p -> p.getPlayerSlot() == slot)
         .sorted(Comparator.comparing(AbilityDraftPickDomain::getPickOrder))
-        .map(p -> p.getAbilityName() != null ? p.getAbilityName() : "ability " + p.getAbilityId())
+        .map(
+            p ->
+                p.getAbilityName() != null
+                    ? LoopWording.ability(p.getAbilityName())
+                    : "ability " + p.getAbilityId())
         .toList();
   }
 
@@ -274,19 +326,6 @@ final class RoleLoopReport {
         .filter(s -> (s.getPlayerSlot() >= FIRST_DIRE_SLOT) == dire)
         .sorted(Comparator.comparing(PlayerMatchStatisticDomain::getPlayerSlot))
         .toList();
-  }
-
-  private static String hero(MatchData d, PlayerMatchStatisticDomain stat) {
-    return d.replayPlayers().stream()
-        .filter(
-            p -> p.getPlayerSlot().equals(stat.getPlayerSlot()) && p.getHeroEntityName() != null)
-        .findFirst()
-        .map(ReplayPlayerDomain::getHeroEntityName)
-        .orElseGet(
-            () ->
-                stat.getHeroName() != null
-                    ? stat.getHeroName()
-                    : "hero " + orQuestion(stat.getHeroId()));
   }
 
   private static String orQuestion(Object value) {

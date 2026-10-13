@@ -5,7 +5,6 @@ import com.ako.dbuff.dao.model.FightExplanationDomain;
 import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.dao.model.GameSpikeDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
-import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.model.TeamfightDomain;
 import com.ako.dbuff.dao.model.TeamfightPlayerDomain;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.LostFight;
@@ -15,6 +14,7 @@ import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.Sw
 import com.ako.dbuff.service.replay.fightloop.FightLoopReport.MatchData;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopDiff;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,7 +50,7 @@ class FightLoopReportTest {
         MatchDomain.builder().id(9L).radiantWin(true).build(),
         "Ability Draft",
         explanation,
-        List.of(ReplayPlayerDomain.builder().playerSlot(128L).heroEntityName("npc_x").build()),
+        Map.of(128L, "Windrunner"),
         List.of(
             TeamfightDomain.builder()
                 .fightIndex(2)
@@ -76,7 +76,7 @@ class FightLoopReportTest {
           .build();
 
   @Test
-  void printsTheLostFightWithTheOpenDotaFactsAndTheRankedReasonWithEmptyVerdictColumns() {
+  void printsTheLostFightInPlainWordsWithTheOpenDotaFactsAndTheRankedReasonWithEmptyVerdicts() {
     String report =
         FightLoopReport.render(
             data(
@@ -86,28 +86,62 @@ class FightLoopReportTest {
                     List.of())));
 
     assertThat(report)
-        .contains("| 0 | 5 | 23:03 | DIRE | 1200 | ? | 1 | #2 | 4 | -1000 |")
+        .contains("| fight | main reason | gold lost | swing | OpenDota teamfight |")
         .contains(
-            "| 0 | 5 | NO_TP | slot 128 (npc_x) | 1 |  | 0.70 | no \\| teleport at start | | |")
-        .contains("### Swing 0, 22:00 to 24:00, 3200 gold");
+            "| Dire lost fight 5 at 23:03 | Windrunner had no teleport | 1.2k | swing 0 |"
+                + " 4 deaths, -1k gold change for the loser |")
+        .contains("| reason | fight | rank | also | severity | assistant | owner |")
+        .contains("| Windrunner had no teleport | Dire lost fight 5 at 23:03 | 1 |  | 0.70 | | |")
+        .contains("### Swing 0, 22:00 to 24:00: Radiant gained 3.2k gold (4.5%), cause: fight win")
+        .contains("**How to read this:**")
+        .contains("**Summary:** 1 lost fight (Dire lost 1); every one has a reason;");
+  }
+
+  @Test
+  void noTableCellShowsAStoredCodeOrAHeroEntityName() {
+    String report =
+        FightLoopReport.render(
+            data(
+                new MatchExplanation(
+                    List.of(
+                        new SwingExplanation(SWING, List.of(lost(5, 0, "DIRE", 1200L, "NO_TP")))),
+                    List.of())));
+
+    assertThat(report.lines().filter(l -> l.startsWith("|")).toList())
+        .noneMatch(l -> l.contains("NO_TP") || l.contains("DIRE") || l.contains("npc_dota"));
+  }
+
+  @Test
+  void theCodeAndTheEvidenceStayUnderTheNotes() {
+    String report =
+        FightLoopReport.render(
+            data(
+                new MatchExplanation(
+                    List.of(
+                        new SwingExplanation(SWING, List.of(lost(5, 0, "DIRE", 1200L, "NO_TP")))),
+                    List.of())));
+
+    assertThat(report)
+        .contains(
+            "- fight 5, Windrunner had no teleport: code NO_TP, evidence: no | teleport at start");
   }
 
   @Test
   void aFightOutsideEverySwingKeepsAPlaceholderSwingAndNoOpenDotaMatchSaysNone() {
     MatchData noOd =
-        data(new MatchExplanation(List.of(), List.of(lost(5, null, "DIRE", null, "X"))));
+        data(new MatchExplanation(List.of(), List.of(lost(5, null, "DIRE", null, "NO_TP"))));
     noOd =
         new MatchData(
             noOd.matchId(),
             noOd.match(),
             noOd.modeName(),
             noOd.explanation(),
-            noOd.replayPlayers(),
+            noOd.heroNames(),
             List.of(),
             List.of());
 
     assertThat(FightLoopReport.render(noOd))
-        .contains("| - | 5 | 23:03 | DIRE | ? | ? | 1 | none | none | none |");
+        .contains("| Dire lost fight 5 at 23:03 | Windrunner had no teleport | ? | none | none |");
   }
 
   @Test
@@ -127,19 +161,20 @@ class FightLoopReportTest {
             FightLoopReport.render(data(second)),
             FightLoopTopic.SECTIONS);
 
-    assertThat(changes).containsExactly("fight 0 5, gold lost: 1200 -> 1500");
+    assertThat(changes).containsExactly("Dire lost fight 5 at 23:03, gold lost: 1.2k -> 1.5k");
   }
 
   @Test
   void ofTwoOverlappingOpenDotaFightsTheOneWithTheMostOverlapIsShown() {
-    MatchData d = data(new MatchExplanation(List.of(), List.of(lost(5, null, "DIRE", null, "X"))));
+    MatchData d =
+        data(new MatchExplanation(List.of(), List.of(lost(5, null, "DIRE", null, "NO_TP"))));
     d =
         new MatchData(
             d.matchId(),
             d.match(),
             d.modeName(),
             d.explanation(),
-            d.replayPlayers(),
+            d.heroNames(),
             List.of(
                 TeamfightDomain.builder()
                     .fightIndex(1)
@@ -155,11 +190,11 @@ class FightLoopReportTest {
                     .build()),
             List.of());
 
-    assertThat(FightLoopReport.render(d)).contains("| #2 | 4 | ? |");
+    assertThat(FightLoopReport.render(d)).contains("| 4 deaths, ? gold change for the loser |");
   }
 
   @Test
-  void anAbsenceEntryListsItsAlsoCodes_andAnEarlyCooldownReasonIsMarkedNotRanked() {
+  void anAbsenceEntryListsItsAlsoReasons_andAnEarlyCooldownReasonIsMarkedNotRanked() {
     LostFight base = lost(5, 0, "DIRE", 1200L, "NO_TP");
     FightReasonDomain cooldown =
         FightReasonDomain.builder()
@@ -190,9 +225,13 @@ class FightLoopReportTest {
                     List.of(new SwingExplanation(SWING, List.of(fight))), List.of())));
 
     assertThat(report)
-        .contains("| NO_TP | slot 128 (npc_x) | 1 | TP_ON_COOLDOWN, SUPPORT_ABSENT | 0.70 |")
         .contains(
-            "| ABILITY_ON_COOLDOWN | slot 128 (npc_x) | not ranked (early fight) |  | 0.40 |");
+            "| Windrunner had no teleport | Dire lost fight 5 at 23:03 | 1 | had the teleport on"
+                + " cooldown, was not in the fight | 0.70 |")
+        .contains(
+            "| Windrunner had E on cooldown | Dire lost fight 5 at 23:03 | not ranked"
+                + " (early fight) |  | 0.40 |")
+        .contains("Windrunner had no teleport (and 1 more)");
   }
 
   @Test

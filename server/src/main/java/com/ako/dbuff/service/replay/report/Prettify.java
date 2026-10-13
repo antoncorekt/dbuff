@@ -5,7 +5,7 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 
 /** Turns the game's internal names into something a person would write. */
-final class Prettify {
+public final class Prettify {
   private static final String HERO_PREFIX = "npc_dota_hero_";
 
   private Prettify() {}
@@ -30,7 +30,7 @@ final class Prettify {
    * {@code item_black_king_bar} to {@code Black King Bar}, {@code sven_storm_bolt} to {@code Sven
    * Storm Bolt}.
    */
-  static String ability(String internal) {
+  public static String ability(String internal) {
     return words(internal.startsWith("item_") ? internal.substring("item_".length()) : internal);
   }
 

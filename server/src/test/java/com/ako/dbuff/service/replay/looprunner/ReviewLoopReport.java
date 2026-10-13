@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.looprunner;
 import com.ako.dbuff.dao.model.MatchDomain;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 
 /** The stand-in report of a match a topic could not report, which is never a diff baseline. */
 public final class ReviewLoopReport {
@@ -53,5 +54,10 @@ public final class ReviewLoopReport {
             m.getRadiantScore() == null ? "?" : m.getRadiantScore(),
             m.getDireScore() == null ? "?" : m.getDireScore(),
             winner);
+  }
+
+  /** The two lines every report opens with after its title: how to read it, and what it found. */
+  public static List<String> introduction(String howToRead, String summary) {
+    return List.of("**How to read this:** " + howToRead, "", "**Summary:** " + summary);
   }
 }

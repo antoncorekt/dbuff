@@ -20,15 +20,18 @@ REPLAY_FIXTURE_DIR=/path/to/replays ./gradlew :server:reviewLoop -Ploop.topic=fi
 docker rm -f fightloop-pg
 ```
 
-The match list is `server/src/test/resources/replay/fight-loop/matches.txt` (the two Ability Draft matches 9038725154 and 9037038717); reports go to `server/build/fight-loop/round-NN/`. Round numbers are per topic.
+The reason sentences are the production `ReasonWording`; the formatter that writes every value is `LoopWording` in the loop runner package. The match list is `server/src/test/resources/replay/fight-loop/matches.txt` (the two Ability Draft matches 9038725154 and 9037038717); reports go to `server/build/fight-loop/round-NN/`. Round numbers are per topic.
 
 ## Output
 
 One `<matchId>.md` per match, and `summary.md` with the diff against the previous round:
 
-- `Lost fights` (compared between rounds): swing, fight, time, loser, gold lost, deaths of the loser with no OpenDota figure matched (`?` when unknown), reasons stored, and the OpenDota fact to compare with: the teamfight that overlaps the fight most (OpenDota needs three deaths, so small fights show `none`), its deaths and the gold delta of the losing team. A fight under a swing the loser's opponent did not benefit from is marked "benefiting side lost".
-- `Reasons` (compared between rounds): swing, fight, code, subject (slot and hero, or the team), rank (or "not ranked (early fight)"), also (the other absence codes the entry stands for), severity, evidence, and empty `assistant` and `owner` columns for the verdicts.
-- `Swings`: each swing's window, gold and cause, and its lost fights.
+Every report follows the layout of `docs/replay-review-loop.md` ("Making a report easy to read"): after the title a "how to read this" line and a one-line summary (the lost fights per side, how many have no reason, the costliest fight), then the tables. Words, not codes: heroes by name ("Windrunner", or "Dire player 2" when unknown), `m:ss`, gold as `1.2k`, Radiant and Dire.
+
+- `Lost fights` (compared between rounds; the first column is the key, for example "Dire lost fight 5 at 23:03"): main reason (the first ranked reason as a sentence, "and N more" when there are others, "no reason found" when none), gold lost (with the deaths that no OpenDota figure was matched to, when there are any), the swing the fight belongs to ("none", or marked when the side the swing favoured lost this fight) and the OpenDota fact to compare with: the teamfight that overlaps the fight most (OpenDota needs three deaths, so small fights show `none`), its deaths and the gold delta of the losing team.
+- `Reasons` (compared between rounds; key: reason and fight): the reason as a sentence ("Windrunner had no teleport"), the fight, rank (or "not ranked (early fight)"), also (the other absence reasons the entry stands for, as phrases), severity, and empty `assistant` and `owner` columns for the verdicts.
+- `Notes behind the reasons`: for each reason the stored code and evidence, for tracing it. This is the only place a stored code appears.
+- `Swings`: each swing's window, the side that gained, its gold and cause in words, and its lost fights.
 
 ## Reviewing
 
