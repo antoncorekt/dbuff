@@ -11,7 +11,7 @@ import java.util.Map;
 final class SmokeEvents {
   static final String ITEM = "item_smoke_of_deceit";
   static final String MODIFIER = "modifier_smoke_of_deceit";
-  private static final String ROSHAN = "npc_dota_roshan";
+  static final String ROSHAN = "npc_dota_roshan";
   private static final double CENTISECONDS = 100.0;
 
   /** A use of the item by the hero of {@code userSlot}. */

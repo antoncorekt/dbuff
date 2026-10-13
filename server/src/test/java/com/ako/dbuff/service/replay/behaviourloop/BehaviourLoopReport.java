@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.behaviourloop;
 
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
+import com.ako.dbuff.dao.model.ObjectiveConversionDomain;
 import com.ako.dbuff.dao.model.SmokeUseDomain;
 import com.ako.dbuff.dao.model.TeamLaneSwapDomain;
 import com.ako.dbuff.dao.model.TeamRotationDomain;
@@ -55,6 +56,7 @@ final class BehaviourLoopReport {
       List<TeamSplitStretchDomain> stretches,
       List<TeamLaneSwapDomain> swaps,
       List<SmokeUseDomain> smokes,
+      List<ObjectiveConversionDomain> objectives,
       Map<Long, Integer> roles,
       BehaviourProperties properties) {}
 
@@ -77,6 +79,8 @@ final class BehaviourLoopReport {
                 + BehaviourSplitSections.summary(d.stretches(), d.swaps())
                 + " Smoke: "
                 + BehaviourSmokeSection.summary(d.smokes())
+                + ". Objectives: "
+                + BehaviourObjectiveSection.summary(d.objectives())
                 + "."));
     out.add("");
     out.addAll(table(d));
@@ -92,6 +96,11 @@ final class BehaviourLoopReport {
     out.add(BehaviourSmokeSection.howToRead(d.properties()));
     out.add("");
     out.addAll(BehaviourSmokeSection.table(d.smokes(), d.heroNames()));
+    out.add("");
+    out.add(BehaviourObjectiveSection.howToRead(d.properties()));
+    out.add("");
+    out.addAll(
+        BehaviourObjectiveSection.table(d.objectives(), d.fights(), d.heroNames(), d.properties()));
     return String.join("\n", out) + "\n";
   }
 

@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.behaviourloop;
 
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
+import com.ako.dbuff.dao.model.ObjectiveConversionDomain;
 import com.ako.dbuff.dao.model.SmokeUseDomain;
 import com.ako.dbuff.dao.model.TeamLaneSwapDomain;
 import com.ako.dbuff.dao.model.TeamRotationDomain;
@@ -55,6 +56,7 @@ class BehaviourLoopReportTest {
                 .zone("LANE")
                 .lane("TOP")
                 .build()),
+        List.of(),
         List.of(),
         List.of(),
         List.of(),
@@ -166,6 +168,7 @@ class BehaviourLoopReportTest {
         stretches,
         swaps,
         base.smokes(),
+        base.objectives(),
         roles,
         base.properties());
   }
@@ -255,6 +258,7 @@ class BehaviourLoopReportTest {
                     .groupDeaths(1)
                     .enemyDeaths(2)
                     .build()),
+            base.objectives(),
             base.roles(),
             base.properties());
 
@@ -276,5 +280,92 @@ class BehaviourLoopReportTest {
   void render_noSmokeIsASummaryPhrase() {
     assertThat(BehaviourLoopReport.render(data(List.of())))
         .contains("Smoke: no smoke uses stored.");
+  }
+
+  private static MatchData withObjectives(List<ObjectiveConversionDomain> objectives) {
+    MatchData base = data(List.of());
+    return new MatchData(
+        base.matchId(),
+        base.match(),
+        base.modeName(),
+        base.heroNames(),
+        base.rotations(),
+        base.fights(),
+        base.stretches(),
+        base.swaps(),
+        base.smokes(),
+        objectives,
+        base.roles(),
+        base.properties());
+  }
+
+  @Test
+  void render_tellsAMissedObjectiveWithTheNearestTowerAndTheDistance() {
+    String report =
+        BehaviourLoopReport.render(
+            withObjectives(
+                List.of(
+                    ObjectiveConversionDomain.builder()
+                        .fightIndex(3)
+                        .winnerTeam("RADIANT")
+                        .result("MISSED")
+                        .winnersAlive(3)
+                        .nearestTower("dota_badguys_tower2_mid")
+                        .towerLane("MID")
+                        .towerDistance(3400)
+                        .nearestHeroSlot(0L)
+                        .heroZone("RIVER")
+                        .build())));
+
+    assertThat(report)
+        .contains("## Objectives after fights")
+        .contains("| fight | who won | result | what happened | owner verdict |")
+        .contains(
+            "| Fight at 12:40 to 13:10 | Radiant | missed | Radiant took nothing in 90 s; nearest"
+                + " enemy tower still standing: tier 2 in the mid lane, 3400 units from Axe (river)"
+                + " at the end of the fight, 3 of the winners alive | |")
+        .contains(
+            "Objectives: 1 won important fight: 0 converted (0 a tower, 0 barracks, 0 the ancient,"
+                + " 0 Roshan), 1 missed.")
+        .doesNotContain("MISSED");
+  }
+
+  @Test
+  void render_tellsATowerAndARoshanKillInPlainWords() {
+    String report =
+        BehaviourLoopReport.render(
+            withObjectives(
+                List.of(
+                    ObjectiveConversionDomain.builder()
+                        .fightIndex(3)
+                        .winnerTeam("DIRE")
+                        .result("CONVERTED")
+                        .objectiveKind("TOWER")
+                        .objectiveKey("npc_dota_goodguys_tower1_top")
+                        .secondsAfter(30)
+                        .build(),
+                    ObjectiveConversionDomain.builder()
+                        .fightIndex(4)
+                        .winnerTeam("RADIANT")
+                        .result("CONVERTED")
+                        .objectiveKind("ROSHAN")
+                        .objectiveKey("npc_dota_roshan")
+                        .secondsAfter(0)
+                        .roshanNearSlots("0")
+                        .roshanCall("GAMBLE")
+                        .build())));
+
+    assertThat(report)
+        .contains(
+            "| converted | Dire took the tier 1 tower in the top lane 30 s after it ended | |")
+        .contains(
+            "| converted | Radiant killed Roshan during the fight; Axe stood at the pit; a gamble,"
+                + " the winner was behind | |");
+  }
+
+  @Test
+  void render_noObjectivesIsASummaryPhrase() {
+    assertThat(BehaviourLoopReport.render(data(List.of())))
+        .contains("Objectives: no objective conversions stored.");
   }
 }

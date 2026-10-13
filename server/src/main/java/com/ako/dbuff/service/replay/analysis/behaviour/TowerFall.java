@@ -14,9 +14,24 @@ import java.util.function.Predicate;
 /**
  * A tower or barracks that fell, with its owner, the lane (null for a building on no lane) and
  * whether its own team denied it.
+ *
+ * @param kind the stored building kind (TOWER, BARRACKS_MELEE, BARRACKS_RANGED, FORT), null when
+ *     not known
+ * @param name the combat log name of the building, null when not known
  */
 public record TowerFall(
-    TeamSide owner, double seconds, Zone.Lane lane, boolean denied, Set<Long> attackers) {
+    TeamSide owner,
+    double seconds,
+    Zone.Lane lane,
+    boolean denied,
+    Set<Long> attackers,
+    String kind,
+    String name) {
+  public TowerFall(
+      TeamSide owner, double seconds, Zone.Lane lane, boolean denied, Set<Long> attackers) {
+    this(owner, seconds, lane, denied, attackers, null, null);
+  }
+
   public TowerFall(TeamSide owner, double seconds, Zone.Lane lane, boolean denied) {
     this(owner, seconds, lane, denied, Set.of());
   }
@@ -51,7 +66,13 @@ public record TowerFall(
     }
     Zone.Lane lane = b.getLane() == null ? null : Enums.find(Zone.Lane.class, b.getLane());
     return new TowerFall(
-        owner, b.getSeconds(), lane, Boolean.TRUE.equals(b.getDenied()), attackers(b));
+        owner,
+        b.getSeconds(),
+        lane,
+        Boolean.TRUE.equals(b.getDenied()),
+        attackers(b),
+        b.getKind(),
+        b.getBuildingName());
   }
 
   private static Set<Long> attackers(BuildingKillContextDomain b) {
