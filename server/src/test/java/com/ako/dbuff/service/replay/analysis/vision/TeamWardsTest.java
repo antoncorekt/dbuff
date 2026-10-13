@@ -28,7 +28,8 @@ class TeamWardsTest {
   }
 
   private static TeamWards radiantAt1000(WardEventDomain... wards) {
-    return TeamWards.at(List.of(wards), TeamSide.RADIANT, 0, 0, 1000, 1020, P);
+    return TeamWards.at(
+        List.of(wards), TeamSide.RADIANT, List.of(new double[] {0, 0}), 1000, 1020, P);
   }
 
   @Test
@@ -60,7 +61,7 @@ class TeamWardsTest {
   void aWardTooFarAway_anEnemyWard_aDeadWard_andAFutureWardDoNotCount() {
     TeamWards w =
         radiantAt1000(
-            ward(0, WardKind.OBSERVER, 800, 2000, null, WardRemovalKind.UNKNOWN),
+            ward(0, WardKind.OBSERVER, 800, 2500, null, WardRemovalKind.UNKNOWN),
             ward(128, WardKind.OBSERVER, 800, 100, null, WardRemovalKind.UNKNOWN),
             ward(0, WardKind.OBSERVER, 700, 100, 990L, WardRemovalKind.KILLED),
             ward(0, WardKind.OBSERVER, 1010, 100, null, WardRemovalKind.UNKNOWN),
@@ -71,11 +72,48 @@ class TeamWardsTest {
   }
 
   @Test
+  void aWardCoversTheFightThroughAnyHeroOfTheTeam_notOnlyTheCentre() {
+    WardEventDomain ward = ward(0, WardKind.OBSERVER, 800, 5000, null, WardRemovalKind.UNKNOWN);
+    List<double[]> heroes = List.of(new double[] {0, 0}, new double[] {4000, 0});
+
+    TeamWards w = TeamWards.at(List.of(ward), TeamSide.RADIANT, heroes, 1000, 1020, P);
+    TeamWards centreOnly =
+        TeamWards.at(List.of(ward), TeamSide.RADIANT, heroes.subList(0, 1), 1000, 1020, P);
+
+    assertThat(w.observers()).isEqualTo(1);
+    assertThat(w.nearestWardDistance()).isEqualTo(1000);
+    assertThat(centreOnly.observers()).isZero();
+    assertThat(centreOnly.nearestWardDistance()).isEqualTo(5000);
+  }
+
+  @Test
+  void theToleranceWidensTheRadius_byTheMeasuredWardPositionError() {
+    WardEventDomain ward = ward(0, WardKind.OBSERVER, 800, 2200, null, WardRemovalKind.UNKNOWN);
+
+    assertThat(radiantAt1000(ward).observers()).as("1600 + 620 = 2220").isEqualTo(1);
+    assertThat(
+            radiantAt1000(ward(0, WardKind.OBSERVER, 800, 2300, null, WardRemovalKind.UNKNOWN))
+                .observers())
+        .isZero();
+  }
+
+  @Test
+  void theNearestObserverDistanceIsKeptForAWardThatDoesNotCover_andNullWithoutOne() {
+    TeamWards far =
+        radiantAt1000(ward(0, WardKind.OBSERVER, 800, 3000, null, WardRemovalKind.UNKNOWN));
+    TeamWards none = radiantAt1000();
+
+    assertThat(far.observers()).isZero();
+    assertThat(far.nearestWardDistance()).isEqualTo(3000);
+    assertThat(none.nearestWardDistance()).isNull();
+  }
+
+  @Test
   void aSentryUsesItsSmallerRadius_andIsNotAnObserver() {
     TeamWards w =
         radiantAt1000(
             ward(0, WardKind.SENTRY, 800, 800, null, WardRemovalKind.UNKNOWN),
-            ward(0, WardKind.SENTRY, 800, 1000, null, WardRemovalKind.UNKNOWN));
+            ward(0, WardKind.SENTRY, 800, 2000, null, WardRemovalKind.UNKNOWN));
 
     assertThat(w.sentries()).isEqualTo(1);
     assertThat(w.observers()).isZero();

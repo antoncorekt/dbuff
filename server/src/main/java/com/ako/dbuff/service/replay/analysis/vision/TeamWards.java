@@ -7,55 +7,78 @@ import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import java.util.List;
 
 /**
- * One team's wards around a fight's centre at its start.
+ * One team's wards around a fight at its start. A ward covers the fight when it is within its
+ * radius plus the position tolerance of any of the team's heroes in it.
  *
- * @param youngestAge seconds since the placement of the youngest observer near, null without one
- * @param weight observers near the fight, a late one counted at its reduced weight
- * @param lateSeconds seconds before the start that the latest late observer was placed, null when
- *     none is late
- * @param sentryPlacedAround a sentry was placed near the fight shortly before or during it
+ * @param observers observers alive at the start that cover the fight
+ * @param lateObservers how many of them were placed shortly before the fight
+ * @param sentries sentries alive at the start that cover the fight
+ * @param youngestAge seconds since the placement of the youngest covering observer, null without
+ * @param weight the covering observers, a late one counted at its reduced weight
+ * @param lateSeconds seconds before the start that the latest covering late observer was placed
+ * @param sentryPlacedAround a sentry covering the fight was placed shortly before or during it
+ * @param nearestWardDistance units from the nearest observer alive at the start, covering or not,
+ *     to the nearest of the team's heroes in the fight; null without an observer alive
  */
 public record TeamWards(
     int observers,
+    int lateObservers,
     int sentries,
     Integer youngestAge,
     Integer oldestAge,
     double weight,
     Integer lateSeconds,
-    boolean sentryPlacedAround) {
+    boolean sentryPlacedAround,
+    Integer nearestWardDistance) {
 
   public boolean late() {
-    return lateSeconds != null;
+    return lateObservers > 0;
   }
 
-  /** The team's wards alive at {@code start} and within their radius of the fight's centre. */
+  public int fullObservers() {
+    return observers - lateObservers;
+  }
+
+  /**
+   * @param points the world positions of the team's heroes in the fight at its start
+   */
   public static TeamWards at(
       List<WardEventDomain> wards,
       TeamSide team,
-      double centerX,
-      double centerY,
+      List<double[]> points,
       double start,
       double end,
       VisionProperties p) {
     int observers = 0;
+    int late = 0;
     int sentries = 0;
     Integer youngest = null;
     Integer oldest = null;
     Integer lateSeconds = null;
+    Integer nearest = null;
     double weight = 0;
     boolean sentryPlaced = false;
     for (WardEventDomain w : wards) {
       if (!ownedBy(w, team) || !isPlaced(w)) {
         continue;
       }
-      boolean near = distance(w, centerX, centerY) <= radius(w.getWardKind(), p);
-      if (near
+      double distance = distance(w, points);
+      boolean covers = distance <= radius(w.getWardKind(), p) + p.getWardPositionTolerance();
+      boolean alive = w.getPlacedTime() <= start && endOf(w) > start;
+      if (covers
           && w.getWardKind() == WardKind.SENTRY
           && w.getPlacedTime() >= start - p.getUseLookbackSeconds()
           && w.getPlacedTime() <= end) {
         sentryPlaced = true;
       }
-      if (!near || w.getPlacedTime() > start || endOf(w) <= start) {
+      if (!alive) {
+        continue;
+      }
+      if (w.getWardKind() == WardKind.OBSERVER) {
+        int d = (int) Math.round(distance);
+        nearest = nearest == null ? d : Math.min(nearest, d);
+      }
+      if (!covers) {
         continue;
       }
       int age = (int) Math.round(start - w.getPlacedTime());
@@ -67,13 +90,15 @@ public record TeamWards(
       youngest = youngest == null ? age : Math.min(youngest, age);
       oldest = oldest == null ? age : Math.max(oldest, age);
       if (age <= p.getLateWardSeconds()) {
+        late++;
         weight += p.getLateWardWeight();
         lateSeconds = lateSeconds == null ? age : Math.min(lateSeconds, age);
       } else {
         weight += 1;
       }
     }
-    return new TeamWards(observers, sentries, youngest, oldest, weight, lateSeconds, sentryPlaced);
+    return new TeamWards(
+        observers, late, sentries, youngest, oldest, weight, lateSeconds, sentryPlaced, nearest);
   }
 
   /**
@@ -111,8 +136,11 @@ public record TeamWards(
         : w.getPlacedTime() + w.getWardKind().getLifetimeSeconds();
   }
 
-  private static double distance(WardEventDomain w, double centerX, double centerY) {
-    return WardCoordinates.distance(w.getX(), w.getY(), centerX, centerY);
+  private static double distance(WardEventDomain w, List<double[]> points) {
+    return points.stream()
+        .mapToDouble(pt -> WardCoordinates.distance(w.getX(), w.getY(), pt[0], pt[1]))
+        .min()
+        .orElse(Double.MAX_VALUE);
   }
 
   private static int radius(WardKind kind, VisionProperties p) {

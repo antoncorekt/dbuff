@@ -15,7 +15,7 @@ public class VisionProperties {
   /** The window ends this long after the fight does. */
   private int windowAfterSeconds = 15;
 
-  /** An observer sees a fight whose centre is within this many world units of it. */
+  /** An observer sees a hero of the fight within this many world units of it. */
   private int observerRadius = 1600;
 
   /** A sentry reveals invisible heroes within this many world units of it. */
@@ -27,8 +27,11 @@ public class VisionProperties {
   /** How much a late ward counts against 1 for an older one. */
   private double lateWardWeight = 0.5;
 
-  /** Below this weight of observers near the fight, a late ward is what vision there was. */
-  private double minVisionWeight = 1.0;
+  /**
+   * A ward covers a hero when it is within its radius plus this many world units of him: the
+   * measured error of a ward's position (see {@link WardCoordinates}).
+   */
+  private int wardPositionTolerance = 620;
 
   /**
    * An invisibility ability or item used this long before the fight, or after its start, counts as

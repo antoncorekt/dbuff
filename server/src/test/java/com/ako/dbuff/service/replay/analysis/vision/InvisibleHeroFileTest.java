@@ -10,7 +10,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class InvisibleHeroFileTest {
   private static InvisibleHeroFile of(String json) {
     return new InvisibleHeroFile(
-        new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)), "test.json");
+        () -> new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)), "test.json");
+  }
+
+  private static Object load(String json) {
+    return of(json).abilities();
   }
 
   private static final String ITEMS = "\"items\": [\"item_glimmer_cape\"]";
@@ -39,17 +43,25 @@ class InvisibleHeroFileTest {
   }
 
   @Test
+  void aBadFileDoesNotFailWhenTheBeanIsBuilt_onlyWhenItIsFirstUsed() {
+    InvisibleHeroFile file = of("{not json");
+
+    assertThat(file).isNotNull();
+    assertThatThrownBy(file::items).hasMessageContaining("cannot be read");
+  }
+
+  @Test
   void aBadEntryStopsTheFileWithTheEntryNamed() {
     assertThatThrownBy(
             () ->
-                of(
+                load(
                     "{\"heroes\": {\"riki\": {\"ability\": \"riki_x_y\", \"mode\": \"ACTIVE\"}}, "
                         + ITEMS
                         + "}"))
         .hasMessageContaining("hero key 'riki'");
     assertThatThrownBy(
             () ->
-                of(
+                load(
                     "{\"heroes\": {\"npc_dota_hero_riki\": {\"ability\": \"clinkz_wind_walk\","
                         + " \"mode\": \"ACTIVE\"}}, "
                         + ITEMS
@@ -57,21 +69,21 @@ class InvisibleHeroFileTest {
         .hasMessageContaining("ability 'clinkz_wind_walk' of another hero");
     assertThatThrownBy(
             () ->
-                of(
+                load(
                     "{\"heroes\": {\"npc_dota_hero_riki\": {\"ability\": \"riki_smoke_screen\","
                         + " \"mode\": \"ALWAYS\"}}, "
                         + ITEMS
                         + "}"))
         .hasMessageContaining("mode 'ALWAYS'");
-    assertThatThrownBy(() -> of("{\"heroes\": {}, " + ITEMS + "}"))
+    assertThatThrownBy(() -> load("{\"heroes\": {}, " + ITEMS + "}"))
         .hasMessageContaining("no heroes");
     assertThatThrownBy(
             () ->
-                of(
+                load(
                     "{\"heroes\": {\"npc_dota_hero_riki\": {\"ability\": \"riki_smoke_screen\","
                         + " \"mode\": \"ACTIVE\"}}, \"items\": [\"glimmer\"]}"))
         .hasMessageContaining("item 'glimmer'");
-    assertThatThrownBy(() -> of("{\"bonus\": {}}")).hasMessageContaining("unknown section 'bonus'");
-    assertThatThrownBy(() -> of("{not json")).hasMessageContaining("cannot be read");
+    assertThatThrownBy(() -> load("{\"bonus\": {}}")).hasMessageContaining("unknown section 'bonus'");
+    assertThatThrownBy(() -> load("{not json")).hasMessageContaining("cannot be read");
   }
 }

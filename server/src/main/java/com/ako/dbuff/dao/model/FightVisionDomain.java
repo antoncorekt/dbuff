@@ -13,10 +13,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * What one team could see around one important fight: its wards near the fight when it began, the
- * enemy's invisible heroes, its detection, and the verdict the rules draw. Wards count only when
- * they stand within their vision radius of the fight's centre; tower, creep and hero vision are not
- * counted.
+ * What one team could see around one important fight: its wards covering the fight when it began,
+ * the enemy's invisible heroes, its detection, and the verdict the rules draw. A ward covers the
+ * fight when it is within its vision radius plus the position tolerance of one of the team's heroes
+ * in it; tower, creep and hero vision are not counted.
  */
 @Entity
 @Table(
@@ -41,6 +41,9 @@ public class FightVisionDomain {
   /** RADIANT or DIRE. */
   private String team;
 
+  /** This team lost the fight. */
+  private boolean lost;
+
   /**
    * The analysed window in game seconds: the fight's start less the lead to its end plus the tail.
    */
@@ -48,16 +51,22 @@ public class FightVisionDomain {
 
   private Double windowEnd;
 
-  /** The team's observers alive at the fight's start within their radius of its centre. */
+  /** The team's observers alive at the fight's start that cover it. */
   private Integer activeObservers;
 
-  /** The team's sentries alive at the fight's start within their radius of its centre. */
+  /** The team's sentries alive at the fight's start that cover it. */
   private Integer activeSentries;
 
   /** Seconds from placement to the fight's start of the youngest and oldest of those observers. */
   private Integer youngestObserverAge;
 
   private Integer oldestObserverAge;
+
+  /**
+   * Units from the nearest observer alive at the fight's start, covering it or not, to the nearest
+   * of the team's heroes in the fight; null when no observer was alive. For calibrating the radius.
+   */
+  private Integer nearestWardDistance;
 
   /** The observers counted, a late one at its reduced weight. */
   private Double visionWeight;
@@ -71,13 +80,16 @@ public class FightVisionDomain {
   /** Enemy wards this team destroyed during the window, anywhere on the map. */
   private Integer wardsDestroyed;
 
-  /** Internal names of the heroes that destroyed them, comma separated. */
+  /**
+   * Player slots of the heroes that destroyed them, comma separated; {@code ?} for a killer the log
+   * names but no player is found for.
+   */
   private String destroyedBy;
 
   /** An enemy hero in the fight was invisible during it. */
   private boolean invisibleHero;
 
-  /** Internal names of those enemy heroes, comma separated. */
+  /** Player slots of those enemy heroes, comma separated. */
   private String invisibleHeroes;
 
   /** The team had a way to see invisible heroes: a sentry near, dust or a gem on a hero present. */

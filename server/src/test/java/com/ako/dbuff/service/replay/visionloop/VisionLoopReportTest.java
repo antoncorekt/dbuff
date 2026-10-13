@@ -21,6 +21,8 @@ class VisionLoopReportTest {
     return FightVisionDomain.builder()
         .fightIndex(5)
         .team(team)
+        .lost(team.equals("DIRE"))
+        .nearestWardDistance(observers == 0 ? 2300 : 800)
         .windowStart(1293.0)
         .windowEnd(1415.0)
         .activeObservers(observers)
@@ -31,7 +33,7 @@ class VisionLoopReportTest {
         .wardsDestroyed(2)
         .destroyedBy("128")
         .invisibleHero(true)
-        .invisibleHeroes("1,128")
+        .invisibleHeroes("1,128,?")
         .detection(true)
         .detectionUsed(false)
         .verdict(verdict)
@@ -72,10 +74,11 @@ class VisionLoopReportTest {
         .contains("no vision near the fight 1")
         .contains("ward placed just before the fight 1")
         .contains(
-            "| 21:33 to 23:35 | Radiant, fight 5 at 23:03 | Dire | 1 observer, youngest 1:12 old |"
-                + " yes, 18 s before | Mirana, Windrunner | available, not used | 2 by Windrunner |"
-                + " ward placed just before the fight |  |  |")
-        .contains("| no observer | no |")
+            "| 21:33 to 23:35 | Radiant, fight 5 at 23:03 | Dire | won | 1 observer, youngest 1:12"
+                + " old, nearest 800 units from a hero | yes, 18 s before | Mirana, Windrunner,"
+                + " unknown hero | available, not used | 2 by Windrunner | ward placed just before"
+                + " the fight |  |  |")
+        .contains("| lost | no observer covers, nearest 2300 units from a hero | no |")
         .contains("no vision near the fight; invisible hero without detection |  |  |")
         .doesNotContain("npc_dota_hero")
         .doesNotContain("INVISIBLE_HERO");

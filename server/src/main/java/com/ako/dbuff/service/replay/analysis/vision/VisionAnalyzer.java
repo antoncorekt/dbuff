@@ -1,7 +1,6 @@
 package com.ako.dbuff.service.replay.analysis.vision;
 
 import com.ako.dbuff.dao.model.FightPlayerDomain;
-import com.ako.dbuff.dao.model.FightVisionDomain;
 import com.ako.dbuff.dao.model.ReplayStateChangeDomain;
 import com.ako.dbuff.dao.model.WardEventDomain;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
@@ -15,11 +14,12 @@ import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.PlayerSlots;
 import com.ako.dbuff.service.replay.StateChangeKind;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
+import com.ako.dbuff.service.replay.analysis.fight.FightAssessor.Trace;
+import com.ako.dbuff.service.replay.analysis.fight.PlayerTraces;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.LostFight;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
-import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -48,6 +48,7 @@ public class VisionAnalyzer implements ReplayAnalyzer {
   private final ReplayPlayerRepo playerRepo;
   private final ReplayStateChangeRepo stateChangeRepo;
   private final CombatLogReader combatLog;
+  private final PlayerTraces playerTraces;
   private final InvisibleHeroes invisibleHeroes;
   private final VisionProperties properties;
   private final FightVisionRepo visionRepo;
@@ -64,7 +65,7 @@ public class VisionAnalyzer implements ReplayAnalyzer {
 
   @Override
   public Set<String> requires() {
-    return Set.of("important-fights", "fights", "combat-log", "state-changes", "players");
+    return Set.of("important-fights", "fights", "combat-log", "state-changes", "players", "tracks");
   }
 
   @Override
@@ -83,12 +84,7 @@ public class VisionAnalyzer implements ReplayAnalyzer {
     FightVisionAssessor assessor =
         new FightVisionAssessor(facts(matchId, wards), properties, version());
     for (LostFight lost : important) {
-      for (TeamSide team : TeamSide.values()) {
-        FightVisionDomain row = assessor.assess(lost.fight(), team);
-        if (row != null) {
-          visionRepo.save(row);
-        }
-      }
+      visionRepo.saveAll(assessor.assess(lost.fight(), lost.explanation().getLosingTeam()));
     }
   }
 
@@ -112,7 +108,16 @@ public class VisionAnalyzer implements ReplayAnalyzer {
         new DetectionLog(events, slotByHero, changes),
         presentSlots(matchId),
         abilities(changes),
-        slotByHero);
+        slotByHero,
+        tracksBySlot(matchId));
+  }
+
+  private Map<Long, Trace> tracksBySlot(long matchId) {
+    Map<Long, Trace> bySlot = new HashMap<>();
+    playerTraces
+        .load(matchId)
+        .forEach((index, trace) -> bySlot.put(PlayerSlots.slot(index), trace));
+    return bySlot;
   }
 
   private Map<Integer, Set<Long>> presentSlots(long matchId) {

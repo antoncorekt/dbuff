@@ -32,14 +32,15 @@ final class VisionLoopReport {
   private static final String HOW_TO_READ =
       "One row per team for each important fight, in the window from 90 s before the fight to 15 s"
           + " after it; nothing else of the match is looked at. \"Wards near the fight\" are the"
-          + " team's own observers (and sentries) within their vision radius of the fight's centre"
-          + " when it began, with the age of the youngest; \"ward placed just before\" tells"
-          + " whether an observer near the fight was placed within 30 s of its start (it counts"
-          + " half). \"Invisible enemy heroes\" are the other team's heroes who were invisible"
-          + " during the fight; \"detection\" is what this team had to see them (a sentry near,"
-          + " dust used or held, a gem) and whether it used it. \"Wards destroyed\" are enemy wards"
-          + " this team killed in the window, anywhere on the map. Tower, creep and hero vision are"
-          + " not counted. Write OK or REJECT in the assistant and owner columns.";
+          + " team's own observers (and sentries) covering the fight (within their vision radius"
+          + " plus 620 units of one of the team's heroes in it) when it began, with the age of the"
+          + " youngest; \"ward placed just before\" tells whether an observer near the fight was"
+          + " placed within 30 s of its start (it counts half). \"Invisible enemy heroes\" are the"
+          + " other team's heroes who were invisible during the fight; \"detection\" is what this"
+          + " team had to see them (a sentry near, dust used or held, a gem) and whether it used"
+          + " it. \"Wards destroyed\" are enemy wards this team killed in the window, anywhere on"
+          + " the map. Tower, creep and hero vision are not counted. Write OK or REJECT in the"
+          + " assistant and owner columns.";
 
   record MatchData(
       long matchId,
@@ -97,10 +98,10 @@ final class VisionLoopReport {
             List.of(
                 "## " + VISION,
                 "",
-                "| time window | team and fight | who lost | wards near the fight | ward placed"
-                    + " just before | invisible enemy heroes | detection | wards destroyed |"
-                    + " verdict | assistant | owner |",
-                "|---|---|---|---|---|---|---|---|---|---|---|"));
+                "| time window | team and fight | who lost | this team | wards near the fight |"
+                    + " ward placed just before | invisible enemy heroes | detection | wards"
+                    + " destroyed | verdict | assistant | owner |",
+                "|---|---|---|---|---|---|---|---|---|---|---|---|"));
     Map<Integer, LostFight> byFight =
         d.importantFights().stream()
             .collect(Collectors.toMap(l -> l.fight().getFightIndex(), l -> l, (a, b) -> a));
@@ -114,7 +115,7 @@ final class VisionLoopReport {
       LostFight lost = byFight.get(row.getFightIndex());
       FightDomain fight = lost == null ? null : lost.fight();
       out.add(
-          "| %s | %s | %s | %s | %s | %s | %s | %s | %s |  |  |"
+          "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |  |  |"
               .formatted(
                   "%s to %s"
                       .formatted(
@@ -126,6 +127,7 @@ final class VisionLoopReport {
                           row.getFightIndex(),
                           fight == null ? "" : " at " + LoopWording.clock(fight.getStartSeconds())),
                   lost == null ? "?" : LoopWording.team(lost.explanation().getLosingTeam()),
+                  row.isLost() ? "lost" : "won",
                   nearWards(row),
                   lateWard(row),
                   heroes(d, row.getInvisibleHeroes(), "none"),
@@ -143,14 +145,22 @@ final class VisionLoopReport {
     String sentries =
         row.getActiveSentries() == 0 ? "" : ", %d sentry".formatted(row.getActiveSentries());
     if (row.getActiveObservers() == 0) {
-      return "no observer" + sentries;
+      return "no observer covers%s%s"
+          .formatted(
+              row.getNearestWardDistance() == null
+                  ? ", none alive"
+                  : ", nearest " + row.getNearestWardDistance() + " units from a hero",
+              sentries);
     }
     return "%d observer%s, youngest %s old%s"
         .formatted(
             row.getActiveObservers(),
             row.getActiveObservers() == 1 ? "" : "s",
             LoopWording.clock(row.getYoungestObserverAge()),
-            sentries);
+            sentries
+                + (row.getNearestWardDistance() == null
+                    ? ""
+                    : ", nearest " + row.getNearestWardDistance() + " units from a hero"));
   }
 
   private static String lateWard(FightVisionDomain row) {
@@ -179,7 +189,9 @@ final class VisionLoopReport {
       return none;
     }
     return Arrays.stream(slots.split(","))
-        .map(s -> LoopWording.hero(d.heroNames(), Long.parseLong(s)))
+        .map(
+            s ->
+                s.equals("?") ? "unknown hero" : LoopWording.hero(d.heroNames(), Long.parseLong(s)))
         .collect(Collectors.joining(", "));
   }
 

@@ -13,12 +13,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class InvisibilityLogTest {
   private static final InvisibleHeroes SOURCES =
       new InvisibleHeroFile(
-          new ByteArrayInputStream(
-              ("{\"heroes\": {\"npc_dota_hero_clinkz\": {\"ability\": \"clinkz_wind_walk\","
-                      + " \"mode\": \"ACTIVE\"}, \"npc_dota_hero_riki\": {\"ability\":"
-                      + " \"riki_permanent_invisibility\", \"mode\": \"PASSIVE\"}}, \"items\":"
-                      + " [\"item_glimmer_cape\"]}")
-                  .getBytes()),
+          () ->
+              new ByteArrayInputStream(
+                  ("{\"heroes\": {\"npc_dota_hero_clinkz\": {\"ability\": \"clinkz_wind_walk\","
+                          + " \"mode\": \"ACTIVE\"}, \"npc_dota_hero_riki\": {\"ability\":"
+                          + " \"riki_permanent_invisibility\", \"mode\": \"PASSIVE\"}}, \"items\":"
+                          + " [\"item_glimmer_cape\"]}")
+                      .getBytes()),
           "test");
   private static final Map<String, Long> SLOTS =
       Map.of("npc_dota_hero_clinkz", 1L, "npc_dota_hero_riki", 2L, "npc_dota_hero_axe", 128L);
