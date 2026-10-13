@@ -206,7 +206,7 @@ final class FightLoopReport {
       for (Row r : rows) {
         FightImportanceDomain i = r.lost().importance();
         if (i != null
-            && Boolean.TRUE.equals(i.getImportant())
+            && i.isImportant()
             && (int) (r.lost().fight().getStartSeconds() / AdvantageSeries.MINUTE) == m) {
           marks.add(
               "important fight %d at %s: %s lost, %s gold"
@@ -270,12 +270,14 @@ final class FightLoopReport {
 
   private static String importantText(LostFight lost) {
     FightImportanceDomain i = lost.importance();
-    return i == null ? "unknown" : Boolean.TRUE.equals(i.getImportant()) ? "yes" : "no";
+    return i == null ? "unknown" : i.isImportant() ? "yes" : "no";
   }
 
   private static String changeText(LostFight lost, Function<FightImportanceDomain, Long> value) {
     FightImportanceDomain i = lost.importance();
-    return i == null ? "?" : LoopWording.change(i.getWinningTeam(), value.apply(i));
+    return i == null || value.apply(i) == null
+        ? "?"
+        : LoopWording.change(i.getWinningTeam(), value.apply(i));
   }
 
   private static String shareText(LostFight lost) {

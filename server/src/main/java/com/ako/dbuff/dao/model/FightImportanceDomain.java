@@ -58,6 +58,6 @@ public class FightImportanceDomain {
   /** The gold advantage moved in the other direction after the fight than before it. */
   private Boolean slopeBreak;
 
-  private Boolean important;
+  private boolean important;
   private Integer analysisVersion;
 }

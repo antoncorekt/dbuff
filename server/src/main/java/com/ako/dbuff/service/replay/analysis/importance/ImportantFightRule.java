@@ -17,7 +17,8 @@ public class ImportantFightRule {
   private final ImportantFightProperties properties;
 
   /**
-   * @param goldChange the winner's gold advantage gained over the window, negative when it lost
+   * @param goldChange the winner's gold advantage gained over the window, negative when it lost,
+   *     null when a minute it needs has no figure
    * @param xpChange the same for experience
    * @param netWorth the winner's team net worth at the end of the window
    * @param leadFlip the sign of the gold advantage changed inside the window
@@ -25,8 +26,8 @@ public class ImportantFightRule {
    * @param slopeBreak the advantage moved the other way after the fight than before it
    */
   public record Measurement(
-      long goldChange,
-      long xpChange,
+      Long goldChange,
+      Long xpChange,
       long netWorth,
       double sharePercent,
       boolean leadFlip,
@@ -35,15 +36,19 @@ public class ImportantFightRule {
 
   public Measurement measure(
       AdvantageSeries series, TeamSide winner, double startSeconds, double endSeconds) {
-    double span = Math.max(endSeconds - startSeconds, properties.getMinWindowSeconds());
-    double from = Math.min(startSeconds, series.endSeconds());
-    double to = Math.min(startSeconds + span + properties.getLagSeconds(), series.endSeconds());
+    double last = series.endSeconds();
+    double minimum = properties.getMinWindowSeconds();
+    double span = Math.max(endSeconds - startSeconds, minimum);
+    double from = Math.max(0, Math.min(startSeconds, last - minimum));
+    double to = Math.min(from + span + properties.getLagSeconds(), last);
     double goldBefore = series.gold(winner, from);
     double goldAfter = series.gold(winner, to);
-    long goldChange = Math.round(goldAfter - goldBefore);
+    boolean goldKnown = complete(series.radiantGold(), from, to);
     long netWorth = Math.round(series.netWorth(winner, to));
-    double share = netWorth > 0 ? 100.0 * goldChange / netWorth : 0;
-    boolean flip = flips(series, winner, from, to);
+    Long goldChange = goldKnown ? Math.round(goldAfter - goldBefore) : null;
+    double share = goldKnown && netWorth > 0 ? 100.0 * goldChange / netWorth : 0;
+    double xpChange = series.xp(winner, to) - series.xp(winner, from);
+    boolean flip = goldKnown && flips(series, winner, from, to);
     boolean flipToWinner = flip && goldAfter > 0;
     double earlier = series.gold(winner, Math.max(0, from - (to - from)));
     double slopeBefore = goldBefore - earlier;
@@ -54,7 +59,7 @@ public class ImportantFightRule {
             && slopeBefore * slopeAfter < 0;
     return new Measurement(
         goldChange,
-        Math.round(series.xp(winner, to) - series.xp(winner, from)),
+        complete(series.radiantXp(), from, to) ? Math.round(xpChange) : null,
         netWorth,
         share,
         flip,
@@ -64,10 +69,23 @@ public class ImportantFightRule {
 
   public boolean isImportant(Measurement m) {
     boolean grew =
-        m.goldChange() > 0
+        m.goldChange() != null
+            && m.goldChange() > 0
             && (m.goldChange() >= properties.getMinGold()
                 || m.sharePercent() >= properties.getMinSharePercent());
     return grew || m.flipToWinner();
+  }
+
+  /** Whether every minute the window touches has a figure. */
+  private static boolean complete(double[] values, double from, double to) {
+    int first = (int) Math.floor(from / AdvantageSeries.MINUTE);
+    int last = Math.min((int) Math.ceil(to / AdvantageSeries.MINUTE), values.length - 1);
+    for (int i = first; i <= last; i++) {
+      if (Double.isNaN(values[i])) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /** Whether the advantage has opposite signs at two successive marks of the window. */
@@ -78,6 +96,9 @@ public class ImportantFightRule {
         t < to;
         t += AdvantageSeries.MINUTE) {
       double value = series.gold(team, t);
+      if (Double.isNaN(value)) {
+        continue;
+      }
       if (previous * value < 0) {
         return true;
       }

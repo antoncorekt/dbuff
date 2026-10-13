@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.TeamTimelineDomain;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
 import com.ako.dbuff.dao.repo.TeamTimelineRepo;
 import com.ako.dbuff.service.replay.analysis.team.TeamNetWorth;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -22,7 +23,10 @@ public class AdvantageSeriesReader {
   private final TeamTimelineRepo teamRepo;
   private final PlayerTimelineRepo playerRepo;
 
-  /** Empty when a minute has no advantage figure, the minutes have a gap or no net worth exists. */
+  /**
+   * Empty when the minutes have a gap or no net worth exists. A minute without a figure is NaN, and
+   * the series ends where the net worth does.
+   */
   public Optional<AdvantageSeries> read(long matchId) {
     List<TeamTimelineDomain> rows =
         teamRepo.findByMatchId(matchId).stream()
@@ -36,11 +40,11 @@ public class AdvantageSeriesReader {
     double[] xp = new double[rows.size()];
     for (int i = 0; i < rows.size(); i++) {
       TeamTimelineDomain row = rows.get(i);
-      if (row.getGameMinute() != i || row.getRadiantGoldAdv() == null) {
+      if (row.getGameMinute() != i) {
         return Optional.empty();
       }
-      gold[i] = row.getRadiantGoldAdv();
-      xp[i] = row.getRadiantXpAdv() == null ? 0 : row.getRadiantXpAdv();
+      gold[i] = row.getRadiantGoldAdv() == null ? Double.NaN : row.getRadiantGoldAdv();
+      xp[i] = row.getRadiantXpAdv() == null ? Double.NaN : row.getRadiantXpAdv();
     }
     List<PlayerTimelineDomain> players = playerRepo.findByMatchId(matchId);
     TeamNetWorth netWorth = TeamNetWorth.of(players);
@@ -48,9 +52,16 @@ public class AdvantageSeriesReader {
       netWorth =
           TeamNetWorth.of(players.stream().map(AdvantageSeriesReader::goldAsNetWorth).toList());
     }
-    return netWorth == null
-        ? Optional.empty()
-        : Optional.of(new AdvantageSeries(gold, xp, netWorth.radiant(), netWorth.dire()));
+    if (netWorth == null) {
+      return Optional.empty();
+    }
+    int covered = Math.min(gold.length, netWorth.radiant().length);
+    return Optional.of(
+        new AdvantageSeries(
+            Arrays.copyOf(gold, covered),
+            Arrays.copyOf(xp, covered),
+            netWorth.radiant(),
+            netWorth.dire()));
   }
 
   private static PlayerTimelineDomain goldAsNetWorth(PlayerTimelineDomain row) {

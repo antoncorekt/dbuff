@@ -5,7 +5,8 @@ import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 /**
  * Per-minute gold and experience advantage of Radiant (negative favours Dire) and each team's net
  * worth. Index {@code m} is the game clock {@code m * 60} seconds; between minutes the values are
- * interpolated linearly, outside the series they stay at the first or last value.
+ * interpolated linearly, outside the series they stay at the first or last value. A minute with no
+ * figure is NaN, and so is anything interpolated from it.
  */
 public record AdvantageSeries(
     double[] radiantGold, double[] radiantXp, double[] radiantNetWorth, double[] direNetWorth) {
@@ -36,6 +37,9 @@ public record AdvantageSeries(
     double minute = Math.max(0, Math.min(seconds / MINUTE, values.length - 1));
     int low = (int) Math.floor(minute);
     int high = Math.min(low + 1, values.length - 1);
+    if (minute == low) {
+      return values[low];
+    }
     return values[low] + (values[high] - values[low]) * (minute - low);
   }
 }

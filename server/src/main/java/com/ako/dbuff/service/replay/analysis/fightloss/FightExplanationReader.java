@@ -74,13 +74,25 @@ public class FightExplanationReader {
       this(fight, explanation, reasons, totalReasons, null);
     }
 
-    /** A fight without a stored importance counts as important, so old matches read as before. */
+    /**
+     * A fight of a match with no importance stored at all counts as important, so old matches read
+     * as before.
+     */
     public boolean important() {
-      return importance == null || Boolean.TRUE.equals(importance.getImportant());
+      return importance == null || importance.isImportant();
     }
   }
 
-  public record SwingExplanation(GameSpikeDomain swing, List<LostFight> fights) {}
+  /**
+   * @param noImportantFight true when none of the swing's lost fights is important and {@code
+   *     fights} holds its costliest one instead, so a swing is never told without a fight
+   */
+  public record SwingExplanation(
+      GameSpikeDomain swing, List<LostFight> fights, boolean noImportantFight) {
+    public SwingExplanation(GameSpikeDomain swing, List<LostFight> fights) {
+      this(swing, fights, false);
+    }
+  }
 
   /**
    * @param swings every swing of the match, with the fights its losing team lost, costliest first
@@ -90,7 +102,10 @@ public class FightExplanationReader {
    */
   public record MatchExplanation(List<SwingExplanation> swings, List<LostFight> otherFights) {}
 
-  /** The important lost fights only; every lost fight when the match has no importance stored. */
+  /**
+   * The important lost fights only; every lost fight when the match has no importance stored. A
+   * swing with no important lost fight keeps its costliest one, flagged.
+   */
   @Transactional(readOnly = true)
   public MatchExplanation read(long matchId, int topReasons, int maxFightsPerSwing) {
     return read(matchId, topReasons, maxFightsPerSwing, true);
@@ -104,17 +119,17 @@ public class FightExplanationReader {
 
   private MatchExplanation read(
       long matchId, int topReasons, int maxFightsPerSwing, boolean importantOnly) {
-    Map<Integer, FightImportanceDomain> importance =
-        importanceRepo.findByMatchId(matchId).stream()
-            .filter(i -> i.getFightIndex() != null)
-            .collect(
-                Collectors.toMap(
-                    FightImportanceDomain::getFightIndex, Function.identity(), (a, b) -> a));
     Map<Integer, FightDomain> fights =
         fightRepo.findByMatchId(matchId).stream()
             .filter(f -> f.getFightIndex() != null)
             .collect(
                 Collectors.toMap(FightDomain::getFightIndex, Function.identity(), (a, b) -> a));
+    Map<Integer, FightImportanceDomain> importance =
+        importanceRepo.findByMatchId(matchId).stream()
+            .filter(i -> i.getFightIndex() != null && fights.containsKey(i.getFightIndex()))
+            .collect(
+                Collectors.toMap(
+                    FightImportanceDomain::getFightIndex, Function.identity(), (a, b) -> a));
     Map<Integer, List<FightReasonDomain>> reasons =
         reasonRepo.findByMatchId(matchId).stream()
             .filter(r -> r.getFightIndex() != null)
@@ -130,8 +145,7 @@ public class FightExplanationReader {
                         e,
                         reasons,
                         topReasons,
-                        importance.get(e.getFightIndex())))
-            .filter(l -> !importantOnly || l.important())
+                        importanceOf(e, importance)))
             .toList();
     List<GameSpikeDomain> spikes =
         spikeRepo.findByMatchId(matchId).stream()
@@ -139,20 +153,40 @@ public class FightExplanationReader {
             .sorted(Comparator.comparing(GameSpikeDomain::getSpikeIndex))
             .toList();
     List<SwingExplanation> swings =
-        spikes.stream()
-            .map(
-                s ->
-                    new SwingExplanation(
-                        s,
-                        lost.stream()
-                            .filter(l -> belongsTo(s, l))
-                            .sorted(COSTLIEST_FIRST)
-                            .limit(Math.max(0, maxFightsPerSwing))
-                            .toList()))
-            .toList();
+        spikes.stream().map(s -> swing(s, lost, maxFightsPerSwing, importantOnly)).toList();
     List<LostFight> other =
-        lost.stream().filter(l -> spikes.stream().noneMatch(s -> belongsTo(s, l))).toList();
+        lost.stream()
+            .filter(l -> !importantOnly || l.important())
+            .filter(l -> spikes.stream().noneMatch(s -> belongsTo(s, l)))
+            .toList();
     return new MatchExplanation(swings, other);
+  }
+
+  private static SwingExplanation swing(
+      GameSpikeDomain swing, List<LostFight> lost, int maxFights, boolean importantOnly) {
+    List<LostFight> own =
+        lost.stream().filter(l -> belongsTo(swing, l)).sorted(COSTLIEST_FIRST).toList();
+    List<LostFight> told = importantOnly ? own.stream().filter(LostFight::important).toList() : own;
+    boolean none = told.isEmpty() && !own.isEmpty();
+    return new SwingExplanation(
+        swing,
+        (none ? own.subList(0, 1) : told).stream().limit(Math.max(0, maxFights)).toList(),
+        none);
+  }
+
+  /**
+   * The stored importance; once a match has any, a decided fight without a row is not important.
+   */
+  private static FightImportanceDomain importanceOf(
+      FightExplanationDomain explanation, Map<Integer, FightImportanceDomain> stored) {
+    FightImportanceDomain row = stored.get(explanation.getFightIndex());
+    if (row != null || stored.isEmpty()) {
+      return row;
+    }
+    return FightImportanceDomain.builder()
+        .matchId(explanation.getMatchId())
+        .fightIndex(explanation.getFightIndex())
+        .build();
   }
 
   /** A swing is told by the fights its losing team lost, not by the ones it won. */

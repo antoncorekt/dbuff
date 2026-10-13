@@ -83,7 +83,7 @@ class ImportantFightAnalyzerTest {
             FightImportanceDomain::getFightIndex,
             FightImportanceDomain::getWinningTeam,
             FightImportanceDomain::getGoldChange,
-            FightImportanceDomain::getImportant)
+            FightImportanceDomain::isImportant)
         .containsExactlyInAnyOrder(tuple(0, "RADIANT", 3000L, true), tuple(3, "DIRE", 0L, false));
   }
 
@@ -97,7 +97,7 @@ class ImportantFightAnalyzerTest {
     FightImportanceDomain row = importanceRepo.findByMatchId(MATCH).get(0);
     assertThat(row.getNetWorth()).isEqualTo(5000L);
     assertThat(row.getSharePercent()).isEqualTo(16.0);
-    assertThat(row.getImportant()).isTrue();
+    assertThat(row.isImportant()).isTrue();
   }
 
   @Test
@@ -120,5 +120,38 @@ class ImportantFightAnalyzerTest {
   void readsTheFightsAndTheFightLossRows() {
     assertThat(analyzer.requires()).containsExactlyInAnyOrder("fights", "fight-loss");
     assertThat(analyzer.name()).isEqualTo("important-fights");
+  }
+
+  @Test
+  void aMissingExperienceFigureIsUnknownNotZero_andANetWorthShorterThanTheSeriesEndsIt() {
+    long[] gold = {0, 0, 0, 0, 3000, 3000, 3000};
+    for (int minute = 0; minute < gold.length; minute++) {
+      teamRepo.save(
+          TeamTimelineDomain.builder()
+              .matchId(MATCH)
+              .gameMinute(minute)
+              .radiantGoldAdv(gold[minute])
+              .radiantXpAdv(minute == 2 ? null : 100L)
+              .build());
+    }
+    for (int minute = 0; minute < 6; minute++) {
+      for (long slot : SLOTS) {
+        playerRepo.save(
+            PlayerTimelineDomain.builder()
+                .matchId(MATCH)
+                .playerSlot(slot)
+                .gameMinute(minute)
+                .networth(4000L)
+                .build());
+      }
+    }
+    fight(0, "RADIANT", 100, 110);
+    fight(1, "RADIANT", 600, 610);
+
+    analyzer.analyze(MATCH);
+
+    assertThat(importanceRepo.findByMatchId(MATCH))
+        .extracting(FightImportanceDomain::getFightIndex, FightImportanceDomain::getXpChange)
+        .containsExactlyInAnyOrder(tuple(0, null), tuple(1, 0L));
   }
 }

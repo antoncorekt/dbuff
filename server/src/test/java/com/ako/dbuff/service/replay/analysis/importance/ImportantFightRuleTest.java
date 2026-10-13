@@ -114,4 +114,38 @@ class ImportantFightRuleTest {
             rule.measure(series(steady, flat(8), 100_000), TeamSide.RADIANT, 180, 190).slopeBreak())
         .isFalse();
   }
+
+  @Test
+  void aFightAfterTheLastMinuteOrInItIsMeasuredOverTheLastMinimumWindow() {
+    double[] gold = {0, 0, 0, 0, 0, 3000};
+    AdvantageSeries s = series(gold, flat(6), 100_000);
+
+    Measurement after = rule.measure(s, TeamSide.RADIANT, 400, 420);
+    Measurement inLast = rule.measure(s, TeamSide.RADIANT, 285, 295);
+
+    assertThat(after.goldChange()).isEqualTo(3000);
+    assertThat(rule.isImportant(after)).isTrue();
+    assertThat(inLast.goldChange()).isEqualTo(3000);
+  }
+
+  @Test
+  void anUnknownMinuteMakesTheExperienceChangeUnknown_butNotTheGold() {
+    double[] gold = {0, 0, 0, 2000, 2000, 2000};
+    double[] xp = {0, 0, 0, Double.NaN, 500, 500};
+
+    Measurement m = rule.measure(series(gold, xp, 100_000), TeamSide.RADIANT, 120, 130);
+
+    assertThat(m.xpChange()).isNull();
+    assertThat(m.goldChange()).isEqualTo(2000);
+  }
+
+  @Test
+  void anUnknownGoldMinuteMakesTheFightUnmeasuredAndNotImportant() {
+    double[] gold = {0, 0, 0, Double.NaN, 5000, 5000};
+
+    Measurement m = rule.measure(series(gold, flat(6), 100_000), TeamSide.RADIANT, 120, 130);
+
+    assertThat(m.goldChange()).isNull();
+    assertThat(rule.isImportant(m)).isFalse();
+  }
 }

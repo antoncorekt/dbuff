@@ -186,7 +186,7 @@ class FightExplanationReaderTest {
         .extracting(f -> f.important())
         .containsExactlyInAnyOrder(true, false, false);
     assertThat(all.otherFights())
-        .extracting(f -> f.importance().getImportant())
+        .extracting(f -> f.importance().isImportant())
         .containsExactly(true, false);
   }
 
@@ -196,5 +196,45 @@ class FightExplanationReaderTest {
 
     assertThat(reader.read(MATCH, 3, 5).swings().get(0).fights()).hasSize(3);
     assertThat(reader.read(MATCH, 3, 5).otherFights()).hasSize(2);
+  }
+
+  @Test
+  void onceAMatchHasImportanceAFightWithoutARowIsNotImportant_andRowsOfGoneFightsAreIgnored() {
+    stored();
+    importance(0, true);
+    importance(99, true);
+
+    MatchExplanation important = reader.read(MATCH, 3, 5);
+    MatchExplanation all = reader.readAll(MATCH, 3, 5);
+
+    assertThat(important.swings().get(0).fights())
+        .extracting(f -> f.fight().getFightIndex())
+        .containsExactly(0);
+    assertThat(important.otherFights()).isEmpty();
+    assertThat(all.otherFights()).extracting(f -> f.important()).containsOnly(false);
+  }
+
+  @Test
+  void aRowOnlyOfAGoneFightLeavesTheMatchWithoutImportance_soEveryFightReads() {
+    stored();
+    importance(99, false);
+
+    assertThat(reader.read(MATCH, 3, 5).swings().get(0).fights()).hasSize(3);
+  }
+
+  @Test
+  void aSwingWithNoImportantLostFightKeepsItsCostliestOne_flagged() {
+    stored();
+    importance(0, false);
+    importance(1, false);
+    importance(2, false);
+    importance(3, true);
+    importance(4, false);
+
+    var swing = reader.read(MATCH, 3, 5).swings().get(0);
+
+    assertThat(swing.noImportantFight()).isTrue();
+    assertThat(swing.fights()).extracting(f -> f.fight().getFightIndex()).containsExactly(1);
+    assertThat(reader.readAll(MATCH, 3, 5).swings().get(0).noImportantFight()).isFalse();
   }
 }

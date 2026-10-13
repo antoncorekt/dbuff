@@ -53,7 +53,7 @@ public final class LoopWording {
 
   /** A Radiant lead as {@code Radiant +2.3k}; a negative one as {@code Dire +1.1k}. */
   public static String advantage(Number radiantLead) {
-    if (radiantLead == null) {
+    if (radiantLead == null || Double.isNaN(radiantLead.doubleValue())) {
       return UNKNOWN;
     }
     long whole = Math.round(radiantLead.doubleValue());

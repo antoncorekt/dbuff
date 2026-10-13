@@ -8,6 +8,7 @@ import com.ako.dbuff.dao.repo.GameSpikeFactorRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.LostFight;
+import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.SwingExplanation;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.spike.SpikeCause;
@@ -79,29 +80,32 @@ public class SwingSection implements ReplayReportSection {
     Map<Integer, List<GameSpikeFactorDomain>> factors =
         factorRepo.findByMatchId(input.matchId()).stream()
             .collect(Collectors.groupingBy(GameSpikeFactorDomain::getSpikeIndex));
-    Map<Integer, List<LostFight>> lostBySwing = lostFights(input.matchId());
+    Map<Integer, SwingExplanation> lostBySwing = lostFights(input.matchId());
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     List<String> lines = new ArrayList<>();
     lines.add("**Swings**");
     for (GameSpikeDomain spike : spikes) {
       lines.add(line(spike, factors.getOrDefault(spike.getSpikeIndex(), List.of())));
-      lostBySwing.getOrDefault(spike.getSpikeIndex(), List.of()).stream()
-          .map(lost -> lostLine(lost, heroes))
-          .flatMap(Optional::stream)
-          .forEach(lines::add);
+      SwingExplanation told = lostBySwing.get(spike.getSpikeIndex());
+      (told == null ? List.<LostFight>of() : told.fights())
+          .stream()
+              .map(lost -> lostLine(lost, heroes, told.noImportantFight()))
+              .flatMap(Optional::stream)
+              .forEach(lines::add);
     }
     return lines;
   }
 
-  private Map<Integer, List<LostFight>> lostFights(long matchId) {
+  private Map<Integer, SwingExplanation> lostFights(long matchId) {
     return explanationReader
         .read(matchId, properties.getMaxReasonsPerFight(), properties.getMaxLostFightsPerSwing())
         .swings()
         .stream()
-        .collect(Collectors.toMap(s -> s.swing().getSpikeIndex(), s -> s.fights(), (a, b) -> a));
+        .collect(Collectors.toMap(s -> s.swing().getSpikeIndex(), s -> s, (a, b) -> a));
   }
 
-  private static Optional<String> lostLine(LostFight lost, Map<Long, String> heroes) {
+  private static Optional<String> lostLine(
+      LostFight lost, Map<Long, String> heroes, boolean noImportantFight) {
     TeamSide loser = Enums.find(TeamSide.class, lost.explanation().getLosingTeam());
     Double start = lost.fight().getStartSeconds();
     if (loser == null || start == null) {
@@ -122,10 +126,11 @@ public class SwingSection implements ReplayReportSection {
     return Optional.of(
         String.format(
             Locale.ROOT,
-            "%s lost %sthe fight at %s: %s",
+            "%s lost %sthe fight at %s%s: %s",
             teamName(loser.name()),
             worthSaying ? String.format(Locale.ROOT, "%.1fk from ", gold / 1000.0) : "",
             GameTime.clock(start),
+            noImportantFight ? " (no single important fight)" : "",
             reasons));
   }
 
