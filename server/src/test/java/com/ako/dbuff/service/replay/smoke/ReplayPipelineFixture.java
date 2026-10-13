@@ -4,12 +4,14 @@ import com.ako.dbuff.dao.model.DeathEventDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
+import com.ako.dbuff.dao.model.TeamTimelineDomain;
 import com.ako.dbuff.dao.model.TeamfightDomain;
 import com.ako.dbuff.dao.model.TeamfightPlayerDomain;
 import com.ako.dbuff.dao.repo.DeathEventRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
+import com.ako.dbuff.dao.repo.TeamTimelineRepo;
 import com.ako.dbuff.dao.repo.TeamfightPlayerRepo;
 import com.ako.dbuff.dao.repo.TeamfightRepo;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
@@ -140,6 +142,7 @@ public abstract class ReplayPipelineFixture {
   @Autowired private DeathEventRepo deathEventRepo;
   @Autowired private TeamfightRepo teamfightRepo;
   @Autowired private TeamfightPlayerRepo teamfightPlayerRepo;
+  @Autowired private TeamTimelineRepo teamTimelineRepo;
 
   protected static Path fixture(String fileName) {
     return Path.of(System.getenv("REPLAY_FIXTURE_DIR"), fileName);
@@ -196,7 +199,24 @@ public abstract class ReplayPipelineFixture {
       playerStatRepo.save(stat);
     }
     seedOpenDotaFights(match.getId(), json);
+    seedTeamTimeline(match.getId(), json);
     return match;
+  }
+
+  /** OpenDota's per-minute Radiant gold and experience advantage. */
+  private void seedTeamTimeline(long matchId, JsonNode json) {
+    teamTimelineRepo.deleteByMatchId(matchId);
+    JsonNode gold = json.path("radiant_gold_adv");
+    JsonNode xp = json.path("radiant_xp_adv");
+    for (int minute = 0; minute < Math.max(gold.size(), xp.size()); minute++) {
+      teamTimelineRepo.save(
+          TeamTimelineDomain.builder()
+              .matchId(matchId)
+              .gameMinute(minute)
+              .radiantGoldAdv(gold.has(minute) ? gold.get(minute).asLong() : null)
+              .radiantXpAdv(xp.has(minute) ? xp.get(minute).asLong() : null)
+              .build());
+    }
   }
 
   private static Long heroDamageTaken(JsonNode player) {

@@ -2,9 +2,11 @@ package com.ako.dbuff.service.replay.analysis.fightloss;
 
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightExplanationDomain;
+import com.ako.dbuff.dao.model.FightImportanceDomain;
 import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.dao.model.GameSpikeDomain;
 import com.ako.dbuff.dao.repo.FightExplanationRepo;
+import com.ako.dbuff.dao.repo.FightImportanceRepo;
 import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
@@ -22,7 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The stored explanations of a match as a tree: swings, their lost fights, and each fight's ranked
- * reasons. Storage is uncapped; a reader that needs a short text passes its limits here.
+ * reasons. Storage is uncapped; a reader that needs a short text passes its limits here. {@link
+ * #read} tells only the important fights (all of them when the match has no importance stored);
+ * {@link #readAll} also returns the others, with their importance.
  */
 @Service
 @RequiredArgsConstructor
@@ -37,6 +41,7 @@ public class FightExplanationReader {
   private final FightRepo fightRepo;
   private final FightExplanationRepo explanationRepo;
   private final FightReasonRepo reasonRepo;
+  private final FightImportanceRepo importanceRepo;
   private final FightLossProperties properties;
 
   /**
@@ -50,6 +55,7 @@ public class FightExplanationReader {
       int rank, FightReasonDomain reason, List<String> also, boolean ranked) {}
 
   /**
+   * @param importance the fight's importance row, null when none is stored
    * @param reasons the top ranked reasons, then every reason that is not ranked
    * @param totalReasons all reasons stored for the losing team, not ranked entries: absence reasons
    *     collapsed into an entry, unranked reasons and those cut by {@code topReasons} all count
@@ -58,7 +64,21 @@ public class FightExplanationReader {
       FightDomain fight,
       FightExplanationDomain explanation,
       List<RankedReason> reasons,
-      int totalReasons) {}
+      int totalReasons,
+      FightImportanceDomain importance) {
+    public LostFight(
+        FightDomain fight,
+        FightExplanationDomain explanation,
+        List<RankedReason> reasons,
+        int totalReasons) {
+      this(fight, explanation, reasons, totalReasons, null);
+    }
+
+    /** A fight without a stored importance counts as important, so old matches read as before. */
+    public boolean important() {
+      return importance == null || Boolean.TRUE.equals(importance.getImportant());
+    }
+  }
 
   public record SwingExplanation(GameSpikeDomain swing, List<LostFight> fights) {}
 
@@ -70,8 +90,26 @@ public class FightExplanationReader {
    */
   public record MatchExplanation(List<SwingExplanation> swings, List<LostFight> otherFights) {}
 
+  /** The important lost fights only; every lost fight when the match has no importance stored. */
   @Transactional(readOnly = true)
   public MatchExplanation read(long matchId, int topReasons, int maxFightsPerSwing) {
+    return read(matchId, topReasons, maxFightsPerSwing, true);
+  }
+
+  /** Every lost fight, each with its importance; for readers that list the unimportant ones. */
+  @Transactional(readOnly = true)
+  public MatchExplanation readAll(long matchId, int topReasons, int maxFightsPerSwing) {
+    return read(matchId, topReasons, maxFightsPerSwing, false);
+  }
+
+  private MatchExplanation read(
+      long matchId, int topReasons, int maxFightsPerSwing, boolean importantOnly) {
+    Map<Integer, FightImportanceDomain> importance =
+        importanceRepo.findByMatchId(matchId).stream()
+            .filter(i -> i.getFightIndex() != null)
+            .collect(
+                Collectors.toMap(
+                    FightImportanceDomain::getFightIndex, Function.identity(), (a, b) -> a));
     Map<Integer, FightDomain> fights =
         fightRepo.findByMatchId(matchId).stream()
             .filter(f -> f.getFightIndex() != null)
@@ -85,7 +123,15 @@ public class FightExplanationReader {
         explanationRepo.findByMatchId(matchId).stream()
             .filter(e -> e.getFightIndex() != null && fights.containsKey(e.getFightIndex()))
             .sorted(Comparator.comparing(FightExplanationDomain::getFightIndex))
-            .map(e -> lostFight(fights.get(e.getFightIndex()), e, reasons, topReasons))
+            .map(
+                e ->
+                    lostFight(
+                        fights.get(e.getFightIndex()),
+                        e,
+                        reasons,
+                        topReasons,
+                        importance.get(e.getFightIndex())))
+            .filter(l -> !importantOnly || l.important())
             .toList();
     List<GameSpikeDomain> spikes =
         spikeRepo.findByMatchId(matchId).stream()
@@ -120,7 +166,8 @@ public class FightExplanationReader {
       FightDomain fight,
       FightExplanationDomain explanation,
       Map<Integer, List<FightReasonDomain>> reasons,
-      int topReasons) {
+      int topReasons,
+      FightImportanceDomain importance) {
     List<FightReasonDomain> ofLoser =
         reasons.getOrDefault(explanation.getFightIndex(), List.of()).stream()
             .filter(r -> explanation.getLosingTeam().equals(r.getTeam()))
@@ -141,6 +188,10 @@ public class FightExplanationReader {
     List<RankedReason> left =
         ranking.notRanked().stream().map(r -> new RankedReason(0, r, List.of(), false)).toList();
     return new LostFight(
-        fight, explanation, Stream.concat(top.stream(), left.stream()).toList(), ofLoser.size());
+        fight,
+        explanation,
+        Stream.concat(top.stream(), left.stream()).toList(),
+        ofLoser.size(),
+        importance);
   }
 }

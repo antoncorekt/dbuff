@@ -51,6 +51,27 @@ public final class LoopWording {
         + "k";
   }
 
+  /** A Radiant lead as {@code Radiant +2.3k}; a negative one as {@code Dire +1.1k}. */
+  public static String advantage(Number radiantLead) {
+    if (radiantLead == null) {
+      return UNKNOWN;
+    }
+    long whole = Math.round(radiantLead.doubleValue());
+    if (whole == 0) {
+      return "even";
+    }
+    return "%s +%s".formatted(whole > 0 ? "Radiant" : "Dire", gold(Math.abs(whole)));
+  }
+
+  /** A gain of a team as {@code Radiant +1.8k}, or {@code Radiant -400} when it lost ground. */
+  public static String change(String team, Number gain) {
+    if (gain == null) {
+      return UNKNOWN;
+    }
+    long whole = Math.round(gain.doubleValue());
+    return "%s %s%s".formatted(team(team), whole < 0 ? "-" : "+", gold(Math.abs(whole)));
+  }
+
   /** {@code RADIANT} as {@code Radiant}; a team that is not known as {@code ?}. */
   public static String team(String stored) {
     if (stored == null) {
