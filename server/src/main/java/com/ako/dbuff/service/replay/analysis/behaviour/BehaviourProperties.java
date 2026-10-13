@@ -57,6 +57,15 @@ public class BehaviourProperties {
   /** A hero has a main lane in the window only if he was in it this share of his living time. */
   private double swapMinShare = 0.5;
 
+  /** Heroes that got the smoke modifier this close to a use, on the user's team, were in it. */
+  private int smokeGroupSeconds = 3;
+
+  /** A smoke modifier removed this much before its full duration ran out was broken. */
+  private double smokeExpirySlackSeconds = 1.0;
+
+  /** A smoke is judged by what its group did from its start to this long after its end. */
+  private int smokeOutcomeSeconds = 20;
+
   @PostConstruct
   void validate() {
     require(minClusterSize >= 2, "min-cluster-size must be at least 2, not " + minClusterSize);
@@ -90,6 +99,15 @@ public class BehaviourProperties {
     require(
         swapMinShare > 0 && swapMinShare <= 1,
         "swap-min-share must be in (0, 1], not " + swapMinShare);
+    require(
+        smokeGroupSeconds >= 0,
+        "smoke-group-seconds must not be negative, not " + smokeGroupSeconds);
+    require(
+        smokeExpirySlackSeconds >= 0,
+        "smoke-expiry-slack-seconds must not be negative, not " + smokeExpirySlackSeconds);
+    require(
+        smokeOutcomeSeconds >= 1,
+        "smoke-outcome-seconds must be at least 1, not " + smokeOutcomeSeconds);
   }
 
   private static void require(boolean ok, String message) {

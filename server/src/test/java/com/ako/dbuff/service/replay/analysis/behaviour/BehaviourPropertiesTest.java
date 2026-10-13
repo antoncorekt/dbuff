@@ -42,5 +42,8 @@ class BehaviourPropertiesTest {
     rejects(p -> p.setSwapToMinute(8), "swap-from-minute");
     rejects(p -> p.setSwapMinShare(0), "swap-min-share");
     rejects(p -> p.setSwapMinShare(1.5), "swap-min-share");
+    rejects(p -> p.setSmokeGroupSeconds(-1), "smoke-group-seconds");
+    rejects(p -> p.setSmokeExpirySlackSeconds(-0.5), "smoke-expiry-slack-seconds");
+    rejects(p -> p.setSmokeOutcomeSeconds(0), "smoke-outcome-seconds");
   }
 }

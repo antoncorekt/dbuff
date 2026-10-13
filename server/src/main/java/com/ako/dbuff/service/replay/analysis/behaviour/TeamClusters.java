@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.analysis.behaviour;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -78,7 +79,7 @@ public final class TeamClusters {
     return true;
   }
 
-  private static Point centre(List<Long> group, Map<Long, Point> alive) {
+  static Point centre(Collection<Long> group, Map<Long, Point> alive) {
     double x = group.stream().mapToDouble(s -> alive.get(s).x()).average().orElse(0);
     double y = group.stream().mapToDouble(s -> alive.get(s).y()).average().orElse(0);
     return new Point(x, y);
