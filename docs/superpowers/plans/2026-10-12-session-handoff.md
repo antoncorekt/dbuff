@@ -1,5 +1,8 @@
 # Session handoff, 2026-10-12: queue, game modes, roles, review loop
 
+> Update, 2026-10-13: the rules (section 1), the rhythm (section 2) and the build quirks (section 3) still apply. The PR list and the open items (sections 4 to 7) are superseded by `2026-10-13-session-handoff.md`: #38 and #54 are merged and the reasons plan was built (#57 to #66), then the next analyses (#69 to #77).
+
+
 For an agent with no memory of the session. Read this, then `CLAUDE.md` ("Replay pipeline"), then `2026-10-12-replay-status-and-next-steps.md` (older, with an update section at the top of its section 7). Facts here were true at the end of the session; check `git log` and `gh pr list` before relying on them.
 
 ## 1. Rules of the owner (they bind)
