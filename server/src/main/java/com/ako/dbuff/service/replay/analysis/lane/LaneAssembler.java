@@ -34,6 +34,7 @@ final class LaneAssembler {
 
   private final LaneProperties properties;
   private final LaneAssigner assigner;
+  private final LaneShadowAssigner shadow;
   private final LaningWindows windows;
   private final CreepTally tally;
   private final LaneVerdict verdict;
@@ -43,6 +44,7 @@ final class LaneAssembler {
       LaneProperties properties, CreepValues values, List<LaneReasonContributor> contributors) {
     this.properties = properties;
     this.assigner = new LaneAssigner(properties);
+    this.shadow = new LaneShadowAssigner(properties);
     this.windows = new LaningWindows(properties);
     this.tally = new CreepTally(values, properties);
     this.verdict = new LaneVerdict(properties);
@@ -50,23 +52,11 @@ final class LaneAssembler {
   }
 
   LaneRows assemble(LaneInputs in, int version) {
-    Map<Long, Zone.Lane> lanes = assigner.assign(rosterOnly(in));
+    Map<Long, List<ActivitySegment>> roster = rosterOnly(in);
     Map<Zone.Lane, Tower> towers = firstTowers(in.buildings());
-    List<LaneHero> heroes = new ArrayList<>();
-    for (Map.Entry<Long, Zone.Lane> e : new TreeMap<>(lanes).entrySet()) {
-      List<ActivitySegment> segments = in.segments().get(e.getKey());
-      Tower tower = towers.get(e.getValue());
-      windows
-          .find(
-              segments,
-              e.getValue(),
-              tower == null ? null : tower.second(),
-              segments.get(segments.size() - 1).endSeconds())
-          .ifPresent(
-              w ->
-                  heroes.add(
-                      new LaneHero(e.getKey(), in.teams().get(e.getKey()), e.getValue(), w)));
-    }
+    List<LaneHero> heroes = laneHeroes(in, assigner.assign(roster), towers);
+    Map<Long, Zone.Lane> shadowed = shadow.assign(roster, in.teams(), in.tracks(), heroes);
+    heroes.addAll(laneHeroes(in, shadowed, towers));
     heroes.removeIf(LaneAssembler::arrivedTooLate);
     clipToContest(heroes);
     heroes.removeIf(LaneAssembler::arrivedTooLate);
@@ -116,6 +106,26 @@ final class LaneAssembler {
       }
     }
     return new LaneRows(assignmentRows(in, laneHeroes, version), playerStats, results, reasons);
+  }
+
+  private List<LaneHero> laneHeroes(
+      LaneInputs in, Map<Long, Zone.Lane> lanes, Map<Zone.Lane, Tower> towers) {
+    List<LaneHero> heroes = new ArrayList<>();
+    for (Map.Entry<Long, Zone.Lane> e : new TreeMap<>(lanes).entrySet()) {
+      List<ActivitySegment> segments = in.segments().get(e.getKey());
+      Tower tower = towers.get(e.getValue());
+      windows
+          .find(
+              segments,
+              e.getValue(),
+              tower == null ? null : tower.second(),
+              segments.get(segments.size() - 1).endSeconds())
+          .ifPresent(
+              w ->
+                  heroes.add(
+                      new LaneHero(e.getKey(), in.teams().get(e.getKey()), e.getValue(), w)));
+    }
+    return heroes;
   }
 
   private static Map<Long, List<ActivitySegment>> rosterOnly(LaneInputs in) {

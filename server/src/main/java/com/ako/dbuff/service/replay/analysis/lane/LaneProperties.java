@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis.lane;
 
+import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +21,19 @@ public class LaneProperties {
 
   /** The share of his time alive in that span a hero must spend in one lane to have a lane. */
   private double minLaneShare = 0.4;
+
+  /**
+   * A hero with no lane of his own gets the lane of his teammates when, over their laning window,
+   * he was alive and within the lane zone or within this distance of a teammate who has the lane
+   * ...
+   */
+  private double shadowDistance = 1500;
+
+  /** ... for at least this share of his time alive in that window ... */
+  private double shadowMinShare = 0.5;
+
+  /** ... and at least this many seconds, so a short window proves nothing. */
+  private int shadowMinSeconds = 60;
 
   /** Away from the lane farming the jungle or another lane this long ends the hero's laning. */
   private int awaySeconds = 30;
@@ -105,4 +119,19 @@ public class LaneProperties {
 
   /** The reasons kept per side of a lane. */
   private int reasonsPerSide = 6;
+
+  @PostConstruct
+  void validate() {
+    require(shadowDistance > 0, "shadow-distance must be positive, not " + shadowDistance);
+    require(
+        shadowMinShare > 0 && shadowMinShare <= 1,
+        "shadow-min-share must be in (0, 1], not " + shadowMinShare);
+    require(shadowMinSeconds > 0, "shadow-min-seconds must be positive, not " + shadowMinSeconds);
+  }
+
+  private static void require(boolean ok, String message) {
+    if (!ok) {
+      throw new IllegalStateException("replay.analysis.lanes." + message);
+    }
+  }
 }

@@ -121,6 +121,39 @@ class LaneAssemblerTest {
   }
 
   @Test
+  void assemble_givesASupportWhoShadowedTheCarryHisLaneAndMakesThemPartners() {
+    long support = 1;
+    long enemy = DIRE;
+    ReplayPlayerTrackDomain beside =
+        ReplayPlayerTrackDomain.builder()
+            .startSeconds(0)
+            .stepSeconds(10)
+            .x(new int[80])
+            .y(new int[80])
+            .build();
+    Map<Long, List<ActivitySegment>> segments =
+        Map.of(
+            RADIANT, List.of(inLane(0, 600, Zone.Lane.MID)),
+            support, List.of(inLane(0, 100, Zone.Lane.MID), inRiver(100, 600)),
+            enemy, List.of(inLane(0, 600, Zone.Lane.MID)));
+
+    LaneRows rows =
+        new LaneAssembler(new LaneProperties(), values, List.of())
+            .assemble(
+                inputs(
+                    segments,
+                    Map.of(
+                        RADIANT, TeamSide.RADIANT, support, TeamSide.RADIANT, enemy, TeamSide.DIRE),
+                    List.of(),
+                    List.of(),
+                    Map.of(RADIANT, beside, support, beside)),
+                1);
+
+    assertThat(of(rows, support).getLane()).isEqualTo("MID");
+    assertThat(of(rows, support).getPairId()).isEqualTo(of(rows, RADIANT).getPairId());
+  }
+
+  @Test
   void assemble_listsAHeroWhoArrivesAfterTheOtherSideLeftAsHavingNoLaneAndKeepsHimOutOfTheRows() {
     Map<Long, List<ActivitySegment>> segments =
         Map.of(

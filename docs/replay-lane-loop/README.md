@@ -15,6 +15,8 @@ The laning stage (who won each lane, and why) is shaped by review rounds on a sm
 
 **Lane of a hero.** The lane zone (`MapLayout.zone`, from the activity segments) where he spent most of his time alive between `assign-from-seconds` (0) and `assign-to-seconds` (240), provided it is at least `min-lane-share` (0.4) of that time and more than his time farming the jungle. The heroes of both teams in the same geographic lane are one lane pair; a tri-lane is a pair with three heroes on one side, a solo mid is one against one.
 
+**Lane of a hero who shadowed a teammate** (`LaneShadowAssigner`, analysis version 2). A hero with no lane by the rule above (a support who started in another lane, or walked with the carry outside the zone) is looked at once more, lane by lane of his own team's heroes who have one. Over the laning window of that lane's holders (first arrival to last departure), the seconds he was alive and either in the lane zone or within `shadow-distance` (1500 units) of a teammate who has the lane (and is inside his own window) must be at least `shadow-min-share` (0.5) of his time alive in that window, at least `shadow-min-seconds` (60) and more than his time farming the jungle there; the lane with most such seconds is his. Then his laning window is found as for any lane hero, so he must also stand in the lane zone at some time. A hero who roamed or jungled fails the share and stays without a lane. The properties are checked when the application starts (`LaneProperties.validate`).
+
 **Laning window of a hero** (`LaningWindows`). It starts when he first stands in his lane (never before 0:00). It ends at the first of:
 
 - he left: a stretch outside his lane that holds `away-seconds` (30) of farming the jungle or another lane, or holds `return-seconds` (60) in all. Time dead and the first `respawn-grace-seconds` (45) after a respawn (the walk back from the fountain) do not count (a teleport or a trip to the base he did not come back from, or standing in the river). The end is when the stretch began, so a fountain trip with a return inside 60 s, and passing through another lane, are not an end;
@@ -57,6 +59,8 @@ A new reason is a new bean; the analyzer does not change.
 - A jungle pull is not a stored event; a stack is (the per minute count), so `STACKED_CAMPS` is the only trace of the support's camp work.
 - Experience and gold in the window come from OpenDota's per minute series by a straight line; without the match detail import they are empty and the experience term counts as no difference.
 - Lane heroes are told apart from heroes in a lane only by the 4 minutes of the assignment span: a hero who switches lane after minute 4 keeps his first lane, and his time in the other lane ends his laning.
+
+- The shadow rule judges by the window of the lane his team holds, not by the first 4 minutes: a hero who laned with one carry for 2 minutes and then walked to another lane gets the lane where he spent most of that lane's window, and a hero with a lane of his own is never moved. His position is taken from the 5 second track samples, so a short visit is not seen. Two teammates in different lanes both far from him in a fight-heavy opening can leave him without a lane. The distance is measured to the teammate's position at the same second, in a straight line, with no allowance for cliffs or the river.
 
 ## Commands
 
