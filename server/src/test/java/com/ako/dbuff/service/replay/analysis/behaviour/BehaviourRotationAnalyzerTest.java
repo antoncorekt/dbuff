@@ -1,0 +1,169 @@
+package com.ako.dbuff.service.replay.analysis.behaviour;
+
+import com.ako.dbuff.dao.model.FightDomain;
+import com.ako.dbuff.dao.model.FightPlayerDomain;
+import com.ako.dbuff.dao.model.ReplayCombatLogDomain;
+import com.ako.dbuff.dao.model.ReplayParseRunDomain;
+import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
+import com.ako.dbuff.dao.model.ReplayStatus;
+import com.ako.dbuff.dao.model.TeamRotationDomain;
+import com.ako.dbuff.dao.repo.FightPlayerRepo;
+import com.ako.dbuff.dao.repo.FightRepo;
+import com.ako.dbuff.dao.repo.ReplayCombatLogRepo;
+import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
+import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
+import com.ako.dbuff.dao.repo.TeamRotationRepo;
+import com.ako.dbuff.service.replay.CombatLogCodec;
+import com.ako.dbuff.service.replay.CombatLogReader;
+import com.ako.dbuff.service.replay.ReplayProcessingProperties;
+import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
+import com.ako.dbuff.service.replay.analysis.fight.PlayerTraces;
+import com.ako.dbuff.service.replay.map.MapLayouts;
+import com.ako.dbuff.service.replay.map.MatchMapLayout;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.IntStream;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@DataJpaTest
+@ActiveProfiles("test")
+@Import({
+  BehaviourRotationAnalyzer.class,
+  BehaviourProperties.class,
+  PlayerTraces.class,
+  StoredActivity.class,
+  CombatLogReader.class,
+  MapLayouts.class,
+  MatchMapLayout.class,
+  ReplayProcessingProperties.class,
+  BehaviourRotationAnalyzerTest.Json.class
+})
+class BehaviourRotationAnalyzerTest {
+  private static final long MATCH = 12L;
+  private static final int SAMPLES = 40;
+
+  @Autowired private BehaviourRotationAnalyzer analyzer;
+  @Autowired private MapLayouts layouts;
+  @Autowired private ReplayProcessingProperties processing;
+  @Autowired private ReplayParseRunRepo runRepo;
+  @Autowired private ReplayPlayerTrackRepo trackRepo;
+  @Autowired private ReplayCombatLogRepo combatLogRepo;
+  @Autowired private FightRepo fightRepo;
+  @Autowired private FightPlayerRepo fightPlayerRepo;
+  @Autowired private TeamRotationRepo rotationRepo;
+
+  @Test
+  void analyze_storesTheRotationOfAHeroWhoLeftTheGroupAndTookPartInAWonFight() {
+    stored(layouts.frozenVersion());
+
+    analyzer.analyze(MATCH);
+    analyzer.analyze(MATCH);
+
+    List<TeamRotationDomain> rows = rotationRepo.findAll();
+    assertThat(rows).hasSize(1);
+    TeamRotationDomain row = rows.getFirst();
+    assertThat(row.getPlayerSlot()).isEqualTo(4L);
+    assertThat(row.getTeam()).isEqualTo("RADIANT");
+    assertThat(row.getToZone()).isEqualTo("LANE");
+    assertThat(row.getFights()).isEqualTo(1);
+    assertThat(row.getFightsWon()).isEqualTo(1);
+    assertThat(row.getVerdict()).isEqualTo("GOOD");
+    assertThat(row.getAnalysisVersion()).isEqualTo(1);
+  }
+
+  @Test
+  void analyze_storesNothingForAMatchPlayedOnAnotherMapVersion() {
+    stored("0123456789ab");
+
+    analyzer.analyze(MATCH);
+
+    assertThat(rotationRepo.findAll()).isEmpty();
+  }
+
+  @Test
+  void deleteByMatchId_removesTheRotations() {
+    stored(layouts.frozenVersion());
+    analyzer.analyze(MATCH);
+
+    analyzer.deleteByMatchId(MATCH);
+
+    assertThat(rotationRepo.findAll()).isEmpty();
+  }
+
+  private void track(long slot, int[] x, int[] y) {
+    int[] ones = new int[SAMPLES];
+    Arrays.fill(ones, 1);
+    trackRepo.saveAndFlush(
+        ReplayPlayerTrackDomain.builder()
+            .matchId(MATCH)
+            .playerSlot(slot)
+            .startSeconds(0)
+            .stepSeconds(5)
+            .sampleCount(SAMPLES)
+            .x(x)
+            .y(y)
+            .hpPercent(ones)
+            .manaPercent(ones)
+            .level(ones)
+            .flags(ones)
+            .build());
+  }
+
+  private void stored(String mapVersion) {
+    runRepo.saveAndFlush(
+        ReplayParseRunDomain.builder()
+            .matchId(MATCH)
+            .parserVersion(processing.getParserVersion())
+            .status(ReplayStatus.DONE)
+            .attempts(1)
+            .mapVersion(mapVersion)
+            .build());
+    int[] mid = IntStream.range(0, SAMPLES).map(i -> -1000).toArray();
+    for (long slot = 0; slot < 4; slot++) {
+      track(slot, mid, mid);
+    }
+    track(
+        4,
+        IntStream.range(0, SAMPLES).map(i -> i < 4 ? -1000 : -6000).toArray(),
+        IntStream.range(0, SAMPLES).map(i -> i < 4 ? -1000 : 5500).toArray());
+    fightRepo.saveAndFlush(
+        FightDomain.builder()
+            .matchId(MATCH)
+            .fightIndex(0)
+            .startSeconds(60.0)
+            .endSeconds(80.0)
+            .winner("RADIANT")
+            .build());
+    fightPlayerRepo.saveAndFlush(
+        FightPlayerDomain.builder()
+            .matchId(MATCH)
+            .fightIndex(0)
+            .playerSlot(4L)
+            .presence("ACTIVE")
+            .build());
+    combatLogRepo.saveAndFlush(
+        ReplayCombatLogDomain.builder()
+            .matchId(MATCH)
+            .codecVersion(CombatLogCodec.VERSION)
+            .eventCount(0)
+            .data(CombatLogCodec.encode(List.of()))
+            .build());
+  }
+
+  @TestConfiguration
+  static class Json {
+    @Bean
+    ObjectMapper objectMapper() {
+      return new ObjectMapper();
+    }
+  }
+}
