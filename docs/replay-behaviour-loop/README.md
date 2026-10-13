@@ -1,10 +1,12 @@
 # Team behaviour learning loop
 
-How the teams moved as a group, and who rotated, is shaped by review rounds on a small fixed list of matches. The method and the shared runner are in `docs/replay-review-loop.md`; the plan is `docs/superpowers/plans/2026-10-13-replay-team-behaviour-plan.md` (A6). This file is what is specific to the `behaviour` topic, as far as PRs B1 and B1b (rotations, mid-game verdict and reasons) go; group or split, smoke and objectives come with B2 to B4.
+How the teams moved as a group, and who rotated, is shaped by review rounds on a small fixed list of matches. The method and the shared runner are in `docs/replay-review-loop.md`; the plan is `docs/superpowers/plans/2026-10-13-replay-team-behaviour-plan.md` (A6). This file is what is specific to the `behaviour` topic, as far as PRs B1, B1b and B2 (rotations, mid-game verdict and reasons, group or split, lane swap) go; smoke and objectives come with B3 and B4.
 
 ## What is stored
 
 `BehaviourRotationAnalyzer` (`rotations`, `@Order(90)`, version 2; requires `players`, `tracks`, `activity`, `combat-log`, `creep-kills`, `deaths`, `buybacks`, `fights`, `lanes`, `building-kills`) writes `team_rotation`, one row per rotation with its reasons and income numbers, replaced per match. All numbers are first guesses in `BehaviourProperties` (`replay.analysis.behaviour.*`).
+
+`BehaviourSplitAnalyzer` (`team-splits`, `@Order(91)`, version 1; requires `players`, `tracks`, `activity`, `deaths`, `lanes`, `building-kills`) writes `team_split_stretch`, and `BehaviourLaneSwapAnalyzer` (`lane-swaps`, `@Order(92)`, version 1; requires `players`, `tracks`, `lanes`) writes `team_lane_swap`; both replaced per match.
 
 ## Rules
 
@@ -22,7 +24,19 @@ How the teams moved as a group, and who rotated, is shaped by review rounds on a
 
 **Verdict** (`RotationVerdict`). DIED (he died before the trip ended; a buyback ends the trip too), else GOOD (a kill or assist, or a won fight), else WASTED (the lane he left was lost, or DID_NOTHING together with INCOME_DROP, or a tower fell while he was away), else NEUTRAL. A trip is stored when he died, fought, got a kill, or it is WASTED.
 
+**Group or split** (`PostureClassifier`, `PostureMinutes`, `SplitStretches`). From the end of the latest lane pair (`lane_result.end_seconds`, else `split-fallback-start-seconds`, 720), rounded up to a whole minute, every 5 s sample of a team is labelled from its living heroes (dead ones are not counted; a sample where the team has fewer than `posture-min-living-heroes` (4) living heroes gets no label, so two or three survivors are never GROUPED or SPLIT): GROUPED when the biggest cluster holds `grouped-min-heroes` (4) heroes, or all of them when fewer are alive; else SPLIT when at least `split-min-alone-heroes` (2) heroes are alone (a group of three and two lone heroes is SPLIT, a group of three and a pair is MIXED) (outside the cluster, not farming the jungle, no living teammate within `cluster-distance`, so two alone heroes are always far apart, in different lanes or not); else MIXED. A minute takes its most frequent label (a tie is MIXED). Neighbouring equal minutes join; a stretch shorter than `min-stretch-minutes` (2) is absorbed by its longer neighbour (the one before on a tie), shortest first; a minute with fewer than two living heroes breaks the run. Each stretch stores towers the team lost and enemy towers it took (`building_kill_context`, a deny is not taken), its own heroes that died and the enemy heroes that died (`own_heroes_died`, `enemy_heroes_died`, from the death rows, so any cause counts: a kill, a tower, neutrals, a denied hero).
+
+**Lane swap** (`LaneSwaps`). The main lane of a hero with a stored lane is the lane zone he stood in for most of his living samples in minutes `swap-from-minute` (8) to `swap-to-minute` (12), needing at least `swap-min-share` (0.5) of them and no tie; a different lane than the stored one is a swap, from the first to the last time he was seen in it in the window. A hero mostly in the jungle, river or base has no main lane and is not a swap. A hero without a stored lane is not examined.
+
 ## What the data cannot tell
+
+- Group or split is geometric. With 4 of 5 heroes needed within 2500 units of each other most minutes after the lane stage come out MIXED; the thresholds are first guesses to tune. MIXED also covers a pair and a trio, which is a normal way to push.
+
+- "What happened" counts everything inside the stretch, not only what the posture caused; the death counts include any cause.
+- The lane swap does not use the stored lane window: a hero whose lane window ended before minute 8 is exactly the swap case, so the rule is a sustained share (50%) of his living time in minutes 8 to 12 in another lane.
+- Finding the activity segment of a sample is a linear search (samples x heroes x segments); small in absolute terms, not optimised.
+- `grouped-min-heroes` must be at least `min-cluster-size`, `posture-min-living-heroes` 2 to 5 and `split-min-alone-heroes` 2 to 5; the application refuses to start otherwise.
+- The lane swap needs a stored lane; a hero the lane analysis gave no lane (a support who stood in a lane next to his carry, for example) is never listed, and his carry then shows no lane partner.
 
 - A kill is any enemy hero death the hero killed or assisted in; it is not necessarily the target of the rotation.
 - The creep-kill proxy exists in the laning stage only; later WASTED comes from the income drop or a lost tower. The income reads gold from OpenDota's totals and is also moved by kills, buybacks and item purchases of the heroes of the group, so it is a hint, not a proof.
@@ -48,7 +62,7 @@ The match list is `server/src/test/resources/replay/behaviour-loop/matches.txt` 
 
 ## Output
 
-One `<matchId>.md` per match and `summary.md` with the diff against the previous round: a "how to read this" line and a one-line summary (counts per verdict and per reason), then one table, `Rotations` (key: "Radiant Mirana at 12:10"): the trip in words (where he left, where he got, when, how long, whether teleported, how it ended), what came of it (fights and wins with the time and place of the key fight, kills or assists, creeps), the lane he left with the proxy counts, the verdict, why (every reason in words, with the farm numbers as 1.2k gold per minute), and an empty `owner verdict` column last.
+One `<matchId>.md` per match and `summary.md` with the diff against the previous round: a "how to read this" line and a one-line summary (counts per verdict and per reason), then three tables. `Rotations` (key: "Radiant Mirana at 12:10"): the trip in words (where he left, where he got, when, how long, whether teleported, how it ended), what came of it (fights and wins with the time and place of the key fight, kills or assists, creeps), the lane he left with the proxy counts, the verdict, why (every reason in words, with the farm numbers as 1.2k gold per minute), and an empty `owner verdict` column last. `Group or split` (key: "Radiant 18:00 to 23:30"): how the team stood in words (together, split up, mixed) and what happened (towers lost and taken, heroes that died on each side). `Lane swaps` (key: "Dire Mirana at 9:00"): one sentence with the hero, his role when known, the lane before and after and the clock. Each table has its own how-to-read line and an empty `owner verdict` column last.
 
 ## Reviewing
 

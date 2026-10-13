@@ -2,7 +2,9 @@ package com.ako.dbuff.service.replay.behaviourloop;
 
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
+import com.ako.dbuff.dao.model.TeamLaneSwapDomain;
 import com.ako.dbuff.dao.model.TeamRotationDomain;
+import com.ako.dbuff.dao.model.TeamSplitStretchDomain;
 import com.ako.dbuff.service.replay.analysis.behaviour.AwayTrip;
 import com.ako.dbuff.service.replay.analysis.behaviour.BehaviourProperties;
 import com.ako.dbuff.service.replay.analysis.behaviour.RotationReason;
@@ -49,6 +51,9 @@ final class BehaviourLoopReport {
       Map<Long, String> heroNames,
       List<TeamRotationDomain> rotations,
       List<FightDomain> fights,
+      List<TeamSplitStretchDomain> stretches,
+      List<TeamLaneSwapDomain> swaps,
+      Map<Long, Integer> roles,
       BehaviourProperties properties) {}
 
   private BehaviourLoopReport() {}
@@ -65,9 +70,17 @@ final class BehaviourLoopReport {
                 d.properties().getProxyWindowSeconds(),
                 d.properties().getIncomeTailSeconds(),
                 Math.round(d.properties().getIncomeShare() * 100)),
-            summary(d)));
+            summary(d) + " " + BehaviourSplitSections.summary(d.stretches(), d.swaps())));
     out.add("");
     out.addAll(table(d));
+    out.add("");
+    out.add(BehaviourSplitSections.stretchesHowToRead(d.properties()));
+    out.add("");
+    out.addAll(BehaviourSplitSections.stretchTable(d.stretches()));
+    out.add("");
+    out.add(BehaviourSplitSections.swapsHowToRead(d.properties()));
+    out.add("");
+    out.addAll(BehaviourSplitSections.swapTable(d.swaps(), d.heroNames(), d.roles()));
     return String.join("\n", out) + "\n";
   }
 

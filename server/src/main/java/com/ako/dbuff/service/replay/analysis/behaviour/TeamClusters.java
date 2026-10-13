@@ -11,7 +11,11 @@ import java.util.Optional;
  * distance. On a tie the tighter group wins, then the lower slots, so the answer is stable.
  */
 public final class TeamClusters {
-  public record Point(double x, double y) {}
+  public record Point(double x, double y) {
+    public double distanceTo(Point other) {
+      return Math.hypot(x - other.x, y - other.y);
+    }
+  }
 
   private final double distance;
   private final int minSize;
@@ -66,9 +70,7 @@ public final class TeamClusters {
   private boolean allClose(List<Long> group, Map<Long, Point> alive) {
     for (int i = 0; i < group.size(); i++) {
       for (int j = i + 1; j < group.size(); j++) {
-        Point a = alive.get(group.get(i));
-        Point b = alive.get(group.get(j));
-        if (Math.hypot(a.x() - b.x(), a.y() - b.y()) > distance) {
+        if (alive.get(group.get(i)).distanceTo(alive.get(group.get(j))) > distance) {
           return false;
         }
       }
@@ -84,8 +86,6 @@ public final class TeamClusters {
 
   private static double spread(List<Long> group, Map<Long, Point> alive) {
     Point c = centre(group, alive);
-    return group.stream()
-        .mapToDouble(s -> Math.hypot(alive.get(s).x() - c.x(), alive.get(s).y() - c.y()))
-        .sum();
+    return group.stream().mapToDouble(s -> alive.get(s).distanceTo(c)).sum();
   }
 }
