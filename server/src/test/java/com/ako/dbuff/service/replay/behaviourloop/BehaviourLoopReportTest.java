@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.behaviourloop;
 
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
+import com.ako.dbuff.dao.model.SmokeUseDomain;
 import com.ako.dbuff.dao.model.TeamLaneSwapDomain;
 import com.ako.dbuff.dao.model.TeamRotationDomain;
 import com.ako.dbuff.dao.model.TeamSplitStretchDomain;
@@ -54,6 +55,7 @@ class BehaviourLoopReportTest {
                 .zone("LANE")
                 .lane("TOP")
                 .build()),
+        List.of(),
         List.of(),
         List.of(),
         Map.of(),
@@ -163,6 +165,7 @@ class BehaviourLoopReportTest {
         base.fights(),
         stretches,
         swaps,
+        base.smokes(),
         roles,
         base.properties());
   }
@@ -219,5 +222,59 @@ class BehaviourLoopReportTest {
                 + " lane at 9:00 (in it until 11:55) | |")
         .contains("1 lane swap.")
         .doesNotContain("TOP");
+  }
+
+  @Test
+  void render_tellsASmokeInPlainWordsWithTheVerdictColumnEmptyAndLast() {
+    MatchData base = data(List.of());
+    MatchData withSmoke =
+        new MatchData(
+            base.matchId(),
+            base.match(),
+            base.modeName(),
+            base.heroNames(),
+            base.rotations(),
+            base.fights(),
+            base.stretches(),
+            base.swaps(),
+            List.of(
+                SmokeUseDomain.builder()
+                    .team("RADIANT")
+                    .userSlot(0L)
+                    .groupSlots("0,128")
+                    .startSeconds(1431)
+                    .endSeconds(1440)
+                    .endReason("BROKEN")
+                    .startZone("LANE")
+                    .startLane("MID")
+                    .endZone("RIVER")
+                    .outcome("PAID_OFF")
+                    .kills(2)
+                    .buildings(1)
+                    .roshanKills(0)
+                    .groupDeaths(1)
+                    .enemyDeaths(2)
+                    .build()),
+            base.roles(),
+            base.properties());
+
+    String report = BehaviourLoopReport.render(withSmoke);
+
+    assertThat(report)
+        .contains("## Smoke")
+        .contains(
+            "| Radiant Axe at 23:51 | Axe, Mirana | 23:51 to 24:00 (9 s), the smoke broke | from"
+                + " the mid lane to the river | paid off | killed or helped kill 2 enemy heroes, 1"
+                + " enemy tower or barracks fell, 1 of the group died | |")
+        .contains(
+            "Smoke: 1 use (Radiant 1, Dire 0): 1 paid off, 0 came to nothing, 0 backfired; 0"
+                + " ran out, 1 broke.")
+        .doesNotContain("PAID_OFF");
+  }
+
+  @Test
+  void render_noSmokeIsASummaryPhrase() {
+    assertThat(BehaviourLoopReport.render(data(List.of())))
+        .contains("Smoke: no smoke uses stored.");
   }
 }

@@ -13,9 +13,7 @@ import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.TeamRotationRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
-import com.ako.dbuff.service.replay.CombatHeroes;
 import com.ako.dbuff.service.replay.CombatLogReader;
-import com.ako.dbuff.service.replay.PlayerSlots;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
 import com.ako.dbuff.service.replay.analysis.building.BuildingName;
@@ -121,16 +119,15 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
 
   private RotationFinder.Inputs inputs(long matchId, Map<Long, Trace> traces) {
     List<CombatEvent> events = combatLog.events(matchId);
-    Map<String, Long> slotByHero = new HashMap<>();
-    CombatHeroes.playerIndexByHero(events, playerRepo.findByMatchId(matchId))
-        .forEach((hero, index) -> slotByHero.put(hero, PlayerSlots.slot(index)));
+    Map<String, Long> slotByHero = CombatSlots.byHero(events, playerRepo.findByMatchId(matchId));
     return new RotationFinder.Inputs(
         traces,
         activity.bySlot(matchId),
         eventTimes.deaths(matchId),
         eventTimes.buybacks(matchId),
         laneSlots.of(matchId),
-        new TripOutcomes.Events(kills(events, slotByHero), creeps(matchId), fights(matchId)),
+        new TripOutcomes.Events(
+            CombatSlots.kills(events, slotByHero), creeps(matchId), fights(matchId)),
         midGame(matchId, events, slotByHero));
   }
 
@@ -171,33 +168,6 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
           .ifPresent(b -> hits.add(new DamageHit(slot, e.gameSecond(), true)));
     }
     return hits;
-  }
-
-  private static Map<Long, List<Double>> kills(
-      List<CombatEvent> events, Map<String, Long> slotByHero) {
-    Map<Long, List<Double>> kills = new HashMap<>();
-    for (CombatEvent e : events) {
-      Long victim = slotByHero.get(e.target());
-      if (e.kind() != CombatEventKind.DEATH || !e.targetIsRealHero() || victim == null) {
-        continue;
-      }
-      Set<Long> takers = new HashSet<>();
-      Long killer = slotByHero.get(e.attacker());
-      if (killer != null && e.attackerIsRealHero()) {
-        takers.add(killer);
-      }
-      for (int index = 0; index < 10; index++) {
-        if ((e.assistMask() & (1 << index)) != 0) {
-          takers.add(PlayerSlots.slot(index));
-        }
-      }
-      for (Long taker : takers) {
-        if (TeamSide.ofSlot(taker) != TeamSide.ofSlot(victim)) {
-          kills.computeIfAbsent(taker, s -> new ArrayList<>()).add(e.gameSecond());
-        }
-      }
-    }
-    return kills;
   }
 
   private List<CreepHit> creeps(long matchId) {

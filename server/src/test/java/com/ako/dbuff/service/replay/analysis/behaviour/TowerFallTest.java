@@ -31,6 +31,22 @@ class TowerFallTest {
   }
 
   @Test
+  void ofObjectives_keepsTheBarracksAndTheAncientToo() {
+    List<TowerFall> falls =
+        TowerFall.ofObjectives(
+            List.of(
+                building("TOWER").build(),
+                building("BARRACKS_MELEE").build(),
+                building("BARRACKS_RANGED").build(),
+                building("FORT").build(),
+                building("OTHER").build(),
+                building(null).build(),
+                building("FORT").seconds(null).build()));
+
+    assertThat(falls).hasSize(4);
+  }
+
+  @Test
   void opponent_isTheOtherTeam() {
     assertThat(TeamSide.RADIANT.opponent()).isEqualTo(TeamSide.DIRE);
     assertThat(TeamSide.DIRE.opponent()).isEqualTo(TeamSide.RADIANT);
