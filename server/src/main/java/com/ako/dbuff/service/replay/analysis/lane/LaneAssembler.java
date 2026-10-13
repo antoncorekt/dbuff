@@ -34,6 +34,7 @@ final class LaneAssembler {
 
   private final LaneProperties properties;
   private final LaneAssigner assigner;
+  private final LaneShadowAssigner shadow;
   private final LaningWindows windows;
   private final CreepTally tally;
   private final LaneVerdict verdict;
@@ -43,6 +44,7 @@ final class LaneAssembler {
       LaneProperties properties, CreepValues values, List<LaneReasonContributor> contributors) {
     this.properties = properties;
     this.assigner = new LaneAssigner(properties);
+    this.shadow = new LaneShadowAssigner(properties);
     this.windows = new LaningWindows(properties);
     this.tally = new CreepTally(values, properties);
     this.verdict = new LaneVerdict(properties);
@@ -50,26 +52,17 @@ final class LaneAssembler {
   }
 
   LaneRows assemble(LaneInputs in, int version) {
-    Map<Long, Zone.Lane> lanes = assigner.assign(rosterOnly(in));
+    Map<Long, List<ActivitySegment>> roster = rosterOnly(in);
     Map<Zone.Lane, Tower> towers = firstTowers(in.buildings());
-    List<LaneHero> heroes = new ArrayList<>();
-    for (Map.Entry<Long, Zone.Lane> e : new TreeMap<>(lanes).entrySet()) {
-      List<ActivitySegment> segments = in.segments().get(e.getKey());
-      Tower tower = towers.get(e.getValue());
-      windows
-          .find(
-              segments,
-              e.getValue(),
-              tower == null ? null : tower.second(),
-              segments.get(segments.size() - 1).endSeconds())
-          .ifPresent(
-              w ->
-                  heroes.add(
-                      new LaneHero(e.getKey(), in.teams().get(e.getKey()), e.getValue(), w)));
-    }
+    Map<Long, Zone.Lane> primary = assigner.assign(roster);
+    List<LaneHero> heroes = laneHeroes(in, primary, towers);
     heroes.removeIf(LaneAssembler::arrivedTooLate);
     clipToContest(heroes);
     heroes.removeIf(LaneAssembler::arrivedTooLate);
+    Map<Long, Zone.Lane> shadowed =
+        shadow.assign(roster, in.teams(), in.tracks(), heroes, primary.keySet());
+    List<LaneHero> shadowHeroes = limitToHolders(laneHeroes(in, shadowed, towers), heroes);
+    heroes.addAll(shadowHeroes);
     Map<Long, LaneHero> laneHeroes =
         heroes.stream().collect(Collectors.toMap(LaneHero::slot, h -> h));
     Set<Long> withoutLane = new TreeSet<>(in.teams().keySet());
@@ -116,6 +109,53 @@ final class LaneAssembler {
       }
     }
     return new LaneRows(assignmentRows(in, laneHeroes, version), playerStats, results, reasons);
+  }
+
+  private List<LaneHero> laneHeroes(
+      LaneInputs in, Map<Long, Zone.Lane> lanes, Map<Zone.Lane, Tower> towers) {
+    List<LaneHero> heroes = new ArrayList<>();
+    for (Map.Entry<Long, Zone.Lane> e : new TreeMap<>(lanes).entrySet()) {
+      List<ActivitySegment> segments = in.segments().get(e.getKey());
+      Tower tower = towers.get(e.getValue());
+      windows
+          .find(
+              segments,
+              e.getValue(),
+              tower == null ? null : tower.second(),
+              segments.get(segments.size() - 1).endSeconds())
+          .ifPresent(
+              w ->
+                  heroes.add(
+                      new LaneHero(e.getKey(), in.teams().get(e.getKey()), e.getValue(), w)));
+    }
+    return heroes;
+  }
+
+  /** A shadowing hero's window does not outlast that of the holders of his lane on his team. */
+  private static List<LaneHero> limitToHolders(
+      List<LaneHero> shadowHeroes, List<LaneHero> holders) {
+    List<LaneHero> limited = new ArrayList<>();
+    for (LaneHero h : shadowHeroes) {
+      int holdersEnd =
+          holders.stream()
+              .filter(o -> o.team() == h.team() && o.lane() == h.lane())
+              .mapToInt(o -> o.window().endSeconds())
+              .max()
+              .orElse(0);
+      LaningWindow w = h.window();
+      LaneHero kept =
+          w.endSeconds() <= holdersEnd
+              ? h
+              : new LaneHero(
+                  h.slot(),
+                  h.team(),
+                  h.lane(),
+                  new LaningWindow(w.startSeconds(), holdersEnd, LaneEnd.OPPONENTS_LEFT));
+      if (!arrivedTooLate(kept)) {
+        limited.add(kept);
+      }
+    }
+    return limited;
   }
 
   private static Map<Long, List<ActivitySegment>> rosterOnly(LaneInputs in) {
