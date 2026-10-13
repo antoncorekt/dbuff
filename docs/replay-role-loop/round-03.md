@@ -47,7 +47,7 @@
 | 9038725154 | 131 | Terrorblade | 2 | 1 | | OK | OK | |
 | 9038725154 | 132 | Jakiro | 1 | 2 | | OK | OK | intent was the leftover 5, now 1 with damage 1.00; expected 2, 1 tolerated. Final 2 OK |
 | 9037038717 | 0 | Crystal Maiden | 5 | 5 | | OK | OK | intent confidence 0.89 now |
-| 9037038717 | 1 | Void Spirit | 1 | 3 | 1 | REJECT | REJECT: accepted by the owner, kept as is | final 1 to 3: conflicts with Brewmaster (expected 1); fits 1(2.36) 3(1.91) 2(1.39), 16.4k, 195 last hits. Round 2 accepted 1; 2 or 3 adjacent. Intent OK |
+| 9037038717 | 1 | Void Spirit | 1 | 3 | 1 | REJECT | REJECT | final 1 to 3: conflicts with Brewmaster (expected 1); fits 1(2.36) 3(1.91) 2(1.39), 16.4k, 195 last hits. Round 2 accepted 1; 2 or 3 adjacent. Intent OK |
 | 9037038717 | 2 | Windrunner | 4 | 2 | 2 | REJECT | | intent was 2 and accepted; Infernal Blade, Ice Blast, Leap, Warcry now fits 3(2.07) 4(1.81) 2(1.63), 4 is the leftover: regression, expected 2 (3 tolerated). Final 2 OK |
 | 9037038717 | 3 | Brewmaster | 3 | 1 | | OK | OK | final fixed (was 3): 30.6k, 364 last hits, top damage of the team; intent 3 OK |
 | 9037038717 | 4 | Ancient Apparition | 2 | 4 | 4 | REJECT | | intent 2, was 1; Storm Bolt, Powershot, Shapeshift, Talon Toss: expected 3 or 4, 2 is adjacent; best fits 3(2.54) 2(2.20). Final 4 OK |
@@ -75,8 +75,14 @@
 - Venomancer (expected 3) is still 4; Void Spirit now conflicts with Brewmaster for the 1 and needs a reviewer's decision.
 - Next final-stage inputs: initiation and disable landed at fights (the fight tables), tower damage.
 - Intent rows still rejected as in round 2 (Sniper, Enchantress, Sven, Furion, Windrunner, Ancient Apparition, Tusk); the attack-skill rule was not changed for lack of a concrete safe change.
-- All Pick is not reviewed yet; it follows the same loop when the owner asks for it.
+- All Pick is skipped for now (owner, 2026-10-13); cleanup later.
 
 ## Owner verdict (2026-10-13)
 
-Round 3 is accepted as it is (owner, 2026-10-13). The open rows stay as recorded hypotheses: Void Spirit against Brewmaster for role 1 (the assistant's REJECT on Void Spirit is kept, accepted by the owner, kept as is), the Doom and Largo swap, and Venomancer. The other REJECT rows are the recorded intent hypotheses above and carry no owner mark.
+The owner accepted round 3 as it is (owner, 2026-10-13). The owner column is `OK` where the assistant said `OK` and `REJECT` where the assistant said `REJECT`; the REJECT rows are recorded hypotheses, not open work:
+
+- Final-stage rows: Void Spirit (conflicts with Brewmaster for role 1; accepted by the owner, kept as is) and Venomancer (expected 3, still 4).
+- Intent-stage rows: Sniper, Enchantress, Sven, Furion, Windrunner, Ancient Apparition, Tusk.
+- Team verdict: the Radiant PICK verdict `CARRIES_3,NO_SAVE_HEAL` of 9037038717.
+
+The Doom and Largo swap is OK in both columns and is not open.
