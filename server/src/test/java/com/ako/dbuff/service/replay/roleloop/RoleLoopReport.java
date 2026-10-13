@@ -30,6 +30,7 @@ final class RoleLoopReport {
   private static final List<String> TEAMS = List.of("RADIANT", "DIRE");
   private static final List<String> VERDICT_STAGES = List.of("PICK", "FINAL");
   private static final int FIRST_DIRE_SLOT = 5;
+  private static final int ROLE_COUNT = 5;
   private static final String HOW_TO_READ =
       "\"Roles\" gives each player's role in the game (final) and the role the draft meant"
           + " (intent, n/a where the mode has none), then the roles that suited the player best by"
@@ -218,27 +219,15 @@ final class RoleLoopReport {
   }
 
   private static String stageLine(PlayerRoleProfileDomain p) {
-    return "role %s (confidence %s), best fit %s, lane %s%n  - scores: %s%n  - %s%n  - evidence: %s"
+    return "role %s (confidence %s), best fit %s, lane %s%n  - scores, best first: %s%n  - %s%n  - evidence: %s"
         .formatted(
             LoopWording.role(p.getRole()),
             number(p.getConfidence()),
             LoopWording.role(p.getFitRole()),
             p.getLane() == null ? "unknown" : LoopWording.words(p.getLane()),
-            allScores(p.getRoleScores()),
+            LoopWording.bestFits(p.getRoleScores(), ROLE_COUNT),
             functions(p),
             blankAs(p.getEvidence(), "none"));
-  }
-
-  private static String allScores(String roleScores) {
-    if (roleScores == null || roleScores.isBlank()) {
-      return "unknown";
-    }
-    String[] parts = roleScores.split(",");
-    List<String> scores = new ArrayList<>();
-    for (int i = 0; i < parts.length; i++) {
-      scores.add("%s %s".formatted(LoopWording.role(i + 1), parts[i].strip()));
-    }
-    return String.join(", ", scores);
   }
 
   private static String functions(PlayerRoleProfileDomain p) {

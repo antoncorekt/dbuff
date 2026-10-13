@@ -175,7 +175,7 @@ class RoleLoopReportTest {
         .contains("- intent: role 1 carry (confidence 0.64), best fit 1 carry, lane safe")
         .contains("farm priority 0.90, jungle unknown")
         .contains("farm priority unknown")
-        .contains("scores: 1 carry 1.50, 2 mid 0.20, 3 offlane 0.10, 4 soft support 0.00")
+        .contains("scores, best first: carry 1.50, mid 0.20, offlane 0.10, soft support 0.00")
         .contains("evidence: nwRank=1")
         .contains("- drafted skills: ability 5, Sniper Shrapnel")
         .contains("- OpenDota: position 1, safe lane, net worth rank 1 of 5 (net worth 20k)")

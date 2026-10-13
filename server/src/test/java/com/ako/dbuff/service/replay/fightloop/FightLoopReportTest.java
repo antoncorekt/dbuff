@@ -88,8 +88,8 @@ class FightLoopReportTest {
     assertThat(report)
         .contains("| fight | main reason | gold lost | swing | OpenDota teamfight |")
         .contains(
-            "| Dire lost fight 5 at 23:03 | Windrunner had no teleport | 1.2k | swing 0 |"
-                + " 4 deaths, -1k gold change for the loser |")
+            "| Dire lost fight 5 at 23:03 | Windrunner had no teleport | 1.2k (deaths not priced:"
+                + " ?) | swing 0 | 4 deaths, -1k gold change for the loser |")
         .contains("| reason | fight | rank | also | severity | assistant | owner |")
         .contains("| Windrunner had no teleport | Dire lost fight 5 at 23:03 | 1 |  | 0.70 | | |")
         .contains("### Swing 0, 22:00 to 24:00: Radiant gained 3.2k gold (4.5%), cause: fight win")
@@ -107,7 +107,12 @@ class FightLoopReportTest {
                         new SwingExplanation(SWING, List.of(lost(5, 0, "DIRE", 1200L, "NO_TP")))),
                     List.of())));
 
-    assertThat(report.lines().filter(l -> l.startsWith("|")).toList())
+    assertThat(
+            report
+                .lines()
+                .takeWhile(l -> !l.startsWith("## " + FightLoopReport.NOTES))
+                .filter(l -> l.startsWith("|"))
+                .toList())
         .noneMatch(l -> l.contains("NO_TP") || l.contains("DIRE") || l.contains("npc_dota"));
   }
 
@@ -122,8 +127,83 @@ class FightLoopReportTest {
                     List.of())));
 
     assertThat(report)
+        .contains("| fight | reason | stored code | evidence |")
         .contains(
-            "- fight 5, Windrunner had no teleport: code NO_TP, evidence: no | teleport at start");
+            "| Dire lost fight 5 at 23:03 | Windrunner had no teleport | NO_TP | no \\| teleport at"
+                + " start |");
+  }
+
+  private static MatchExplanation single(LostFight fight) {
+    return new MatchExplanation(List.of(new SwingExplanation(SWING, List.of(fight))), List.of());
+  }
+
+  @Test
+  void aChangedCodeOrEvidenceUnderTheSameSentenceIsInTheDiff() {
+    LostFight before = lost(5, 0, "DIRE", 1200L, "NO_TP");
+    LostFight after = lost(5, 0, "DIRE", 1200L, "NO_TP");
+    after.reasons().get(0).reason().setEvidence("another note");
+
+    List<String> changes =
+        ReviewLoopDiff.changes(
+            FightLoopReport.render(data(single(before))),
+            FightLoopReport.render(data(single(after))),
+            FightLoopTopic.SECTIONS);
+
+    assertThat(changes)
+        .containsExactly(
+            "Dire lost fight 5 at 23:03 Windrunner had no teleport, evidence: no | teleport at"
+                + " start -> another note");
+  }
+
+  @Test
+  void twoReasonsWithTheSameSentenceKeepSeparateRows() {
+    LostFight base = lost(5, 0, "DIRE", 1200L, "NO_TP");
+    FightReasonDomain twin =
+        FightReasonDomain.builder()
+            .code("NO_TP")
+            .scope("PLAYER")
+            .subjectSlot(128L)
+            .team("DIRE")
+            .severity(0.5)
+            .evidence("second")
+            .build();
+    LostFight fight =
+        new LostFight(
+            base.fight(),
+            base.explanation(),
+            List.of(base.reasons().get(0), new RankedReason(2, twin, List.of(), true)),
+            2);
+
+    String report = FightLoopReport.render(data(single(fight)));
+
+    assertThat(report)
+        .contains("| Windrunner had no teleport (2) | Dire lost fight 5 at 23:03 | 2 |")
+        .contains("| Windrunner had no teleport (2) | NO_TP | second |");
+    assertThat(
+            ReviewLoopDiff.changes(report, report.replace("0.50", "0.60"), FightLoopTopic.SECTIONS))
+        .containsExactly(
+            "Windrunner had no teleport (2) Dire lost fight 5 at 23:03, severity: 0.50 -> 0.60");
+  }
+
+  @Test
+  void unknownUnmatchedDeathsShowAMarkerAndKnownOnesTheirCount() {
+    LostFight unknown = lost(5, 0, "DIRE", 1200L, "NO_TP");
+    LostFight none = lost(6, 0, "DIRE", 1200L, "NO_TP");
+    none.explanation().setUnmatchedDeaths(0);
+    LostFight some = lost(7, 0, "DIRE", 1200L, "NO_TP");
+    some.explanation().setUnmatchedDeaths(2);
+
+    String report =
+        FightLoopReport.render(
+            data(
+                new MatchExplanation(
+                    List.of(new SwingExplanation(SWING, List.of(unknown, none, some))),
+                    List.of())));
+
+    assertThat(report)
+        .contains("| 1.2k (deaths not priced: ?) | swing 0 |")
+        .contains("| 1.2k | swing 0 |")
+        .contains("| 1.2k (2 deaths not priced) | swing 0 |");
   }
 
   @Test
@@ -161,7 +241,10 @@ class FightLoopReportTest {
             FightLoopReport.render(data(second)),
             FightLoopTopic.SECTIONS);
 
-    assertThat(changes).containsExactly("Dire lost fight 5 at 23:03, gold lost: 1.2k -> 1.5k");
+    assertThat(changes)
+        .containsExactly(
+            "Dire lost fight 5 at 23:03, gold lost: 1.2k (deaths not priced: ?) -> 1.5k (deaths not"
+                + " priced: ?)");
   }
 
   @Test

@@ -101,6 +101,11 @@ public final class LoopWording {
    * 0.20}; {@code unknown} when the list is empty.
    */
   public static String bestFits(String roleScores) {
+    return bestFits(roleScores, BEST_FITS);
+  }
+
+  /** The best {@code limit} scores, at most one per role, highest first. */
+  public static String bestFits(String roleScores, int limit) {
     if (roleScores == null || roleScores.isBlank()) {
       return "unknown";
     }
@@ -108,7 +113,7 @@ public final class LoopWording {
     return IntStream.range(0, Math.min(parts.length, ROLES.size()))
         .boxed()
         .sorted(Comparator.comparingDouble(i -> -Double.parseDouble(parts[i])))
-        .limit(BEST_FITS)
+        .limit(limit)
         .map(i -> "%s %s".formatted(ROLES.get(i), parts[i].strip()))
         .collect(Collectors.joining(", "));
   }

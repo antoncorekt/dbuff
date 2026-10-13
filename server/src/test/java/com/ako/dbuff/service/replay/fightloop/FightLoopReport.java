@@ -15,6 +15,7 @@ import com.ako.dbuff.service.replay.looprunner.LoopWording;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -23,9 +24,10 @@ import java.util.stream.Collectors;
 
 /**
  * The review report of one stored match, as markdown. It only lays out what the tables hold; the
- * two tables headed {@link #FIGHTS} and {@link #REASONS} are what {@link FightLoopTopic} lets the
- * loop compare between rounds. The verdict columns are left empty for the reviewers, and the stored
- * codes and evidence behind a reason are listed under {@link #NOTES}, not in the tables.
+ * three tables headed {@link #FIGHTS}, {@link #REASONS} and {@link #NOTES} are what {@link
+ * FightLoopTopic} lets the loop compare between rounds. The verdict columns are left empty for the
+ * reviewers, and the stored codes and evidence behind a reason are in the {@link #NOTES} table
+ * only.
  */
 final class FightLoopReport {
   static final String FIGHTS = "Lost fights";
@@ -156,13 +158,30 @@ final class FightLoopReport {
               .formatted(
                   ReviewLoopReport.tableCell(fightLabel(lost)),
                   ReviewLoopReport.tableCell(mainReason(d, lost)),
-                  unmatched == null || unmatched == 0
-                      ? gold
-                      : "%s (%d deaths not priced)".formatted(gold, unmatched),
+                  unpriced(gold, unmatched),
                   ReviewLoopReport.tableCell(r.swing()),
                   openDotaFight(d, lost.fight())
                       .map(t -> openDotaText(d, t, loser))
                       .orElse("none")));
+    }
+    return out;
+  }
+
+  private static String unpriced(String gold, Integer unmatched) {
+    if (unmatched == null) {
+      return "?".equals(gold) ? gold : gold + " (deaths not priced: ?)";
+    }
+    return unmatched == 0 ? gold : "%s (%d deaths not priced)".formatted(gold, unmatched);
+  }
+
+  /** The sentence of each reason of a fight; a repeated sentence gets " (2)", " (3)". */
+  private static List<String> sentences(MatchData d, LostFight lost) {
+    Map<String, Integer> seen = new HashMap<>();
+    List<String> out = new ArrayList<>();
+    for (RankedReason ranked : lost.reasons()) {
+      String text = reasonText(d, ranked);
+      int n = seen.merge(text, 1, Integer::sum);
+      out.add(n == 1 ? text : text + " (" + n + ")");
     }
     return out;
   }
@@ -190,11 +209,13 @@ final class FightLoopReport {
                 "| reason | fight | rank | also | severity | assistant | owner |",
                 "|---|---|---|---|---|---|---|"));
     for (Row r : rows) {
-      for (RankedReason ranked : r.lost().reasons()) {
+      List<String> sentences = sentences(d, r.lost());
+      for (int i = 0; i < sentences.size(); i++) {
+        RankedReason ranked = r.lost().reasons().get(i);
         out.add(
             "| %s | %s | %s | %s | %s | | |"
                 .formatted(
-                    ReviewLoopReport.tableCell(reasonText(d, ranked)),
+                    ReviewLoopReport.tableCell(sentences.get(i)),
                     fightLabel(r.lost()),
                     ranked.ranked() ? String.valueOf(ranked.rank()) : NOT_RANKED,
                     ReviewLoopReport.tableCell(also(d, ranked)),
@@ -223,22 +244,31 @@ final class FightLoopReport {
 
   /** The stored code and evidence of every reason, for whoever needs to trace one. */
   private static List<String> notes(MatchData d, List<Row> rows) {
-    List<String> out = new ArrayList<>(List.of("## " + NOTES, ""));
+    List<String> out =
+        new ArrayList<>(
+            List.of(
+                "## " + NOTES,
+                "",
+                "| fight | reason | stored code | evidence |",
+                "|---|---|---|---|"));
     for (Row r : rows) {
-      for (RankedReason ranked : r.lost().reasons()) {
-        var reason = ranked.reason();
+      List<String> sentences = sentences(d, r.lost());
+      for (int i = 0; i < sentences.size(); i++) {
+        var reason = r.lost().reasons().get(i).reason();
         out.add(
-            "- fight %d, %s: code %s, evidence: %s"
+            "| %s | %s | %s | %s |"
                 .formatted(
-                    r.lost().fight().getFightIndex(),
-                    ReviewLoopReport.singleLine(reasonText(d, ranked)),
-                    reason.getCode(),
-                    reason.getEvidence() == null
-                        ? "none"
-                        : ReviewLoopReport.singleLine(reason.getEvidence())));
+                    fightLabel(r.lost()),
+                    ReviewLoopReport.tableCell(sentences.get(i)),
+                    ReviewLoopReport.tableCell(orQuestion(reason.getCode())),
+                    ReviewLoopReport.tableCell(orQuestion(reason.getEvidence()))));
       }
     }
     return out;
+  }
+
+  private static String orQuestion(String value) {
+    return value == null || value.isBlank() ? "?" : value;
   }
 
   private static String swingLine(SwingExplanation s) {

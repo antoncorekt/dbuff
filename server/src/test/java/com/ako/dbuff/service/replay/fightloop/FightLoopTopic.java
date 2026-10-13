@@ -20,7 +20,9 @@ class FightLoopTopic implements ReviewLoopTopic {
   static final Path MATCH_LIST = Path.of("src/test/resources/replay/fight-loop/matches.txt");
   static final List<Section> SECTIONS =
       List.of(
-          new Section(FightLoopReport.FIGHTS, "", 1), new Section(FightLoopReport.REASONS, "", 2));
+          new Section(FightLoopReport.FIGHTS, "", 1),
+          new Section(FightLoopReport.REASONS, "", 2),
+          new Section(FightLoopReport.NOTES, "", 2));
 
   private final StoredMatchModes matchModes;
   private final MatchRepo matchRepo;
