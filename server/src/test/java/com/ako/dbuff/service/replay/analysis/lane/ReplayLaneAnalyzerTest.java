@@ -7,6 +7,7 @@ import com.ako.dbuff.dao.model.LaneResultDomain;
 import com.ako.dbuff.dao.model.PlayerActivitySegmentDomain;
 import com.ako.dbuff.dao.model.PlayerRoleDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
+import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.dao.repo.BuildingKillContextRepo;
 import com.ako.dbuff.dao.repo.CreepKillRepo;
 import com.ako.dbuff.dao.repo.LaneAssignmentRepo;
@@ -16,6 +17,7 @@ import com.ako.dbuff.dao.repo.LaneResultRepo;
 import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
+import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.replay.CombatLogReader;
@@ -70,6 +72,7 @@ class ReplayLaneAnalyzerTest {
   @Autowired private CreepKillRepo creepRepo;
   @Autowired private BuildingKillContextRepo buildingRepo;
   @Autowired private PlayerRoleRepo roleRepo;
+  @Autowired private ReplayPlayerTrackRepo trackRepo;
   @Autowired private LaneAssignmentRepo assignmentRepo;
   @Autowired private LanePlayerStatRepo statRepo;
   @Autowired private LaneResultRepo resultRepo;
@@ -158,6 +161,17 @@ class ReplayLaneAnalyzerTest {
     assertThat(dire.getOwnTowerFell()).isTrue();
     assertThat(radiant.getEnemyTowerFell()).isTrue();
     assertThat(radiant.getResult()).isEqualTo("WON");
+  }
+
+  @Test
+  void analyze_skipsTracksAndRolesWithoutASlotOrARole() {
+    stored();
+    roleRepo.save(PlayerRoleDomain.builder().matchId(MATCH).playerSlot(RADIANT_MID).build());
+    trackRepo.save(ReplayPlayerTrackDomain.builder().matchId(MATCH).build());
+
+    analyzer.analyze(MATCH);
+
+    assertThat(resultRepo.findByMatchId(MATCH)).hasSize(3);
   }
 
   @Test

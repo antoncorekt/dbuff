@@ -14,6 +14,7 @@ record HeroLaneStats(
     int meleeLastHits,
     int rangedLastHits,
     int siegeLastHits,
+    int otherLastHits,
     int denies,
     double creepScore,
     Double xp,

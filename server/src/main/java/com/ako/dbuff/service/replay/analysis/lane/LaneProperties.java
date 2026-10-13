@@ -29,6 +29,9 @@ public class LaneProperties {
    */
   private int returnSeconds = 60;
 
+  /** The first seconds after a respawn, the walk back from the fountain, do not count as away. */
+  private int respawnGraceSeconds = 45;
+
   /** The safety limit of the laning stage, in game seconds. */
   private int capSeconds = 900;
 

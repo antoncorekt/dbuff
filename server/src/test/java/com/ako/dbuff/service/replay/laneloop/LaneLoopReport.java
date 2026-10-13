@@ -291,12 +291,15 @@ final class LaneLoopReport {
                                       LoopWording.clock(a.getStartSeconds()),
                                       LoopWording.clock(a.getEndSeconds()),
                                       endWords(a.getEndReason()))),
-                          "%d (%d melee, %d ranged, %d siege)"
+                          "%d (%d melee, %d ranged, %d siege%s)"
                               .formatted(
                                   s.getLastHits(),
                                   s.getMeleeLastHits(),
                                   s.getRangedLastHits(),
-                                  s.getSiegeLastHits()),
+                                  s.getSiegeLastHits(),
+                                  s.getOtherLastHits() == null || s.getOtherLastHits() == 0
+                                      ? ""
+                                      : ", %d other".formatted(s.getOtherLastHits())),
                           s.getDenies(),
                           "%d, %d%% of his side"
                               .formatted(

@@ -156,4 +156,55 @@ class LaningWindowsTest {
     assertThat(w.contains(10)).isTrue();
     assertThat(w.contains(GAME_END)).isFalse();
   }
+
+  @Test
+  void find_doesNotCountTheWalkBackFromTheFountainAfterARespawnAsAway() {
+    LaningWindow w =
+        find(
+                null,
+                inLane(0, 300, LANE),
+                dead(300, 340),
+                inBase(340, 380),
+                inRiver(380, 385),
+                inLane(385, 700, LANE))
+            .orElseThrow();
+
+    assertThat(w.end()).isEqualTo(LaneEnd.GAME_END);
+  }
+
+  @Test
+  void find_countsOnlyTheTimeAfterTheRespawnGraceOfALongStretchAway() {
+    LaningWindow w =
+        find(null, inLane(0, 300, LANE), dead(300, 340), inBase(340, 440), inLane(440, 700, LANE))
+            .orElseThrow();
+
+    assertThat(w.end())
+        .as("100 s in base, 45 of them grace, 55 counted")
+        .isEqualTo(LaneEnd.GAME_END);
+  }
+
+  @Test
+  void find_endsWhenTheStretchAfterTheGraceReachesSixtySeconds() {
+    LaningWindow w =
+        find(null, inLane(0, 300, LANE), dead(300, 340), inBase(340, 460), inLane(460, 700, LANE))
+            .orElseThrow();
+
+    assertThat(w.endSeconds()).isEqualTo(385);
+    assertThat(w.end()).isEqualTo(LaneEnd.LEFT);
+  }
+
+  @Test
+  void find_doesNotAddTimeDeadInsideAStretchAwayToTheSixtySeconds() {
+    LaningWindow w =
+        find(
+                null,
+                inLane(0, 300, LANE),
+                inRiver(300, 330),
+                dead(330, 420),
+                inRiver(420, 445),
+                inLane(445, 700, LANE))
+            .orElseThrow();
+
+    assertThat(w.end()).as("30 + 25 s away, not 145").isEqualTo(LaneEnd.GAME_END);
+  }
 }

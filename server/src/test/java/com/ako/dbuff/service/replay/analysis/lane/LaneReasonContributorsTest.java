@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.assertj.core.api.Assertions.within;
 
 class LaneReasonContributorsTest {
   private static final long AXE = 0;
@@ -38,7 +39,7 @@ class LaneReasonContributorsTest {
 
   private static HeroLaneStats stats(long slot, int siege, int denies, int stacks) {
     return new HeroLaneStats(
-        slot, 10, 6, 3, siege, denies, 900, 1000.0, 1000.0, 5, 0, 0, 0, 0, 0, stacks);
+        slot, 10, 6, 3, siege, 0, denies, 900, 1000.0, 1000.0, 5, 0, 0, 0, 0, 0, stacks);
   }
 
   private LaneContext context(
@@ -253,5 +254,54 @@ class LaneReasonContributorsTest {
         0,
         0,
         0);
+  }
+
+  @Test
+  void harassment_countsOnlyTheDamageOfTheLaneOpponentsNotOfOtherLanes() {
+    hero(AXE, Zone.Lane.TOP, 10, 480);
+    hero(MIRANA, Zone.Lane.TOP, 10, 480);
+    hero(DOOM, Zone.Lane.BOTTOM, 10, 480);
+    Map<String, Long> slots =
+        Map.of(
+            "npc_dota_hero_axe", AXE, "npc_dota_hero_mirana", MIRANA, "npc_dota_hero_doom", DOOM);
+    Map<Long, LaningWindow> windows = new HashMap<>();
+    laneHeroes.forEach((slot, h) -> windows.put(slot, h.window()));
+    DamageLedger ledger =
+        new DamageLedger(
+            List.of(
+                damage("npc_dota_hero_mirana", "npc_dota_hero_axe", 200, 100),
+                damage("npc_dota_hero_axe", "npc_dota_hero_mirana", 200, 110),
+                damage("npc_dota_hero_doom", "npc_dota_hero_axe", 900, 120)),
+            slots,
+            windows);
+
+    assertThat(
+            new HarassmentContributor()
+                .contribute(context(Zone.Lane.TOP, TeamSide.RADIANT, ledger, Set.of())))
+        .as("200 taken against 200 dealt; Doom's 900 is a gank")
+        .isEmpty();
+  }
+
+  @Test
+  void earlyKill_keepsOneRowPerHeroAndCountsTheDeathsInTheEvidence() {
+    hero(AXE, Zone.Lane.TOP, 10, 480);
+    hero(MIRANA, Zone.Lane.TOP, 10, 480);
+    deaths = List.of(new LaneDeath(AXE, MIRANA, 150), new LaneDeath(AXE, MIRANA, 250));
+
+    List<LaneReason> radiant =
+        new EarlyKillContributor().contribute(context(Zone.Lane.TOP, TeamSide.RADIANT));
+    List<LaneReason> dire =
+        new EarlyKillContributor().contribute(context(Zone.Lane.TOP, TeamSide.DIRE));
+
+    assertThat(radiant)
+        .singleElement()
+        .satisfies(
+            r -> {
+              assertThat(r.evidence()).contains("2 times").contains("2:30").contains("4:10");
+              assertThat(r.severity()).as("the first death sets it").isCloseTo(0.45, within(0.01));
+            });
+    assertThat(dire)
+        .singleElement()
+        .satisfies(r -> assertThat(r.evidence()).contains("Axe at 2:30").contains("Axe at 4:10"));
   }
 }

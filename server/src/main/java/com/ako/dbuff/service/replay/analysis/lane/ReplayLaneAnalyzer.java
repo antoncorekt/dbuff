@@ -177,6 +177,7 @@ public class ReplayLaneAnalyzer implements ReplayAnalyzer {
     }
     Map<Long, ReplayPlayerTrackDomain> tracks =
         trackRepo.findByMatchId(matchId).stream()
+            .filter(t -> t.getPlayerSlot() != null)
             .collect(
                 Collectors.toMap(
                     ReplayPlayerTrackDomain::getPlayerSlot, Function.identity(), (a, b) -> a));
@@ -197,6 +198,7 @@ public class ReplayLaneAnalyzer implements ReplayAnalyzer {
         runeRepo.findByMatchId(matchId),
         heroNames.bySlot(matchId),
         roleRepo.findByMatchId(matchId).stream()
+            .filter(r -> r.getPlayerSlot() != null && r.getRole() != null)
             .collect(
                 Collectors.toMap(
                     PlayerRoleDomain::getPlayerSlot, PlayerRoleDomain::getRole, (a, b) -> a)),

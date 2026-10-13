@@ -67,7 +67,9 @@ final class LaneAssembler {
                   heroes.add(
                       new LaneHero(e.getKey(), in.teams().get(e.getKey()), e.getValue(), w)));
     }
+    heroes.removeIf(LaneAssembler::arrivedTooLate);
     clipToContest(heroes);
+    heroes.removeIf(LaneAssembler::arrivedTooLate);
     Map<Long, LaneHero> laneHeroes =
         heroes.stream().collect(Collectors.toMap(LaneHero::slot, h -> h));
     Set<Long> withoutLane = new TreeSet<>(in.teams().keySet());
@@ -148,6 +150,14 @@ final class LaneAssembler {
     return towers;
   }
 
+  /**
+   * A hero whose window has no time (he came after the tower fell or the contest ended) was not
+   * laning; he is listed as a hero with no lane.
+   */
+  private static boolean arrivedTooLate(LaneHero hero) {
+    return hero.window().length() <= 0;
+  }
+
   /** Ends the window of the side that stayed when the other side had left the lane. */
   private void clipToContest(List<LaneHero> heroes) {
     if (!properties.isEndWhenOpponentsLeft()) {
@@ -224,7 +234,10 @@ final class LaneAssembler {
     LaningWindow w = hero.window();
     var creeps =
         tally.tally(
-            in.creepKills().stream().filter(k -> hero.slot() == k.getPlayerSlot()).toList(), w);
+            in.creepKills().stream()
+                .filter(k -> k.getPlayerSlot() != null && hero.slot() == k.getPlayerSlot())
+                .toList(),
+            w);
     MinuteSeries xp = in.xp().get(hero.slot());
     MinuteSeries gold = in.gold().get(hero.slot());
     MinuteSeries stacks = in.stacks().get(hero.slot());
@@ -235,6 +248,7 @@ final class LaneAssembler {
         creeps.meleeLastHits(),
         creeps.rangedLastHits(),
         creeps.siegeLastHits(),
+        creeps.otherLastHits(),
         creeps.denies(),
         creeps.score(),
         xp == null ? null : xp.gain(w.startSeconds(), w.endSeconds()),
@@ -256,7 +270,12 @@ final class LaneAssembler {
   }
 
   private static int levelAt(ReplayPlayerTrackDomain track, int second) {
-    if (track == null || track.getLevel() == null || track.getLevel().length == 0) {
+    if (track == null
+        || track.getLevel() == null
+        || track.getLevel().length == 0
+        || track.getStartSeconds() == null
+        || track.getStepSeconds() == null
+        || track.getStepSeconds() <= 0) {
       return 0;
     }
     int index = (second - track.getStartSeconds()) / track.getStepSeconds();
@@ -356,6 +375,7 @@ final class LaneAssembler {
                     .meleeLastHits(s.meleeLastHits())
                     .rangedLastHits(s.rangedLastHits())
                     .siegeLastHits(s.siegeLastHits())
+                    .otherLastHits(s.otherLastHits())
                     .denies(s.denies())
                     .creepScore(s.creepScore())
                     .sideShare(

@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.analysis.lane;
 import com.ako.dbuff.dao.model.CreepKillDomain;
 import com.ako.dbuff.service.replay.analysis.creep.CreepClass;
 import com.ako.dbuff.service.replay.analysis.creep.CreepValues;
+import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import java.util.List;
 
 /**
@@ -25,10 +26,11 @@ final class CreepTally {
     int melee = 0;
     int ranged = 0;
     int siege = 0;
+    int other = 0;
     int denies = 0;
     double score = 0;
     for (CreepKillDomain k : kills) {
-      CreepClass creep = k.getCreepClass() == null ? null : CreepClass.valueOf(k.getCreepClass());
+      CreepClass creep = creepClass(k.getCreepClass());
       if (creep == null
           || !creep.isLane()
           || k.getSeconds() == null
@@ -47,13 +49,13 @@ final class CreepTally {
       lastHits++;
       score += gold + properties.getXpWeight() * xp;
       switch (creep) {
-        case LANE_MELEE, LANE_MELEE_UPGRADED -> melee++;
+        case LANE_MELEE, LANE_MELEE_UPGRADED, LANE_FLAGBEARER, LANE_FLAGBEARER_UPGRADED -> melee++;
         case LANE_RANGED, LANE_RANGED_UPGRADED -> ranged++;
         case LANE_SIEGE, LANE_SIEGE_UPGRADED -> siege++;
-        default -> {}
+        default -> other++;
       }
     }
-    return new Result(lastHits, melee, ranged, siege, denies, score);
+    return new Result(lastHits, melee, ranged, siege, other, denies, score);
   }
 
   record Result(
@@ -61,6 +63,16 @@ final class CreepTally {
       int meleeLastHits,
       int rangedLastHits,
       int siegeLastHits,
+      int otherLastHits,
       int denies,
       double score) {}
+
+  /** A stored name that is no class counts as an unknown lane creep, with no value. */
+  private static CreepClass creepClass(String stored) {
+    if (stored == null) {
+      return null;
+    }
+    CreepClass found = Enums.find(CreepClass.class, stored);
+    return found == null ? CreepClass.LANE_OTHER : found;
+  }
 }

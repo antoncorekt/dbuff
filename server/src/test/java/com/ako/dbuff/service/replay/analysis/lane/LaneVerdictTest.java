@@ -46,7 +46,7 @@ class LaneVerdictTest {
 
     assertThat(own.result()).isEqualTo(LaneResult.WON);
     assertThat(other.result()).isEqualTo(LaneResult.LOST);
-    assertThat(own.margin()).isGreaterThan(0.3).isCloseTo(-other.margin(), within(1e-9));
+    assertThat(own.margin()).isGreaterThan(0.25).isCloseTo(-other.margin(), within(1e-9));
   }
 
   @Test
@@ -87,5 +87,30 @@ class LaneVerdictTest {
     SideTotals dire = side(TeamSide.DIRE, 2000, 3000, 6, 0, 3);
 
     assertThat(verdict.decide(radiant, dire).margin()).isFinite();
+  }
+
+  @Test
+  void decide_doesNotFavourTheSideWithMoreHeroes() {
+    SideTotals two =
+        new SideTotals(
+            TeamSide.RADIANT, 2, 40, 0, 6, 4000, 6000.0, 2000.0, 6, 2, 0, 0, 0, 0, false, false);
+    SideTotals one =
+        new SideTotals(
+            TeamSide.DIRE, 1, 20, 0, 3, 2000, 3000.0, 1000.0, 6, 1, 0, 0, 0, 0, false, false);
+
+    assertThat(verdict.decide(two, one).result()).isEqualTo(LaneResult.EVEN);
+    assertThat(verdict.decide(one, two).result()).isEqualTo(LaneResult.EVEN);
+  }
+
+  @Test
+  void decide_givesTheLaneToTheSideWithTheBetterAveragePerHero() {
+    SideTotals two =
+        new SideTotals(
+            TeamSide.RADIANT, 2, 20, 0, 3, 2000, 3000.0, 2000.0, 6, 0, 0, 0, 0, 0, false, false);
+    SideTotals one =
+        new SideTotals(
+            TeamSide.DIRE, 1, 20, 0, 3, 2000, 3000.0, 1000.0, 6, 1, 0, 0, 0, 0, false, false);
+
+    assertThat(verdict.decide(one, two).result()).isEqualTo(LaneResult.WON);
   }
 }

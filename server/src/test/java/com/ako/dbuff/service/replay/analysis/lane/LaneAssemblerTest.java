@@ -1,6 +1,9 @@
 package com.ako.dbuff.service.replay.analysis.lane;
 
+import com.ako.dbuff.dao.model.BuildingKillContextDomain;
+import com.ako.dbuff.dao.model.CreepKillDomain;
 import com.ako.dbuff.dao.model.LaneAssignmentDomain;
+import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
 import com.ako.dbuff.service.replay.analysis.creep.CreepValues;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
@@ -10,6 +13,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static com.ako.dbuff.service.replay.analysis.lane.LaneTestData.inLane;
+import static com.ako.dbuff.service.replay.analysis.lane.LaneTestData.inRiver;
 import static com.ako.dbuff.service.replay.analysis.lane.LaneTestData.jungleFarm;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -103,5 +107,116 @@ class LaneAssemblerTest {
 
     assertThat(rows.assignments()).singleElement().satisfies(a -> assertThat(a.getLane()).isNull());
     assertThat(rows.results()).isEmpty();
+  }
+
+  private static LaneInputs inputs(
+      Map<Long, List<ActivitySegment>> segments,
+      Map<Long, TeamSide> teams,
+      List<BuildingKillContextDomain> buildings,
+      List<CreepKillDomain> creeps,
+      Map<Long, ReplayPlayerTrackDomain> tracks) {
+    return new LaneInputs(
+        1L, teams, segments, buildings, creeps, tracks, Map.of(), Map.of(), Map.of(), List.of(),
+        Map.of(), List.of(), List.of(), Map.of(), Map.of(), Map.of());
+  }
+
+  @Test
+  void assemble_listsAHeroWhoArrivesAfterTheOtherSideLeftAsHavingNoLaneAndKeepsHimOutOfTheRows() {
+    Map<Long, List<ActivitySegment>> segments =
+        Map.of(
+            RADIANT,
+            List.of(inLane(0, 800, Zone.Lane.MID)),
+            DIRE,
+            List.of(inLane(0, 300, Zone.Lane.MID), jungleFarm(300, 800)),
+            RADIANT + 1,
+            List.of(
+                inLane(0, 40, Zone.Lane.TOP),
+                jungleFarm(40, 400),
+                inLane(400, 800, Zone.Lane.MID)));
+    LaneInputs in =
+        inputs(
+            segments,
+            Map.of(RADIANT, TeamSide.RADIANT, RADIANT + 1, TeamSide.RADIANT, DIRE, TeamSide.DIRE),
+            List.of(),
+            List.of(),
+            Map.of());
+
+    LaneRows rows = new LaneAssembler(new LaneProperties(), values, List.of()).assemble(in, 1);
+
+    assertThat(of(rows, RADIANT + 1).getLane()).isNull();
+    assertThat(rows.playerStats()).extracting(s -> s.getPlayerSlot()).doesNotContain(RADIANT + 1);
+    assertThat(rows.results()).allSatisfy(r -> assertThat(r.getHeroes()).isEqualTo(1));
+  }
+
+  @Test
+  void assemble_listsAHeroWhoArrivesAfterTheLaneTowerFellAsHavingNoLane() {
+    Map<Long, List<ActivitySegment>> segments =
+        Map.of(
+            RADIANT,
+            List.of(inLane(0, 800, Zone.Lane.MID)),
+            DIRE,
+            List.of(inLane(0, 800, Zone.Lane.MID)),
+            RADIANT + 1,
+            List.of(inRiver(0, 100), inLane(100, 800, Zone.Lane.MID)));
+    BuildingKillContextDomain tower =
+        BuildingKillContextDomain.builder()
+            .seconds(60.0)
+            .kind("TOWER")
+            .tier(1)
+            .lane("MID")
+            .ownerTeam("DIRE")
+            .build();
+
+    LaneRows rows =
+        new LaneAssembler(new LaneProperties(), values, List.of())
+            .assemble(
+                inputs(
+                    segments,
+                    Map.of(
+                        RADIANT,
+                        TeamSide.RADIANT,
+                        RADIANT + 1,
+                        TeamSide.RADIANT,
+                        DIRE,
+                        TeamSide.DIRE),
+                    List.of(tower),
+                    List.of(),
+                    Map.of()),
+                1);
+
+    assertThat(of(rows, RADIANT + 1).getLane()).as("arrived after the tower fell").isNull();
+    assertThat(rows.results())
+        .allSatisfy(r -> assertThat(r.getEndReason()).isEqualTo("TOWER_FELL"));
+  }
+
+  @Test
+  void assemble_skipsRowsWithMissingValuesInsteadOfFailing() {
+    ReplayPlayerTrackDomain noStep =
+        ReplayPlayerTrackDomain.builder().playerSlot(RADIANT).level(new int[] {1, 2, 3}).build();
+    CreepKillDomain noSlot =
+        CreepKillDomain.builder().creepClass("LANE_MELEE").seconds(50.0).denied(false).build();
+    Map<Long, List<ActivitySegment>> segments =
+        Map.of(
+            RADIANT, List.of(inLane(0, 800, Zone.Lane.MID)),
+            DIRE, List.of(inLane(0, 800, Zone.Lane.MID)));
+
+    LaneRows rows =
+        new LaneAssembler(new LaneProperties(), values, List.of())
+            .assemble(
+                inputs(
+                    segments,
+                    Map.of(RADIANT, TeamSide.RADIANT, DIRE, TeamSide.DIRE),
+                    List.of(),
+                    List.of(noSlot),
+                    Map.of(RADIANT, noStep)),
+                1);
+
+    assertThat(rows.playerStats())
+        .hasSize(2)
+        .allSatisfy(
+            s -> {
+              assertThat(s.getLevel()).isNull();
+              assertThat(s.getLastHits()).isZero();
+            });
   }
 }

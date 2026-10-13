@@ -70,4 +70,24 @@ class CreepTallyTest {
     assertThat(r.lastHits()).isZero();
     assertThat(r.score()).isZero();
   }
+
+  @Test
+  void tally_countsFlagbearersAsMeleeAndUnknownNamesAsOtherSoTheColumnsAddUp() {
+    CreepTally.Result r =
+        tally.tally(
+            List.of(
+                kill("LANE_MELEE", 100, false),
+                kill("LANE_FLAGBEARER", 110, false),
+                kill("LANE_RANGED", 120, false),
+                kill("LANE_SIEGE", 130, false),
+                kill("LANE_MEGA", 140, false),
+                kill("NOT_A_CLASS", 150, false)),
+            window);
+
+    assertThat(r.lastHits()).isEqualTo(6);
+    assertThat(r.meleeLastHits()).isEqualTo(2);
+    assertThat(r.otherLastHits()).isEqualTo(2);
+    assertThat(r.meleeLastHits() + r.rangedLastHits() + r.siegeLastHits() + r.otherLastHits())
+        .isEqualTo(r.lastHits());
+  }
 }

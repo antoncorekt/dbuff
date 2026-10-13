@@ -39,9 +39,15 @@ public class LanePlayerStatDomain {
   /** All last hits and denies inside his window. */
   private Integer lastHits;
 
+  /** Melee creeps, flagbearers included. */
   private Integer meleeLastHits;
+
   private Integer rangedLastHits;
   private Integer siegeLastHits;
+
+  /** Mega and other lane creeps; melee, ranged, siege and other add up to the last hits. */
+  private Integer otherLastHits;
+
   private Integer denies;
 
   /** The value-weighted score of his last hits and denies. */

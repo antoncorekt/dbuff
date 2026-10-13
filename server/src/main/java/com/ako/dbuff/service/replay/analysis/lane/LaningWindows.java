@@ -11,8 +11,9 @@ import java.util.Optional;
  * (not before 0:00). It ends at the first of: he left, the lane's tower fell, the cap.
  *
  * <p>He left when a stretch outside the lane, without death time, either holds {@code awaySeconds}
- * of farming the jungle or another lane, or lasts {@code returnSeconds} in all (a teleport or a
- * trip to the base he did not come back from within that time). The end is when the stretch began.
+ * of farming the jungle or another lane, or holds {@code returnSeconds} in all (a teleport or a
+ * trip to the base he did not come back from within that time). Time dead and the respawn grace
+ * after it do not count. The end is when the stretch began.
  */
 final class LaningWindows {
   private final LaneProperties properties;
@@ -33,11 +34,17 @@ final class LaningWindows {
     Integer start = null;
     int streakStart = -1;
     int hardSeconds = 0;
+    int awaySeconds = 0;
+    int graceUntil = Integer.MIN_VALUE;
     boolean teleported = false;
     LaneEnd leftFor = null;
     int leftAt = -1;
     for (ActivitySegment s : segments) {
-      if (s.activity() == Activity.DEAD || s.endSeconds() <= 0) {
+      if (s.endSeconds() <= 0) {
+        continue;
+      }
+      if (s.activity() == Activity.DEAD) {
+        graceUntil = s.endSeconds() + properties.getRespawnGraceSeconds();
         continue;
       }
       int from = Math.max(s.startSeconds(), 0);
@@ -51,21 +58,27 @@ final class LaningWindows {
       if (home) {
         streakStart = -1;
         hardSeconds = 0;
+        awaySeconds = 0;
         teleported = false;
         continue;
       }
-      if (streakStart < 0) {
-        streakStart = from;
+      int counted = Math.max(from, graceUntil);
+      if (counted >= s.endSeconds()) {
+        continue;
       }
+      if (streakStart < 0) {
+        streakStart = counted;
+      }
+      awaySeconds += s.endSeconds() - counted;
       teleported |= s.activity() == Activity.TELEPORTING;
       LaneEnd hard = hardAway(s);
       if (hard != null) {
-        hardSeconds += s.endSeconds() - from;
+        hardSeconds += s.endSeconds() - counted;
         if (hardSeconds >= properties.getAwaySeconds()) {
           leftFor = hard;
         }
       }
-      if (leftFor == null && s.endSeconds() - streakStart >= properties.getReturnSeconds()) {
+      if (leftFor == null && awaySeconds >= properties.getReturnSeconds()) {
         leftFor = teleported ? LaneEnd.TELEPORTED : LaneEnd.LEFT;
       }
       if (leftFor != null) {

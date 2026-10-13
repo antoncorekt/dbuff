@@ -3,7 +3,10 @@ package com.ako.dbuff.service.replay.analysis.lane;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
-/** More hero damage taken than dealt inside the windows hurt the side; the other way helped it. */
+/**
+ * More hero damage taken than dealt against the lane's opponents hurt the side; the other way
+ * helped it. Damage from enemies of other lanes is a gank, not harassment.
+ */
 @Component
 class HarassmentContributor implements LaneReasonContributor {
   static final String CODE = "HARASSMENT";
@@ -12,8 +15,14 @@ class HarassmentContributor implements LaneReasonContributor {
 
   @Override
   public List<LaneReason> contribute(LaneContext c) {
-    long taken = c.own().damageTaken();
-    long dealt = c.own().damageDealt();
+    long taken = 0;
+    long dealt = 0;
+    for (LaneHero own : c.ownHeroes()) {
+      for (LaneHero opponent : c.enemyHeroes()) {
+        taken += c.facts().damage().takenFrom(own.slot(), opponent.slot());
+        dealt += c.facts().damage().takenFrom(opponent.slot(), own.slot());
+      }
+    }
     long threshold = c.facts().properties().getHarassmentDamage();
     long difference = taken - dealt;
     if (Math.abs(difference) < threshold) {
