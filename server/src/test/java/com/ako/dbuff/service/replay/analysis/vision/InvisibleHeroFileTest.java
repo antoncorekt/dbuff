@@ -83,7 +83,8 @@ class InvisibleHeroFileTest {
                     "{\"heroes\": {\"npc_dota_hero_riki\": {\"ability\": \"riki_smoke_screen\","
                         + " \"mode\": \"ACTIVE\"}}, \"items\": [\"glimmer\"]}"))
         .hasMessageContaining("item 'glimmer'");
-    assertThatThrownBy(() -> load("{\"bonus\": {}}")).hasMessageContaining("unknown section 'bonus'");
+    assertThatThrownBy(() -> load("{\"bonus\": {}}"))
+        .hasMessageContaining("unknown section 'bonus'");
     assertThatThrownBy(() -> load("{not json")).hasMessageContaining("cannot be read");
   }
 }
