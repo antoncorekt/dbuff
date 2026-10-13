@@ -35,17 +35,18 @@ final class LaneLoopReport {
   private static final double BIG = 0.6;
 
   private static final String HOW_TO_READ =
-      "Each hero's lane is the lane he spent most time in during the first 4 minutes; the two"
-          + " teams' heroes in the same lane are one lane (Radiant's safe lane is Dire's"
-          + " offlane). The laning stage of a hero starts when he first stands in his lane and"
-          + " ends when he leaves it for the jungle or another lane (30 s), is away for 60 s, or"
-          + " when the lane's first tower falls, at the latest at 15:00. \"Lanes\" says who won"
+      "Each hero's lane is the lane he spent most time in during the first 4 minutes (a hero with"
+          + " no lane of his own gets the lane of his teammates where he spent most of that lane's"
+          + " window); the two teams' heroes in the same lane are one lane (Radiant's safe lane is"
+          + " Dire's offlane). The laning stage of a hero starts when he first stands in his lane"
+          + " and ends when he leaves it for the jungle or another lane (30 s), is away for 60 s,"
+          + " or when the lane's first tower falls, at the latest at 15:00. \"Lanes\" says who won"
           + " each lane (creep score, XP, level, kills, denies and the tower; the score weighs"
-          + " every creep by its gold and XP, so a siege creep counts more, and a deny by the XP"
-          + " it takes) and how clearly. \"Players in the lane\" has each hero's last hits, denies"
-          + " and score inside his own laning window and his share of his side's score. \"Why\""
-          + " lists the reasons found for each side, strongest first. Times are the game clock"
-          + " (m:ss). Write OK or REJECT in the assistant and owner columns.";
+          + " every creep by its gold and XP, so a siege creep counts more, and a deny by the XP it"
+          + " takes) and how clearly. \"Players in the lane\" has each hero's last hits, denies and"
+          + " score inside his own laning window and his share of his side's score. \"Why\" lists"
+          + " the reasons found for each side, strongest first. Times are the game clock (m:ss)."
+          + " Write OK or REJECT in the assistant and owner columns.";
 
   record MatchData(
       long matchId,

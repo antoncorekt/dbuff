@@ -10,13 +10,14 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A hero with no lane of his own who stayed in the lane of his teammates (a support who walked with
  * the carry, or who spent the first minutes elsewhere) gets that lane. Over the laning window of a
  * lane his team holds, the seconds he was alive and either in the lane zone or within {@code
  * shadow-distance} of a teammate who has the lane must be at least {@code shadow-min-share} of his
- * time alive in that window, and more than his jungle farming there; a roamer or a jungler fails
+ * time alive in that window (time farming the jungle never counts); a roamer or a jungler fails
  * that and stays without a lane.
  */
 final class LaneShadowAssigner {
@@ -30,14 +31,18 @@ final class LaneShadowAssigner {
       Map<Long, List<ActivitySegment>> segmentsBySlot,
       Map<Long, TeamSide> teams,
       Map<Long, ReplayPlayerTrackDomain> tracks,
-      List<LaneHero> holders) {
+      List<LaneHero> holders,
+      Set<Long> assigned) {
     Map<Long, Zone.Lane> lanes = new HashMap<>();
     Map<TeamSide, Map<Zone.Lane, List<LaneHero>>> byTeamAndLane = byTeamAndLane(holders);
     segmentsBySlot.forEach(
         (slot, segments) -> {
           ReplayPlayerTrackDomain track = tracks.get(slot);
           TeamSide team = teams.get(slot);
-          if (track == null || team == null || holders.stream().anyMatch(h -> h.slot() == slot)) {
+          if (!readable(track)
+              || team == null
+              || assigned.contains(slot)
+              || holders.stream().anyMatch(h -> h.slot() == slot)) {
             return;
           }
           Zone.Lane lane =
@@ -74,25 +79,21 @@ final class LaneShadowAssigner {
       int from = lane.getValue().stream().mapToInt(h -> h.window().startSeconds()).min().orElse(0);
       int to = lane.getValue().stream().mapToInt(h -> h.window().endSeconds()).max().orElse(0);
       int alive = 0;
-      int jungle = 0;
       int together = 0;
       int step = track.getStepSeconds();
-      for (int i = 0; i < track.getX().length; i++) {
+      for (int i = 0; i < samples(track); i++) {
         int second = track.getStartSeconds() + i * step;
         ActivitySegment s = segmentAt(segments, second);
         if (second < from || second >= to || s == null || s.activity() == Activity.DEAD) {
           continue;
         }
         alive += step;
-        if (s.activity() == Activity.JUNGLE_FARM) {
-          jungle += step;
-        }
-        if (inLane(s, lane.getKey()) || near(track, i, second, lane.getValue(), tracks)) {
+        if (s.activity() != Activity.JUNGLE_FARM
+            && (inLane(s, lane.getKey()) || near(track, i, second, lane.getValue(), tracks))) {
           together += step;
         }
       }
       if (together >= properties.getShadowMinSeconds()
-          && together > jungle
           && together >= properties.getShadowMinShare() * alive
           && together > bestSeconds) {
         best = lane.getKey();
@@ -100,6 +101,20 @@ final class LaneShadowAssigner {
       }
     }
     return best;
+  }
+
+  private static boolean readable(ReplayPlayerTrackDomain track) {
+    return track != null
+        && track.getStartSeconds() != null
+        && track.getStepSeconds() != null
+        && track.getStepSeconds() > 0
+        && samples(track) > 0;
+  }
+
+  private static int samples(ReplayPlayerTrackDomain track) {
+    return track.getX() == null || track.getY() == null
+        ? 0
+        : Math.min(track.getX().length, track.getY().length);
   }
 
   private static boolean inLane(ActivitySegment segment, Zone.Lane lane) {
@@ -114,11 +129,11 @@ final class LaneShadowAssigner {
       Map<Long, ReplayPlayerTrackDomain> tracks) {
     for (LaneHero partner : partners) {
       ReplayPlayerTrackDomain other = tracks.get(partner.slot());
-      if (other == null || !partner.window().contains(second)) {
+      if (!readable(other) || !partner.window().contains(second)) {
         continue;
       }
       int j = (second - other.getStartSeconds()) / other.getStepSeconds();
-      if (j >= 0 && j < other.getX().length) {
+      if (j >= 0 && j < samples(other)) {
         double dx = track.getX()[index] - other.getX()[j];
         double dy = track.getY()[index] - other.getY()[j];
         if (Math.hypot(dx, dy) <= properties.getShadowDistance()) {
