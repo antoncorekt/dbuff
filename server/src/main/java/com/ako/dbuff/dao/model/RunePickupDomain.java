@@ -60,6 +60,12 @@ public class RunePickupDomain {
    */
   private Integer gold;
 
+  /**
+   * The game second the rune's effect ended, from the modifier events (removed, or the hero died);
+   * null when the log has no span for the pickup.
+   */
+  private Double effectEndSeconds;
+
   private Boolean midLane;
   private Integer analysisVersion;
 }

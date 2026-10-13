@@ -27,12 +27,14 @@ final class RunePickups {
   private final Map<Long, List<ActivitySegment>> segments;
   private final MapLayout layout;
   private final List<CombatEvent> bountyGold;
+  private final List<CombatEvent> events;
   private final Set<CombatEvent> paid = Collections.newSetFromMap(new IdentityHashMap<>());
 
   /**
    * @param heroOfSlot the combat-log hero name of each player slot
    * @param layout null when the map version is not frozen
-   * @param bountyGold the bounty-rune gold entries; empty when the log keeps no gold reasons
+   * @param events the combat log: bounty-rune gold entries (none when it keeps no gold reasons),
+   *     the rune modifiers and the deaths
    */
   RunePickups(
       RuneProperties properties,
@@ -46,6 +48,7 @@ final class RunePickups {
     this.tracks = tracks;
     this.segments = segments;
     this.layout = layout;
+    this.events = events;
     this.bountyGold =
         events.stream()
             .filter(e -> e.kind() == CombatEventKind.GOLD)
@@ -67,6 +70,7 @@ final class RunePickups {
       int seconds = rune.getEventTime().intValue();
       RuneType type = RuneType.of(rune.getRuneType());
       Zone zone = zoneAt(slot, seconds);
+      Double effectEnd = effectEnd(slot, seconds, type);
       rows.add(
           RunePickupDomain.builder()
               .matchId(matchId)
@@ -78,7 +82,8 @@ final class RunePickups {
               .zone(zone == null ? null : zone.kind().name())
               .lane(zone == null || zone.lane() == null ? null : zone.lane().name())
               .gold(type == RuneType.BOUNTY ? goldAt(slot, seconds) : null)
-              .midLane(midLane(slot, seconds))
+              .effectEndSeconds(effectEnd)
+              .midLane(midLane(slot, seconds, zone))
               .analysisVersion(version)
               .build());
     }
@@ -87,7 +92,12 @@ final class RunePickups {
 
   private Zone zoneAt(long slot, int seconds) {
     ReplayPlayerTrackDomain track = tracks.get(slot);
-    if (layout == null || track == null || track.getSampleCount() == null) {
+    if (layout == null
+        || track == null
+        || track.getSampleCount() == null
+        || track.getStartSeconds() == null
+        || track.getStepSeconds() == null
+        || track.getStepSeconds() <= 0) {
       return null;
     }
     int last = track.getSampleCount() - 1;
@@ -119,17 +129,61 @@ final class RunePickups {
     return best.value();
   }
 
-  /** In the mid lane now by the activity segment, or mid as the main lane of the early game. */
-  private boolean midLane(long slot, int seconds) {
+  /**
+   * In the mid lane zone at the pickup (by his activity segment when there is no position), or the
+   * pickup is early and mid is his main lane of the first minutes.
+   */
+  private boolean midLane(long slot, int seconds, Zone zone) {
     List<ActivitySegment> own = segments.getOrDefault(slot, List.of());
-    boolean now =
-        own.stream()
-            .anyMatch(
-                s ->
-                    s.lane() == Zone.Lane.MID
-                        && s.startSeconds() <= seconds
-                        && seconds < s.endSeconds());
-    return now || mainEarlyLane(own) == Zone.Lane.MID;
+    boolean inMid =
+        zone != null
+            ? zone.kind() == Zone.Kind.LANE && zone.lane() == Zone.Lane.MID
+            : own.stream()
+                .anyMatch(
+                    s ->
+                        s.lane() == Zone.Lane.MID
+                            && s.startSeconds() <= seconds
+                            && seconds < s.endSeconds());
+    return inMid
+        || (seconds < properties.getMidLanePickupSeconds() && mainEarlyLane(own) == Zone.Lane.MID);
+  }
+
+  /**
+   * When the rune's modifier ended on the hero: its removal, or his death if sooner. Null for a
+   * rune with no modifier, or when no modifier of that rune began near the pickup (a blob stored
+   * before the modifiers were kept), so the reader falls back on the duration property.
+   */
+  private Double effectEnd(long slot, int seconds, RuneType type) {
+    String hero = heroOfSlot.get(slot);
+    if (type.modifier() == null || hero == null) {
+      return null;
+    }
+    CombatEvent begin = null;
+    for (CombatEvent e : events) {
+      if (e.kind() == CombatEventKind.MODIFIER_ADD
+          && e.target().equals(hero)
+          && e.inflictor().equals(type.modifier())
+          && Math.abs(e.gameSecond() - seconds) <= properties.getModifierMatchSeconds()
+          && (begin == null
+              || Math.abs(e.gameSecond() - seconds) < Math.abs(begin.gameSecond() - seconds))) {
+        begin = e;
+      }
+    }
+    if (begin == null) {
+      return null;
+    }
+    for (CombatEvent e : events) {
+      boolean ends =
+          e.gameSecond() > begin.gameSecond()
+              && e.target().equals(hero)
+              && ((e.kind() == CombatEventKind.MODIFIER_REMOVE
+                      && e.inflictor().equals(type.modifier()))
+                  || (e.kind() == CombatEventKind.DEATH && e.targetIsRealHero()));
+      if (ends) {
+        return e.gameSecond();
+      }
+    }
+    return null;
   }
 
   private Zone.Lane mainEarlyLane(List<ActivitySegment> own) {

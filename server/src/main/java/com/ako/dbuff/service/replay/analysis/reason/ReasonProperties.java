@@ -148,6 +148,9 @@ public class ReasonProperties {
               RuneType.INVISIBILITY, 0.4,
               RuneType.SHIELD, 0.4));
 
+  /** Added to the severity for each further rune in the same rune reason of one fight. */
+  private double runeAdvantageExtraStep = 0.1;
+
   /** The severity of a reason about a player, lowered when he was near the fight but passive. */
   public double byPresence(double severity, Presence presence) {
     return presence == Presence.PRESENT_PASSIVE ? severity * passivePresenceFactor : severity;

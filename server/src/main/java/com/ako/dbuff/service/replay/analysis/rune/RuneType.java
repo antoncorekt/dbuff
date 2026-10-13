@@ -9,26 +9,28 @@ package com.ako.dbuff.service.replay.analysis.rune;
  * #UNKNOWN}.
  */
 public enum RuneType {
-  DOUBLE_DAMAGE(0, "double damage", true),
-  HASTE(1, "haste", true),
-  ILLUSION(2, "illusion", false),
-  INVISIBILITY(3, "invisibility", true),
-  REGENERATION(4, "regeneration", false),
-  BOUNTY(5, "bounty", false),
-  ARCANE(6, "arcane", true),
-  WATER(7, "water", false),
-  WISDOM(8, "wisdom", false),
-  SHIELD(9, "shield", true),
-  UNKNOWN(-1, "unknown", false);
+  DOUBLE_DAMAGE(0, "double damage", true, "modifier_rune_doubledamage"),
+  HASTE(1, "haste", true, "modifier_rune_haste"),
+  ILLUSION(2, "illusion", false, null),
+  INVISIBILITY(3, "invisibility", true, "modifier_rune_invis"),
+  REGENERATION(4, "regeneration", false, null),
+  BOUNTY(5, "bounty", false, null),
+  ARCANE(6, "arcane", true, "modifier_rune_arcane"),
+  WATER(7, "water", false, null),
+  WISDOM(8, "wisdom", false, null),
+  SHIELD(9, "shield", true, "modifier_rune_shield"),
+  UNKNOWN(-1, "unknown", false, null);
 
   private final int code;
   private final String words;
   private final boolean fightEffect;
+  private final String modifier;
 
-  RuneType(int code, String words, boolean fightEffect) {
+  RuneType(int code, String words, boolean fightEffect, String modifier) {
     this.code = code;
     this.words = words;
     this.fightEffect = fightEffect;
+    this.modifier = modifier;
   }
 
   public static RuneType of(Integer code) {
@@ -52,5 +54,10 @@ public enum RuneType {
   /** Whether holding it changes how a fight goes: a damage, speed, spell or protection effect. */
   public boolean isFightEffect() {
     return fightEffect;
+  }
+
+  /** The modifier the combat log shows on the hero while the effect lasts; null for none. */
+  public String modifier() {
+    return modifier;
   }
 }

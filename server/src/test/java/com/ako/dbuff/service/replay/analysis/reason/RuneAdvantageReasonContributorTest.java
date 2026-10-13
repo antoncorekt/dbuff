@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.RunePickupDomain;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.analysis.rune.RuneEvidence;
 import com.ako.dbuff.service.replay.analysis.rune.RuneProperties;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import java.util.List;
@@ -26,6 +27,15 @@ class RuneAdvantageReasonContributorTest {
     return RunePickupDomain.builder().playerSlot(slot).runeType(type).seconds(seconds).build();
   }
 
+  private static RunePickupDomain rune(long slot, String type, int seconds, double effectEnd) {
+    return RunePickupDomain.builder()
+        .playerSlot(slot)
+        .runeType(type)
+        .seconds(seconds)
+        .effectEndSeconds(effectEnd)
+        .build();
+  }
+
   private static FightPlayerDomain row(long slot, String presence) {
     return FightPlayerDomain.builder().playerSlot(slot).presence(presence).build();
   }
@@ -41,7 +51,7 @@ class RuneAdvantageReasonContributorTest {
         List.of(),
         List.of(),
         List.of(),
-        Map.of(0L, 1L, 128L, 2L),
+        Map.of(0L, 1L, 1L, 2L, 128L, 2L),
         List.of(),
         runes);
   }
@@ -105,6 +115,46 @@ class RuneAdvantageReasonContributorTest {
                 context(List.of(rune(0, "DOUBLE_DAMAGE", 590)), row(0, "ABSENT_FAR"))))
         .isEmpty();
     assertThat(contributor.contribute(context(List.of(rune(0, "DOUBLE_DAMAGE", 590))))).isEmpty();
+  }
+
+  @Test
+  void theModifierSpanDecidesWhenThereIsOne() {
+    assertThat(
+            contributor.contribute(
+                context(List.of(rune(0, "DOUBLE_DAMAGE", 560, 590)), row(0, "ACTIVE"))))
+        .as("the hero died or the effect was removed at 9:50, before the fight at 10:00")
+        .isEmpty();
+    assertThat(
+            contributor.contribute(context(List.of(rune(0, "HASTE", 560, 610)), row(0, "ACTIVE"))))
+        .as("the span lasts longer than the 22 s of the property")
+        .hasSize(2);
+  }
+
+  @Test
+  void aSecondRuneOfTheSameHeroOrTeamIsListedAndNeverReplacesTheFirst() {
+    List<Reason> reasons =
+        contributor.contribute(
+            context(
+                List.of(
+                    rune(0, "DOUBLE_DAMAGE", 570), rune(0, "HASTE", 595), rune(1, "ARCANE", 600)),
+                row(0, "ACTIVE"),
+                row(1, "ACTIVE")));
+
+    assertThat(reasons)
+        .extracting(Reason::code, Reason::subjectSlot, Reason::severity)
+        .containsExactly(
+            tuple("RUNE_ADVANTAGE", 0L, 0.6),
+            tuple("RUNE_ADVANTAGE", 1L, 0.3),
+            tuple("ENEMY_RUNE_ADVANTAGE", null, 0.7));
+    assertThat(reasons.get(0).evidence())
+        .contains("double damage rune taken at 9:30 by Windrunner")
+        .contains("; haste rune taken at 9:55 by Windrunner");
+    assertThat(RuneEvidence.parseAll(reasons.get(2).evidence()))
+        .extracting(RuneEvidence::rune, RuneEvidence::hero)
+        .containsExactly(
+            tuple("double damage", "Windrunner"),
+            tuple("haste", "Windrunner"),
+            tuple("arcane", "Axe"));
   }
 
   @Test

@@ -345,7 +345,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
               e -> {
                 assertThat(e.getCode()).isEqualTo("ENEMY_RUNE_ADVANTAGE");
                 assertThat(e.getFightIndex()).isEqualTo(r.getFightIndex());
-                assertThat(e.getEvidence()).isEqualTo(r.getEvidence());
+                assertThat(e.getEvidence()).contains(r.getEvidence());
                 assertThat(e.getTeam()).isNotEqualTo(r.getTeam());
               });
     }

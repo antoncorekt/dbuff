@@ -32,7 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Stores every rune a hero picked up ({@code rune_pickup}: where, the bounty gold, mid lane or not)
  * and how each team did in the opening window around the first rune spawn ({@code
  * opening_summary}). The opening needs the gold and experience reasons of a version 2 combat log,
- * so an older blob gets pickups without gold and no summary.
+ * so an older blob gets pickups without gold and no summary, and a match whose heroes the log does
+ * not name gets no summary.
  */
 @Slf4j
 @Order(14)
@@ -75,11 +76,7 @@ public class RunePickupAnalyzer implements ReplayAnalyzer {
       log.info(
           "opening summary skipped: combat log stored without gold reasons, re-parse the replay");
     }
-    if (reasons) {
-      deleteByMatchId(matchId);
-    } else {
-      pickupRepo.deleteByMatchId(matchId);
-    }
+    deleteByMatchId(matchId);
     List<CombatEvent> events = combatLog.events(matchId);
     List<ReplayPlayerDomain> roster = playerRepo.findByMatchId(matchId);
     Set<String> heroNames = CombatHeroes.names(events);
@@ -104,10 +101,10 @@ public class RunePickupAnalyzer implements ReplayAnalyzer {
                 tracks,
                 activity.bySlot(matchId),
                 matchMapLayout.of(matchId).orElse(null),
-                reasons ? events : List.of())
+                events)
             .build(matchId, runeRepo.findByMatchId(matchId), version());
     pickupRepo.saveAll(pickups);
-    if (reasons && !events.isEmpty()) {
+    if (reasons && !events.isEmpty() && !teamOfHero.isEmpty()) {
       summaryRepo.saveAll(
           new OpeningSummaries(properties, teamOfHero).build(matchId, pickups, events, version()));
     }

@@ -137,4 +137,24 @@ class ReasonWordingTest {
     assertThat(ReasonWording.phrase(teamWith("ENEMY_RUNE_ADVANTAGE", "odd"), "ignored"))
         .isEqualTo("the team: the enemy had a rune effect");
   }
+
+  @Test
+  void phrase_listsEveryRuneOfOneReason() {
+    String first =
+        "haste rune taken at 5:20 by Windrunner, 10 s from the fight start, active in the fight";
+    String second =
+        "arcane rune taken at 5:25 by Axe, 5 s from the fight start, active in the fight";
+
+    assertThat(
+            ReasonWording.phrase(
+                player("RUNE_ADVANTAGE", first + "; " + first.replace("haste", "shield")),
+                "Windrunner"))
+        .isEqualTo(
+            "Windrunner took a haste rune 10 s before the fight and a shield rune 10 s before the"
+                + " fight");
+    assertThat(ReasonWording.phrase(teamWith("ENEMY_RUNE_ADVANTAGE", first + "; " + second), "x"))
+        .isEqualTo(
+            "the enemy Windrunner took a haste rune 10 s before the fight, Axe took an arcane rune"
+                + " 5 s before the fight");
+  }
 }

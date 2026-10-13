@@ -104,26 +104,109 @@ class RunePickupAnalyzerTest {
   }
 
   @Test
-  void analyze_countsAHeroWhoseMainEarlyLaneIsMidAsAMidLanerAlsoWhileElsewhere() {
+  void analyze_marksMidLaneOnlyInTheMidZoneOrForAnEarlyPickupOfAMainMidLaner() {
     stored(layouts.frozenVersion());
     segmentRepo.deleteAll();
     segmentRepo.flush();
     segmentRepo.saveAndFlush(segment(DIRE, 0, 100, "MID"));
     segmentRepo.saveAndFlush(segment(DIRE, 100, 500, "TOP"));
     segmentRepo.saveAndFlush(segment(RADIANT, 0, 200, "BOTTOM"));
-    segmentRepo.saveAndFlush(segment(RADIANT, 40, 60, "MID"));
+    rune(DIRE, 2, 700, 8);
 
     analyzer.analyze(MATCH);
 
     List<RunePickupDomain> rows = pickupRepo.findByMatchId(MATCH);
-    assertThat(row(rows, DIRE, "BOUNTY").getMidLane()).as("mid at 20 s").isTrue();
-    assertThat(row(rows, DIRE, "WISDOM").getMidLane())
-        .as("main lane top, not mid at 420 s")
-        .isFalse();
-    assertThat(row(rows, RADIANT, "DOUBLE_DAMAGE").getMidLane())
-        .as("in the mid lane at 50 s")
+    assertThat(row(rows, DIRE, "BOUNTY").getMidLane())
+        .as("no position, mid by his segment at 20 s")
         .isTrue();
-    assertThat(row(rows, RADIANT, "BOUNTY").getMidLane()).isFalse();
+    assertThat(
+            rows.stream()
+                .filter(r -> r.getPlayerSlot() == DIRE && r.getRuneType().equals("WISDOM"))
+                .map(RunePickupDomain::getMidLane))
+        .as("main early lane top, not mid at 420 s or 700 s")
+        .containsOnly(false);
+    assertThat(row(rows, RADIANT, "DOUBLE_DAMAGE").getMidLane()).as("in the bottom lane").isFalse();
+  }
+
+  @Test
+  void analyze_countsAnEarlyPickupOfAMainMidLanerButNotALateOneOutsideTheMidZone() {
+    stored(layouts.frozenVersion());
+    segmentRepo.deleteAll();
+    segmentRepo.flush();
+    segmentRepo.saveAndFlush(segment(RADIANT, 0, 240, "MID"));
+    rune(RADIANT, 2, 700, 0);
+
+    analyzer.analyze(MATCH);
+
+    List<RunePickupDomain> radiant =
+        pickupRepo.findByMatchId(MATCH).stream().filter(r -> r.getPlayerSlot() == RADIANT).toList();
+    assertThat(radiant)
+        .as("the track puts him in the bottom lane; he is early, so his main lane counts")
+        .filteredOn(r -> r.getSeconds() < 600)
+        .allMatch(r -> r.getMidLane());
+    assertThat(radiant)
+        .filteredOn(r -> r.getSeconds() >= 600)
+        .as("after 10:00 only the zone counts")
+        .allMatch(r -> !r.getMidLane());
+  }
+
+  @Test
+  void analyze_endsTheEffectAtTheModifierRemovalOrTheDeathAndLeavesItOpenWithoutAModifier() {
+    stored(layouts.frozenVersion());
+    combatLogRepo.deleteAll();
+    combatLogRepo.flush();
+    save(
+        List.of(
+            modifier(CombatEventKind.MODIFIER_ADD, 50.3, SNIPER, "modifier_rune_doubledamage"),
+            modifier(CombatEventKind.MODIFIER_REMOVE, 95.3, SNIPER, "modifier_rune_doubledamage"),
+            modifier(CombatEventKind.MODIFIER_ADD, 20.5, VENOMANCER, "modifier_rune_haste"),
+            death(40, SNIPER, VENOMANCER),
+            modifier(CombatEventKind.MODIFIER_ADD, 3.2, SNIPER, "modifier_rune_doubledamage")));
+    rune(DIRE, 2, 20, 1);
+    rune(DIRE, 3, 300, 3);
+
+    analyzer.analyze(MATCH);
+
+    List<RunePickupDomain> rows = pickupRepo.findByMatchId(MATCH);
+    assertThat(row(rows, RADIANT, "DOUBLE_DAMAGE").getEffectEndSeconds()).isEqualTo(95.3);
+    assertThat(row(rows, DIRE, "HASTE").getEffectEndSeconds())
+        .as("the hero died at 40 s, which ends it")
+        .isEqualTo(40.0);
+    assertThat(row(rows, DIRE, "INVISIBILITY").getEffectEndSeconds())
+        .as("no modifier near the pickup")
+        .isNull();
+    assertThat(row(rows, RADIANT, "BOUNTY").getEffectEndSeconds()).isNull();
+  }
+
+  @Test
+  void analyze_keepsAPickupWhoseTrackHasNoStepWithoutAZone() {
+    stored(layouts.frozenVersion());
+    trackRepo.deleteAll();
+    trackRepo.flush();
+    trackRepo.saveAndFlush(
+        ReplayPlayerTrackDomain.builder()
+            .matchId(MATCH)
+            .playerSlot(RADIANT)
+            .sampleCount(40)
+            .x(new int[40])
+            .y(new int[40])
+            .build());
+
+    analyzer.analyze(MATCH);
+
+    assertThat(pickupRepo.findByMatchId(MATCH)).hasSize(4).allMatch(r -> r.getZone() == null);
+  }
+
+  @Test
+  void analyze_storesNoOpeningWhenNoHeroResolvesToATeam() {
+    stored(layouts.frozenVersion());
+    playerRepo.deleteAll();
+    playerRepo.flush();
+
+    analyzer.analyze(MATCH);
+
+    assertThat(pickupRepo.findByMatchId(MATCH)).hasSize(4);
+    assertThat(summaryRepo.findByMatchId(MATCH)).isEmpty();
   }
 
   @Test
@@ -219,7 +302,7 @@ class RunePickupAnalyzerTest {
     analyzer.analyze(MATCH);
 
     assertThat(pickupRepo.findByMatchId(MATCH)).hasSize(4).allMatch(r -> r.getGold() == null);
-    assertThat(summaryRepo.findByMatchId(MATCH)).as("the earlier summary is kept").hasSize(2);
+    assertThat(summaryRepo.findByMatchId(MATCH)).as("no stale summary is left").isEmpty();
   }
 
   @Test
@@ -346,6 +429,12 @@ class RunePickupAnalyzerTest {
             .eventCount(events.size())
             .data(CombatLogCodec.encode(events))
             .build());
+  }
+
+  private static CombatEvent modifier(
+      CombatEventKind kind, double second, String hero, String name) {
+    return new CombatEvent(
+        kind, second, "", hero, name, CombatEvent.TARGET_HERO, 0, 0, 0, 0, 0, 0, 0);
   }
 
   private static CombatEvent death(double second, String killer, String victim) {

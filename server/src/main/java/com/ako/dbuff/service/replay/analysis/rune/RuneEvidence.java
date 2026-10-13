@@ -1,5 +1,7 @@
 package com.ako.dbuff.service.replay.analysis.rune;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -22,6 +24,20 @@ public record RuneEvidence(String rune, String clock, String hero, int leadSecon
   public String text() {
     return "%s rune taken at %s by %s, %d s from the fight start, active in the fight"
         .formatted(rune, clock, hero, leadSeconds);
+  }
+
+  /** The separator of the runes of one reason; a hero or a team may have several in a fight. */
+  public static final String SEPARATOR = "; ";
+
+  /** Every rune a reason lists, in order; empty for a text that is not rune evidence. */
+  public static List<RuneEvidence> parseAll(String text) {
+    if (text == null) {
+      return List.of();
+    }
+    return Arrays.stream(text.split(Pattern.quote(SEPARATOR)))
+        .map(RuneEvidence::parse)
+        .flatMap(Optional::stream)
+        .toList();
   }
 
   public static Optional<RuneEvidence> parse(String text) {

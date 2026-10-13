@@ -38,15 +38,16 @@ final class RuneLoopReport {
   private static final String NO = "no";
 
   private static final String HOW_TO_READ =
-      "\"Opening\" is how each team did from 30 s before to 90 s after the first rune spawn: who"
-          + " won it (gold plus experience first, kills break a tie), the runes it took, the bounty"
-          + " gold, kills, and the gold and experience it received in that window. \"Runes\" lists"
-          + " every rune taken, with who took it, where he stood, the bounty gold it paid, whether"
-          + " he was a mid laner (a proxy: mid lane at that time, or mid as his main lane in the"
-          + " first 4 minutes) and, for a power rune, whether an important fight started while its"
-          + " effect lasted. \"Rune advantage in fights\" lists the fights where a hero fought"
-          + " under a power rune, with who won. Times are the game clock (m:ss). Write OK or REJECT"
-          + " in the assistant and owner columns.";
+      "\"Opening\" is how each team did from 30 s before to 90 s after the first (0:00) bounty rune"
+          + " spawn: who won it (gold plus experience first, kills break a tie), the runes it took,"
+          + " the bounty gold, kills, and the gold and experience it received in that window."
+          + " \"Runes\" lists every rune taken, with who took it, where he stood, the bounty gold"
+          + " it paid, whether he was a mid laner (a proxy: in the mid lane at the pickup, or an"
+          + " early pickup of a hero whose main lane of the first 4 minutes is mid) and, for a"
+          + " power rune, whether an important fight started while its effect lasted. \"Rune"
+          + " advantage in fights\" lists the fights where a hero fought under a power rune, with"
+          + " who won. Times are the game clock (m:ss). Write OK or REJECT in the assistant and"
+          + " owner columns.";
 
   record MatchData(
       long matchId,
@@ -315,7 +316,11 @@ final class RuneLoopReport {
     return d.reasons().stream()
         .filter(r -> ENEMY_RUNE_ADVANTAGE.equals(r.getCode()))
         .filter(r -> r.getFightIndex().equals(advantage.getFightIndex()))
-        .filter(r -> r.getEvidence() != null && r.getEvidence().equals(advantage.getEvidence()))
+        .filter(
+            r ->
+                r.getEvidence() != null
+                    && advantage.getEvidence() != null
+                    && r.getEvidence().contains(advantage.getEvidence()))
         .findFirst()
         .map(r -> LoopWording.team(r.getTeam()) + " list: yes")
         .orElse("no");

@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
 import com.ako.dbuff.service.replay.analysis.rune.RuneEvidence;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
@@ -67,9 +68,16 @@ public final class ReasonWording {
 
   private static String teamPhrase(String code, String evidence) {
     if (ENEMY_RUNE.equals(code)) {
-      return RuneEvidence.parse(evidence)
-          .map(r -> "the enemy " + r.hero() + " " + tookRune(evidence))
-          .orElse(TEAM + ": the enemy had a rune effect");
+      List<RuneEvidence> runes = RuneEvidence.parseAll(evidence);
+      return runes.isEmpty()
+          ? TEAM + ": the enemy had a rune effect"
+          : "the enemy "
+              + runes.stream()
+                  .map(
+                      r ->
+                          "%s took %s %s rune %s"
+                              .formatted(r.hero(), article(r.rune()), r.rune(), r.timing()))
+                  .collect(Collectors.joining(", "));
     }
     if (!CompositionToken.isToken(code)) {
       String note = evidence == null ? "" : evidence.trim();
@@ -84,9 +92,14 @@ public final class ReasonWording {
   }
 
   private static String tookRune(String evidence) {
-    return RuneEvidence.parse(evidence)
-        .map(r -> "took %s %s rune %s".formatted(article(r.rune()), r.rune(), r.timing()))
-        .orElse("had a rune effect");
+    List<RuneEvidence> runes = RuneEvidence.parseAll(evidence);
+    if (runes.isEmpty()) {
+      return "had a rune effect";
+    }
+    return "took "
+        + runes.stream()
+            .map(r -> "%s %s rune %s".formatted(article(r.rune()), r.rune(), r.timing()))
+            .collect(Collectors.joining(" and "));
   }
 
   private static String article(String word) {
