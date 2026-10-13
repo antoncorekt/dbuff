@@ -1,56 +1,58 @@
 package com.ako.dbuff.service.replay.analysis.behaviour;
 
+import com.ako.dbuff.service.replay.analysis.behaviour.CombatSlots.HeroKill;
+import com.ako.dbuff.service.replay.analysis.behaviour.SmokeEvents.RoshanKill;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
-/** Judges what a smoke came to from the deaths, kills and objectives inside its window. */
+/** Judges what a smoke came to from what its group did inside the smoke's window. */
 final class SmokeOutcomes {
   /**
-   * @param kills when each hero killed or assisted in the death of an enemy hero, by slot
+   * @param kills the deaths of heroes with who killed or assisted
    * @param deaths when each hero died (an Aegis revival excluded), by slot
    * @param buildings the towers and barracks that fell
-   * @param roshanKills when each team killed Roshan
+   * @param roshanKills the Roshan kills by hero
    */
   record Events(
-      Map<Long, List<Double>> kills,
+      List<HeroKill> kills,
       Map<Long, List<Double>> deaths,
       List<TowerFall> buildings,
-      Map<TeamSide, List<Double>> roshanKills) {}
+      List<RoshanKill> roshanKills) {}
 
   private SmokeOutcomes() {}
 
   /**
-   * PAID_OFF when the group killed an enemy hero, an enemy tower or barracks fell, or the team
-   * killed Roshan between {@code from} and {@code to}; else BACKFIRED when a hero of the group died
-   * and no enemy hero did; else NOTHING.
+   * PAID_OFF when, between {@code from} and {@code to}, a group member killed or assisted in the
+   * death of an enemy hero, a group member was among the attackers of an enemy tower, barracks or
+   * ancient (not a deny), or a group member killed Roshan. Otherwise BACKFIRED when a hero of the
+   * group died, else NOTHING. What teammates outside the group did does not count.
    */
   static SmokeResult of(
       TeamSide team, Collection<Long> group, double from, double to, Events events) {
     int kills =
         (int)
-            group.stream()
-                .flatMap(slot -> times(events.kills(), slot))
-                .filter(t -> within(t, from, to))
-                .distinct()
+            events.kills().stream()
+                .filter(k -> within(k.seconds(), from, to))
+                .filter(k -> k.takers().stream().anyMatch(group::contains))
                 .count();
     int buildings =
         (int)
             events.buildings().stream()
                 .filter(b -> b.owner() == team.opponent() && !b.denied())
                 .filter(b -> within(b.seconds(), from, to))
+                .filter(b -> b.attackers().stream().anyMatch(group::contains))
                 .count();
     int roshan =
         (int)
-            events.roshanKills().getOrDefault(team, List.of()).stream()
-                .filter(t -> within(t, from, to))
+            events.roshanKills().stream()
+                .filter(r -> group.contains(r.slot()) && within(r.seconds(), from, to))
                 .count();
     int groupDeaths =
         (int)
             group.stream()
-                .flatMap(slot -> times(events.deaths(), slot))
+                .flatMap(slot -> events.deaths().getOrDefault(slot, List.of()).stream())
                 .filter(t -> within(t, from, to))
                 .count();
     int enemyDeaths =
@@ -61,7 +63,7 @@ final class SmokeOutcomes {
                 .filter(t -> within(t, from, to))
                 .count();
     return new SmokeResult(
-        outcome(kills + buildings + roshan, groupDeaths, enemyDeaths),
+        outcome(kills + buildings + roshan, groupDeaths),
         kills,
         buildings,
         roshan,
@@ -69,15 +71,11 @@ final class SmokeOutcomes {
         enemyDeaths);
   }
 
-  private static SmokeOutcome outcome(int gains, int groupDeaths, int enemyDeaths) {
+  private static SmokeOutcome outcome(int gains, int groupDeaths) {
     if (gains > 0) {
       return SmokeOutcome.PAID_OFF;
     }
-    return groupDeaths > 0 && enemyDeaths == 0 ? SmokeOutcome.BACKFIRED : SmokeOutcome.NOTHING;
-  }
-
-  private static Stream<Double> times(Map<Long, List<Double>> bySlot, long slot) {
-    return bySlot.getOrDefault(slot, List.of()).stream();
+    return groupDeaths > 0 ? SmokeOutcome.BACKFIRED : SmokeOutcome.NOTHING;
   }
 
   private static boolean within(double seconds, double from, double to) {

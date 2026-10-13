@@ -268,7 +268,7 @@ class BehaviourLoopReportTest {
                 + " enemy tower or barracks fell, 1 of the group died | |")
         .contains(
             "Smoke: 1 use (Radiant 1, Dire 0): 1 paid off, 0 came to nothing, 0 backfired; 0"
-                + " ran out, 1 broke.")
+                + " ran out, 1 broke, 0 not known.")
         .doesNotContain("PAID_OFF");
   }
 

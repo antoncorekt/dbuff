@@ -24,15 +24,18 @@ final class BehaviourSmokeSection {
   static final String SMOKE = "Smoke";
 
   private static final String HOW_TO_READ =
-      "Smoke: a hero used a Smoke of Deceit. The group is the heroes of his team that got the smoke"
+      "Smoke: a hero used a Smoke of Deceit. The group is the heroes of his team that got his smoke"
           + " within %d s of the use. The smoke ends for the group when it breaks for the first of"
-          + " them (a hero came near an enemy, or died), or when it runs out. \"where\" is the zone"
-          + " of the group's middle at the start and at the end. The outcome is judged from the use"
-          + " to %d s after the smoke ended: paid off (the group killed or helped kill an enemy"
-          + " hero, an enemy tower or barracks fell, or the team killed Roshan), backfired (a hero"
-          + " of the group died and no enemy hero did), else came to nothing. A use with no smoke"
-          + " logged for the user is not listed. Times are the game clock"
-          + " (m:ss). Write OK or REJECT in the owner verdict column.";
+          + " them (a hero came near an enemy, or died), or when it runs out; when the log gives no"
+          + " removal or duration, how it ended is not known. \"where\" is the zone of the group's"
+          + " middle at the start and at the end. Only what the group did counts, from the use to"
+          + " %d s after the smoke ended: paid off (a group member killed or helped kill an enemy"
+          + " hero, was among the heroes who took an enemy tower or barracks, or killed Roshan),"
+          + " backfired (nothing of that, and a hero of the group died), else came to nothing."
+          + " Kills and towers of teammates outside the group do not count. A use with no smoke"
+          + " logged for the user is not listed; two uses by one group within the group window are"
+          + " one row. Times are the game clock (m:ss). Write OK or REJECT in the owner verdict"
+          + " column.";
 
   private BehaviourSmokeSection() {}
 
@@ -54,7 +57,7 @@ final class BehaviourSmokeSection {
                     "%d %s"
                         .formatted(count(smokes, SmokeUseDomain::getOutcome, o.name()), o.words()))
             .collect(Collectors.joining(", "));
-    return "%d %s (Radiant %d, Dire %d): %s; %d ran out, %d broke"
+    return "%d %s (Radiant %d, Dire %d): %s; %d ran out, %d broke, %d not known"
         .formatted(
             smokes.size(),
             smokes.size() == 1 ? "use" : "uses",
@@ -62,7 +65,8 @@ final class BehaviourSmokeSection {
             byTeam.getOrDefault("DIRE", 0L),
             outcomes,
             count(smokes, SmokeUseDomain::getEndReason, SmokeUse.End.EXPIRED.name()),
-            count(smokes, SmokeUseDomain::getEndReason, SmokeUse.End.BROKEN.name()));
+            count(smokes, SmokeUseDomain::getEndReason, SmokeUse.End.BROKEN.name()),
+            count(smokes, SmokeUseDomain::getEndReason, SmokeUse.End.UNKNOWN.name()));
   }
 
   static List<String> table(List<SmokeUseDomain> smokes, Map<Long, String> heroNames) {

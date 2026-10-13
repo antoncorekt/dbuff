@@ -63,8 +63,8 @@ public class BehaviourProperties {
   /** A smoke modifier removed this much before its full duration ran out was broken. */
   private double smokeExpirySlackSeconds = 1.0;
 
-  /** A smoke is judged by what happened from its start to this long after its end. */
-  private int smokeOutcomeSeconds = 60;
+  /** A smoke is judged by what its group did from its start to this long after its end. */
+  private int smokeOutcomeSeconds = 20;
 
   @PostConstruct
   void validate() {

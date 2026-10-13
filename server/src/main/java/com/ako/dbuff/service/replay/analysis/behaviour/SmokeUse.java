@@ -9,7 +9,8 @@ import java.util.List;
  *
  * @param group the slots of the heroes that held the modifier, the user included, in order
  * @param endSeconds when the smoke ended for the group: the first time it broke for a hero, else
- *     when the last modifier ran out
+ *     when the last modifier ended
+ * @param end UNKNOWN when no modifier broke and one has no removal or no duration in the log
  * @param startZone where the group stood at the start, null when no hero of it had a track sample
  * @param endZone where the group stood at the end, null likewise
  */
@@ -26,7 +27,8 @@ public record SmokeUse(
 
   public enum End {
     EXPIRED("ran out"),
-    BROKEN("broke");
+    BROKEN("broke"),
+    UNKNOWN("ended, the log does not say how");
 
     private final String words;
 

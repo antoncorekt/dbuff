@@ -28,11 +28,15 @@ final class CombatSlots {
   }
 
   /**
-   * When each hero killed or assisted in the death of an enemy hero, by slot; an Aegis revival
-   * counts as a death here, as in the log.
+   * An enemy hero death, with the heroes of the other team that killed or assisted in it.
+   *
+   * @param victim the slot of the hero who died (an Aegis revival counts as a death, as in the log)
+   * @param takers the slots of the killer and the assisters, all of the victim's opponents
    */
-  static Map<Long, List<Double>> kills(List<CombatEvent> events, Map<String, Long> slotByHero) {
-    Map<Long, List<Double>> kills = new HashMap<>();
+  record HeroKill(long victim, double seconds, Set<Long> takers) {}
+
+  static List<HeroKill> killEvents(List<CombatEvent> events, Map<String, Long> slotByHero) {
+    List<HeroKill> kills = new ArrayList<>();
     for (CombatEvent e : events) {
       Long victim = slotByHero.get(e.target());
       if (e.kind() != CombatEventKind.DEATH || !e.targetIsRealHero() || victim == null) {
@@ -48,10 +52,18 @@ final class CombatSlots {
           takers.add(PlayerSlots.slot(index));
         }
       }
-      for (Long taker : takers) {
-        if (TeamSide.ofSlot(taker) != TeamSide.ofSlot(victim)) {
-          kills.computeIfAbsent(taker, s -> new ArrayList<>()).add(e.gameSecond());
-        }
+      takers.removeIf(taker -> TeamSide.ofSlot(taker) == TeamSide.ofSlot(victim));
+      kills.add(new HeroKill(victim, e.gameSecond(), takers));
+    }
+    return kills;
+  }
+
+  /** When each hero killed or assisted in the death of an enemy hero, by slot. */
+  static Map<Long, List<Double>> kills(List<CombatEvent> events, Map<String, Long> slotByHero) {
+    Map<Long, List<Double>> kills = new HashMap<>();
+    for (HeroKill kill : killEvents(events, slotByHero)) {
+      for (Long taker : kill.takers()) {
+        kills.computeIfAbsent(taker, s -> new ArrayList<>()).add(kill.seconds());
       }
     }
     return kills;

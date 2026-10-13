@@ -2,7 +2,6 @@ package com.ako.dbuff.service.replay.analysis.behaviour;
 
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
-import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -46,9 +45,22 @@ class SmokeEventsTest {
 
     assertThat(SmokeEvents.holds(events, SLOTS))
         .containsExactlyInAnyOrder(
-            new SmokeHold(0, 10, 55.0, 45),
-            new SmokeHold(1, 10, 20.0, 45),
-            new SmokeHold(1, 300, null, 45));
+            new SmokeHold(0, 0L, 10, 55.0, 45),
+            new SmokeHold(1, 0L, 10, 20.0, 45),
+            new SmokeHold(1, 0L, 300, null, 45));
+  }
+
+  @Test
+  void holds_aNewAddForAnOpenHoldClosesTheOldOneAtThatTime() {
+    List<CombatEvent> events =
+        List.of(
+            modifier(CombatEventKind.MODIFIER_ADD, 10, "npc_dota_hero_lion"),
+            modifier(CombatEventKind.MODIFIER_ADD, 30, "npc_dota_hero_lion"),
+            modifier(CombatEventKind.MODIFIER_REMOVE, 50, "npc_dota_hero_lion"));
+
+    assertThat(SmokeEvents.holds(events, SLOTS))
+        .containsExactlyInAnyOrder(
+            new SmokeHold(1, 0L, 10, 30.0, 45), new SmokeHold(1, 0L, 30, 50.0, 45));
   }
 
   @Test
@@ -60,6 +72,6 @@ class SmokeEventsTest {
             event(CombatEventKind.DEATH, 902, "npc_dota_roshan", "npc_dota_hero_axe", ""));
 
     assertThat(SmokeEvents.roshanKills(events, SLOTS))
-        .isEqualTo(Map.of(TeamSide.DIRE, List.of(900.0)));
+        .containsExactly(new SmokeEvents.RoshanKill(128, 900));
   }
 }

@@ -58,14 +58,16 @@ public class BehaviourSmokeAnalyzer implements ReplayAnalyzer {
   @Override
   @Transactional
   public void analyze(long matchId) {
-    deleteByMatchId(matchId);
     MapLayout layout = matchMapLayout.of(matchId).orElse(null);
     if (layout == null) {
-      log.info("Match {} was not played on the frozen map layout, no smoke uses stored", matchId);
+      log.info(
+          "Match {} was not played on the frozen map layout, smoke uses left as they were",
+          matchId);
       return;
     }
     Map<Long, Trace> traces = slotTraces.of(matchId);
     if (traces.isEmpty()) {
+      log.info("Match {} has no tracks, smoke uses left as they were", matchId);
       return;
     }
     List<CombatEvent> events = combatLog.events(matchId);
@@ -77,7 +79,7 @@ public class BehaviourSmokeAnalyzer implements ReplayAnalyzer {
                 SmokeEvents.uses(events, slotByHero),
                 SmokeEvents.holds(events, slotByHero),
                 new SmokeOutcomes.Events(
-                    CombatSlots.kills(events, slotByHero),
+                    CombatSlots.killEvents(events, slotByHero),
                     eventTimes.deaths(matchId),
                     TowerFall.ofObjectives(buildingRepo.findByMatchId(matchId)),
                     SmokeEvents.roshanKills(events, slotByHero)));
@@ -87,6 +89,7 @@ public class BehaviourSmokeAnalyzer implements ReplayAnalyzer {
           matchId,
           found.dropped());
     }
+    deleteByMatchId(matchId);
     smokeRepo.saveAll(found.uses().stream().map(u -> row(matchId, u)).toList());
   }
 

@@ -4,6 +4,7 @@ import com.ako.dbuff.service.replay.analysis.behaviour.TeamClusters.Point;
 import com.ako.dbuff.service.replay.analysis.fight.FightAssessor.Trace;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.map.Zone;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -34,13 +35,25 @@ final class SmokeFinder {
       List<SmokeEvents.Use> uses,
       List<SmokeHold> holds,
       SmokeOutcomes.Events events) {
-    List<SmokeUse> found =
-        uses.stream()
-            .sorted(Comparator.comparingDouble(SmokeEvents.Use::seconds))
-            .map(use -> smoke(use, traces, holds, events))
-            .flatMap(Optional::stream)
-            .toList();
-    return new Found(found, uses.size() - found.size());
+    List<SmokeUse> found = new ArrayList<>();
+    int dropped = 0;
+    for (SmokeEvents.Use use :
+        uses.stream().sorted(Comparator.comparingDouble(SmokeEvents.Use::seconds)).toList()) {
+      Optional<SmokeUse> smoke = smoke(use, traces, holds, events);
+      if (smoke.isEmpty()) {
+        dropped++;
+      } else if (found.stream().noneMatch(f -> sameSmoke(f, smoke.get()))) {
+        found.add(smoke.get());
+      }
+    }
+    return new Found(found, dropped);
+  }
+
+  /** Two uses in a row by one group (a stack used twice) are one smoke. */
+  private boolean sameSmoke(SmokeUse a, SmokeUse b) {
+    return a.team() == b.team()
+        && a.group().equals(b.group())
+        && Math.abs(a.startSeconds() - b.startSeconds()) <= properties.getSmokeGroupSeconds();
   }
 
   private Optional<SmokeUse> smoke(
@@ -52,6 +65,7 @@ final class SmokeFinder {
     List<SmokeHold> group =
         holds.stream()
             .filter(h -> TeamSide.ofSlot(h.slot()) == team)
+            .filter(h -> h.sourceSlot() == null || h.sourceSlot() == use.userSlot())
             .filter(
                 h -> Math.abs(h.addSeconds() - use.seconds()) <= properties.getSmokeGroupSeconds())
             .sorted(Comparator.comparingLong(SmokeHold::slot))
@@ -60,11 +74,17 @@ final class SmokeFinder {
       return Optional.empty();
     }
     double slack = properties.getSmokeExpirySlackSeconds();
-    List<SmokeHold> broken = group.stream().filter(h -> h.brokenBefore(slack)).toList();
+    List<SmokeHold> broken =
+        group.stream().filter(h -> h.state(slack) == SmokeHold.State.BROKEN).toList();
+    boolean unknown = group.stream().anyMatch(h -> h.state(slack) == SmokeHold.State.UNKNOWN);
     double end =
         broken.isEmpty()
             ? group.stream().mapToDouble(SmokeHold::endSeconds).max().orElseThrow()
             : broken.stream().mapToDouble(SmokeHold::endSeconds).min().orElseThrow();
+    SmokeUse.End reason =
+        !broken.isEmpty()
+            ? SmokeUse.End.BROKEN
+            : unknown ? SmokeUse.End.UNKNOWN : SmokeUse.End.EXPIRED;
     List<Long> slots = group.stream().map(SmokeHold::slot).toList();
     SmokeResult result =
         SmokeOutcomes.of(
@@ -76,7 +96,7 @@ final class SmokeFinder {
             slots,
             (int) Math.round(use.seconds()),
             (int) Math.round(end),
-            broken.isEmpty() ? SmokeUse.End.EXPIRED : SmokeUse.End.BROKEN,
+            reason,
             zoneAt(traces, slots, use.seconds(), use.seconds() + SAMPLE_SECONDS),
             zoneAt(traces, slots, end, end - SAMPLE_SECONDS),
             result));

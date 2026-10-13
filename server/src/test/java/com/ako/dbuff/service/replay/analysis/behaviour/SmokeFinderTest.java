@@ -4,6 +4,7 @@ import com.ako.dbuff.service.replay.analysis.fight.FightAssessor.Trace;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static com.ako.dbuff.service.replay.analysis.behaviour.BehaviourTestData.MID;
@@ -13,12 +14,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SmokeFinderTest {
   private static final SmokeOutcomes.Events NO_EVENTS =
-      new SmokeOutcomes.Events(Map.of(), Map.of(), List.of(), Map.of());
+      new SmokeOutcomes.Events(List.of(), Map.of(), List.of(), List.of());
 
   private final SmokeFinder finder = new SmokeFinder(new BehaviourProperties(), ZONES);
 
   private static SmokeHold hold(long slot, double add, Double remove) {
-    return new SmokeHold(slot, add, remove, 45);
+    return new SmokeHold(slot, null, add, remove, 45);
   }
 
   private static Map<Long, Trace> traces() {
@@ -81,14 +82,41 @@ class SmokeFinderTest {
   }
 
   @Test
-  void find_aModifierStillOnAtTheEndOfTheLogRanItsFullDuration() {
+  void find_aModifierWithNoRemovalLeavesTheEndReasonUnknown() {
     SmokeUse use =
         find(List.of(new SmokeEvents.Use(0, 100)), List.of(hold(0, 100, null)), NO_EVENTS)
             .uses()
             .getFirst();
 
-    assertThat(use.end()).isEqualTo(SmokeUse.End.EXPIRED);
+    assertThat(use.end()).isEqualTo(SmokeUse.End.UNKNOWN);
     assertThat(use.endSeconds()).isEqualTo(145);
+  }
+
+  @Test
+  void find_aModifierWithoutADurationLeavesTheEndReasonUnknown() {
+    SmokeUse use =
+        find(
+                List.of(new SmokeEvents.Use(0, 100)),
+                List.of(new SmokeHold(0, null, 100, 120.0, 0)),
+                NO_EVENTS)
+            .uses()
+            .getFirst();
+
+    assertThat(use.end()).isEqualTo(SmokeUse.End.UNKNOWN);
+    assertThat(use.endSeconds()).isEqualTo(120);
+  }
+
+  @Test
+  void find_aBrokenModifierDecidesEvenWhenAnotherIsUnknown() {
+    SmokeUse use =
+        find(
+                List.of(new SmokeEvents.Use(0, 100)),
+                List.of(hold(0, 100, 130.0), hold(1, 100, null)),
+                NO_EVENTS)
+            .uses()
+            .getFirst();
+
+    assertThat(use.end()).isEqualTo(SmokeUse.End.BROKEN);
   }
 
   @Test
@@ -118,9 +146,13 @@ class SmokeFinderTest {
   }
 
   @Test
-  void find_judgesTheUseByTheWindowFromItsStartToSecondsAfterItsEnd() {
+  void find_judgesTheUseByTheWindowFromItsStartToTheOutcomeSecondsAfterItsEnd() {
     SmokeOutcomes.Events kill =
-        new SmokeOutcomes.Events(Map.of(1L, List.of(189.0)), Map.of(), List.of(), Map.of());
+        new SmokeOutcomes.Events(
+            List.of(new CombatSlots.HeroKill(128, 149.0, Set.of(1L))),
+            Map.of(),
+            List.of(),
+            List.of());
 
     SmokeUse use =
         find(
@@ -137,7 +169,11 @@ class SmokeFinderTest {
   @Test
   void find_aKillAfterTheWindowIsNotCounted() {
     SmokeOutcomes.Events kill =
-        new SmokeOutcomes.Events(Map.of(1L, List.of(191.0)), Map.of(), List.of(), Map.of());
+        new SmokeOutcomes.Events(
+            List.of(new CombatSlots.HeroKill(128, 151.0, Set.of(1L))),
+            Map.of(),
+            List.of(),
+            List.of());
 
     SmokeUse use =
         find(List.of(new SmokeEvents.Use(0, 100)), List.of(hold(0, 100, 130.0)), kill)
@@ -171,5 +207,34 @@ class SmokeFinderTest {
             .getFirst();
 
     assertThat(use.startZone()).isEqualTo(TOP);
+  }
+
+  @Test
+  void find_aStackUsedTwiceByOneHeroIsOneSmoke() {
+    SmokeFinder.Found found =
+        find(
+            List.of(new SmokeEvents.Use(0, 100), new SmokeEvents.Use(0, 101.5)),
+            List.of(hold(0, 100, 130.0), hold(1, 100, 130.0)),
+            NO_EVENTS);
+
+    assertThat(found.uses()).hasSize(1);
+    assertThat(found.dropped()).isZero();
+  }
+
+  @Test
+  void find_twoGroupsOfOneTeamWithinTheGroupWindowStaySeparate() {
+    SmokeFinder.Found found =
+        find(
+            List.of(new SmokeEvents.Use(0, 100), new SmokeEvents.Use(2, 101)),
+            List.of(
+                new SmokeHold(0, 0L, 100, 130.0, 45),
+                new SmokeHold(1, 0L, 100, 130.0, 45),
+                new SmokeHold(2, 2L, 101, 131.0, 45),
+                new SmokeHold(3, 2L, 101, 131.0, 45)),
+            NO_EVENTS);
+
+    assertThat(found.uses())
+        .extracting(SmokeUse::group)
+        .containsExactly(List.of(0L, 1L), List.of(2L, 3L));
   }
 }

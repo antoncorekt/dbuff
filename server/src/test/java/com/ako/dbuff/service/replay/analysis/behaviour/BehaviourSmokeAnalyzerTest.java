@@ -76,6 +76,7 @@ class BehaviourSmokeAnalyzerTest {
             .ownerTeam("DIRE")
             .seconds(150.0)
             .denied(false)
+            .killerSlot(1L)
             .build());
 
     analyzer.analyze(MATCH);
@@ -95,6 +96,16 @@ class BehaviourSmokeAnalyzerTest {
     assertThat(row.getKills()).isEqualTo(1);
     assertThat(row.getBuildings()).isEqualTo(1);
     assertThat(row.getAnalysisVersion()).isEqualTo(1);
+  }
+
+  @Test
+  void analyze_keepsEarlierRowsWhenTheNewOnesCannotBeBuilt() {
+    stored("0123456789ab", events(true));
+    smokeRepo.saveAndFlush(SmokeUseDomain.builder().matchId(MATCH).team("DIRE").build());
+
+    analyzer.analyze(MATCH);
+
+    assertThat(smokeRepo.findAll()).hasSize(1);
   }
 
   @Test
