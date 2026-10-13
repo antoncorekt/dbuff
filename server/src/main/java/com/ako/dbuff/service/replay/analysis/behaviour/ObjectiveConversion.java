@@ -37,7 +37,8 @@ public record ObjectiveConversion(
 
   /**
    * @param nearSlots the heroes of the winner within the Roshan radius of the hero who killed him
-   *     (the killer included when he had a track sample)
+   *     (the killer included); null when the killer had no track sample, so where he stood is not
+   *     known
    */
   public record RoshanNote(List<Long> nearSlots, RoshanCall call) {}
 }

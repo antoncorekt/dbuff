@@ -154,13 +154,15 @@ final class BehaviourObjectiveSection {
 
   private static String roshan(ObjectiveConversionDomain r, Map<Long, String> heroNames) {
     String near =
-        r.getRoshanNearSlots() == null || r.getRoshanNearSlots().isBlank()
-            ? "no winner hero was found at the pit"
-            : Arrays.stream(r.getRoshanNearSlots().split(","))
-                    .map(Long::parseLong)
-                    .map(slot -> LoopWording.hero(heroNames, slot))
-                    .collect(Collectors.joining(", "))
-                + " stood at the pit";
+        r.getRoshanNearSlots() == null
+            ? "where the killer stood is not known"
+            : r.getRoshanNearSlots().isBlank()
+                ? "no winner hero was found at the pit"
+                : Arrays.stream(r.getRoshanNearSlots().split(","))
+                        .map(Long::parseLong)
+                        .map(slot -> LoopWording.hero(heroNames, slot))
+                        .collect(Collectors.joining(", "))
+                    + " stood at the pit";
     RoshanCall call = Enums.find(RoshanCall.class, r.getRoshanCall());
     return near + "; " + (call == null ? "the state before the fight is not known" : call.words());
   }
@@ -177,14 +179,17 @@ final class BehaviourObjectiveSection {
                   ? "no hero of the winner was alive when the fight ended"
                   : "no enemy lane tower was left to measure from");
     }
-    BuildingName tower = BuildingName.parse(r.getNearestTower()).orElseThrow();
+    String tier =
+        BuildingName.parse(r.getNearestTower())
+            .map(t -> "tier " + t.tier())
+            .orElse(r.getNearestTower());
     String lane =
         r.getTowerLane() == null ? "" : " in the " + LoopWording.words(r.getTowerLane()) + " lane";
-    return "%s %s; nearest enemy tower still standing: tier %d%s, %d units from %s (%s) at the end of the fight, %d of the winners alive"
+    return "%s %s; nearest enemy tower still standing: %s%s, %d units from %s (%s) at the end of the fight, %d of the winners alive"
         .formatted(
             LoopWording.team(r.getWinnerTeam()),
             took,
-            tower.tier(),
+            tier,
             lane,
             r.getTowerDistance(),
             LoopWording.hero(heroNames, r.getNearestHeroSlot()),

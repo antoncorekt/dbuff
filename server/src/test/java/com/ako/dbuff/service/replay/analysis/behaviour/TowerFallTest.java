@@ -27,8 +27,8 @@ class TowerFallTest {
 
     assertThat(falls)
         .containsExactly(
-            new TowerFall(TeamSide.DIRE, 100.0, Zone.Lane.TOP, true, Set.of(), "TOWER", null),
-            new TowerFall(TeamSide.DIRE, 100.0, null, false, Set.of(), "TOWER", null));
+            new TowerFall(TeamSide.DIRE, 100.0, Zone.Lane.TOP, true, Set.of(), "TOWER", null, null),
+            new TowerFall(TeamSide.DIRE, 100.0, null, false, Set.of(), "TOWER", null, null));
   }
 
   @Test

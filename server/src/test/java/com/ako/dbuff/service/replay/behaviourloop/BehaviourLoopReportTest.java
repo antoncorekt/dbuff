@@ -353,6 +353,24 @@ class BehaviourLoopReportTest {
                         .secondsAfter(0)
                         .roshanNearSlots("0")
                         .roshanCall("GAMBLE")
+                        .build(),
+                    ObjectiveConversionDomain.builder()
+                        .fightIndex(5)
+                        .winnerTeam("RADIANT")
+                        .result("CONVERTED")
+                        .objectiveKind("ROSHAN")
+                        .objectiveKey("npc_dota_roshan")
+                        .secondsAfter(10)
+                        .roshanCall("EXPECTED")
+                        .build(),
+                    ObjectiveConversionDomain.builder()
+                        .fightIndex(6)
+                        .winnerTeam("RADIANT")
+                        .result("MISSED")
+                        .winnersAlive(2)
+                        .nearestTower("odd_name")
+                        .towerDistance(900)
+                        .nearestHeroSlot(0L)
                         .build())));
 
     assertThat(report)
@@ -360,7 +378,9 @@ class BehaviourLoopReportTest {
             "| converted | Dire took the tier 1 tower in the top lane 30 s after it ended | |")
         .contains(
             "| converted | Radiant killed Roshan during the fight; Axe stood at the pit; a gamble,"
-                + " the winner was behind | |");
+                + " the winner was behind | |")
+        .contains("where the killer stood is not known; expected, the winner was ahead")
+        .contains("nearest enemy tower still standing: odd_name, 900 units from Axe");
   }
 
   @Test

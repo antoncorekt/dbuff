@@ -8,11 +8,10 @@ import com.ako.dbuff.service.replay.analysis.fight.FightAssessor.Trace;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Stream;
 
 /**
@@ -40,7 +39,8 @@ final class ObjectiveFinder {
    */
   record Found(List<ObjectiveConversion> conversions, int cutShort) {}
 
-  private record Taken(ObjectiveKind kind, String key, double seconds, Long roshanKiller) {}
+  private record Taken(
+      ObjectiveKind kind, String key, double seconds, TeamSide taker, Long roshanKiller) {}
 
   private final BehaviourProperties properties;
   private final ZoneLookup zones;
@@ -51,13 +51,16 @@ final class ObjectiveFinder {
   }
 
   Found find(List<ObjectiveFight> fights, Map<Long, Trace> traces, Events events) {
+    List<ObjectiveFight> ordered =
+        fights.stream().sorted(Comparator.comparingDouble(ObjectiveFight::startSeconds)).toList();
+    Map<Integer, Taken> takenBy = firstClaims(ordered, events);
     List<ObjectiveConversion> found = new ArrayList<>();
     int cutShort = 0;
-    for (ObjectiveFight fight : fights) {
+    for (ObjectiveFight fight : ordered) {
       Map<Long, Point> alive = winnersAlive(fight, traces);
-      Optional<Taken> taken = taken(fight, events);
-      if (taken.isPresent()) {
-        found.add(converted(fight, taken.get(), alive, traces));
+      Taken taken = takenBy.get(fight.index());
+      if (taken != null) {
+        found.add(converted(fight, taken, alive, traces));
       } else if (fight.endSeconds() + properties.getObjectiveWindowSeconds()
           > events.gameEndSeconds()) {
         cutShort++;
@@ -68,21 +71,58 @@ final class ObjectiveFinder {
     return new Found(found, cutShort);
   }
 
-  private Optional<Taken> taken(ObjectiveFight fight, Events events) {
-    double to = fight.endSeconds() + properties.getObjectiveWindowSeconds();
+  /**
+   * Each objective goes to the earliest fight whose window covers it and whose winner took it; a
+   * fight gets the earliest objective among those. The map is by fight index.
+   */
+  private Map<Integer, Taken> firstClaims(List<ObjectiveFight> ordered, Events events) {
+    Map<Integer, Taken> claims = new HashMap<>();
+    for (Taken taken : objectives(events)) {
+      ordered.stream()
+          .filter(f -> f.winner() == taken.taker())
+          .filter(
+              f ->
+                  within(
+                      taken.seconds(),
+                      f.startSeconds(),
+                      f.endSeconds() + properties.getObjectiveWindowSeconds()))
+          .findFirst()
+          .ifPresent(f -> claims.merge(f.index(), taken, ObjectiveFinder::earlier));
+    }
+    return claims;
+  }
+
+  private static Taken earlier(Taken a, Taken b) {
+    return Comparator.comparingDouble(Taken::seconds).thenComparing(Taken::kind).compare(a, b) <= 0
+        ? a
+        : b;
+  }
+
+  private static List<Taken> objectives(Events events) {
     Stream<Taken> buildings =
         events.buildings().stream()
-            .filter(b -> b.owner() == fight.winner().opponent() && !b.denied())
-            .filter(b -> within(b.seconds(), fight.startSeconds(), to))
-            .filter(b -> ObjectiveKind.ofBuilding(b.kind()) != null)
-            .map(b -> new Taken(ObjectiveKind.ofBuilding(b.kind()), b.name(), b.seconds(), null));
+            .filter(b -> !b.denied() && ObjectiveKind.ofBuilding(b.kind()) != null)
+            .map(
+                b ->
+                    new Taken(
+                        ObjectiveKind.ofBuilding(b.kind()),
+                        b.name(),
+                        b.seconds(),
+                        b.owner().opponent(),
+                        null));
     Stream<Taken> roshan =
         events.roshanKills().stream()
-            .filter(r -> TeamSide.ofSlot(r.slot()) == fight.winner())
-            .filter(r -> within(r.seconds(), fight.startSeconds(), to))
-            .map(r -> new Taken(ObjectiveKind.ROSHAN, SmokeEvents.ROSHAN, r.seconds(), r.slot()));
+            .map(
+                r ->
+                    new Taken(
+                        ObjectiveKind.ROSHAN,
+                        SmokeEvents.ROSHAN,
+                        r.seconds(),
+                        TeamSide.ofSlot(r.slot()),
+                        r.slot()));
     return Stream.concat(buildings, roshan)
-        .min(Comparator.comparingDouble(Taken::seconds).thenComparing(Taken::kind));
+        .sorted(Comparator.comparingDouble(Taken::seconds))
+        .toList();
   }
 
   private ObjectiveConversion converted(
@@ -120,14 +160,14 @@ final class ObjectiveFinder {
   }
 
   private Optional<Nearest> nearest(ObjectiveFight fight, Map<Long, Point> alive, Events events) {
-    Set<String> fallen = new HashSet<>();
-    events.buildings().stream()
-        .filter(b -> b.owner() == fight.winner().opponent() && b.name() != null)
-        .filter(b -> b.seconds() <= fight.endSeconds())
-        .forEach(b -> fallen.add(StandingTower.key(b.name())));
+    List<TowerFall> fallen =
+        events.buildings().stream()
+            .filter(b -> b.owner() == fight.winner().opponent())
+            .filter(b -> b.seconds() <= fight.endSeconds())
+            .toList();
     Optional<Nearest> best = Optional.empty();
     for (StandingTower tower : events.towers()) {
-      if (tower.owner() != fight.winner().opponent() || fallen.contains(tower.name())) {
+      if (tower.owner() != fight.winner().opponent() || tower.fellIn(fallen)) {
         continue;
       }
       for (Map.Entry<Long, Point> hero : alive.entrySet()) {
@@ -154,7 +194,7 @@ final class ObjectiveFinder {
             .toList();
       }
     }
-    return List.of();
+    return null;
   }
 
   private static Map<Long, Point> winnersAlive(ObjectiveFight fight, Map<Long, Trace> traces) {

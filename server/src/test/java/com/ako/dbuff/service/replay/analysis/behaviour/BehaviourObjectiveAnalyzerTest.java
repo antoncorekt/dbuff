@@ -127,8 +127,8 @@ class BehaviourObjectiveAnalyzerTest {
   }
 
   @Test
-  void analyze_aFightAtTheEndOfTheGameStoresNothing() {
-    stored(layouts.frozenVersion(), 150, false);
+  void analyze_aFightWhoseWindowRunsPastTheEndOfTheTracksStoresNothing() {
+    stored(layouts.frozenVersion(), 150, false, 30);
 
     analyzer.analyze(MATCH);
 
@@ -171,10 +171,10 @@ class BehaviourObjectiveAnalyzerTest {
     return new CombatEvent(kind, second, attacker, target, "", flags, 0, 0, 0, 4500, 0, 0, 1 << 1);
   }
 
-  private void track(long slot) {
-    int[] xs = new int[SAMPLES];
+  private void track(long slot, int samples) {
+    int[] xs = new int[samples];
     Arrays.fill(xs, -1000);
-    int[] ones = new int[SAMPLES];
+    int[] ones = new int[samples];
     Arrays.fill(ones, 1);
     trackRepo.saveAndFlush(
         ReplayPlayerTrackDomain.builder()
@@ -182,7 +182,7 @@ class BehaviourObjectiveAnalyzerTest {
             .playerSlot(slot)
             .startSeconds(0)
             .stepSeconds(5)
-            .sampleCount(SAMPLES)
+            .sampleCount(samples)
             .x(xs)
             .y(xs)
             .hpPercent(ones)
@@ -203,6 +203,10 @@ class BehaviourObjectiveAnalyzerTest {
   }
 
   private void stored(String mapVersion, int lastEventSecond, boolean roshan) {
+    stored(mapVersion, lastEventSecond, roshan, SAMPLES);
+  }
+
+  private void stored(String mapVersion, int lastEventSecond, boolean roshan, int samples) {
     runRepo.saveAndFlush(
         ReplayParseRunDomain.builder()
             .matchId(MATCH)
@@ -211,8 +215,8 @@ class BehaviourObjectiveAnalyzerTest {
             .attempts(1)
             .mapVersion(mapVersion)
             .build());
-    track(0);
-    track(1);
+    track(0, samples);
+    track(1, samples);
     player(0, 0);
     player(1, 1);
     player(128, 5);

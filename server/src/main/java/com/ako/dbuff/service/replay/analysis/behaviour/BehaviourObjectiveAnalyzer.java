@@ -95,19 +95,17 @@ public class BehaviourObjectiveAnalyzer implements ReplayAnalyzer {
             fightRepo.findByMatchId(matchId),
             stateRepo.findByMatchId(matchId));
     Map<String, Long> slotByHero = CombatSlots.byHero(events, playerRepo.findByMatchId(matchId));
+    List<TowerFall> buildings = TowerFall.ofObjectives(buildingRepo.findByMatchId(matchId));
     ObjectiveFinder.Found found =
         new ObjectiveFinder(properties, layout::zone)
             .find(
                 fights,
                 traces,
                 new ObjectiveFinder.Events(
-                    TowerFall.ofObjectives(buildingRepo.findByMatchId(matchId)),
+                    buildings,
                     SmokeEvents.roshanKills(events, slotByHero),
                     StandingTower.of(layout.facts()),
-                    events.stream().mapToDouble(CombatEvent::gameSecond).max().orElse(0)));
-    if (fights.isEmpty()) {
-      log.info("Match {} has no important fight with a winner, no objective conversions", matchId);
-    }
+                    gameEnd(buildings, traces)));
     if (found.cutShort() > 0) {
       log.info(
           "Match {}: {} fights left out, nothing taken and the game ended inside the window",
@@ -145,7 +143,7 @@ public class BehaviourObjectiveAnalyzer implements ReplayAnalyzer {
         .heroZone(heroZone == null ? null : name(heroZone.kind()))
         .heroLane(heroZone == null ? null : name(heroZone.lane()))
         .roshanNearSlots(
-            roshan == null
+            roshan == null || roshan.nearSlots() == null
                 ? null
                 : roshan.nearSlots().stream()
                     .sorted(Comparator.naturalOrder())
@@ -154,6 +152,20 @@ public class BehaviourObjectiveAnalyzer implements ReplayAnalyzer {
         .roshanCall(roshan == null ? null : name(roshan.call()))
         .analysisVersion(version())
         .build();
+  }
+
+  /** The ancient's fall when it fell, else the last track sample of any hero. */
+  private static double gameEnd(List<TowerFall> buildings, Map<Long, Trace> traces) {
+    return buildings.stream()
+        .filter(b -> "FORT".equals(b.kind()))
+        .mapToDouble(TowerFall::seconds)
+        .min()
+        .orElseGet(
+            () ->
+                traces.values().stream()
+                    .mapToDouble(t -> t.startSeconds() + (t.x().length - 1.0) * t.stepSeconds())
+                    .max()
+                    .orElse(0));
   }
 
   private static String name(Enum<?> value) {

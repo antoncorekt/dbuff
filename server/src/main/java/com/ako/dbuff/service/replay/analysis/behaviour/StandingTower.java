@@ -6,6 +6,7 @@ import com.ako.dbuff.service.replay.analysis.building.BuildingName;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.map.Zone;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,7 +16,7 @@ import java.util.Optional;
  *
  * @param name the map's name, without the combat log's {@code npc_} prefix
  */
-public record StandingTower(String name, TeamSide owner, Zone.Lane lane, Point position) {
+public record StandingTower(String name, TeamSide owner, Zone.Lane lane, int tier, Point position) {
   private static final String PREFIX = "npc_";
   private static final int LAST_LANE_TIER = 3;
 
@@ -32,6 +33,19 @@ public record StandingTower(String name, TeamSide owner, Zone.Lane lane, Point p
     return name.startsWith(PREFIX) ? name.substring(PREFIX.length()) : name;
   }
 
+  /**
+   * Whether one of the fallen towers is this one: by name when the stored building has one that
+   * matches, else by owner, lane and tier, so a fall stored without a usable name still counts.
+   */
+  boolean fellIn(Collection<TowerFall> fallen) {
+    return fallen.stream()
+        .filter(f -> f.owner() == owner)
+        .anyMatch(
+            f ->
+                f.name() != null && key(f.name()).equals(name)
+                    || f.lane() == lane && f.tier() != null && f.tier() == tier);
+  }
+
   private static Optional<StandingTower> tower(MapFacts.Building b, Optional<BuildingName> name) {
     if (name.isEmpty()
         || !"TOWER".equals(name.get().kind())
@@ -44,6 +58,7 @@ public record StandingTower(String name, TeamSide owner, Zone.Lane lane, Point p
             key(b.name()),
             Enums.find(TeamSide.class, name.get().team()),
             Enums.find(Zone.Lane.class, name.get().lane()),
+            name.get().tier(),
             new Point(b.x(), b.y())));
   }
 }

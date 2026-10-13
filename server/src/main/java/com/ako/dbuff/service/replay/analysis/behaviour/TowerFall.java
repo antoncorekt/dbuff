@@ -18,6 +18,7 @@ import java.util.function.Predicate;
  * @param kind the stored building kind (TOWER, BARRACKS_MELEE, BARRACKS_RANGED, FORT), null when
  *     not known
  * @param name the combat log name of the building, null when not known
+ * @param tier the tower's tier (1 to 4), null when not known or not a tower
  */
 public record TowerFall(
     TeamSide owner,
@@ -26,10 +27,11 @@ public record TowerFall(
     boolean denied,
     Set<Long> attackers,
     String kind,
-    String name) {
+    String name,
+    Integer tier) {
   public TowerFall(
       TeamSide owner, double seconds, Zone.Lane lane, boolean denied, Set<Long> attackers) {
-    this(owner, seconds, lane, denied, attackers, null, null);
+    this(owner, seconds, lane, denied, attackers, null, null, null);
   }
 
   public TowerFall(TeamSide owner, double seconds, Zone.Lane lane, boolean denied) {
@@ -72,7 +74,8 @@ public record TowerFall(
         Boolean.TRUE.equals(b.getDenied()),
         attackers(b),
         b.getKind(),
-        b.getBuildingName());
+        b.getBuildingName(),
+        b.getTier());
   }
 
   private static Set<Long> attackers(BuildingKillContextDomain b) {

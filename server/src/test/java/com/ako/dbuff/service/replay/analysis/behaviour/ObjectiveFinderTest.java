@@ -18,13 +18,13 @@ class ObjectiveFinderTest {
   private static final double GAME_END = 1000;
   private static final StandingTower FIRST =
       new StandingTower(
-          "dota_badguys_tower1_mid", TeamSide.DIRE, Zone.Lane.MID, new Point(1000, 0));
+          "dota_badguys_tower1_mid", TeamSide.DIRE, Zone.Lane.MID, 1, new Point(1000, 0));
   private static final StandingTower SECOND =
       new StandingTower(
-          "dota_badguys_tower2_mid", TeamSide.DIRE, Zone.Lane.MID, new Point(3000, 0));
+          "dota_badguys_tower2_mid", TeamSide.DIRE, Zone.Lane.MID, 2, new Point(3000, 0));
   private static final StandingTower OWN =
       new StandingTower(
-          "dota_goodguys_tower1_mid", TeamSide.RADIANT, Zone.Lane.MID, new Point(100, 0));
+          "dota_goodguys_tower1_mid", TeamSide.RADIANT, Zone.Lane.MID, 1, new Point(100, 0));
 
   private final ObjectiveFinder finder = new ObjectiveFinder(new BehaviourProperties(), ZONES);
 
@@ -45,7 +45,7 @@ class ObjectiveFinderTest {
   }
 
   private static TowerFall fall(TeamSide owner, double seconds, String kind, String name) {
-    return new TowerFall(owner, seconds, Zone.Lane.MID, false, Set.of(), kind, name);
+    return new TowerFall(owner, seconds, Zone.Lane.MID, false, Set.of(), kind, name, null);
   }
 
   private static ObjectiveFinder.Events events(List<TowerFall> buildings, List<RoshanKill> roshan) {
@@ -119,7 +119,7 @@ class ObjectiveFinderTest {
   @Test
   void find_aDenyAnOwnTowerAndAnObjectiveOutsideTheWindowAreNotConversions() {
     TowerFall denied =
-        new TowerFall(TeamSide.DIRE, 120, Zone.Lane.MID, true, Set.of(), "TOWER", "d");
+        new TowerFall(TeamSide.DIRE, 120, Zone.Lane.MID, true, Set.of(), "TOWER", "d", null);
     ObjectiveFinder.Found found =
         find(
             fight(null),
@@ -216,10 +216,13 @@ class ObjectiveFinderTest {
   @Test
   void find_aKillerWithNoTrackSampleLeavesNobodyNearTheRoshanPit() {
     ObjectiveConversion c =
-        find(fight(null), List.of(), List.of(new RoshanKill(4, 140))).conversions().getFirst();
+        find(fight(State.EVEN), List.of(), List.of(new RoshanKill(4, 140)))
+            .conversions()
+            .getFirst();
 
     assertThat(c.result()).isEqualTo(ObjectiveResult.CONVERTED);
-    assertThat(c.roshan().nearSlots()).isEmpty();
+    assertThat(c.roshan().nearSlots()).isNull();
+    assertThat(c.roshan().call()).isEqualTo(RoshanCall.EVEN);
   }
 
   @Test
@@ -253,5 +256,77 @@ class ObjectiveFinderTest {
 
     assertThat(found.conversions()).isEmpty();
     assertThat(found.cutShort()).isZero();
+  }
+
+  @Test
+  void find_aFightWhoseWindowFitsBeforeTheRealEndIsMissedNotCutShort() {
+    ObjectiveFinder.Found found =
+        finder.find(
+            List.of(fight(null)),
+            traces(),
+            new ObjectiveFinder.Events(List.of(), List.of(), List.of(FIRST), 190));
+
+    assertThat(found.conversions().getFirst().result()).isEqualTo(ObjectiveResult.MISSED);
+    assertThat(found.cutShort()).isZero();
+  }
+
+  @Test
+  void find_aFallenTowerWithoutANameIsMatchedByOwnerLaneAndTier() {
+    TowerFall unnamed =
+        new TowerFall(TeamSide.DIRE, 60, Zone.Lane.MID, false, Set.of(), "TOWER", null, 1);
+
+    ObjectiveConversion c = find(fight(null), List.of(unnamed), List.of()).conversions().getFirst();
+
+    assertThat(c.nearest().tower()).isEqualTo(SECOND);
+  }
+
+  @Test
+  void find_aFallenTowerOfAnotherOwnerLaneOrTierDoesNotRemoveAStandingOne() {
+    List<TowerFall> others =
+        List.of(
+            new TowerFall(TeamSide.RADIANT, 60, Zone.Lane.MID, false, Set.of(), "TOWER", null, 1),
+            new TowerFall(TeamSide.DIRE, 60, Zone.Lane.TOP, false, Set.of(), "TOWER", null, 1),
+            new TowerFall(TeamSide.DIRE, 60, Zone.Lane.MID, false, Set.of(), "TOWER", null, 3));
+
+    assertThat(find(fight(null), others, List.of()).conversions().getFirst().nearest().tower())
+        .isEqualTo(FIRST);
+  }
+
+  @Test
+  void find_oneObjectiveConvertsOnlyTheEarliestFightThatCoversIt() {
+    ObjectiveFight first = new ObjectiveFight(1, TeamSide.RADIANT, 80, 100, null);
+    ObjectiveFight second = new ObjectiveFight(2, TeamSide.RADIANT, 120, 140, null);
+
+    List<ObjectiveConversion> found =
+        finder
+            .find(
+                List.of(second, first),
+                traces(),
+                events(List.of(fall(TeamSide.DIRE, 150, "TOWER", "t")), List.of()))
+            .conversions();
+
+    assertThat(found).extracting(ObjectiveConversion::fightIndex).containsExactly(1, 2);
+    assertThat(found.get(0).result()).isEqualTo(ObjectiveResult.CONVERTED);
+    assertThat(found.get(1).result()).isEqualTo(ObjectiveResult.MISSED);
+  }
+
+  @Test
+  void find_theLaterFightIsConvertedByALaterObjective() {
+    ObjectiveFight first = new ObjectiveFight(1, TeamSide.RADIANT, 80, 100, null);
+    ObjectiveFight second = new ObjectiveFight(2, TeamSide.RADIANT, 120, 140, null);
+
+    List<ObjectiveConversion> found =
+        finder
+            .find(
+                List.of(first, second),
+                traces(),
+                events(
+                    List.of(
+                        fall(TeamSide.DIRE, 150, "TOWER", "t"),
+                        fall(TeamSide.DIRE, 220, "TOWER", "u")),
+                    List.of()))
+            .conversions();
+
+    assertThat(found).extracting(ObjectiveConversion::key).containsExactly("t", "u");
   }
 }
