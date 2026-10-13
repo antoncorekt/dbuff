@@ -1,6 +1,6 @@
 # Replay: the next analyses
 
-Status: plan, nothing built. Replay processing and the Discord report stay OFF in production. Every number in this document is a first guess, to be tuned in the review loop (`docs/replay-review-loop.md`). Builds on the reasons plan (`2026-10-12-replay-reasons-plan.md`, PRs #56 to #66, merged and deployed).
+Status: plan, nothing built. Replay processing and the Discord report stay OFF in production. Every number in this document is a first guess, kept as a property and tuned in the review loop (`docs/replay-review-loop.md`). Builds on the reasons plan (`2026-10-12-replay-reasons-plan.md`, PRs #56 to #66, merged and deployed).
 
 ## 1. Why a new plan
 
@@ -29,7 +29,7 @@ The owner reviewed the fights loop: it is too noisy, because every lost fight is
 | 11 | A6 team behaviour | Rotations, split push, smoke, objectives (detailed after the first topics are reviewed) |
 | 12 | A7 others | End game, `/match` detail, key item behind a swing, outliers, courier, metrics, load test |
 
-Small docs PR in parallel: roles round 3 accepted (owner verdicts in `round-03.md`).
+Small docs PR in parallel: roles round 3 accepted (recorded in PR #68, owner verdicts in `round-03.md`). Step 0 is done (environment restored 2026-10-13).
 
 ## 3. Rules that bind every PR
 
@@ -49,7 +49,7 @@ Small docs PR in parallel: roles round 3 accepted (owner verdicts in `round-03.m
 | E3 item data | none | S | none |
 | A1 important fights | L1 | M | `fights` (reworked) and `advantage` (new table) |
 | A2 vision | A1, E2 | M | `vision` |
-| A3 runes and opening | E2 (E1 for the reason) | M | `runes` |
+| A3 runes and opening | E1, E2 (E1 for the gold and XP balance in the opening window) | M | `runes` |
 | A4 laning stage | E1, E2, L1 | L | `lanes` |
 | A5 item efficiency | E1, E3 | L | `items` |
 | A6 team behaviour | A1, A4 reviewed | L | `behaviour` (outline only) |
@@ -57,13 +57,13 @@ Small docs PR in parallel: roles round 3 accepted (owner verdicts in `round-03.m
 
 E1, E2 and E3 touch different classes and can run in parallel; L1 can run in parallel with them. An analysis PR waits for the owner's accepted round on the one before it only when it reads that PR's output (A2 reads A1, A6 reads A1 and A4).
 
-## 5. Step 0: environment
+## 5. Step 0: environment (done, 2026-10-13)
 
-The scratchpad of the earlier session is gone: the four replays (`.dem`, `.zst`, OpenDota `.json`), the `constants-*.json` and the google-java-format jar are missing and the Docker daemon is not running (probably a reboot cleaned `/private/tmp`). Stored data in the `roleloop-pg` container may also be gone. Every real-replay run is blocked until this is fixed.
+The scratchpad of the earlier session was cleaned (probably a reboot cleaned `/private/tmp`), which blocked every real-replay run. The environment was restored on 2026-10-13:
 
-- Start Docker; re-fetch the formatter jar from Maven; re-download the four replays (the app's downloader, with cluster and salt from OpenDota; replays expire around January 2027) and the constants.
-- Keep them in a stable folder outside `/tmp` (for example `~/dbuff-fixtures`), and update the paths in `CLAUDE.md`, `2026-10-12-session-handoff.md` and the memory notes.
-- No repo change except the docs paths.
+- Replays, OpenDota `.json` and `constants-*.json`: `~/dbuff-fixtures/replays` (the four matches). Formatter jar: `~/dbuff-fixtures/tools/gjf/google-java-format-1.25.2-all-deps.jar`. Both are outside git; replays expire around January 2027.
+- The old paths are still written in `docs/replay-role-loop/README.md`, `docs/replay-fight-loop/README.md`, `2026-10-12-session-handoff.md`, `2026-10-12-replay-status-and-next-steps.md` and `2026-10-11-replay-extraction-plan.md` (`REPLAY_FIXTURE_DIR` and `/private/tmp` scratchpad paths). `CLAUDE.md` mentions `REPLAY_FIXTURE_DIR` but names no path. Pointing them at `~/dbuff-fixtures` is a docs change for the first PR that touches each file.
+- Docker and the stored loop data (`roleloop-pg`) are checked by each PR that needs them.
 
 ## 6. What data exists, and what is missing
 
@@ -94,7 +94,7 @@ Extractors implement `ReplayExtractor` and analyzers implement `ReplayAnalyzer`;
 |---|---|---|
 | Rune events (who, which, when) | Not stored; only per-minute rune counts exist. OpenDota `runes_log` is in the generated client (`MatchResponsePlayersInnerRunesLogInner`) and read only by the smoke test and the loop report | Store `runes_log`; position from the hero track at the pickup time |
 | Ward events (placement, position, time, killer) | Not stored. The client has `obs_log`, `sen_log`, `obs_left_log`, `sen_left_log` and `killed` as untyped lists, and only per-minute counts are stored | Store them (E2); verify on the fixtures before relying on them |
-| Gold and XP reason | `CombatLogRecorder` copies `getStunDuration() * 100` into `aux` for every kind. The `CombatEvent` javadoc says "the gold or experience reason, or a stun duration", but nothing writes the reason. For a GOLD or XP entry `aux` is therefore the stun duration, in practice 0, and the reason is lost. Clarity (5.0.1) has `getGoldReason()` and `getXpReason()` | Read the reason for GOLD and XP kinds in `CombatLogRecorder` (E1) |
+| Gold and XP reason | `CombatLogRecorder` copies `getStunDuration() * 100` into `aux` for every kind. The `CombatEvent` javadoc says "the gold or experience reason, or a stun duration", but nothing writes the reason. For a GOLD or XP entry `aux` is therefore the stun duration, in practice 0, and the reason is lost. Clarity 5.0.1 (the version in `build.gradle`) has `getGoldReason()` and `getXpReason()` on `CombatLogEntry`, verified with `javap` on the cached jar; what values they return for each reason is to verify in E1 | Read the reason for GOLD and XP kinds in `CombatLogRecorder` (E1) |
 | Creep kills by type | DEATH rows carry the creep name, nothing groups them. `ActivitySegmenter` counts a lane creep only when the name starts with `npc_dota_creep_` and contains `goodguys` or `badguys`, and a neutral by its own prefix. Siege creep names may not follow that pattern: unchecked, so a possible miss | Typed creep kill record (E1); check siege names on the fixtures first |
 | Item charges (Magic Stick) | Not read: the state-change kinds have no charges | Extend the state-change extractor (E3) |
 | Item components | `ItemConstant` has only `id`, `dname`, `cost` and `attrib`; recipes are dropped | Add the components field and its parsing (E3) |
@@ -108,7 +108,8 @@ Two parts of the first draft of this plan were wrong and are fixed here: per-min
 
 - **Series:** the per-minute Radiant gold and XP advantage from `TeamTimelineDomain`. (The first draft preferred a 30 s replay net worth; it does not exist, so per minute is the first version.)
 - **Measure per fight:** the change of the advantage over the fight window plus a short lag (first guess 60 s, to cover the minute resolution), and three flags: size, a lead flip (the sign of the advantage changes), a slope break (the direction of the graph changes).
-- **Important:** above a threshold, a share of the team net worth (first guess 3 percent) or a gold amount (first guess 1500); both are properties. A flip or a slope break above a smaller size also counts.
+- **Important (one rule, everywhere):** a fight is important when the advantage change reaches EITHER 3 percent of the team's total net worth OR 1500 gold. Both numbers are first guesses and properties. The lead flip and the slope break are shown as flags and do not make a fight important by themselves.
+- **Which fights:** importance is computed for every fight with a decided winner. A draw or an unknown winner is not important and gets no row. A fight shorter than the series resolution uses a minimum window of one minute plus the lag.
 - **Storage:** `importance` and the flags are added to `fight_explanation`; reasons stay stored for all fights. The ranking, the Discord line and the loop use only the important ones.
 - **Loop report:** first the advantage graph as a table (per minute gold and XP advantage, with the spikes, direction changes and important fights marked), then the reasons only for the important fights; the other fights are listed with their importance.
 - **Home:** a stage of `FightLossAnalyzer` or a new analyzer that it requires; decided in the PR. `SpikeAnalyzer` already finds swings from the same series and is read, not changed.
@@ -116,10 +117,10 @@ Two parts of the first draft of this plan were wrong and are fixed here: per-min
 ## 8. A2: wards and vision (after A1)
 
 - **Source:** the OpenDota ward logs stored by E2; the replay entity parse only if they are not enough.
-- **Scope (owner decision):** only the important-fight windows, first guess from 90 s before the fight start to 15 s after its end. Nothing else is analysed.
+- **Scope (owner decision):** only the important-fight windows, first guess from 90 s before the fight start to 15 s after its end (both are properties). Nothing else is analysed.
 - **Per window:**
   - active wards near the fight and their age;
-  - a ward placed just before the fight (smaller weight);
+  - a ward placed just before the fight (smaller weight: a ward placed within 30 s before the fight weighs 0.5 of an older ward; both numbers are first guesses);
   - sentries and dust used or available (dust and sentry use from the combat log ITEM events);
   - invisible heroes present (from the hero constants: Riki, Clinkz, Weaver, Nyx Assassin, Templar Assassin, invisibility items) and the other team's detection;
   - enemy wards destroyed.
@@ -127,7 +128,7 @@ Two parts of the first draft of this plan were wrong and are fixed here: per-min
 
 ## 9. A3: runes and the pre-game fight
 
-- **Goal:** who takes the first runes, who takes the contested ones, and the first fight around 0:00: the bounty runes at the start, kills in a window around the rune spawn (pre-horn kills count; first guess -30 s to +90 s, a property), and which team came out ahead.
+- **Goal:** who takes the first runes, who takes the contested ones, and the first fight around 0:00: the bounty runes at the start, kills in a window around the rune spawn (pre-horn kills count; first guess -30 s to +90 s, a property). Rune weights are first guesses: bounty 1.0, power and water 0.5, and which team came out ahead.
 - **Data:** `rune_event` (time, type, slot) from OpenDota `runes_log`; the hero position at the pickup from the track; kills from the DEATH rows in the window; gold and XP per team in the window.
 - **Tables:** `rune_pickup` (who, which rune, time, zone) and `opening_summary` per match (runes per team, first taker, kills and gold balance, winner of the opening).
 - **Topic `runes`:** one row per rune and one per opening.
@@ -136,9 +137,9 @@ Two parts of the first draft of this plan were wrong and are fixed here: per-min
 
 Steps, each with its own table in the topic `lanes`:
 
-1. **Lane assignment:** a hero's lane is the lane zone where he spent most time in the first 2 to 4 minutes (activity segments plus `MapLayout.zone`). Pair the lanes of the two teams (Radiant safe lane against Dire off lane). Roamers and junglers get "no lane". OpenDota `lane_role` is a cross-check.
-2. **Laning start:** the hero reaches his lane zone (about 0:00 to 1:00).
-3. **Laning end, per hero:** the first time after the start that he is outside his lane for at least 30 s (jungle, another lane, teleport), or his lane tower falls, or a cap (first guess 9 minutes). The lane ends when all heroes of the pair have left. Typical values are 7 to 9 minutes, so there is no fixed 10 minutes. `PhaseWindows` stays the coarse game phase and is not reused for this.
+1. **Lane assignment:** a hero's lane is the lane zone where he spent most time in the first 2 to 4 minutes (first guess, a property; activity segments plus `MapLayout.zone`). Pair the lanes of the two teams (Radiant safe lane against Dire off lane). Roamers and junglers get "no lane". OpenDota `lane_role` is a cross-check.
+2. **Laning start:** the hero reaches his lane zone (first guess: 0:00 to 1:00, a property).
+3. **Laning end, per hero:** the first time after the start that he is outside his lane for at least 30 s (first guess; jungle, another lane, teleport), or his lane tower falls, or a cap (first guess 9 minutes). The lane ends when all heroes of the pair have left. The 9 minute cap and the 7 to 9 minute typical values are first guesses (properties), so there is no fixed 10 minutes. `PhaseWindows` stays the coarse game phase and is not reused for this.
 4. **Creep stats by value:** a typed creep kill per hero (`creep_kill`: time, unit class, own or enemy side, deny flag, lane or camp). A class value is measured from the GOLD and XP events once the reason is stored (siege gives more than melee or ranged; ancient and large camps differ from small ones). The values live in one validated JSON file, not in code. A deny is scored by the experience it takes from the enemy.
 5. **Lane result:** compare the pair on weighted creep score, denies, XP, level at lane end, kills and deaths inside the lane window, tower damage and tower state. Per lane: WON, LOST or EVEN with the margin; per hero: his share.
 6. **Why** (contributors, the same extension idea as the fight reasons): partner absent or roaming, enemy gank or dive, enemy harassment (hero damage in the lane), a level lead from a rune, a pull or stack, supports present, role and hero matchup (hero constants), item start (Magic Stick, see A5), and how the hero's stats compare with his lane partner.
@@ -148,8 +149,8 @@ Steps, each with its own table in the topic `lanes`:
 - **Whitelist file** `replay/item-efficiency.json` (next to `replay/role-overrides.json`, validated at load the same way): items or groups, with the evaluator type and its parameters. One interface `ItemEfficiencyEvaluator` (`supports(item or group)`, `evaluate(player, match data)`) with one bean per kind. Adding an item is a JSON entry, plus a class only when its logic is new (open for extension).
 - **Not the existing config.** `ItemEfficiencyConfig` (prefix `dbuff.report.item-efficiency`) feeds the OpenDota based purchase-time report and stays separate.
 - **Bug to fix in this PR:** `application.properties` defines `groups[0]` twice: first `Magic Stick` (item id 34), then `Hand of Midas` (id 65). The second overwrites the first, so the Magic Stick group does not exist; Midas plus Octarine Core is `groups[1]`. The Magic Stick entry has to become its own index.
-- **Magic Stick** (cost from the constants, 200): charges used, HP and mana restored (needs charges from E3, the use from the ITEM events, hp and mana from the track), and saves: a use right before or during enemy damage after which the hero survived, with the damage taken around the use and his HP as evidence. Efficiency is the value restored plus saves against the cost.
-- **Hand of Midas:** gold and XP gained from the purchase to the end (its uses from the ITEM events, and what the creep gave, which needs the reason from E1), uptime (seconds ready but unused while the hero was farming), payback time (when the cumulative gain passed the cost). Efficiency is gain divided by cost at the end of the game.
+- **Magic Stick** (its cost is read from the item constants, never written in the plan or in code): charges used, HP and mana restored (needs charges from E3, the use from the ITEM events, hp and mana from the track), and saves: a use right before or during enemy damage after which the hero survived, with the damage taken around the use and his HP as evidence. Efficiency is the value restored plus saves against the cost.
+- **Hand of Midas** (cost from the constants): gold and XP gained from the purchase to the end (its uses from the ITEM events, and what the creep gave, which needs the reason from E1), uptime (seconds ready but unused while the hero was farming), payback time (when the cumulative gain passed the cost). Efficiency is gain divided by cost at the end of the game.
 - **Farming group** (for example Battle Fury, Maelstrom, Mjollnir; names to confirm in the constants): creep kills, gold per minute and camps per minute before and after the purchase, against the cost and the purchase time.
 - **Output:** `item_efficiency` rows (match, slot, item or group, metrics, score), a report line per hero for whitelisted items, topic `items`.
 
@@ -171,18 +172,18 @@ The loop reports the owner compares (advantage graph, important fights, runes, l
 - A short "how to read this" header and a one-line summary at the top (counts, the main finding).
 - Before and after tables for a round show only what changed.
 
-The loop runner (`ReviewLoopTopic` with `render(matchId)`, `matchList()`, `outputDir()`, `sections()`) gets one shared formatter for hero names, times, gold and team names, so every topic reads the same. L1 moves the existing roles and fights reports onto it, before any new topic is added.
+The loop runner (`ReviewLoopTopic` with `name()`, `matchList()`, `outputDir()`, `sections()` and `render(matchId)`, in the test sources, package `looprunner`) gets one shared formatter for hero names, times, gold and team names, so every topic reads the same. The formatter lives in the same test sources (`looprunner`), next to the topic. L1 moves the existing roles and fights reports onto it, before any new topic is added.
 
 ## 15. Questions for the owner
 
 Each with the default the plan assumes.
 
-1. Fight importance threshold: 3 percent of net worth or 1500 gold, whichever is lower. Default: both are properties, start with those.
+1. Fight importance threshold: a fight is important when the advantage change reaches either 3 percent of the team net worth or 1500 gold (both properties). Default: as written.
 2. Can XP alone make a fight important? Default: no, only together with a gold change.
 3. Lag after a fight when measuring the advantage change: 60 s. Default: 60 s.
 4. Vision window: 90 s before to 15 s after the fight. Default: as written.
 5. Opening window around the rune spawn: -30 s to +90 s. Default: as written.
-6. Do power and water runes count the same as bounty runes? Default: no, bounty at full weight, power and water at half.
+6. Do power and water runes count the same as bounty runes? Default: no, bounty 1.0, power and water 0.5 (first guesses).
 7. How to rate an opening won only by kills? Default: kills count, but a gold and XP balance is shown beside them.
 8. Where does a tri-lane count, and how is solo mid treated? Default: a tri-lane is one lane with three heroes, solo mid is a lane of one against one.
 9. Which creep classes are weighted first? Default: siege, then ranged, then melee, then camps.
