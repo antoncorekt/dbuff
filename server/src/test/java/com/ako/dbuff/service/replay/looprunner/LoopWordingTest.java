@@ -80,4 +80,14 @@ class LoopWordingTest {
     assertThat(LoopWording.laneRole(null)).isEqualTo("?");
     assertThat(LoopWording.ability("sniper_shrapnel")).isEqualTo("Sniper Shrapnel");
   }
+
+  @Test
+  void aSignedLeadNamesTheTeamThatHoldsIt() {
+    assertThat(LoopWording.advantage(2300L)).isEqualTo("Radiant +2.3k");
+    assertThat(LoopWording.advantage(-450L)).isEqualTo("Dire +450");
+    assertThat(LoopWording.advantage(0L)).isEqualTo("even");
+    assertThat(LoopWording.advantage(null)).isEqualTo("?");
+    assertThat(LoopWording.change("DIRE", 1800L)).isEqualTo("Dire +1.8k");
+    assertThat(LoopWording.change("RADIANT", -400L)).isEqualTo("Radiant -400");
+  }
 }

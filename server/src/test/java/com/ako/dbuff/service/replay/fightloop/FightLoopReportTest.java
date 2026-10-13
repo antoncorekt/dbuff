@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.fightloop;
 
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightExplanationDomain;
+import com.ako.dbuff.dao.model.FightImportanceDomain;
 import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.dao.model.GameSpikeDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
@@ -11,6 +12,7 @@ import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.Lo
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.MatchExplanation;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.RankedReason;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.SwingExplanation;
+import com.ako.dbuff.service.replay.analysis.importance.AdvantageSeries;
 import com.ako.dbuff.service.replay.fightloop.FightLoopReport.MatchData;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopDiff;
 import java.util.List;
@@ -51,6 +53,7 @@ class FightLoopReportTest {
         "Ability Draft",
         explanation,
         Map.of(128L, "Windrunner"),
+        null,
         List.of(
             TeamfightDomain.builder()
                 .fightIndex(2)
@@ -86,15 +89,20 @@ class FightLoopReportTest {
                     List.of())));
 
     assertThat(report)
-        .contains("| fight | main reason | gold lost | swing | OpenDota teamfight |")
         .contains(
-            "| Dire lost fight 5 at 23:03 | Windrunner had no teleport | 1.2k (deaths not priced:"
-                + " ?) | swing 0 | 4 deaths, -1k gold change for the loser |")
+            "| fight | important | gold change | XP change | share of net worth | flags | main"
+                + " reason | gold lost | swing | OpenDota teamfight |")
+        .contains(
+            "| Dire lost fight 5 at 23:03 | unknown | ? | ? | ? | ? | Windrunner had no teleport |"
+                + " 1.2k (deaths not priced: ?) | swing 0 | 4 deaths, -1k gold change for the loser"
+                + " |")
         .contains("| reason | fight | rank | also | severity | assistant | owner |")
         .contains("| Windrunner had no teleport | Dire lost fight 5 at 23:03 | 1 |  | 0.70 | | |")
         .contains("### Swing 0, 22:00 to 24:00: Radiant gained 3.2k gold (4.5%), cause: fight win")
         .contains("**How to read this:**")
-        .contains("**Summary:** 1 lost fight (Dire lost 1); every one has a reason;");
+        .contains(
+            "**Summary:** 1 decided fight, importance not known, no advantage series (Dire lost 1);"
+                + " every one has a reason;");
   }
 
   @Test
@@ -133,8 +141,8 @@ class FightLoopReportTest {
                 + " start |");
   }
 
-  private static MatchExplanation single(LostFight fight) {
-    return new MatchExplanation(List.of(new SwingExplanation(SWING, List.of(fight))), List.of());
+  private static MatchExplanation single(LostFight... fights) {
+    return new MatchExplanation(List.of(new SwingExplanation(SWING, List.of(fights))), List.of());
   }
 
   @Test
@@ -217,11 +225,14 @@ class FightLoopReportTest {
             noOd.modeName(),
             noOd.explanation(),
             noOd.heroNames(),
+            null,
             List.of(),
             List.of());
 
     assertThat(FightLoopReport.render(noOd))
-        .contains("| Dire lost fight 5 at 23:03 | Windrunner had no teleport | ? | none | none |");
+        .contains(
+            "| Dire lost fight 5 at 23:03 | unknown | ? | ? | ? | ? | Windrunner had no teleport |"
+                + " ? | none | none |");
   }
 
   @Test
@@ -258,6 +269,7 @@ class FightLoopReportTest {
             d.modeName(),
             d.explanation(),
             d.heroNames(),
+            null,
             List.of(
                 TeamfightDomain.builder()
                     .fightIndex(1)
@@ -321,5 +333,89 @@ class FightLoopReportTest {
   void aMatchWithNoLostFightsSaysSo() {
     assertThat(FightLoopReport.render(data(new MatchExplanation(List.of(), List.of()))))
         .contains("No lost fights stored");
+  }
+
+  private static LostFight important(LostFight base, boolean important, long gold, long xp) {
+    return new LostFight(
+        base.fight(),
+        base.explanation(),
+        base.reasons(),
+        base.totalReasons(),
+        FightImportanceDomain.builder()
+            .fightIndex(base.fight().getFightIndex())
+            .winningTeam("RADIANT")
+            .goldChange(gold)
+            .xpChange(xp)
+            .sharePercent(4.25)
+            .leadFlip(true)
+            .flipToWinner(true)
+            .slopeBreak(false)
+            .important(important)
+            .build());
+  }
+
+  private static MatchData withSeries(MatchExplanation explanation) {
+    MatchData d = data(explanation);
+    double[] gold = {0, 500, -300, 2300, 2300};
+    double[] xp = {0, 100, 200, 900, 900};
+    double[] nw = {20000, 20000, 20000, 20000, 20000};
+    return new MatchData(
+        d.matchId(),
+        d.match(),
+        d.modeName(),
+        d.explanation(),
+        d.heroNames(),
+        new AdvantageSeries(gold, xp, nw, nw),
+        d.openDotaFights(),
+        d.openDotaPlayers());
+  }
+
+  @Test
+  void anUnimportantFightIsListedWithItsNumbersButHasNoReasonsAndTheSummaryCountsBoth() {
+    LostFight big = important(lost(5, 0, "DIRE", 1200L, "NO_TP"), true, 2600, 700);
+    LostFight small = important(lost(6, 0, "DIRE", 300L, "NO_BKB"), false, 150, 20);
+
+    String report = FightLoopReport.render(withSeries(single(big, small)));
+
+    assertThat(report)
+        .contains("**Summary:** 1 of 2 decided fights are important (Dire lost 1)")
+        .contains(
+            "| Dire lost fight 5 at 23:03 | yes | Radiant +2.6k | Radiant +700 | 4.3% | lead"
+                + " flipped to the winner | Windrunner had no teleport |")
+        .contains(
+            "| Dire lost fight 6 at 23:03 | no | Radiant +150 | Radiant +20 | 4.3% | lead flipped"
+                + " to the winner | not told (unimportant) |")
+        .contains("| Windrunner had no teleport | Dire lost fight 5 at 23:03 | 1 |")
+        .doesNotContain("| Dire lost fight 6 at 23:03 | 1 |")
+        .doesNotContain("NO_BKB");
+  }
+
+  @Test
+  void theAdvantageGraphComesFirstWithSignedReadableLeadsAndMarks() {
+    LostFight big = important(lost(5, 0, "DIRE", 1200L, "NO_TP"), true, 2600, 700);
+    big.fight().setStartSeconds(190.0);
+
+    String report = FightLoopReport.render(withSeries(single(big)));
+
+    assertThat(report.indexOf("## " + FightLoopReport.GRAPH))
+        .isLessThan(report.indexOf("## " + FightLoopReport.FIGHTS))
+        .isPositive();
+    assertThat(report)
+        .contains("| minute | gold advantage | XP advantage | what happened |")
+        .contains("| 1:00 | Radiant +500 | Radiant +100 |")
+        .contains("| 2:00 | Dire +300 | Radiant +200 | gold lead goes to Dire |")
+        .contains(
+            "| 3:00 | Radiant +2.3k | Radiant +900 | gold lead goes to Radiant; important fight 5"
+                + " at 3:10: Dire lost, Radiant +2.6k gold |");
+  }
+
+  @Test
+  void aMatchWithoutASeriesSaysSoAndTreatsEveryFightAsImportant() {
+    String report = FightLoopReport.render(data(single(lost(5, 0, "DIRE", 1200L, "NO_TP"))));
+
+    assertThat(report)
+        .contains("No advantage series stored")
+        .contains("**Summary:** 1 decided fight, importance not known")
+        .contains("| Windrunner had no teleport | Dire lost fight 5 at 23:03 | 1 |");
   }
 }

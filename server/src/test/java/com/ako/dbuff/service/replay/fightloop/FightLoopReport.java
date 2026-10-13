@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.fightloop;
 
 import com.ako.dbuff.dao.model.FightDomain;
+import com.ako.dbuff.dao.model.FightImportanceDomain;
 import com.ako.dbuff.dao.model.GameSpikeDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.TeamfightDomain;
@@ -9,6 +10,7 @@ import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.Lo
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.MatchExplanation;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.RankedReason;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.SwingExplanation;
+import com.ako.dbuff.service.replay.analysis.importance.AdvantageSeries;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
@@ -20,6 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -30,6 +33,7 @@ import java.util.stream.Collectors;
  * only.
  */
 final class FightLoopReport {
+  static final String GRAPH = "Advantage graph";
   static final String FIGHTS = "Lost fights";
   static final String REASONS = "Reasons";
   static final String NOTES = "Notes behind the reasons";
@@ -40,10 +44,14 @@ final class FightLoopReport {
   private static final int OPEN_DOTA_SLACK_SECONDS = 10;
 
   private static final String HOW_TO_READ =
-      "each row of \"Lost fights\" is a teamfight one side lost, with the likeliest reason first;"
-          + " \"Reasons\" lists every reason stored for those fights in order of rank. Times are"
-          + " the game clock (m:ss) and gold is what the loser's deaths cost. Write OK or REJECT"
-          + " in the assistant and owner columns of \"Reasons\".";
+      "\"Advantage graph\" is the gold and experience lead of each team minute by minute, with the"
+          + " swings, lead changes and important fights marked. \"Lost fights\" lists every"
+          + " fight with a winner and whether it was important (it moved the winner's gold lead"
+          + " enough, or flipped the lead to the winner); \"Reasons\" lists the reasons of the"
+          + " important fights in order of rank. Times are the game clock (m:ss), \"gold change\""
+          + " is the winner's gain in lead from the start of the fight to a minute after it, and"
+          + " \"gold lost\" is what the loser's deaths cost. Write OK or REJECT in the assistant"
+          + " and owner columns of \"Reasons\".";
 
   record MatchData(
       long matchId,
@@ -51,6 +59,7 @@ final class FightLoopReport {
       String modeName,
       MatchExplanation explanation,
       Map<Long, String> heroNames,
+      AdvantageSeries series,
       List<TeamfightDomain> openDotaFights,
       List<TeamfightPlayerDomain> openDotaPlayers) {}
 
@@ -61,7 +70,10 @@ final class FightLoopReport {
     out.add(ReviewLoopReport.matchHeader(d.matchId(), d.modeName(), d.match()));
     out.add("");
     List<Row> rows = rows(d);
-    out.addAll(ReviewLoopReport.introduction(HOW_TO_READ, summary(rows)));
+    List<Row> important = rows.stream().filter(r -> r.lost().important()).toList();
+    out.addAll(ReviewLoopReport.introduction(HOW_TO_READ, summary(rows, important)));
+    out.add("");
+    out.addAll(graphTable(d, rows));
     out.add("");
     if (rows.isEmpty()) {
       out.add("**No lost fights stored (no fights with a winner, or the analysis did not run).**");
@@ -69,9 +81,9 @@ final class FightLoopReport {
     }
     out.addAll(fightsTable(d, rows));
     out.add("");
-    out.addAll(reasonsTable(d, rows));
+    out.addAll(reasonsTable(d, important));
     out.add("");
-    out.addAll(notes(d, rows));
+    out.addAll(notes(d, important));
     out.add("");
     out.add("## Swings");
     for (SwingExplanation swing : d.explanation().swings()) {
@@ -98,28 +110,40 @@ final class FightLoopReport {
     return spike == null ? NO_SWING : "swing " + spike + ", but the side it favoured lost this";
   }
 
-  private static String summary(List<Row> rows) {
+  private static String summary(List<Row> rows, List<Row> important) {
     if (rows.isEmpty()) {
       return "no lost fights stored.";
     }
+    boolean known = rows.stream().anyMatch(r -> r.lost().importance() != null);
     Map<String, Long> byLoser =
-        rows.stream()
+        important.stream()
             .collect(Collectors.groupingBy(r -> loserName(r.lost()), Collectors.counting()));
-    long unexplained = rows.stream().filter(r -> r.lost().reasons().isEmpty()).count();
+    long unexplained = important.stream().filter(r -> r.lost().reasons().isEmpty()).count();
     Row costliest =
-        rows.stream()
+        important.stream()
             .filter(r -> r.lost().explanation().getGoldLost() != null)
             .max(Comparator.comparingLong(r -> r.lost().explanation().getGoldLost()))
             .orElse(null);
-    return "%d lost %s (%s); %s%s."
+    return "%s%s%s%s."
         .formatted(
-            rows.size(),
-            rows.size() == 1 ? "fight" : "fights",
-            byLoser.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .map(e -> e.getKey() + " lost " + e.getValue())
-                .collect(Collectors.joining(", ")),
-            unexplained == 0 ? "every one has a reason" : unexplained + " have no reason stored",
+            known
+                ? "%d of %d decided fights are important".formatted(important.size(), rows.size())
+                : "%d decided %s, importance not known, no advantage series"
+                    .formatted(rows.size(), rows.size() == 1 ? "fight" : "fights"),
+            byLoser.isEmpty()
+                ? ""
+                : " ("
+                    + byLoser.entrySet().stream()
+                        .sorted(Map.Entry.comparingByKey())
+                        .map(e -> e.getKey() + " lost " + e.getValue())
+                        .collect(Collectors.joining(", "))
+                    + ")",
+            important.isEmpty()
+                ? ""
+                : "; "
+                    + (unexplained == 0
+                        ? "every one has a reason"
+                        : unexplained + " have no reason stored"),
             costliest == null
                 ? ""
                 : "; the costliest was fight %d at %s, %s lost %s"
@@ -140,24 +164,101 @@ final class FightLoopReport {
         .formatted(loserName(lost), f.getFightIndex(), LoopWording.clock(f.getStartSeconds()));
   }
 
+  private static List<String> graphTable(MatchData d, List<Row> rows) {
+    List<String> out =
+        new ArrayList<>(
+            List.of(
+                "## " + GRAPH,
+                "",
+                "| minute | gold advantage | XP advantage | what happened |",
+                "|---|---|---|---|"));
+    AdvantageSeries series = d.series();
+    if (series == null) {
+      return List.of("## " + GRAPH, "", "**No advantage series stored for this match.**");
+    }
+    int minutes = (int) (series.endSeconds() / AdvantageSeries.MINUTE) + 1;
+    for (int m = 0; m < minutes; m++) {
+      double now = m * (double) AdvantageSeries.MINUTE;
+      double before = Math.max(0, now - AdvantageSeries.MINUTE);
+      List<String> marks = new ArrayList<>();
+      leadChange("gold", series.radiantGold()[Math.max(0, m - 1)], series.radiantGold()[m], marks);
+      leadChange("XP", series.radiantXp()[Math.max(0, m - 1)], series.radiantXp()[m], marks);
+      for (SwingExplanation s : d.explanation().swings()) {
+        GameSpikeDomain g = s.swing();
+        if (g.getStartSeconds() / AdvantageSeries.MINUTE == m) {
+          marks.add(
+              "swing %d starts: %s gains %s"
+                  .formatted(
+                      g.getSpikeIndex(),
+                      LoopWording.team(g.getBenefitingTeam()),
+                      LoopWording.gold(g.getDeltaGold())));
+        }
+        if (g.getEndSeconds() / AdvantageSeries.MINUTE == m) {
+          marks.add(
+              "swing %d ends%s"
+                  .formatted(
+                      g.getSpikeIndex(),
+                      Boolean.TRUE.equals(g.getDirectionChange())
+                          ? ", " + LoopWording.team(g.getBenefitingTeam()) + " took the lead"
+                          : ""));
+        }
+      }
+      for (Row r : rows) {
+        FightImportanceDomain i = r.lost().importance();
+        if (i != null
+            && i.isImportant()
+            && (int) (r.lost().fight().getStartSeconds() / AdvantageSeries.MINUTE) == m) {
+          marks.add(
+              "important fight %d at %s: %s lost, %s gold"
+                  .formatted(
+                      r.lost().fight().getFightIndex(),
+                      LoopWording.clock(r.lost().fight().getStartSeconds()),
+                      loserName(r.lost()),
+                      LoopWording.change(i.getWinningTeam(), i.getGoldChange())));
+        }
+      }
+      out.add(
+          "| %d:00 | %s | %s | %s |"
+              .formatted(
+                  m,
+                  LoopWording.advantage(series.radiantGold()[m]),
+                  LoopWording.advantage(series.radiantXp()[m]),
+                  ReviewLoopReport.tableCell(String.join("; ", marks))));
+    }
+    return out;
+  }
+
+  private static void leadChange(String what, double before, double after, List<String> marks) {
+    if (before * after < 0) {
+      marks.add("%s lead goes to %s".formatted(what, after > 0 ? "Radiant" : "Dire"));
+    }
+  }
+
   private static List<String> fightsTable(MatchData d, List<Row> rows) {
     List<String> out =
         new ArrayList<>(
             List.of(
                 "## " + FIGHTS,
                 "",
-                "| fight | main reason | gold lost | swing | OpenDota teamfight |",
-                "|---|---|---|---|---|"));
+                "| fight | important | gold change | XP change | share of net worth | flags | main"
+                    + " reason | gold lost | swing | OpenDota teamfight |",
+                "|---|---|---|---|---|---|---|---|---|---|"));
     for (Row r : rows) {
       LostFight lost = r.lost();
       TeamSide loser = Enums.find(TeamSide.class, lost.explanation().getLosingTeam());
       Integer unmatched = lost.explanation().getUnmatchedDeaths();
       String gold = LoopWording.gold(lost.explanation().getGoldLost());
       out.add(
-          "| %s | %s | %s | %s | %s |"
+          "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
               .formatted(
                   ReviewLoopReport.tableCell(fightLabel(lost)),
-                  ReviewLoopReport.tableCell(mainReason(d, lost)),
+                  importantText(lost),
+                  changeText(lost, FightImportanceDomain::getGoldChange),
+                  changeText(lost, FightImportanceDomain::getXpChange),
+                  shareText(lost),
+                  flagsText(lost),
+                  ReviewLoopReport.tableCell(
+                      lost.important() ? mainReason(d, lost) : "not told (unimportant)"),
                   unpriced(gold, unmatched),
                   ReviewLoopReport.tableCell(r.swing()),
                   openDotaFight(d, lost.fight())
@@ -165,6 +266,43 @@ final class FightLoopReport {
                       .orElse("none")));
     }
     return out;
+  }
+
+  private static String importantText(LostFight lost) {
+    FightImportanceDomain i = lost.importance();
+    return i == null ? "unknown" : i.isImportant() ? "yes" : "no";
+  }
+
+  private static String changeText(LostFight lost, Function<FightImportanceDomain, Long> value) {
+    FightImportanceDomain i = lost.importance();
+    return i == null || value.apply(i) == null
+        ? "?"
+        : LoopWording.change(i.getWinningTeam(), value.apply(i));
+  }
+
+  private static String shareText(LostFight lost) {
+    FightImportanceDomain i = lost.importance();
+    return i == null || i.getSharePercent() == null
+        ? "?"
+        : String.format(Locale.ROOT, "%.1f%%", i.getSharePercent());
+  }
+
+  private static String flagsText(LostFight lost) {
+    FightImportanceDomain i = lost.importance();
+    if (i == null) {
+      return "?";
+    }
+    List<String> flags = new ArrayList<>();
+    if (Boolean.TRUE.equals(i.getLeadFlip())) {
+      flags.add(
+          Boolean.TRUE.equals(i.getFlipToWinner())
+              ? "lead flipped to the winner"
+              : "lead flipped to the loser");
+    }
+    if (Boolean.TRUE.equals(i.getSlopeBreak())) {
+      flags.add("direction change");
+    }
+    return flags.isEmpty() ? "none" : String.join(", ", flags);
   }
 
   private static String unpriced(String gold, Integer unmatched) {

@@ -2,9 +2,11 @@ package com.ako.dbuff.service.replay.analysis.fightloss;
 
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightExplanationDomain;
+import com.ako.dbuff.dao.model.FightImportanceDomain;
 import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.dao.model.GameSpikeDomain;
 import com.ako.dbuff.dao.repo.FightExplanationRepo;
+import com.ako.dbuff.dao.repo.FightImportanceRepo;
 import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
@@ -28,6 +30,7 @@ class FightExplanationReaderTest {
   @Autowired private GameSpikeRepo spikeRepo;
   @Autowired private FightExplanationRepo explanationRepo;
   @Autowired private FightReasonRepo reasonRepo;
+  @Autowired private FightImportanceRepo importanceRepo;
 
   private void swing(int index, String benefiting) {
     spikeRepo.save(
@@ -148,5 +151,90 @@ class FightExplanationReaderTest {
 
     assertThat(read.swings()).isEmpty();
     assertThat(read.otherFights()).isEmpty();
+  }
+
+  private void importance(int fight, boolean important) {
+    importanceRepo.save(
+        FightImportanceDomain.builder()
+            .matchId(MATCH)
+            .fightIndex(fight)
+            .winningTeam("RADIANT")
+            .important(important)
+            .build());
+  }
+
+  @Test
+  void readTellsOnlyTheImportantFights_readAllKeepsTheOthersWithTheirImportance() {
+    stored();
+    importance(0, true);
+    importance(1, false);
+    importance(2, false);
+    importance(3, true);
+    importance(4, false);
+
+    MatchExplanation important = reader.read(MATCH, 3, 5);
+    MatchExplanation all = reader.readAll(MATCH, 3, 5);
+
+    assertThat(important.swings().get(0).fights())
+        .extracting(f -> f.fight().getFightIndex())
+        .containsExactly(0);
+    assertThat(important.otherFights())
+        .extracting(f -> f.fight().getFightIndex())
+        .containsExactly(3);
+    assertThat(all.swings().get(0).fights()).hasSize(3);
+    assertThat(all.swings().get(0).fights())
+        .extracting(f -> f.important())
+        .containsExactlyInAnyOrder(true, false, false);
+    assertThat(all.otherFights())
+        .extracting(f -> f.importance().isImportant())
+        .containsExactly(true, false);
+  }
+
+  @Test
+  void aMatchWithNoImportanceStoredReadsEveryLostFight() {
+    stored();
+
+    assertThat(reader.read(MATCH, 3, 5).swings().get(0).fights()).hasSize(3);
+    assertThat(reader.read(MATCH, 3, 5).otherFights()).hasSize(2);
+  }
+
+  @Test
+  void onceAMatchHasImportanceAFightWithoutARowIsNotImportant_andRowsOfGoneFightsAreIgnored() {
+    stored();
+    importance(0, true);
+    importance(99, true);
+
+    MatchExplanation important = reader.read(MATCH, 3, 5);
+    MatchExplanation all = reader.readAll(MATCH, 3, 5);
+
+    assertThat(important.swings().get(0).fights())
+        .extracting(f -> f.fight().getFightIndex())
+        .containsExactly(0);
+    assertThat(important.otherFights()).isEmpty();
+    assertThat(all.otherFights()).extracting(f -> f.important()).containsOnly(false);
+  }
+
+  @Test
+  void aRowOnlyOfAGoneFightLeavesTheMatchWithoutImportance_soEveryFightReads() {
+    stored();
+    importance(99, false);
+
+    assertThat(reader.read(MATCH, 3, 5).swings().get(0).fights()).hasSize(3);
+  }
+
+  @Test
+  void aSwingWithNoImportantLostFightKeepsItsCostliestOne_flagged() {
+    stored();
+    importance(0, false);
+    importance(1, false);
+    importance(2, false);
+    importance(3, true);
+    importance(4, false);
+
+    var swing = reader.read(MATCH, 3, 5).swings().get(0);
+
+    assertThat(swing.noImportantFight()).isTrue();
+    assertThat(swing.fights()).extracting(f -> f.fight().getFightIndex()).containsExactly(1);
+    assertThat(reader.readAll(MATCH, 3, 5).swings().get(0).noImportantFight()).isFalse();
   }
 }
