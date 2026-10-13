@@ -39,7 +39,7 @@ class LaneReasonContributorsTest {
 
   private static HeroLaneStats stats(long slot, int siege, int denies, int stacks) {
     return new HeroLaneStats(
-        slot, 10, 6, 3, siege, 0, denies, 900, 1000.0, 1000.0, 5, 0, 0, 0, 0, 0, stacks);
+        slot, 10, 6, 3, siege, 0, denies, 900, 1000.0, 1000.0, 5, 0, 0, 0, 0, 0, stacks, null);
   }
 
   private LaneContext context(
@@ -303,5 +303,50 @@ class LaneReasonContributorsTest {
     assertThat(dire)
         .singleElement()
         .satisfies(r -> assertThat(r.evidence()).contains("Axe at 2:30").contains("Axe at 4:10"));
+  }
+
+  private static HeroLaneStats leveled(long slot, int level, Integer ultimateSeconds) {
+    return new HeroLaneStats(
+        slot, 10, 6, 3, 0, 0, 0, 900, 1000.0, 1000.0, level, 0, 0, 0, 0, 0, 0, ultimateSeconds);
+  }
+
+  @Test
+  void ultimate_hurtsTheSideWhoseHeroLackedItAndHelpsTheOtherWhenTheOpponentHadIt() {
+    hero(AXE, Zone.Lane.TOP, 10, 480);
+    hero(MIRANA, Zone.Lane.TOP, 10, 480);
+    stats.put(AXE, leveled(AXE, 5, null));
+    stats.put(MIRANA, leveled(MIRANA, 6, 400));
+
+    List<LaneReason> radiant =
+        new UltimateContributor().contribute(context(Zone.Lane.TOP, TeamSide.RADIANT));
+    List<LaneReason> dire =
+        new UltimateContributor().contribute(context(Zone.Lane.TOP, TeamSide.DIRE));
+
+    assertThat(radiant)
+        .singleElement()
+        .satisfies(
+            r -> {
+              assertThat(r.direction()).isEqualTo(LaneReason.Direction.HURT);
+              assertThat(r.subjectSlot()).isEqualTo(AXE);
+              assertThat(r.evidence()).contains("Axe").contains("level 6");
+            });
+    assertThat(dire)
+        .singleElement()
+        .satisfies(r -> assertThat(r.direction()).isEqualTo(LaneReason.Direction.HELPED));
+  }
+
+  @Test
+  void ultimate_saysNothingWhenBothSidesLackedItOrTheLevelIsUnknown() {
+    hero(AXE, Zone.Lane.TOP, 10, 480);
+    hero(MIRANA, Zone.Lane.TOP, 10, 480);
+    stats.put(AXE, leveled(AXE, 5, null));
+    stats.put(MIRANA, leveled(MIRANA, 5, null));
+    assertThat(new UltimateContributor().contribute(context(Zone.Lane.TOP, TeamSide.RADIANT)))
+        .isEmpty();
+
+    stats.put(MIRANA, leveled(MIRANA, 0, null));
+    assertThat(new UltimateContributor().contribute(context(Zone.Lane.TOP, TeamSide.RADIANT)))
+        .as("his level is not known")
+        .isEmpty();
   }
 }

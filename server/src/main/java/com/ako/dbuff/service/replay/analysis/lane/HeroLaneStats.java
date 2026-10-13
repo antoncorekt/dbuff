@@ -7,6 +7,8 @@ package com.ako.dbuff.service.replay.analysis.lane;
  * @param xp the experience he gained in the window, null without the per minute series
  * @param gold the gold he gained in the window, null without the per minute series
  * @param level his level when the window ended, 0 when the track does not say
+ * @param ultimateSeconds the first sample second he was at the ultimate level, when that was not
+ *     after the window ended; null when he was not, or the track does not say
  */
 record HeroLaneStats(
     long slot,
@@ -25,4 +27,5 @@ record HeroLaneStats(
     long damageDealt,
     long damageTaken,
     long towerDamage,
-    int stacks) {}
+    int stacks,
+    Integer ultimateSeconds) {}

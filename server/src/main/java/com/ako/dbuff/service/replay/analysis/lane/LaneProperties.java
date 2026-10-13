@@ -97,6 +97,12 @@ public class LaneProperties {
   /** Denies this far apart are an edge. */
   private int denyEdge = 3;
 
+  /** The level at which a hero has his ultimate. */
+  private int ultimateLevel = 6;
+
+  /** Severity of {@code NO_ULTIMATE_AT_LANE_END}: a side lacked the ultimate, the other had it. */
+  private double noUltimateSeverity = 0.25;
+
   /** The reasons kept per side of a lane. */
   private int reasonsPerSide = 6;
 }

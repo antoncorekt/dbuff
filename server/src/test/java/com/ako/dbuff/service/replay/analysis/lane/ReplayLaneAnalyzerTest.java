@@ -57,6 +57,7 @@ import static org.assertj.core.api.Assertions.offset;
   MatchupContributor.class,
   CreepEdgeContributor.class,
   EarlyKillContributor.class,
+  UltimateContributor.class,
   ReplayLaneAnalyzerTest.Beans.class
 })
 class ReplayLaneAnalyzerTest {

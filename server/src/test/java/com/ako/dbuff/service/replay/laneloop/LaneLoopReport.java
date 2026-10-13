@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -54,7 +55,8 @@ final class LaneLoopReport {
       List<LaneAssignmentDomain> assignments,
       List<LanePlayerStatDomain> stats,
       List<LaneResultDomain> results,
-      List<LaneReasonDomain> reasons) {}
+      List<LaneReasonDomain> reasons,
+      int ultimateLevel) {}
 
   private LaneLoopReport() {}
 
@@ -182,7 +184,7 @@ final class LaneLoopReport {
                   ReviewLoopReport.tableCell(windows(sides)),
                   ReviewLoopReport.tableCell(creeps(sides)),
                   ReviewLoopReport.tableCell(xpAndLevel(sides)),
-                  ReviewLoopReport.tableCell(facts(sides))));
+                  ReviewLoopReport.tableCell(facts(d, id, sides))));
     }
     return out;
   }
@@ -238,14 +240,68 @@ final class LaneLoopReport {
         .collect(Collectors.joining(" vs "));
   }
 
-  private static String facts(List<LaneResultDomain> sides) {
+  private static String facts(MatchData d, int pairId, List<LaneResultDomain> sides) {
     List<String> facts = new ArrayList<>();
     facts.add("kills " + perSide(sides, r -> String.valueOf(r.getKills())));
     facts.add("hero damage dealt " + perSide(sides, r -> String.valueOf(r.getHeroDamageDealt())));
     sides.stream()
         .filter(r -> Boolean.TRUE.equals(r.getOwnTowerFell()))
         .forEach(r -> facts.add("the %s lane tower fell".formatted(LoopWording.team(r.getTeam()))));
+    sides.forEach(r -> ultimatePhrase(d, pairId, r.getTeam()).ifPresent(facts::add));
     return String.join("; ", facts);
+  }
+
+  /** One phrase for a side: all had the ultimate, or who did not reach the level. */
+  private static Optional<String> ultimatePhrase(MatchData d, int pairId, String team) {
+    List<LaneAssignmentDomain> heroes =
+        d.assignments().stream()
+            .filter(a -> Objects.equals(a.getPairId(), pairId) && team.equals(a.getTeam()))
+            .sorted(Comparator.comparing(LaneAssignmentDomain::getPlayerSlot))
+            .toList();
+    Map<Long, LanePlayerStatDomain> stats = statsBySlot(d);
+    List<String> lacking = new ArrayList<>();
+    int known = 0;
+    for (LaneAssignmentDomain a : heroes) {
+      LanePlayerStatDomain s = stats.get(a.getPlayerSlot());
+      if (s == null || s.getLevel() == null) {
+        continue;
+      }
+      known++;
+      if (s.getUltimateSeconds() == null) {
+        lacking.add(
+            "%s's %s did not reach level %d"
+                .formatted(
+                    LoopWording.team(team),
+                    LoopWording.hero(d.heroNames(), a.getPlayerSlot()),
+                    d.ultimateLevel()));
+      }
+    }
+    if (known == 0) {
+      return Optional.empty();
+    }
+    if (!lacking.isEmpty()) {
+      return Optional.of(String.join(", ", lacking));
+    }
+    return Optional.of(
+        "%s: %s had the ultimate"
+            .formatted(
+                LoopWording.team(team),
+                known == 1 ? "the hero" : known == 2 ? "both heroes" : "all heroes"));
+  }
+
+  private static Map<Long, LanePlayerStatDomain> statsBySlot(MatchData d) {
+    return d.stats().stream()
+        .collect(Collectors.toMap(LanePlayerStatDomain::getPlayerSlot, s -> s, (a, b) -> a));
+  }
+
+  private static String ultimateText(LanePlayerStatDomain s, int level) {
+    if (s.getLevel() == null) {
+      return "level %d not known".formatted(level);
+    }
+    return s.getUltimateSeconds() == null
+        ? "did not reach level %d when the lane ended (level %d)".formatted(level, s.getLevel())
+        : "reached level %d at %s, before the lane ended"
+            .formatted(level, LoopWording.clock(s.getUltimateSeconds()));
   }
 
   private static String perSide(
@@ -305,10 +361,11 @@ final class LaneLoopReport {
                               .formatted(
                                   Math.round(s.getCreepScore()),
                                   Math.round(s.getSideShare() * 100)),
-                          "%s XP, level %s"
+                          "%s XP, level %s; %s"
                               .formatted(
                                   s.getXp() == null ? "?" : LoopWording.gold(s.getXp()),
-                                  s.getLevel() == null ? "?" : s.getLevel()),
+                                  s.getLevel() == null ? "?" : s.getLevel(),
+                                  ultimateText(s, d.ultimateLevel())),
                           "kills %d, deaths %d".formatted(s.getKills(), s.getDeaths())));
             });
     return out;

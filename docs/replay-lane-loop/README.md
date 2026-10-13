@@ -7,7 +7,7 @@ The laning stage (who won each lane, and why) is shaped by review rounds on a sm
 `ReplayLaneAnalyzer` (`lanes`, `@Order(47)`; requires `players`, `tracks`, `activity`, `combat-log`, `creep-kills`, `runes`, `roles`, `deaths`, `building-kills`) writes four tables. It is not the OpenDota based `LaneAnalyzer` of the old match report. All numbers are first guesses in `LaneProperties` (`replay.analysis.lanes.*`).
 
 - `lane_assignment`, one row per player: his lane (BOTTOM, MID or TOP; empty for a hero with no lane, a roamer or a jungler), the pair id (one per lane, shared by the heroes of both teams in it), SAFE, MID or OFF from his own team's side (Radiant's safe lane is the bottom one, Dire's the top one, so Radiant safe is Dire's offlane), his laning window and why it ended.
-- `lane_player_stat`, one row per hero with a lane: last hits (melee including flagbearers, ranged, siege, other: mega and unknown names; the four add up), denies, the value-weighted creep score, his share of his side's score, the experience and gold gained in the window (OpenDota's per minute series, read by a straight line between the minutes), his level at the end, kills and deaths inside the window, hero damage dealt and taken (combat log, inside the window), tower damage and camps stacked.
+- `lane_player_stat`, one row per hero with a lane: last hits (melee including flagbearers, ranged, siege, other: mega and unknown names; the four add up), denies, the value-weighted creep score, his share of his side's score, the experience and gold gained in the window (OpenDota's per minute series, read by a straight line between the minutes), his level at the end and `ultimate_seconds` (the first track sample at level `ultimate-level` (6) by the end of his window; empty when he had not reached it or the track does not say), kills and deaths inside the window, hero damage dealt and taken (combat log, inside the window), tower damage and camps stacked.
 - `lane_result`, one row per side of each lane: the pair's window and end reason, the side's own end, the sums of the hero stats, the average level, whether a tower of the lane fell (the side's or the other side's), the result (WON, LOST, EVEN, or UNCONTESTED when the other team had no hero in the lane) and the margin.
 - `lane_reason`, the reasons of each side, ranked (1 is the strongest), each HELPED or HURT the side, with a hero when it is about one, a severity and an evidence text.
 
@@ -46,6 +46,7 @@ The lane pair's window is from the first arrival to the last departure; one hero
 | `STACKED_CAMPS` | a hero stacked camps while laning (OpenDota's per minute count) |
 | `MATCHUP` | ranged heroes, nukers and disablers (hero constants) on one side more than the other; weak, low severity |
 | `SIEGE_EDGE`, `DENY_EDGE` | siege last hits or denies differ by `siege-edge` (1) or `deny-edge` (3) |
+| `NO_ULTIMATE_AT_LANE_END` | a hero of the side had not reached level 6 when his laning ended while every hero of the other side had (HURT; the reverse HELPED); severity `no-ultimate-severity` (0.25). A hero without his ultimate may farm efficiently and still not be "in the lane", so read the result with it |
 | `EARLY_DEATH`, `EARLY_KILL` | a hero of the lane died, or killed a hero of the other side, before `early-kill-seconds` (300); one row per hero, the evidence counts them |
 
 A new reason is a new bean; the analyzer does not change.
@@ -73,8 +74,8 @@ The match list is `server/src/test/resources/replay/lane-loop/matches.txt` (9038
 
 One `<matchId>.md` per match and `summary.md` with the diff against the previous round: a "how to read this" line and a one-line summary, then three tables compared between rounds:
 
-- `Lanes` (key: the lane sentence "Radiant safe lane: Axe and Lich vs Dire off lane: Mirana and Doom"): who won and how clearly, the laning window with the end reason in words, creep score and denies per side, XP and level, key facts.
-- `Players in the lane` (key: the hero): lane and window, last hits by class, denies, creep score and share of his side, XP and level, kills and deaths. A hero with no lane is listed as such.
+- `Lanes` (key: the lane sentence "Radiant safe lane: Axe and Lich vs Dire off lane: Mirana and Doom"): who won and how clearly, the laning window with the end reason in words, creep score and denies per side, XP and level, key facts (including one phrase per side on the ultimate: "Radiant: both heroes had the ultimate", "Dire's Mirana did not reach level 6").
+- `Players in the lane` (key: the hero): lane and window, last hits by class, denies, creep score and share of his side, XP and level, kills and deaths; the XP and level cell says when he reached level 6 ("reached level 6 at 7:40, before the lane ended") or that he did not ("did not reach level 6 when the lane ended (level 5)"). A hero with no lane is listed as such.
 - `Why` (key: the reason sentence): the ranked reasons of each side, in plain words, with the severity.
 
 The `assistant` and `owner` columns are empty, last.

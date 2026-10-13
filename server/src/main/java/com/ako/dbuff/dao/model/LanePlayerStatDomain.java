@@ -70,5 +70,12 @@ public class LanePlayerStatDomain {
   private Long heroDamageTaken;
   private Long towerDamage;
   private Integer stacks;
+
+  /**
+   * The game second he first stood at the ultimate level (6), when that was by the end of his
+   * window; null when he had not reached it, or the track does not say.
+   */
+  private Integer ultimateSeconds;
+
   private Integer analysisVersion;
 }

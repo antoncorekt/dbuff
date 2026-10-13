@@ -266,7 +266,25 @@ final class LaneAssembler {
         damage.dealt(hero.slot()),
         damage.taken(hero.slot()),
         damage.towerDamage(hero.slot()),
-        stacked == null ? 0 : (int) Math.round(stacked));
+        stacked == null ? 0 : (int) Math.round(stacked),
+        ultimateSecond(in.tracks().get(hero.slot()), w.endSeconds()));
+  }
+
+  private Integer ultimateSecond(ReplayPlayerTrackDomain track, int end) {
+    if (levelAt(track, end) == 0) {
+      return null;
+    }
+    int step = track.getStepSeconds();
+    for (int i = 0; i < track.getLevel().length; i++) {
+      int second = track.getStartSeconds() + i * step;
+      if (second > end) {
+        return null;
+      }
+      if (track.getLevel()[i] >= properties.getUltimateLevel()) {
+        return second;
+      }
+    }
+    return null;
   }
 
   private static int levelAt(ReplayPlayerTrackDomain track, int second) {
@@ -391,6 +409,7 @@ final class LaneAssembler {
                     .heroDamageTaken(s.damageTaken())
                     .towerDamage(s.towerDamage())
                     .stacks(s.stacks())
+                    .ultimateSeconds(s.ultimateSeconds())
                     .analysisVersion(version)
                     .build())
         .toList();

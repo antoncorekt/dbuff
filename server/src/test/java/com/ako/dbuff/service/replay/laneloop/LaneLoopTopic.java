@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.repo.LanePlayerStatRepo;
 import com.ako.dbuff.dao.repo.LaneReasonRepo;
 import com.ako.dbuff.dao.repo.LaneResultRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
+import com.ako.dbuff.service.replay.analysis.lane.LaneProperties;
 import com.ako.dbuff.service.replay.laneloop.LaneLoopReport.MatchData;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopDiff.Section;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopTopic;
@@ -32,6 +33,7 @@ class LaneLoopTopic implements ReviewLoopTopic {
   private final LanePlayerStatRepo statRepo;
   private final LaneResultRepo resultRepo;
   private final LaneReasonRepo reasonRepo;
+  private final LaneProperties properties;
 
   LaneLoopTopic(
       StoredMatchModes matchModes,
@@ -40,7 +42,8 @@ class LaneLoopTopic implements ReviewLoopTopic {
       LaneAssignmentRepo assignmentRepo,
       LanePlayerStatRepo statRepo,
       LaneResultRepo resultRepo,
-      LaneReasonRepo reasonRepo) {
+      LaneReasonRepo reasonRepo,
+      LaneProperties properties) {
     this.matchModes = matchModes;
     this.matchRepo = matchRepo;
     this.heroNames = heroNames;
@@ -48,6 +51,7 @@ class LaneLoopTopic implements ReviewLoopTopic {
     this.statRepo = statRepo;
     this.resultRepo = resultRepo;
     this.reasonRepo = reasonRepo;
+    this.properties = properties;
   }
 
   @Override
@@ -83,6 +87,7 @@ class LaneLoopTopic implements ReviewLoopTopic {
             assignmentRepo.findByMatchId(matchId),
             statRepo.findByMatchId(matchId),
             resultRepo.findByMatchId(matchId),
-            reasonRepo.findByMatchId(matchId)));
+            reasonRepo.findByMatchId(matchId),
+            properties.getUltimateLevel()));
   }
 }

@@ -219,4 +219,50 @@ class LaneAssemblerTest {
               assertThat(s.getLastHits()).isZero();
             });
   }
+
+  @Test
+  void assemble_storesTheSecondAHeroReachedTheUltimateLevelOrNullWhenHeDidNot() {
+    ReplayPlayerTrackDomain early =
+        ReplayPlayerTrackDomain.builder()
+            .playerSlot(RADIANT)
+            .startSeconds(0)
+            .stepSeconds(100)
+            .level(new int[] {1, 3, 5, 6, 6, 7, 7, 8, 8})
+            .build();
+    ReplayPlayerTrackDomain late =
+        ReplayPlayerTrackDomain.builder()
+            .playerSlot(DIRE)
+            .startSeconds(0)
+            .stepSeconds(100)
+            .level(new int[] {1, 3, 5, 5, 5, 5, 5, 6, 6})
+            .build();
+    Map<Long, List<ActivitySegment>> segments =
+        Map.of(
+            RADIANT, List.of(inLane(0, 600, Zone.Lane.MID)),
+            DIRE, List.of(inLane(0, 600, Zone.Lane.MID)));
+
+    LaneRows rows =
+        new LaneAssembler(new LaneProperties(), values, List.of())
+            .assemble(
+                inputs(
+                    segments,
+                    Map.of(RADIANT, TeamSide.RADIANT, DIRE, TeamSide.DIRE),
+                    List.of(),
+                    List.of(),
+                    Map.of(RADIANT, early, DIRE, late)),
+                1);
+
+    assertThat(rows.playerStats())
+        .filteredOn(s -> s.getPlayerSlot() == RADIANT)
+        .singleElement()
+        .satisfies(s -> assertThat(s.getUltimateSeconds()).isEqualTo(300));
+    assertThat(rows.playerStats())
+        .filteredOn(s -> s.getPlayerSlot() == DIRE)
+        .singleElement()
+        .satisfies(
+            s -> {
+              assertThat(s.getLevel()).isEqualTo(5);
+              assertThat(s.getUltimateSeconds()).as("level 6 came at 700, after 600").isNull();
+            });
+  }
 }

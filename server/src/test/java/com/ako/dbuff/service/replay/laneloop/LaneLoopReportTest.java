@@ -84,11 +84,27 @@ class LaneLoopReportTest {
                 .sideShare(0.73)
                 .xp(1500.0)
                 .level(6)
+                .ultimateSeconds(460)
                 .kills(1)
                 .deaths(0)
+                .build(),
+            LanePlayerStatDomain.builder()
+                .playerSlot(128L)
+                .pairId(1)
+                .lastHits(10)
+                .meleeLastHits(10)
+                .rangedLastHits(0)
+                .siegeLastHits(0)
+                .denies(1)
+                .creepScore(300.0)
+                .sideShare(0.5)
+                .level(5)
+                .kills(0)
+                .deaths(1)
                 .build()),
         List.of(result("RADIANT", "SAFE", "WON", 0.45), result("DIRE", "OFF", "LOST", -0.45)),
-        reasons);
+        reasons,
+        6);
   }
 
   @Test
@@ -121,6 +137,10 @@ class LaneLoopReportTest {
         .contains(
             "| Axe | Radiant safe lane, 0:15 to 8:20 (went to farm the jungle) | 20 (12 melee,")
         .contains("73% of his side")
+        .contains("Dire's Mirana did not reach level 6")
+        .contains("did not reach level 6 when the lane ended (level 5)")
+        .contains("reached level 6 at 7:40, before the lane ended")
+        .contains("Radiant: the hero had the ultimate")
         .contains("| Rubick | no lane (roaming, jungling or not seen in a lane)")
         .contains(
             "| Dire off lane (lost) was hurt: Doom was away 120 s of the 480 s his side laned | 1 |"
@@ -141,7 +161,8 @@ class LaneLoopReportTest {
             List.of(),
             List.of(),
             List.of(),
-            List.of());
+            List.of(),
+            6);
 
     assertThat(LaneLoopReport.render(empty)).contains("no lanes stored");
   }
