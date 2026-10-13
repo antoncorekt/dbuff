@@ -147,6 +147,10 @@ Still NOT verified:
 
 ## 7. What is left, in order
 
+### Update, 2026-10-13
+
+The next analyses are planned in `2026-10-13-replay-next-analyses-plan.md`. Owner decisions: roles round 3 accepted as it is (`docs/replay-role-loop/round-03.md`); All Pick skipped for now; cleanup later.
+
 ### Update, evening of 2026-10-12
 
 Everything below is merged to `main` and deployed; replay processing and the report are still switched off in production.
