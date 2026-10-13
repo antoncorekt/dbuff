@@ -43,7 +43,7 @@ import org.springframework.test.context.TestPropertySource;
         @ComponentScan.Filter(
             type = FilterType.REGEX,
             pattern =
-                ".*\\.(ReplayProcessingJob|ReplayRunJanitor|ReplayQueue|ReplayBatchService|ConstantAbilityNames|ConstantHeroKits|ReplayTempCleaner|ReplayReportService)|.*Test(\\$.*)?"))
+                ".*\\.(ReplayProcessingJob|ReplayRunJanitor|ReplayQueue|ReplayBatchService|ConstantAbilityNames|ConstantHeroKits|ConstantItemKits|ReplayTempCleaner|ReplayReportService)|.*Test(\\$.*)?"))
 @Import({
   ReplayPipelineFixture.Config.class,
   SwingSection.class,
