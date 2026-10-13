@@ -7,6 +7,7 @@ import com.ako.dbuff.dao.repo.ConstantDomainRepo;
 import com.ako.dbuff.dotapi.api.ConstantsApi;
 import com.ako.dbuff.dotapi.invoker.ApiClient;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import com.ako.dbuff.service.constant.data.ItemConstant;
 import com.ako.dbuff.service.constant.data.PatchConstant;
 import com.google.common.util.concurrent.RateLimiter;
 import com.sun.net.httpserver.HttpServer;
@@ -15,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +50,7 @@ class DotaApiConstantsFetchTest {
     serve(
         "/constants/hero_abilities",
         "{\"npc_dota_hero_axe\":{\"abilities\":[\"axe_berserkers_call\"]}}");
-    serve("/constants/items", "{\"blink\":{\"id\":1,\"dname\":\"Blink Dagger\",\"cost\":2250}}");
+    serve("/constants/items", resource("constants_items.json"));
     serve("/constants/game_mode", "{\"1\":{\"id\":1,\"name\":\"game_mode_all_pick\"}}");
     serve("/constants/bad", "[{\"id\":1},\"x\"]");
     server.start();
@@ -77,6 +79,18 @@ class DotaApiConstantsFetchTest {
   }
 
   @Test
+  void recordedItemsResponse_parsesThroughTheGeneratedClientWithMixedTypes() {
+    Map<String, ItemConstant> items =
+        new ItemConstantService(mock(ConstantDomainRepo.class), fetcher).getConstantMap();
+
+    assertEquals(22, items.size());
+    assertEquals(List.of("gloves"), items.get("hand_of_midas").getComponents());
+    assertEquals(2200L, items.get("hand_of_midas").getCost());
+    assertEquals(List.of(1.0), items.get("hand_of_midas").getCharges());
+    assertEquals(List.of(17.0), items.get("magic_stick").getCd());
+  }
+
+  @Test
   void arrayConstant_isFetchedAndConverted() {
     Map<String, PatchConstant> patches =
         new PatchConstantService(mock(ConstantDomainRepo.class), fetcher).getConstantMap();
@@ -94,10 +108,10 @@ class DotaApiConstantsFetchTest {
     assertEquals(6, mapOf(DotaApiConstant.ABILITIES).size());
     assertEquals(3, mapOf(DotaApiConstant.HERO).size());
     assertEquals(
-        "Blink Dagger",
+        "Magic Stick",
         new ItemConstantService(mock(ConstantDomainRepo.class), fetcher)
             .getConstantMap()
-            .get("blink")
+            .get("magic_stick")
             .getDname());
     assertEquals(
         2,

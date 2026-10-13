@@ -7,5 +7,7 @@ public enum StateChangeKind {
   COOLDOWN,
   ABILITY_LEVEL,
   /** An item or ability's mana cost, first seen or changed (it follows the skill level). */
-  MANA_COST
+  MANA_COST,
+  /** The charge count of a whitelisted item, first seen above 0 or changed. */
+  ITEM_CHARGES
 }

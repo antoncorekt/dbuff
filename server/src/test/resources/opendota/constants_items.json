@@ -1,0 +1,734 @@
+{
+ "magic_stick": {
+  "id": 34,
+  "dname": "Magic Stick",
+  "qual": "component",
+  "cost": 200,
+  "behavior": [
+   "Instant Cast",
+   "No Target"
+  ],
+  "attrib": [
+   {
+    "key": "max_charges",
+    "value": "10"
+   },
+   {
+    "key": "charge_radius",
+    "value": "1200"
+   },
+   {
+    "key": "restore_per_charge",
+    "value": "15"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": 17,
+  "components": null,
+  "created": false,
+  "charges": false
+ },
+ "magic_wand": {
+  "id": 36,
+  "dname": "Magic Wand",
+  "qual": "common",
+  "cost": 460,
+  "behavior": [
+   "Instant Cast",
+   "No Target"
+  ],
+  "attrib": [
+   {
+    "key": "max_charges",
+    "value": "20"
+   },
+   {
+    "key": "charge_radius",
+    "value": "1200"
+   },
+   {
+    "key": "bonus_all_stats",
+    "display": "+ {value} All Attributes",
+    "value": "3"
+   },
+   {
+    "key": "restore_per_charge",
+    "value": "15"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": 15,
+  "components": [
+   "magic_stick",
+   "branches",
+   "branches"
+  ],
+  "created": true,
+  "charges": false
+ },
+ "hand_of_midas": {
+  "id": 65,
+  "dname": "Hand of Midas",
+  "qual": "common",
+  "cost": 2200,
+  "behavior": "Unit Target",
+  "target_team": "Enemy",
+  "target_type": [],
+  "attrib": [
+   {
+    "key": "bonus_attack_speed",
+    "display": "+ {value} Attack Speed",
+    "value": "35"
+   },
+   {
+    "key": "bonus_gold",
+    "value": "160"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": [
+   "gloves"
+  ],
+  "created": true,
+  "charges": 1
+ },
+ "bfury": {
+  "id": 145,
+  "dname": "Battle Fury",
+  "qual": "epic",
+  "cost": 3900,
+  "behavior": "Unit Target",
+  "target_team": [],
+  "target_type": "Tree",
+  "attrib": [
+   {
+    "key": "bonus_damage",
+    "display": "+ {value} Damage",
+    "value": "50"
+   },
+   {
+    "key": "bonus_health_regen",
+    "display": "+ {value} Health Regeneration",
+    "value": "7.5"
+   },
+   {
+    "key": "bonus_mana_regen",
+    "display": "+ {value} Mana Regeneration",
+    "value": "2.75"
+   },
+   {
+    "key": "cleave_damage_percent",
+    "value": "60"
+   },
+   {
+    "key": "cleave_damage_percent_creep",
+    "value": "40"
+   },
+   {
+    "key": "quelling_bonus",
+    "value": "10"
+   },
+   {
+    "key": "quelling_bonus_ranged",
+    "value": "5"
+   },
+   {
+    "key": "cleave_starting_width",
+    "value": "150"
+   },
+   {
+    "key": "cleave_ending_width",
+    "value": "360"
+   },
+   {
+    "key": "cleave_distance",
+    "value": "650"
+   },
+   {
+    "key": "upgraded_cleave_bonus",
+    "value": "25"
+   },
+   {
+    "key": "upgraded_damage_bonus",
+    "value": "15"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": 4,
+  "components": [
+   "pers",
+   "broadsword",
+   "broadsword",
+   "quelling_blade"
+  ],
+  "created": true,
+  "charges": false
+ },
+ "maelstrom": {
+  "id": 166,
+  "dname": "Maelstrom",
+  "qual": "artifact",
+  "cost": 2950,
+  "attrib": [
+   {
+    "key": "bonus_damage",
+    "display": "+ {value} Damage",
+    "value": "25"
+   },
+   {
+    "key": "bonus_attack_speed",
+    "display": "+ {value} Attack Speed",
+    "value": "25"
+   },
+   {
+    "key": "chain_chance",
+    "value": "25"
+   },
+   {
+    "key": "chain_damage",
+    "value": "110"
+   },
+   {
+    "key": "chain_strikes",
+    "value": "4"
+   },
+   {
+    "key": "chain_radius",
+    "value": "650"
+   },
+   {
+    "key": "chain_delay",
+    "value": "0.25"
+   },
+   {
+    "key": "chain_cooldown",
+    "value": "0.2"
+   },
+   {
+    "key": "illusion_multiplier_pct",
+    "value": "100"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": [
+   "mithril_hammer",
+   "javelin",
+   "gloves"
+  ],
+  "created": true,
+  "charges": false
+ },
+ "mjollnir": {
+  "id": 158,
+  "dname": "Mjollnir",
+  "qual": "artifact",
+  "cost": 5500,
+  "behavior": "Unit Target",
+  "dispellable": "Yes",
+  "target_team": "Friendly",
+  "target_type": [
+   "Hero",
+   "Basic"
+  ],
+  "attrib": [
+   {
+    "key": "bonus_damage",
+    "display": "+ {value} Damage",
+    "value": "25"
+   },
+   {
+    "key": "bonus_attack_speed",
+    "display": "+ {value} Attack Speed",
+    "value": "90"
+   },
+   {
+    "key": "static_duration",
+    "value": "15.0"
+   },
+   {
+    "key": "static_chance",
+    "value": "20"
+   },
+   {
+    "key": "static_strikes",
+    "value": "4"
+   },
+   {
+    "key": "static_damage",
+    "value": "225"
+   },
+   {
+    "key": "static_primary_radius",
+    "value": "600"
+   },
+   {
+    "key": "static_seconary_radius",
+    "value": "900"
+   },
+   {
+    "key": "static_radius",
+    "value": "900"
+   },
+   {
+    "key": "static_cooldown",
+    "value": "1.0"
+   },
+   {
+    "key": "chain_chance",
+    "value": "25"
+   },
+   {
+    "key": "chain_damage",
+    "value": "180"
+   },
+   {
+    "key": "chain_strikes",
+    "value": "12"
+   },
+   {
+    "key": "chain_radius",
+    "value": "650"
+   },
+   {
+    "key": "chain_delay",
+    "value": "0.25"
+   },
+   {
+    "key": "chain_cooldown",
+    "value": "0.2"
+   },
+   {
+    "key": "max_charges",
+    "value": "0"
+   },
+   {
+    "key": "illusion_multiplier_pct",
+    "value": "100"
+   }
+  ],
+  "mc": 50,
+  "hc": false,
+  "cd": 35,
+  "components": [
+   "maelstrom",
+   "hyperstone"
+  ],
+  "created": true,
+  "charges": false
+ },
+ "radiance": {
+  "id": 137,
+  "dname": "Radiance",
+  "qual": "epic",
+  "cost": 4700,
+  "behavior": "No Target",
+  "attrib": [
+   {
+    "key": "bonus_damage",
+    "display": "+ {value} Damage",
+    "value": "55"
+   },
+   {
+    "key": "aura_damage",
+    "value": "60"
+   },
+   {
+    "key": "aura_damage_illusions",
+    "value": "35"
+   },
+   {
+    "key": "upgrade_day_vision",
+    "value": "250"
+   },
+   {
+    "key": "evasion",
+    "display": "+ {value}% Evasion",
+    "value": "25"
+   },
+   {
+    "key": "blind_pct",
+    "value": "0"
+   },
+   {
+    "key": "aura_radius",
+    "value": "650"
+   },
+   {
+    "key": "illusion_multiplier_pct",
+    "value": "100"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": [
+   "relic",
+   "talisman_of_evasion"
+  ],
+  "created": true,
+  "charges": false
+ },
+ "octarine_core": {
+  "id": 235,
+  "dname": "Octarine Core",
+  "qual": "rare",
+  "cost": 4900,
+  "attrib": [
+   {
+    "key": "bonus_cooldown",
+    "display": "+ {value}% Cooldown Reduction",
+    "value": "25"
+   },
+   {
+    "key": "bonus_health",
+    "display": "+ {value} Health",
+    "value": "450"
+   },
+   {
+    "key": "bonus_mana",
+    "display": "+ {value} Mana",
+    "value": "450"
+   },
+   {
+    "key": "bonus_health_regen",
+    "value": "0"
+   },
+   {
+    "key": "bonus_mana_regen",
+    "display": "+ {value} Mana Regeneration",
+    "value": "6"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": [
+   "soul_booster",
+   "tiara_of_selemene",
+   ""
+  ],
+  "created": true,
+  "charges": false
+ },
+ "gloves": {
+  "id": 25,
+  "dname": "Gloves of Haste",
+  "qual": "component",
+  "cost": 450,
+  "attrib": [
+   {
+    "key": "bonus_attack_speed",
+    "display": "+ {value} Attack Speed",
+    "value": "20"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": null,
+  "created": false,
+  "charges": false
+ },
+ "branches": {
+  "id": 16,
+  "dname": "Iron Branch",
+  "qual": "consumable",
+  "cost": 55,
+  "behavior": "Point Target",
+  "attrib": [
+   {
+    "key": "bonus_all_stats",
+    "display": "+ {value} All Attributes",
+    "value": "1"
+   },
+   {
+    "key": "tree_duration",
+    "value": "20"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": null,
+  "created": false,
+  "charges": false
+ },
+ "pers": {
+  "id": 69,
+  "dname": "Perseverance",
+  "qual": "common",
+  "cost": 1400,
+  "attrib": [
+   {
+    "key": "bonus_health_regen",
+    "display": "+ {value} Health Regeneration",
+    "value": "5.5"
+   },
+   {
+    "key": "bonus_mana_regen",
+    "display": "+ {value} Mana Regeneration",
+    "value": "2.25"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": [
+   "ring_of_health",
+   "void_stone"
+  ],
+  "created": true,
+  "charges": false
+ },
+ "broadsword": {
+  "id": 3,
+  "dname": "Broadsword",
+  "qual": "component",
+  "cost": 1000,
+  "attrib": [
+   {
+    "key": "bonus_damage",
+    "display": "+ {value} Damage",
+    "value": "15"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": null,
+  "created": false,
+  "charges": false
+ },
+ "quelling_blade": {
+  "id": 11,
+  "dname": "Quelling Blade",
+  "qual": "component",
+  "cost": 100,
+  "behavior": "Unit Target",
+  "target_team": [],
+  "target_type": "Tree",
+  "attrib": [
+   {
+    "key": "damage_bonus",
+    "value": "8"
+   },
+   {
+    "key": "damage_bonus_ranged",
+    "value": "4"
+   },
+   {
+    "key": "quelling_range_tooltip",
+    "value": "350"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": 4,
+  "components": null,
+  "created": false,
+  "charges": false
+ },
+ "mithril_hammer": {
+  "id": 8,
+  "dname": "Mithril Hammer",
+  "qual": "component",
+  "cost": 1600,
+  "attrib": [
+   {
+    "key": "bonus_damage",
+    "display": "+ {value} Damage",
+    "value": "24"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": null,
+  "created": false,
+  "charges": false
+ },
+ "javelin": {
+  "id": 7,
+  "dname": "Javelin",
+  "qual": "component",
+  "cost": 900,
+  "attrib": [
+   {
+    "key": "bonus_chance",
+    "value": "25"
+   },
+   {
+    "key": "bonus_chance_damage",
+    "value": "60"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": null,
+  "created": false,
+  "charges": false
+ },
+ "hyperstone": {
+  "id": 55,
+  "dname": "Hyperstone",
+  "qual": "secret_shop",
+  "cost": 2000,
+  "attrib": [
+   {
+    "key": "bonus_attack_speed",
+    "display": "+ {value} Attack Speed",
+    "value": "60"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": null,
+  "created": false,
+  "charges": false
+ },
+ "relic": {
+  "id": 54,
+  "dname": "Sacred Relic",
+  "qual": "secret_shop",
+  "cost": 3400,
+  "attrib": [
+   {
+    "key": "bonus_damage",
+    "display": "+ {value} Damage",
+    "value": "55"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": null,
+  "created": false,
+  "charges": false
+ },
+ "talisman_of_evasion": {
+  "id": 32,
+  "dname": "Talisman of Evasion",
+  "qual": "secret_shop",
+  "cost": 1300,
+  "attrib": [
+   {
+    "key": "bonus_evasion",
+    "display": "+ {value}% Evasion",
+    "value": "15"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": null,
+  "created": false,
+  "charges": false
+ },
+ "soul_booster": {
+  "id": 129,
+  "dname": "Soul Booster",
+  "qual": "epic",
+  "cost": 3000,
+  "attrib": [
+   {
+    "key": "bonus_health",
+    "display": "+ {value} Health",
+    "value": "425"
+   },
+   {
+    "key": "bonus_mana",
+    "display": "+ {value} Mana",
+    "value": "425"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": [
+   "point_booster",
+   "vitality_booster",
+   "energy_booster"
+  ],
+  "created": true,
+  "charges": false
+ },
+ "tiara_of_selemene": {
+  "id": 1802,
+  "dname": "Tiara of Selemene",
+  "qual": "component",
+  "cost": 1700,
+  "attrib": [
+   {
+    "key": "bonus_mana_regen",
+    "display": "+ {value} Mana Regeneration",
+    "value": "6"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": null,
+  "created": false,
+  "charges": false
+ },
+ "vambrace": {
+  "id": 331,
+  "dname": "Vambrace",
+  "qual": "common",
+  "cost": 0,
+  "behavior": [
+   "Instant Cast",
+   "No Target"
+  ],
+  "attrib": [
+   {
+    "key": "bonus_primary_stat",
+    "value": "10"
+   },
+   {
+    "key": "bonus_secondary_stat",
+    "value": "4"
+   },
+   {
+    "key": "bonus_spell_amp",
+    "value": "8"
+   },
+   {
+    "key": "bonus_magic_resistance",
+    "value": "10"
+   },
+   {
+    "key": "bonus_attack_speed",
+    "value": "15"
+   }
+  ],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": null,
+  "created": false,
+  "charges": false
+ },
+ "recipe_hand_of_midas": {
+  "id": 64,
+  "dname": "Hand of Midas Recipe",
+  "cost": 1750,
+  "behavior": false,
+  "attrib": [],
+  "mc": false,
+  "hc": false,
+  "cd": false,
+  "components": null,
+  "created": false,
+  "charges": false
+ }
+}

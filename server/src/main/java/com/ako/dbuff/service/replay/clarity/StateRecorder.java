@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import skadistats.clarity.model.Entity;
 import skadistats.clarity.model.StringTable;
 import skadistats.clarity.processor.entities.Entities;
@@ -30,12 +31,14 @@ final class StateRecorder implements SampleObserver {
 
   private final Entities entities;
   private final StringTables stringTables;
+  private final Set<String> chargeItems;
   private final List<RawChange> changes = new ArrayList<>();
   private final Map<Integer, PlayerState> players = new HashMap<>();
 
-  StateRecorder(Entities entities, StringTables stringTables) {
+  StateRecorder(Entities entities, StringTables stringTables, Set<String> chargeItems) {
     this.entities = entities;
     this.stringTables = stringTables;
+    this.chargeItems = chargeItems;
   }
 
   @Override
@@ -93,6 +96,39 @@ final class StateRecorder implements SampleObserver {
                 firstSlot.get(name),
                 c[0],
                 c[1]));
+    charges(state, view.playerId(), tick, firstEntity, firstSlot);
+  }
+
+  /** Charges are followed for the whitelisted items only; an item that leaves forgets its count. */
+  private void charges(
+      PlayerState state,
+      int playerId,
+      long tick,
+      Map<String, Entity> held,
+      Map<String, Integer> firstSlot) {
+    state.charges.keySet().retainAll(held.keySet());
+    for (String name : chargeItems) {
+      Entity item = held.get(name);
+      if (item == null) {
+        continue;
+      }
+      int charges = (int) number(item, "m_iCurrentCharges");
+      Integer previous = state.charges.put(name, charges);
+      if (charges != (previous == null ? 0 : previous)) {
+        changes.add(
+            new RawChange(
+                playerId,
+                tick,
+                StateChangeKind.ITEM_CHARGES,
+                name,
+                firstSlot.get(name),
+                0,
+                0,
+                0,
+                0,
+                charges));
+      }
+    }
   }
 
   private void sampleAbilities(
@@ -134,7 +170,8 @@ final class StateRecorder implements SampleObserver {
                   : 0,
               c.length(),
               c.level(),
-              c.manaCost()));
+              c.manaCost(),
+              c.charges()));
     }
     return new StateFacts(List.copyOf(result));
   }
@@ -258,12 +295,27 @@ final class StateRecorder implements SampleObserver {
       double readyAtTick,
       double length,
       int level,
-      int manaCost) {}
+      int manaCost,
+      int charges) {
+    RawChange(
+        int playerId,
+        long tick,
+        StateChangeKind kind,
+        String name,
+        int slot,
+        double readyAtTick,
+        double length,
+        int level,
+        int manaCost) {
+      this(playerId, tick, kind, name, slot, readyAtTick, length, level, manaCost, 0);
+    }
+  }
 
   private static final class PlayerState {
     private Map<String, Integer> items = new HashMap<>();
     private final Map<String, Double> readyAt = new HashMap<>();
     private final Map<String, Integer> levels = new HashMap<>();
     private final Map<String, Integer> manaCosts = new HashMap<>();
+    private final Map<String, Integer> charges = new HashMap<>();
   }
 }

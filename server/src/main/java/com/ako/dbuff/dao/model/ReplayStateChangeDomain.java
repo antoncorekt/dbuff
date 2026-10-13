@@ -13,9 +13,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * An item gained or lost, an item or ability going on cooldown, or a skill level gained. Seen on
- * the replay's sampling grid, so {@code gameSeconds} is accurate to a few seconds; a cooldown's
- * {@code readyAtSeconds} is exact.
+ * An item gained or lost, an item or ability going on cooldown, a skill level gained, or the
+ * charges of a tracked item changing. Seen on the replay's sampling grid, so {@code gameSeconds} is
+ * accurate to a few seconds; a cooldown's {@code readyAtSeconds} is exact.
  */
 @Entity
 @Table(
@@ -57,4 +57,7 @@ public class ReplayStateChangeDomain {
 
   /** For a mana cost change, the new cost. */
   private Integer manaCost;
+
+  /** For an item charges change, the new charge count. Null on rows stored before charges. */
+  private Integer charges;
 }

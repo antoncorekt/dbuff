@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -39,6 +40,11 @@ public class ReplayProcessingProperties {
   private int retryPriorityAttempts = 2;
 
   private Backlog backlog = new Backlog();
+
+  /**
+   * Items whose charge count is stored as state changes; others are left out to keep memory small.
+   */
+  private Set<String> chargeItems = Set.of("item_magic_stick", "item_magic_wand");
 
   private int maxAttempts = 5;
 

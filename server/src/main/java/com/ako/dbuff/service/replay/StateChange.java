@@ -20,6 +20,7 @@ package com.ako.dbuff.service.replay;
  *     moment it was seen to be over (some abilities leave it unset)
  * @param level for an ability level change, the new level; otherwise 0
  * @param manaCost for a mana cost change, the new cost; otherwise 0
+ * @param charges for an item charges change, the new charge count; otherwise 0
  */
 public record StateChange(
     int replayPlayerId,
@@ -30,4 +31,5 @@ public record StateChange(
     double readyAtSeconds,
     double cooldownLength,
     int level,
-    int manaCost) {}
+    int manaCost,
+    int charges) {}

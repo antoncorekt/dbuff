@@ -4,6 +4,8 @@ import com.ako.dbuff.dao.model.ConstantDomain;
 import com.ako.dbuff.dao.repo.ConstantDomainRepo;
 import com.ako.dbuff.dotapi.model.GetConstantsByResource200Response;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import com.ako.dbuff.service.constant.data.ItemConstant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -60,6 +62,33 @@ class BaseApiConstantServiceTest {
 
     assertEquals("Anti-Mage", result.get("1").getLocalized_name());
     verify(repo, never()).save(any());
+  }
+
+  @Test
+  void itemsStoredWithoutComponents_areRefetchedForTheCurrentVersion() {
+    ItemConstantService items = new ItemConstantService(repo, fetcher);
+    when(repo.findById("items"))
+        .thenReturn(
+            Optional.of(
+                ConstantDomain.builder()
+                    .constantName("items")
+                    .constantValue(Map.of("magic_wand", Map.of("id", 36, "dname", "Magic Wand")))
+                    .schemaVersion(0)
+                    .build()));
+    GetConstantsByResource200Response response = mock(GetConstantsByResource200Response.class);
+    when(response.getMapStringObject())
+        .thenReturn(
+            Map.of(
+                "magic_wand",
+                Map.of("id", 36, "dname", "Magic Wand", "components", List.of("magic_stick"))));
+    when(fetcher.fetch(any())).thenReturn(response);
+
+    Map<String, ItemConstant> result = items.getConstantMap();
+
+    assertEquals(List.of("magic_stick"), result.get("magic_wand").getComponents());
+    ArgumentCaptor<ConstantDomain> saved = ArgumentCaptor.forClass(ConstantDomain.class);
+    verify(repo).save(saved.capture());
+    assertEquals(1, saved.getValue().getSchemaVersion());
   }
 
   private static ConstantDomain stored(Integer version) {

@@ -42,6 +42,7 @@ public class ReplayStateChangeExtractor implements ReplayExtractor {
       boolean cooldown = change.kind() == StateChangeKind.COOLDOWN;
       boolean level = change.kind() == StateChangeKind.ABILITY_LEVEL;
       boolean cost = change.kind() == StateChangeKind.MANA_COST;
+      boolean charges = change.kind() == StateChangeKind.ITEM_CHARGES;
       rows.add(
           ReplayStateChangeDomain.builder()
               .matchId(match.getId())
@@ -54,6 +55,7 @@ public class ReplayStateChangeExtractor implements ReplayExtractor {
               .cooldownLength(cooldown ? change.cooldownLength() : null)
               .abilityLevel(level ? change.level() : null)
               .manaCost(cost ? change.manaCost() : null)
+              .charges(charges ? change.charges() : null)
               .build());
     }
     if (dropped > 0) {
