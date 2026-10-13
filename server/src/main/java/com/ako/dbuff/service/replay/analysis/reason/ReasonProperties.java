@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.analysis.death.DeathReason;
 import com.ako.dbuff.service.replay.analysis.fight.AbsenceReason;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
 import com.ako.dbuff.service.replay.analysis.role.RoleFunction;
+import com.ako.dbuff.service.replay.analysis.rune.RuneType;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.Map;
@@ -134,6 +135,19 @@ public class ReasonProperties {
   private Map<Integer, Double> heroRoleMismatchSeverity =
       Map.of(1, 0.6, 2, 0.4, 3, 0.3, 4, 0.3, 5, 0.3);
 
+  /**
+   * A power rune whose effect is active in the fight, by rune; it is a factor, not a cause, so the
+   * values stay below the reasons of what happened in the fight.
+   */
+  private Map<RuneType, Double> runeAdvantageSeverity =
+      new EnumMap<>(
+          Map.of(
+              RuneType.DOUBLE_DAMAGE, 0.5,
+              RuneType.HASTE, 0.4,
+              RuneType.ARCANE, 0.3,
+              RuneType.INVISIBILITY, 0.4,
+              RuneType.SHIELD, 0.4));
+
   /** The severity of a reason about a player, lowered when he was near the fight but passive. */
   public double byPresence(double severity, Presence presence) {
     return presence == Presence.PRESENT_PASSIVE ? severity * passivePresenceFactor : severity;
@@ -145,6 +159,10 @@ public class ReasonProperties {
 
   public double severity(DeathReason reason) {
     return deathSeverity.getOrDefault(reason, defaultSeverity);
+  }
+
+  public double severity(RuneType type) {
+    return runeAdvantageSeverity.getOrDefault(type, defaultSeverity);
   }
 
   public double severity(CompositionToken token) {

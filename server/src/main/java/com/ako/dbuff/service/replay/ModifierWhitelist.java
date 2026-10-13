@@ -27,9 +27,12 @@ public final class ModifierWhitelist {
           "modifier_aegis",
           "modifier_buyback_gold_penalty");
 
+  /** The effects of the runes a hero picks up; a few events per pickup. */
+  private static final String RUNE_PREFIX = "modifier_rune_";
+
   private ModifierWhitelist() {}
 
   public static boolean keeps(String modifierName, double stunSeconds) {
-    return stunSeconds > 0 || NAMES.contains(modifierName);
+    return stunSeconds > 0 || NAMES.contains(modifierName) || modifierName.startsWith(RUNE_PREFIX);
   }
 }

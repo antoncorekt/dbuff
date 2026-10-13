@@ -9,6 +9,7 @@ import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerRoleDomain;
 import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
+import com.ako.dbuff.dao.model.RunePickupDomain;
 import com.ako.dbuff.dao.model.TeamCompositionDomain;
 import com.ako.dbuff.dao.repo.AbilityDraftPoolRepo;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
@@ -19,6 +20,7 @@ import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleRepo;
+import com.ako.dbuff.dao.repo.RunePickupRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
@@ -57,6 +59,7 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
   private final PlayerRoleProfileRepo roleProfileRepo;
   private final PlayerGameStatisticRepo statisticRepo;
   private final AbilityDraftPoolRepo poolRepo;
+  private final RunePickupRepo runePickupRepo;
   private final FightReasonRepo reasonRepo;
 
   @Override
@@ -66,7 +69,7 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 3;
+    return 4;
   }
 
   @Override
@@ -111,6 +114,7 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
                     PlayerMatchStatisticDomain::getHeroId,
                     (first, second) -> first));
     List<AbilityDraftPoolDomain> pool = poolRepo.findByMatchId(matchId);
+    List<RunePickupDomain> runes = runePickupRepo.findByMatchId(matchId);
     List<FightReasonDomain> rows = new ArrayList<>();
     for (FightDomain fight : fightRepo.findByMatchId(matchId)) {
       if (fight.getFightIndex() == null) {
@@ -129,7 +133,8 @@ public class FightReasonAnalyzer implements ReplayAnalyzer {
               compositions,
               profiles,
               heroIds,
-              pool);
+              pool,
+              runes);
       Map<String, Reason> byKey = new LinkedHashMap<>();
       for (ReasonContributor contributor : active) {
         for (Reason reason : contributor.contribute(context)) {

@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
+import com.ako.dbuff.service.replay.analysis.rune.RuneEvidence;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
 public final class ReasonWording {
   private static final String TEAM = "the team";
   private static final String TEAM_REASON = "TEAM";
+  private static final String ENEMY_RUNE = "ENEMY_RUNE_ADVANTAGE";
   private static final Pattern ABOUT_A_TEAM = Pattern.compile("^(Radiant|Dire) ");
   private static final Pattern FARMING = Pattern.compile("was (farming [a-z ]+?) when");
 
@@ -31,6 +33,7 @@ public final class ReasonWording {
           Map.entry("ITEM_ON_COOLDOWN", ReasonWording::onCooldown),
           Map.entry("CARRY_FARMING_ELSEWHERE", ReasonWording::farming),
           Map.entry("SUPPORT_ABSENT", e -> "was not in the fight"),
+          Map.entry("RUNE_ADVANTAGE", ReasonWording::tookRune),
           Map.entry("DIED_FIRST", e -> "died first"),
           Map.entry("BKB_READY_UNUSED", e -> "died with Black King Bar ready"),
           Map.entry("BKB_ON_COOLDOWN", e -> "died with Black King Bar on cooldown"),
@@ -63,6 +66,11 @@ public final class ReasonWording {
   }
 
   private static String teamPhrase(String code, String evidence) {
+    if (ENEMY_RUNE.equals(code)) {
+      return RuneEvidence.parse(evidence)
+          .map(r -> "the enemy " + r.hero() + " " + tookRune(evidence))
+          .orElse(TEAM + ": the enemy had a rune effect");
+    }
     if (!CompositionToken.isToken(code)) {
       String note = evidence == null ? "" : evidence.trim();
       if (note.isEmpty()) {
@@ -73,6 +81,16 @@ public final class ReasonWording {
     String words = CompositionToken.words(code);
     boolean has = words.startsWith("no ") || Character.isDigit(words.charAt(0));
     return TEAM + (has ? " had " : ": ") + words;
+  }
+
+  private static String tookRune(String evidence) {
+    return RuneEvidence.parse(evidence)
+        .map(r -> "took %s %s rune %s".formatted(article(r.rune()), r.rune(), r.timing()))
+        .orElse("had a rune effect");
+  }
+
+  private static String article(String word) {
+    return "aeiou".indexOf(word.charAt(0)) >= 0 ? "an" : "a";
   }
 
   private static String outOfMana(String evidence) {

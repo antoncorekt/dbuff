@@ -6,10 +6,12 @@ import com.ako.dbuff.dao.model.FightExplanationDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
+import com.ako.dbuff.dao.model.OpeningSummaryDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
+import com.ako.dbuff.dao.model.RunePickupDomain;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.dao.repo.AbilityDraftPoolRepo;
 import com.ako.dbuff.dao.repo.BuybackEventRepo;
@@ -21,6 +23,7 @@ import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
 import com.ako.dbuff.dao.repo.GameStateSegmentRepo;
+import com.ako.dbuff.dao.repo.OpeningSummaryRepo;
 import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerPhaseSummaryRepo;
@@ -32,6 +35,7 @@ import com.ako.dbuff.dao.repo.ReplayPlayerMinuteRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
+import com.ako.dbuff.dao.repo.RunePickupRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.ReplayDataService;
 import com.ako.dbuff.service.replay.ReplayRunService;
@@ -47,6 +51,7 @@ import com.ako.dbuff.service.replay.analysis.reason.ReasonScope;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
 import com.ako.dbuff.service.replay.analysis.role.IntentProfileCalculator;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.analysis.rune.RuneType;
 import com.ako.dbuff.service.replay.report.CompositionSection;
 import com.ako.dbuff.service.replay.report.DeathSection;
 import com.ako.dbuff.service.replay.report.DraftSection;
@@ -107,6 +112,8 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private PlayerActivitySegmentRepo activityRepo;
   @Autowired private FightRepo fightRepo;
   @Autowired private CreepKillRepo creepKillRepo;
+  @Autowired private RunePickupRepo runePickupRepo;
+  @Autowired private OpeningSummaryRepo openingSummaryRepo;
   @Autowired private DeathAnalysisRepo deathRepo;
   @Autowired private FightReasonRepo reasonRepo;
   @Autowired private FightExplanationRepo explanationRepo;
@@ -177,6 +184,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .containsExactlyInAnyOrder("RADIANT", "DIRE");
       assertAllPickReasons(id, match.getId());
       assertCreepKills(id, match.getId());
+      assertRunes(id, match.getId());
       assertThat(buybackRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(spikeRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(stateSegmentRepo.findByMatchId(match.getId())).isNotEmpty();
@@ -206,6 +214,8 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(deathRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
     assertThat(reasonRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
     assertThat(creepKillRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
+    assertThat(runePickupRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
+    assertThat(openingSummaryRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
     assertThat(explanationRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
   }
 
@@ -237,6 +247,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .containsExactlyInAnyOrder("RADIANT PICK", "RADIANT FINAL", "DIRE PICK", "DIRE FINAL");
       assertRoleAwareReasons(id, match.getId());
       assertCreepKills(id, match.getId());
+      assertRunes(id, match.getId());
       assertAbilityDraftReasons(id, match.getId());
       assertFightExplanations(id, match.getId());
       printAbilityDraft(id, match.getId(), profiles);
@@ -289,6 +300,62 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(ours)
         .as("%s: last hits of all heroes against OpenDota's %d", id, theirs)
         .isGreaterThanOrEqualTo(Math.round(theirs * 0.75));
+  }
+
+  /**
+   * Every rune of OpenDota's log is a pickup, bounty gold is paid, and the opening has a winner.
+   */
+  private void assertRunes(String id, long matchId) throws Exception {
+    JsonNode players = new ObjectMapper().readTree(fixture(id + ".json").toFile()).get("players");
+    int logged = 0;
+    for (JsonNode p : players) {
+      logged += p.path("runes_log").size();
+    }
+    List<RunePickupDomain> pickups = runePickupRepo.findByMatchId(matchId);
+    assertThat(pickups).as("%s: one pickup per logged rune", id).hasSize(logged);
+    assertThat(pickups)
+        .extracting(RunePickupDomain::getRuneType)
+        .as("%s: every rune code is known", id)
+        .doesNotContain(RuneType.UNKNOWN.name());
+    List<RunePickupDomain> bounty =
+        pickups.stream().filter(r -> RuneType.BOUNTY.name().equals(r.getRuneType())).toList();
+    assertThat(bounty).as("%s: bounty runes", id).isNotEmpty();
+    assertThat(bounty.stream().filter(r -> r.getGold() != null && r.getGold() > 0).count())
+        .as("%s: bounty runes with their gold", id)
+        .isGreaterThanOrEqualTo(bounty.size() * 9L / 10);
+    assertThat(pickups.stream().filter(r -> !bounty.contains(r)))
+        .as("%s: only a bounty rune pays gold", id)
+        .allSatisfy(r -> assertThat(r.getGold()).isNull());
+    List<OpeningSummaryDomain> opening = openingSummaryRepo.findByMatchId(matchId);
+    assertThat(opening).as("%s: an opening per team", id).hasSize(2);
+    List<String> results = opening.stream().map(OpeningSummaryDomain::getResult).sorted().toList();
+    assertThat(results)
+        .as("%s: one winner or a draw", id)
+        .isIn(List.of("LOST", "WON"), List.of("DRAW", "DRAW"));
+    assertThat(opening.stream().mapToLong(OpeningSummaryDomain::getBalance).sum())
+        .as("%s: the balances are opposite", id)
+        .isZero();
+    List<FightReasonDomain> reasons = reasonRepo.findByMatchId(matchId);
+    List<FightReasonDomain> advantage =
+        reasons.stream().filter(r -> "RUNE_ADVANTAGE".equals(r.getCode())).toList();
+    for (FightReasonDomain r : advantage) {
+      assertThat(reasons)
+          .as("%s fight %d: the other side says it", id, r.getFightIndex())
+          .anySatisfy(
+              e -> {
+                assertThat(e.getCode()).isEqualTo("ENEMY_RUNE_ADVANTAGE");
+                assertThat(e.getFightIndex()).isEqualTo(r.getFightIndex());
+                assertThat(e.getEvidence()).isEqualTo(r.getEvidence());
+                assertThat(e.getTeam()).isNotEqualTo(r.getTeam());
+              });
+    }
+    System.out.printf(
+        "RUNES %s: %d pickups (%d bounty), %d rune advantage reasons, opening %s%n",
+        id,
+        pickups.size(),
+        bounty.size(),
+        advantage.size(),
+        opening.stream().map(o -> o.getTeam() + " " + o.getResult()).toList());
   }
 
   private void assertFightExplanations(String id, long matchId) {
@@ -394,6 +461,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
         stored.stream()
             .filter(r -> r.getScope().equals(ReasonScope.TEAM.name()))
             .filter(r -> r.getSource().equals(Reason.COMMON))
+            .filter(r -> !r.getCode().equals("ENEMY_RUNE_ADVANTAGE"))
             .map(r -> r.getFightIndex() + "/" + r.getTeam() + "/" + r.getCode())
             .collect(Collectors.toCollection(TreeSet::new));
     assertThat(storedGaps)

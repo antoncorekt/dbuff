@@ -7,6 +7,7 @@ import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.PlayerRoleDomain;
 import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
+import com.ako.dbuff.dao.model.RunePickupDomain;
 import com.ako.dbuff.dao.model.TeamCompositionDomain;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionStage;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
@@ -24,6 +25,7 @@ import java.util.Optional;
  * stored.
  *
  * @param heroIds the hero each player slot played
+ * @param runes every rune pickup of the match; empty when none is stored
  */
 public record FightContext(
     long matchId,
@@ -36,7 +38,35 @@ public record FightContext(
     List<TeamCompositionDomain> compositions,
     List<PlayerRoleProfileDomain> profiles,
     Map<Long, Long> heroIds,
-    List<AbilityDraftPoolDomain> draftPool) {
+    List<AbilityDraftPoolDomain> draftPool,
+    List<RunePickupDomain> runes) {
+
+  public FightContext(
+      long matchId,
+      GameModeProfile mode,
+      FightDomain fight,
+      List<FightPlayerDomain> players,
+      List<FightAbilityUseDomain> abilityUses,
+      List<DeathAnalysisDomain> deaths,
+      List<PlayerRoleDomain> roles,
+      List<TeamCompositionDomain> compositions,
+      List<PlayerRoleProfileDomain> profiles,
+      Map<Long, Long> heroIds,
+      List<AbilityDraftPoolDomain> draftPool) {
+    this(
+        matchId,
+        mode,
+        fight,
+        players,
+        abilityUses,
+        deaths,
+        roles,
+        compositions,
+        profiles,
+        heroIds,
+        draftPool,
+        List.of());
+  }
 
   /** Empty when the player has no row in this fight. */
   public Optional<FightPlayerDomain> player(long playerSlot) {

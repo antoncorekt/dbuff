@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.DeathEventDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
+import com.ako.dbuff.dao.model.RuneEventDomain;
 import com.ako.dbuff.dao.model.TeamTimelineDomain;
 import com.ako.dbuff.dao.model.TeamfightDomain;
 import com.ako.dbuff.dao.model.TeamfightPlayerDomain;
@@ -11,6 +12,7 @@ import com.ako.dbuff.dao.repo.DeathEventRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
+import com.ako.dbuff.dao.repo.RuneEventRepo;
 import com.ako.dbuff.dao.repo.TeamTimelineRepo;
 import com.ako.dbuff.dao.repo.TeamfightPlayerRepo;
 import com.ako.dbuff.dao.repo.TeamfightRepo;
@@ -143,6 +145,7 @@ public abstract class ReplayPipelineFixture {
   @Autowired private TeamfightRepo teamfightRepo;
   @Autowired private TeamfightPlayerRepo teamfightPlayerRepo;
   @Autowired private TeamTimelineRepo teamTimelineRepo;
+  @Autowired private RuneEventRepo runeEventRepo;
 
   protected static Path fixture(String fileName) {
     return Path.of(System.getenv("REPLAY_FIXTURE_DIR"), fileName);
@@ -200,7 +203,27 @@ public abstract class ReplayPipelineFixture {
     }
     seedOpenDotaFights(match.getId(), json);
     seedTeamTimeline(match.getId(), json);
+    seedRunes(match.getId(), json);
     return match;
+  }
+
+  /** OpenDota's rune log of each player, as the match data mapper stores it. */
+  private void seedRunes(long matchId, JsonNode json) {
+    runeEventRepo.deleteByMatchId(matchId);
+    for (JsonNode p : json.path("players")) {
+      int index = 0;
+      for (JsonNode rune : p.path("runes_log")) {
+        runeEventRepo.save(
+            RuneEventDomain.builder()
+                .matchId(matchId)
+                .playerSlot(p.path("player_slot").asLong())
+                .playerId(optLong(p, "account_id"))
+                .runeIndex(index++)
+                .eventTime(optLong(rune, "time"))
+                .runeType(rune.path("key").asInt())
+                .build());
+      }
+    }
   }
 
   /** OpenDota's per-minute Radiant gold and experience advantage. */

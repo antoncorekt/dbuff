@@ -210,7 +210,7 @@ class FightReasonAnalyzerTest {
             r -> {
               assertThat(r.getScope()).isEqualTo("PLAYER");
               assertThat(r.getSource()).isEqualTo("COMMON");
-              assertThat(r.getAnalysisVersion()).isEqualTo(3);
+              assertThat(r.getAnalysisVersion()).isEqualTo(4);
             });
     assertThat(rows)
         .filteredOn(r -> r.getSubjectSlot() == 128L)

@@ -141,6 +141,7 @@ class CombatLogCodecTest {
     assertThat(ModifierWhitelist.keeps("modifier_black_king_bar_immune", 0)).isTrue();
     assertThat(ModifierWhitelist.keeps("modifier_teleporting", 0)).isTrue();
     assertThat(ModifierWhitelist.keeps("modifier_some_hero_ability_stun", 1.5)).isTrue();
+    assertThat(ModifierWhitelist.keeps("modifier_rune_doubledamage", 0)).isTrue();
     assertThat(ModifierWhitelist.keeps("modifier_item_buff", 0)).isFalse();
   }
 }
