@@ -74,6 +74,19 @@ class VisionReasonContributorTest {
   }
 
   @Test
+  void aWinnerWithUnknownOrZeroObserversGivesNoReason() {
+    FightVisionDomain unknown = vision("RADIANT", "FINE", 1);
+    unknown.setActiveObservers(null);
+
+    assertThat(contributor.contribute(context("RADIANT", unknown, vision("DIRE", "NO_VISION", 0))))
+        .isEmpty();
+    assertThat(
+            contributor.contribute(
+                context("RADIANT", vision("RADIANT", "FINE", 0), vision("DIRE", "NO_VISION", 0))))
+        .isEmpty();
+  }
+
+  @Test
   void aLoserWithNoVisionRowOfTheWinnerGivesNoReason() {
     assertThat(contributor.contribute(context("RADIANT", vision("DIRE", "NO_VISION", 0))))
         .isEmpty();

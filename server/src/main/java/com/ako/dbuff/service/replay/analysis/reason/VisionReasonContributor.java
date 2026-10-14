@@ -48,19 +48,15 @@ public class VisionReasonContributor implements LateReasonContributor {
     }
     Set<VisionVerdict> verdicts = LateFightContext.verdicts(own);
     List<Reason> reasons = new ArrayList<>();
-    if (verdicts.contains(VisionVerdict.NO_VISION)) {
-      context
-          .vision(other(loser))
-          .filter(winner -> !LateFightContext.verdicts(winner).contains(VisionVerdict.NO_VISION))
-          .ifPresent(
-              winner ->
-                  reasons.add(
-                      team(
-                          NO_VISION_BEFORE_FIGHT,
-                          loser,
-                          VisionVerdict.NO_VISION,
-                          "%s had no ward covering the fight when it began, %s had %s"
-                              .formatted(name(loser), name(other(loser)), wards(winner)))));
+    FightVisionDomain winner = context.vision(other(loser)).orElse(null);
+    if (verdicts.contains(VisionVerdict.NO_VISION) && hadVision(winner)) {
+      reasons.add(
+          team(
+              NO_VISION_BEFORE_FIGHT,
+              loser,
+              VisionVerdict.NO_VISION,
+              "%s had no ward covering the fight when it began, %s had %s"
+                  .formatted(name(loser), name(other(loser)), wards(winner))));
     }
     if (verdicts.contains(VisionVerdict.INVISIBLE_HERO_NO_DETECTION)) {
       String heroes = invisibleHeroes(context, own);
@@ -107,8 +103,15 @@ public class VisionReasonContributor implements LateReasonContributor {
     return names.isEmpty() ? "An enemy hero" : String.join(" and ", names);
   }
 
+  private static boolean hadVision(FightVisionDomain row) {
+    return row != null
+        && row.getActiveObservers() != null
+        && row.getActiveObservers() > 0
+        && !LateFightContext.verdicts(row).contains(VisionVerdict.NO_VISION);
+  }
+
   private static String wards(FightVisionDomain winner) {
-    int observers = winner.getActiveObservers() == null ? 0 : winner.getActiveObservers();
+    int observers = winner.getActiveObservers();
     return observers == 1 ? "1 ward" : observers + " wards";
   }
 

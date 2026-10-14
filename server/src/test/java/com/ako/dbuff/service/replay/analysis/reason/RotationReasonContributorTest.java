@@ -104,13 +104,23 @@ class RotationReasonContributorTest {
   }
 
   @Test
-  void aHeroWhoTookPartInTheFightGivesNothing_aPassiveOneAHalvedSeverity() {
+  void aHeroWhoTookPartInTheFightOrWasNearItGivesNothing() {
     List<TeamRotationDomain> trips = List.of(trip("RADIANT", 1, 900, 970, "WASTED", null));
 
     assertThat(contributor.contribute(context(trips, presence(1, "ACTIVE")))).isEmpty();
-    assertThat(contributor.contribute(context(trips, presence(1, "PRESENT_PASSIVE"))))
-        .extracting(Reason::severity)
-        .containsExactly(0.2);
+    assertThat(contributor.contribute(context(trips, presence(1, "PRESENT_PASSIVE")))).isEmpty();
+  }
+
+  @Test
+  void aRowWithNoOrAnUnknownVerdictIsSkipped() {
+    assertThat(
+            contributor.contribute(
+                context(
+                    List.of(
+                        trip("RADIANT", 1, 900, 970, null, null),
+                        trip("RADIANT", 1, 900, 970, "SOMETHING_NEW", null)),
+                    presence(1, "ABSENT_FAR"))))
+        .isEmpty();
   }
 
   @Test
@@ -135,7 +145,7 @@ class RotationReasonContributorTest {
   }
 
   @Test
-  void twoTripsOfOneHeroGiveTheMoreSevereAfterTheMergeOfTheAnalyzer() {
+  void twoTripsOfOneHeroGiveOneReasonEachByVerdict() {
     List<Reason> reasons =
         contributor.contribute(
             context(
@@ -144,6 +154,9 @@ class RotationReasonContributorTest {
                     trip("RADIANT", 1, 950, 990, "DIED", null)),
                 presence(1, "ABSENT_FAR")));
 
-    assertThat(reasons).extracting(Reason::severity).containsExactly(0.4, 0.5);
+    assertThat(reasons)
+        .extracting(Reason::code, Reason::severity)
+        .containsExactly(
+            tuple("ROTATION_WASTED_BEFORE_FIGHT", 0.4), tuple("ROTATION_DIED_BEFORE_FIGHT", 0.5));
   }
 }

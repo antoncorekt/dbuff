@@ -4,30 +4,36 @@ import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.TeamRotationDomain;
 import com.ako.dbuff.service.replay.analysis.behaviour.RotationReason;
 import com.ako.dbuff.service.replay.analysis.behaviour.RotationVerdict;
-import com.ako.dbuff.service.replay.analysis.fight.Presence;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
+import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
  * A hero of the losing team whose rotation came to nothing (WASTED) or ended in his death, and
- * whose trip ended shortly before the fight or was still on when it began, and who then took no
- * real part in it: his team fought a man down for a trip that gave nothing.
+ * whose trip ended shortly before the fight or was still on when it began, and who then was not in
+ * it (no fight row, or absent; a hero near the fight but passive is left out, since he did not miss
+ * it): his team fought a man down for a trip that gave nothing. The two verdicts have codes of
+ * their own.
  */
 @Component
 @RequiredArgsConstructor
 public class RotationReasonContributor implements LateReasonContributor {
   public static final String SOURCE = "ROTATION";
   static final String ROTATION_WASTED_BEFORE_FIGHT = "ROTATION_WASTED_BEFORE_FIGHT";
-  private static final Set<RotationVerdict> COUNTED =
-      Set.of(RotationVerdict.WASTED, RotationVerdict.DIED);
+  static final String ROTATION_DIED_BEFORE_FIGHT = "ROTATION_DIED_BEFORE_FIGHT";
+  private static final Map<RotationVerdict, String> CODES =
+      new EnumMap<>(
+          Map.of(
+              RotationVerdict.WASTED, ROTATION_WASTED_BEFORE_FIGHT,
+              RotationVerdict.DIED, ROTATION_DIED_BEFORE_FIGHT));
   private static final int SECONDS_PER_MINUTE = 60;
 
   private final ReasonProperties properties;
@@ -58,20 +64,15 @@ public class RotationReasonContributor implements LateReasonContributor {
         .filter(r -> r.getPlayerSlot() != null)
         .filter(r -> r.getStartSeconds() != null && r.getEndSeconds() != null)
         .filter(r -> within(r, start, end))
-        .filter(r -> !isActive(context.presenceOf(r.getPlayerSlot())))
+        .filter(r -> !context.inFight(r.getPlayerSlot()))
         .map(r -> reason(context, r, start))
         .toList();
   }
 
   private boolean within(TeamRotationDomain rotation, double fightStart, double fightEnd) {
-    RotationVerdict verdict = Enums.find(RotationVerdict.class, rotation.getVerdict());
-    return COUNTED.contains(verdict)
+    return CODES.containsKey(Enums.find(RotationVerdict.class, rotation.getVerdict()))
         && rotation.getEndSeconds() >= fightStart - properties.getRotationWindowSeconds()
         && rotation.getStartSeconds() <= fightEnd;
-  }
-
-  private static boolean isActive(Presence presence) {
-    return presence == Presence.ACTIVE;
   }
 
   private Reason reason(FightContext context, TeamRotationDomain rotation, double fightStart) {
@@ -93,12 +94,7 @@ public class RotationReasonContributor implements LateReasonContributor {
                 clock(rotation.getStartSeconds()),
                 timing,
                 outcome(verdict, rotation.getReasons()));
-    return Reason.player(
-        SOURCE,
-        ROTATION_WASTED_BEFORE_FIGHT,
-        slot,
-        properties.byPresence(properties.severity(verdict), context.presenceOf(slot)),
-        evidence);
+    return Reason.player(SOURCE, CODES.get(verdict), slot, properties.severity(verdict), evidence);
   }
 
   private static String outcome(RotationVerdict verdict, String reasons) {

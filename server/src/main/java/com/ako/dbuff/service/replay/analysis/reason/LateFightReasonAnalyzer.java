@@ -25,11 +25,13 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The second pass of the fight reasons: the vision and rotation tables only exist after {@link
  * FightReasonAnalyzer} ({@code @Order(32)}) has run, and those analyzers must not move, so their
- * reasons are appended here once the vision, rotation and objective analyzers are done. It owns
- * only the rows of its contributors' sources, so a re-run is idempotent and the first pass's rows
- * are never touched. The readers rank {@code fight_reason} on read, so these rows compete with the
- * others; {@code fight_explanation.reason_count}, written by the loss analyzer before them, is
- * recounted here.
+ * reasons are appended here once the vision, rotation and objective analyzers are done. It does not
+ * require those tables: a contributor with no rows of its own for the match adds nothing, so a
+ * failed rotations run does not cost the vision reasons and the other way round. It owns only the
+ * rows of its contributors' sources, so a re-run is idempotent and the first pass's rows are never
+ * touched. The readers rank {@code fight_reason} on read, so these rows compete with the others;
+ * {@code fight_explanation.reason_count}, written by the loss analyzer before them, is recounted
+ * here.
  */
 @Order(95)
 @Component
@@ -55,7 +57,7 @@ public class LateFightReasonAnalyzer implements ReplayAnalyzer {
 
   @Override
   public Set<String> requires() {
-    return Set.of("fights", "vision", "rotations", "fight-reasons");
+    return Set.of("fights", "fight-reasons", "fight-loss");
   }
 
   @Override

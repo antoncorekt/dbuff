@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.TeamRotationDomain;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.vision.VisionVerdict;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -20,8 +21,13 @@ import java.util.stream.Collectors;
 public record LateFightContext(
     FightContext fight, List<FightVisionDomain> visions, List<TeamRotationDomain> rotations) {
 
+  /** The newest row (largest id) when a team has several, so the choice never depends on order. */
   public Optional<FightVisionDomain> vision(TeamSide team) {
-    return visions.stream().filter(v -> team.name().equals(v.getTeam())).findFirst();
+    return visions.stream()
+        .filter(v -> team.name().equals(v.getTeam()))
+        .max(
+            Comparator.comparing(
+                FightVisionDomain::getId, Comparator.nullsFirst(Comparator.naturalOrder())));
   }
 
   /** The verdicts a vision row stored, which the analyzer keeps as comma separated codes. */

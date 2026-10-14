@@ -220,6 +220,32 @@ class LateFightReasonAnalyzerTest {
   }
 
   @Test
+  void withOnlyVisionRowsTheVisionReasonsStillCome() {
+    stored();
+    rotationRepo.deleteAll();
+    entityManager.flush();
+
+    analyzer.analyze(MATCH);
+
+    assertThat(late())
+        .extracting(FightReasonDomain::getCode)
+        .containsExactly("NO_VISION_BEFORE_FIGHT");
+  }
+
+  @Test
+  void withOnlyRotationRowsTheRotationReasonsStillCome() {
+    stored();
+    visionRepo.deleteAll();
+    entityManager.flush();
+
+    analyzer.analyze(MATCH);
+
+    assertThat(late())
+        .extracting(FightReasonDomain::getCode)
+        .containsExactly("ROTATION_WASTED_BEFORE_FIGHT");
+  }
+
+  @Test
   void aMatchWithNoStoredModeKeepsWhatIsThereAndAddsNothing() {
     analyzer.analyze(MATCH);
 
@@ -242,7 +268,7 @@ class LateFightReasonAnalyzerTest {
   @Test
   void requiresTheTablesItReads_andRunsAfterEveryAnalyzerThatWritesThem() {
     assertThat(analyzer.requires())
-        .containsExactlyInAnyOrder("fights", "vision", "rotations", "fight-reasons");
+        .containsExactlyInAnyOrder("fights", "fight-reasons", "fight-loss");
     int order = AnnotationUtils.findAnnotation(LateFightReasonAnalyzer.class, Order.class).value();
     assertThat(order)
         .isGreaterThan(order(VisionAnalyzer.class))

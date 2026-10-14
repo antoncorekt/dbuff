@@ -196,7 +196,7 @@ public class ReasonProperties {
       String property, Map<E, Double> severities, List<E> required) {
     for (E verdict : required) {
       Double value = severities.get(verdict);
-      if (value == null || value < 0 || value > 1) {
+      if (value == null || !(value >= 0 && value <= 1)) {
         throw new IllegalStateException(
             "replay.analysis.reasons." + property + " needs a value from 0 to 1 for " + verdict);
       }

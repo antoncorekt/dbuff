@@ -181,22 +181,14 @@ class ReasonWordingTest {
             WORDING.phrase(
                 teamWith(
                     "NO_DETECTION_VS_INVISIBLE",
-                    "Riki and Clinkz were invisible in the fight and Dire had no detection"),
+                    "Riki was invisible in the fight and Dire had no detection"),
                 "x"))
-        .isEqualTo("the team had no detection against Riki and Clinkz");
-    assertThat(
-            WORDING.phrase(
-                teamWith(
-                    "NO_DETECTION_VS_INVISIBLE",
-                    "An enemy hero was invisible in the fight and Dire had no detection"),
-                "x"))
-        .isEqualTo("the team had no detection against an enemy hero");
+        .isEqualTo("the team had no detection against an invisible enemy hero");
     assertThat(WORDING.phrase(teamWith("LATE_WARD", "Dire's wards"), "x"))
         .isEqualTo("the team's ward near the fight went down too late");
-    assertThat(WORDING.phrase(player("ROTATION_WASTED_BEFORE_FIGHT", "left; gave nothing"), "Axe"))
+    assertThat(WORDING.phrase(player("ROTATION_WASTED_BEFORE_FIGHT", "anything"), "Axe"))
         .isEqualTo("Axe had just wasted a rotation and missed the fight");
-    assertThat(
-            WORDING.phrase(player("ROTATION_WASTED_BEFORE_FIGHT", "x; and he died on it"), "Axe"))
-        .isEqualTo("Axe died on a rotation just before the fight");
+    assertThat(WORDING.phrase(player("ROTATION_DIED_BEFORE_FIGHT", "anything"), "Axe"))
+        .isEqualTo("Axe died on a rotation just before the fight and missed it");
   }
 }

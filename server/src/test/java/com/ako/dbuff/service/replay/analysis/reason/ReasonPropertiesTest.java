@@ -51,4 +51,15 @@ class ReasonPropertiesTest {
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("rotation-window-seconds");
   }
+
+  @Test
+  void nanAndInfiniteSeveritiesAreRefused() {
+    for (double bad :
+        new double[] {Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY}) {
+      ReasonProperties properties = new ReasonProperties();
+      properties.getVisionSeverity().put(VisionVerdict.LATE_WARD, bad);
+
+      assertThatThrownBy(properties::validate).isInstanceOf(IllegalStateException.class);
+    }
+  }
 }
