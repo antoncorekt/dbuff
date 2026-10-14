@@ -28,7 +28,8 @@ class SectionSwitchContextTest {
           FightSection.class,
           MovementSection.class,
           DraftSection.class,
-          CompositionSection.class);
+          CompositionSection.class,
+          ImportantFightsSection.class);
 
   @Configuration
   @EnableConfigurationProperties(ReplayReportProperties.class)
@@ -61,7 +62,7 @@ class SectionSwitchContextTest {
   }
 
   @Test
-  void theRealSectionsHaveUniqueStableNamesAndAreOnByDefault() {
+  void theRealSectionsHaveUniqueStableNamesAndOnlyTheNewOneIsOffByDefault() {
     runner()
         .withPropertyValues("replay.report.enabled=true")
         .run(
@@ -72,8 +73,17 @@ class SectionSwitchContextTest {
                       .collect(Collectors.toMap(ReplayReportSection::name, s -> s));
               assertThat(byName.keySet())
                   .containsExactlyInAnyOrder(
-                      "swing", "deaths", "fights", "movement", "draft", "composition");
-              assertThat(byName.values()).allMatch(ReplayReportSection::defaultEnabled);
+                      "swing",
+                      "deaths",
+                      "fights",
+                      "movement",
+                      "draft",
+                      "composition",
+                      "important-fights");
+              assertThat(byName.values())
+                  .filteredOn(s -> !s.name().equals("important-fights"))
+                  .allMatch(ReplayReportSection::defaultEnabled);
+              assertThat(byName.get("important-fights").defaultEnabled()).isFalse();
             });
   }
 

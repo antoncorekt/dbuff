@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.report;
 
+import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.Data;
@@ -11,6 +12,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "replay.report")
 public class ReplayReportProperties {
+  private static final int MAX_IMPORTANT_FIGHT_LINES = 15;
+
   /** The server-wide switch; nothing is posted until it is turned on. */
   private boolean enabled = false;
 
@@ -32,11 +35,29 @@ public class ReplayReportProperties {
   /** The most lost fights one swing tells the reasons of. */
   private int maxLostFightsPerSwing = 2;
 
+  /** The most lines the important fights section lists. */
+  private int maxImportantFightLines = 6;
+
   /** How far back a finished replay run is looked at for an analysis not yet posted. */
   private int lookbackHours = 48;
 
   /** The per-section switches by section name; a section without one follows its own default. */
   private Map<String, SectionToggle> sections = new HashMap<>();
+
+  /**
+   * Fails at startup on an important fights cap that leaves the section empty or too long for a
+   * message.
+   */
+  @PostConstruct
+  public void validate() {
+    if (maxImportantFightLines < 1 || maxImportantFightLines > MAX_IMPORTANT_FIGHT_LINES) {
+      throw new IllegalStateException(
+          "replay.report.max-important-fight-lines must be 1 to "
+              + MAX_IMPORTANT_FIGHT_LINES
+              + ", got "
+              + maxImportantFightLines);
+    }
+  }
 
   @Data
   public static class SectionToggle {

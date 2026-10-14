@@ -1,6 +1,5 @@
 package com.ako.dbuff.service.replay.report;
 
-import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.dao.model.GameSpikeDomain;
 import com.ako.dbuff.dao.model.GameSpikeFactorDomain;
 import com.ako.dbuff.dao.model.ReportDetail;
@@ -77,13 +76,7 @@ public class SwingSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
-    List<GameSpikeDomain> spikes =
-        spikeRepo.findByMatchId(input.matchId()).stream()
-            .filter(s -> !SpikeCause.OTHER.name().equals(s.getPrimaryCause()))
-            .sorted(Comparator.comparingLong(GameSpikeDomain::getDeltaGold).reversed())
-            .limit(input.maxFindings())
-            .sorted(Comparator.comparingInt(GameSpikeDomain::getStartSeconds))
-            .toList();
+    List<GameSpikeDomain> spikes = selectedSwings(input);
     if (spikes.isEmpty()) {
       return List.of();
     }
@@ -106,6 +99,15 @@ public class SwingSection implements ReplayReportSection {
     return lines;
   }
 
+  private List<GameSpikeDomain> selectedSwings(ReplayReportInput input) {
+    return spikeRepo.findByMatchId(input.matchId()).stream()
+        .filter(s -> !SpikeCause.OTHER.name().equals(s.getPrimaryCause()))
+        .sorted(Comparator.comparingLong(GameSpikeDomain::getDeltaGold).reversed())
+        .limit(input.maxFindings())
+        .sorted(Comparator.comparingInt(GameSpikeDomain::getStartSeconds))
+        .toList();
+  }
+
   private Map<Integer, SwingExplanation> lostFights(long matchId) {
     return explanationReader
         .read(matchId, properties.getMaxReasonsPerFight(), properties.getMaxLostFightsPerSwing())
@@ -121,13 +123,7 @@ public class SwingSection implements ReplayReportSection {
     if (loser == null || start == null) {
       return Optional.empty();
     }
-    String reasons =
-        lost.reasons().stream()
-            .filter(FightExplanationReader.RankedReason::ranked)
-            .map(r -> r.reason())
-            .map(r -> phrase(r, heroes))
-            .flatMap(Optional::stream)
-            .collect(Collectors.joining(", "));
+    String reasons = ReasonWording.ranked(lost.reasons(), heroes, Integer.MAX_VALUE);
     if (reasons.isEmpty()) {
       return Optional.empty();
     }
@@ -137,27 +133,15 @@ public class SwingSection implements ReplayReportSection {
         String.format(
             Locale.ROOT,
             "%s lost %sthe fight at %s%s: %s",
-            teamName(loser.name()),
+            Prettify.team(loser.name()),
             worthSaying ? String.format(Locale.ROOT, "%.1fk from ", gold / 1000.0) : "",
             GameTime.clock(start),
             noImportantFight ? " (no single important fight)" : "",
             reasons));
   }
 
-  private static Optional<String> phrase(FightReasonDomain reason, Map<Long, String> heroes) {
-    String hero = reason.getSubjectSlot() == null ? null : heroes.get(reason.getSubjectSlot());
-    if (hero == null && !"TEAM".equals(reason.getScope())) {
-      return Optional.empty();
-    }
-    return Optional.of(ReasonWording.phrase(reason, hero));
-  }
-
-  private static String teamName(String team) {
-    return "RADIANT".equals(team) ? "Radiant" : "Dire";
-  }
-
   private static String line(GameSpikeDomain spike, List<GameSpikeFactorDomain> factors) {
-    String team = teamName(spike.getBenefitingTeam());
+    String team = Prettify.team(spike.getBenefitingTeam());
     String because =
         factors.stream()
             .filter(f -> f.getFactorType().equals("SOURCE") && f.getSharePercent() >= MIN_SHARE)
