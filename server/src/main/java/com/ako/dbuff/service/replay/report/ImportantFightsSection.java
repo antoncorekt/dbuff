@@ -27,12 +27,12 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ImportantFightsSection implements ReplayReportSection {
   private static final int MAX_REASONS = 2;
-  private static final PlainViewRenderer PLAIN = new PlainViewRenderer();
 
   private final FightExplanationReader explanationReader;
   private final ReportHeroNames heroNames;
   private final ReasonWording wording;
   private final ReplayReportProperties properties;
+  private final PlainViewRenderer plain;
 
   @Override
   public String name() {
@@ -51,7 +51,7 @@ public class ImportantFightsSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
-    return view(input).map(PLAIN::lines).orElse(List.of());
+    return view(input).map(plain::lines).orElse(List.of());
   }
 
   @Override
@@ -82,10 +82,12 @@ public class ImportantFightsSection implements ReplayReportSection {
       LostFight full = withReasons.getOrDefault(index, fight);
       lines.add(line(fight, full, heroes, yours));
     }
+    Outcome outcome = outcome(important, yours);
     return Optional.of(
-        new SectionView(
-            "Important fights", verdict(listed, yours), accent(listed, yours), lines, null));
+        new SectionView("Important fights", outcome.verdict(), outcome.accent(), lines, null));
   }
+
+  private record Outcome(String verdict, Accent accent) {}
 
   private static long wonBy(List<LostFight> fights, TeamSide side) {
     return fights.stream()
@@ -93,29 +95,30 @@ public class ImportantFightsSection implements ReplayReportSection {
         .count();
   }
 
-  private static String verdict(List<LostFight> fights, TeamSide yours) {
-    TeamSide side = yours;
-    if (side == null) {
-      side =
-          wonBy(fights, TeamSide.RADIANT) >= wonBy(fights, TeamSide.DIRE)
-              ? TeamSide.RADIANT
-              : TeamSide.DIRE;
+  /** Who won more of all the important fights of the match, not only the listed ones. */
+  private static Outcome outcome(List<LostFight> fights, TeamSide yours) {
+    long total = fights.size();
+    if (yours != null) {
+      long won = wonBy(fights, yours);
+      long lost = total - won;
+      Accent accent = won > lost ? Accent.WIN : won < lost ? Accent.LOSS : Accent.NEUTRAL;
+      return new Outcome(
+          String.format(
+              Locale.ROOT, "%s won %d of %d", Prettify.teamOf(yours.name(), yours), won, total),
+          accent);
     }
-    return String.format(
-        Locale.ROOT,
-        "%s won %d of %d",
-        Prettify.teamOf(side.name(), yours),
-        wonBy(fights, side),
-        fights.size());
-  }
-
-  private static Accent accent(List<LostFight> fights, TeamSide yours) {
-    if (yours == null) {
-      return Accent.NEUTRAL;
-    }
-    long won = wonBy(fights, yours);
-    long lost = fights.size() - won;
-    return won > lost ? Accent.WIN : won < lost ? Accent.LOSS : Accent.NEUTRAL;
+    long radiant = wonBy(fights, TeamSide.RADIANT);
+    long dire = total - radiant;
+    String verdict =
+        radiant == dire
+            ? String.format(Locale.ROOT, "Radiant and Dire won %d each", radiant)
+            : String.format(
+                Locale.ROOT,
+                "%s won %d of %d",
+                radiant > dire ? "Radiant" : "Dire",
+                Math.max(radiant, dire),
+                total);
+    return new Outcome(verdict, Accent.NEUTRAL);
   }
 
   /** The tenths of a thousand gold the fight moved, 0 when too small to tell, -1 when unknown. */

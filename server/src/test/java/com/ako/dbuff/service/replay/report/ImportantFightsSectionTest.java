@@ -33,7 +33,11 @@ class ImportantFightsSectionTest {
   private final SectionSwitch sectionSwitch = new SectionSwitch(properties, List.of());
   private final ImportantFightsSection section =
       new ImportantFightsSection(
-          reader, heroNames, new ReasonWording(Prettify::ability), properties);
+          reader,
+          heroNames,
+          new ReasonWording(Prettify::ability),
+          properties,
+          new PlainViewRenderer());
 
   ImportantFightsSectionTest() {
     when(heroNames.bySlot(1L)).thenReturn(Map.of(2L, "Terrorblade", 130L, "Venomancer"));
@@ -132,7 +136,11 @@ class ImportantFightsSectionTest {
     stored(fight(1, 600, "DIRE", 1200L, false, cooldown));
     ImportantFightsSection real =
         new ImportantFightsSection(
-            reader, heroNames, new ReasonWording(TestLabels.labels()), properties);
+            reader,
+            heroNames,
+            new ReasonWording(TestLabels.labels()),
+            properties,
+            new PlainViewRenderer());
 
     assertThat(real.lines(input(2L)).get(1))
         .endsWith("Terrorblade had Metamorphosis and Gods Strength on cooldown");
@@ -173,7 +181,7 @@ class ImportantFightsSectionTest {
     assertThat(section.view(input(0L)).orElseThrow().accent()).isEqualTo(Accent.NEUTRAL);
     SectionView both = section.view(input(2L, 130L)).orElseThrow();
     assertThat(both.accent()).isEqualTo(Accent.NEUTRAL);
-    assertThat(both.verdict()).isEqualTo("Radiant won 1 of 2");
+    assertThat(both.verdict()).isEqualTo("Radiant and Dire won 1 each");
   }
 
   @Test
@@ -193,6 +201,34 @@ class ImportantFightsSectionTest {
     when(reader.importantFights(1L)).thenReturn(List.of());
 
     assertThat(section.view(input(0L))).isEmpty();
+  }
+
+  @Test
+  void viewJudgesAllImportantFightsNotOnlyTheListedOnes() {
+    properties.setMaxImportantFightLines(3);
+    stored(
+        fight(1, 100, "RADIANT", 100L, false),
+        fight(2, 200, "RADIANT", 100L, false),
+        fight(3, 300, "RADIANT", 100L, false),
+        fight(4, 400, "DIRE", 9000L, false),
+        fight(5, 500, "DIRE", 8000L, false),
+        fight(6, 600, "DIRE", 7000L, false));
+
+    SectionView view = section.view(input(0L)).orElseThrow();
+
+    assertThat(view.bullets()).hasSize(3);
+    assertThat(view.verdict()).isEqualTo("Radiant (your team) won 3 of 6");
+    assertThat(view.accent()).isEqualTo(Accent.NEUTRAL);
+  }
+
+  @Test
+  void viewNamesTheLeaderWhenNoTeamIsTracked() {
+    stored(
+        fight(1, 100, "DIRE", 100L, false),
+        fight(2, 200, "DIRE", 100L, false),
+        fight(3, 300, "RADIANT", 100L, false));
+
+    assertThat(section.view(input()).orElseThrow().verdict()).isEqualTo("Dire won 2 of 3");
   }
 
   @Test

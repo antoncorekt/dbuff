@@ -25,6 +25,7 @@ import com.ako.dbuff.service.replay.metrics.ReplayMetrics;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.GameModeRegistry;
 import com.ako.dbuff.service.replay.report.view.ComponentsViewRenderer;
+import com.ako.dbuff.service.replay.report.view.MessageLimits;
 import com.ako.dbuff.service.replay.report.view.ReportMessage;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import java.time.LocalDateTime;
@@ -167,17 +168,38 @@ public class ReplayReportService {
             .messages(messages.size())
             .postedAt(LocalDateTime.now())
             .build());
-    messages.forEach(message -> send(channel, message));
+    messages.forEach(message -> send(match.getId(), channel, message));
     metrics.reportPosted();
     log.info("Replay report of match {} posted in {} messages", match.getId(), messages.size());
   }
 
-  private void send(ThreadChannel channel, ReportMessage message) {
+  private void send(long matchId, ThreadChannel channel, ReportMessage message) {
     switch (message) {
       case ReportMessage.Plain plain -> discord.sendThreadMessageBlocking(channel, plain.text());
-      case ReportMessage.Components cards ->
+      case ReportMessage.Components cards -> {
+        try {
           discord.sendThreadComponentsBlocking(channel, cards.components());
+        } catch (RuntimeException e) {
+          log.warn(
+              "Components of the replay report of match {} rejected, posting plain text: {}",
+              matchId,
+              e.getMessage());
+          plainTexts(cards.fallback()).forEach(t -> discord.sendThreadMessageBlocking(channel, t));
+        }
+      }
     }
+  }
+
+  private List<String> plainTexts(String text) {
+    String cut =
+        text.lines()
+            .map(
+                l ->
+                    l.length() <= MessageLimits.PLAIN_TEXT
+                        ? l
+                        : l.substring(0, MessageLimits.PLAIN_TEXT - 1) + "…")
+            .collect(Collectors.joining("\n"));
+    return formatter.formatForDiscord(List.of(new TextReport("replay", cut)), Map.of());
   }
 
   private List<ReportMessage> messages(
@@ -233,10 +255,8 @@ public class ReplayReportService {
 
   private List<ReportMessage> components(
       List<ReplayReportSection> active, ReplayReportInput input) {
-    return active.stream()
-        .flatMap(section -> section.view(input).stream())
-        .flatMap(view -> componentsRenderer.render(view).stream())
-        .toList();
+    return componentsRenderer.renderAll(
+        active.stream().flatMap(section -> section.view(input).stream()).toList());
   }
 
   private ReplayReportInput input(

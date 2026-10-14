@@ -12,7 +12,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ComponentsViewRendererTest {
 
-  private final ComponentsViewRenderer renderer = new ComponentsViewRenderer();
+  private final ComponentsViewRenderer renderer =
+      new ComponentsViewRenderer(new PlainViewRenderer());
 
   private static SectionView view(
       Accent accent, String verdict, String footnote, String... bullets) {
@@ -114,26 +115,89 @@ class ComponentsViewRendererTest {
   }
 
   @Test
-  void aNoteIsAddedOnlyWhileItFits() {
-    ReportMessage.Components small =
-        (ReportMessage.Components) renderer.render(view(Accent.INFO, null, null, "a")).get(0);
+  void aNoteAlwaysFitsTheLastPageOfAViewThatFilledItsBudgets() {
+    String[] bullets = IntStream.range(0, 80).mapToObj(i -> "x".repeat(300)).toArray(String[]::new);
+    List<ReportMessage> messages = renderer.render(view(Accent.INFO, null, null, bullets));
 
-    ReportMessage noted = small.withNote("\n_(2 more left out)_");
-
-    assertThat(((ReportMessage.Components) noted).components()).hasSize(2);
-    assertThat(((TextDisplay) ((ReportMessage.Components) noted).components().get(1)).getContent())
+    messages.forEach(m -> assertThat(m.withNote("\n_(12 more left out)_")).isPresent());
+    ReportMessage.Components noted =
+        (ReportMessage.Components) messages.get(0).withNote("\n_(2 more left out)_").orElseThrow();
+    assertThat(((TextDisplay) noted.components().get(1)).getContent())
         .isEqualTo("_(2 more left out)_");
-    ReportMessage.Components full =
-        (ReportMessage.Components)
-            renderer.render(view(Accent.INFO, null, null, "z".repeat(9000))).get(0);
-    assertThat(full.withNote("\n_(1 more left out)_")).isSameAs(full);
+    assertThat(noted.fallback()).endsWith("_(2 more left out)_");
   }
 
   @Test
-  void aPlainNoteIsAddedOnlyWhileItFits() {
+  void aNoteThatCannotFitIsRefusedForTheCapToPostSeparately() {
+    ReportMessage.Components full =
+        new ReportMessage.Components(List.of(), MessageLimits.COMPONENTS_TEXT, 1, "");
+
+    assertThat(full.withNote("\n_(1 more left out)_")).isEmpty();
+    ReportMessage.Plain plain = new ReportMessage.Plain("a".repeat(MessageLimits.PLAIN_TEXT));
+    assertThat(plain.withNote("!")).isEmpty();
     assertThat(new ReportMessage.Plain("abc").withNote("!"))
-        .isEqualTo(new ReportMessage.Plain("abc!"));
-    ReportMessage.Plain full = new ReportMessage.Plain("a".repeat(MessageLimits.PLAIN_TEXT));
-    assertThat(full.withNote("!")).isSameAs(full);
+        .contains(new ReportMessage.Plain("abc!"));
+  }
+
+  @Test
+  void anUntitledMultiPageViewStillShowsThePageMarker() {
+    String[] bullets = IntStream.range(0, 80).mapToObj(i -> "b" + i).toArray(String[]::new);
+
+    List<ReportMessage> messages =
+        renderer.render(new SectionView("", null, Accent.INFO, List.of(bullets), null));
+
+    assertThat(messages).hasSize(3);
+    assertThat(texts(messages.get(1)).get(0)).isEqualTo("**(2/3)**");
+  }
+
+  @Test
+  void boundsAHugeTitleAndVerdictSoTheItemsKeepTheirRoom() {
+    SectionView view =
+        new SectionView("T".repeat(4500), "V".repeat(4500), Accent.INFO, List.of("a", "b"), null);
+
+    List<ReportMessage> messages = renderer.render(view);
+
+    assertThat(messages).hasSize(1);
+    ReportMessage.Components only = (ReportMessage.Components) messages.get(0);
+    assertThat(only.textLength()).isLessThanOrEqualTo(MessageLimits.COMPONENTS_TEXT);
+    assertThat(texts(only)).hasSize(3).element(0).asString().contains("…");
+  }
+
+  @Test
+  void packsConsecutiveCardsWhileTheyFitAndStartsTheNextMessageWhenTheyDoNot() {
+    SectionView small = view(Accent.INFO, null, null, "a", "b");
+    SectionView big =
+        view(
+            Accent.WIN,
+            null,
+            null,
+            IntStream.range(0, 3).mapToObj(i -> "x".repeat(1310)).toArray(String[]::new));
+
+    List<ReportMessage> messages = renderer.renderAll(List.of(small, small, big, big, small));
+
+    assertThat(messages).hasSize(3);
+    assertThat(((ReportMessage.Components) messages.get(0)).components()).hasSize(2);
+    assertThat(((ReportMessage.Components) messages.get(1)).components()).hasSize(1);
+    assertThat(((ReportMessage.Components) messages.get(2)).components()).hasSize(2);
+    messages.forEach(
+        m -> {
+          ReportMessage.Components c = (ReportMessage.Components) m;
+          assertThat(c.textLength()).isLessThanOrEqualTo(MessageLimits.COMPONENTS_TEXT);
+          assertThat(c.componentCount()).isLessThanOrEqualTo(MessageLimits.COMPONENTS_COUNT);
+        });
+  }
+
+  @Test
+  void packingCountsEveryNestedComponent() {
+    SectionView ten =
+        view(
+            Accent.INFO,
+            null,
+            null,
+            IntStream.range(0, 12).mapToObj(i -> "b").toArray(String[]::new));
+
+    List<ReportMessage> messages = renderer.renderAll(List.of(ten, ten, ten));
+
+    assertThat(messages).hasSize(2);
   }
 }

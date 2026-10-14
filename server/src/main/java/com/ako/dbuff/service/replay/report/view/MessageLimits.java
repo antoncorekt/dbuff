@@ -11,5 +11,14 @@ public final class MessageLimits {
   /** Components of a Components V2 message, nested ones included; from third-party docs. */
   public static final int COMPONENTS_COUNT = 40;
 
+  /** Text kept free in every Components V2 message for the "left out" note. */
+  public static final int NOTE_TEXT_RESERVE = 40;
+
+  /** Components kept free in every Components V2 message for the "left out" note. */
+  public static final int NOTE_COMPONENT_RESERVE = 1;
+
+  /** The most characters of a card's title, and of its verdict; longer ones end in an ellipsis. */
+  public static final int HEADER_PART = 200;
+
   private MessageLimits() {}
 }
