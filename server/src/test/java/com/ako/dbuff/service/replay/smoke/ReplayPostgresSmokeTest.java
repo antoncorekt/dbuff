@@ -20,6 +20,7 @@ import com.ako.dbuff.dao.repo.AbilityDraftPoolRepo;
 import com.ako.dbuff.dao.repo.BuybackEventRepo;
 import com.ako.dbuff.dao.repo.CreepKillRepo;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
+import com.ako.dbuff.dao.repo.EndGameSummaryRepo;
 import com.ako.dbuff.dao.repo.FightExplanationRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightReasonRepo;
@@ -66,6 +67,7 @@ import com.ako.dbuff.service.replay.read.AnalysisAssembler;
 import com.ako.dbuff.service.replay.report.CompositionSection;
 import com.ako.dbuff.service.replay.report.DeathSection;
 import com.ako.dbuff.service.replay.report.DraftSection;
+import com.ako.dbuff.service.replay.report.EndGameSection;
 import com.ako.dbuff.service.replay.report.FightSection;
 import com.ako.dbuff.service.replay.report.ImportantFightsSection;
 import com.ako.dbuff.service.replay.report.ItemsSection;
@@ -164,6 +166,8 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private RotationsSection rotationsSection;
   @Autowired private SmokeSection smokeSection;
   @Autowired private ObjectivesSection objectivesSection;
+  @Autowired private EndGameSection endGameSection;
+  @Autowired private EndGameSummaryRepo endGameRepo;
   @Autowired private ItemsSection itemsSection;
   @Autowired private OpeningSection openingSection;
   @Autowired private VisionSection visionSection;
@@ -398,7 +402,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(document.keySet())
         .as("%s: every section", id)
         .containsExactly(
-            "run", "roles", "fights", "vision", "runes", "lanes", "items", "behaviour");
+            "run", "roles", "fights", "vision", "runes", "lanes", "items", "behaviour", "endgame");
     JsonNode json = new ObjectMapper().valueToTree(document);
     assertThat(json.at("/run/status").asText()).isEqualTo("DONE");
     assertThat(json.at("/roles/players")).as("%s roles", id).hasSize(10);
@@ -756,6 +760,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     saveSection("rotations", rotationsSection.lines(input), id, 5);
     saveSection("smoke", smokeSection.lines(input), id, 4);
     saveSection("objectives", objectivesSection.lines(input), id, 7);
+    assertThat(endGameRepo.findByMatchId(matchId)).as("%s: end game row", id).hasSize(1);
+    System.out.println("END GAME " + id + " " + endGameRepo.findByMatchId(matchId).getFirst());
+    saveSection("endgame", endGameSection.lines(input), id, 2);
     saveSection("items", itemsSection.lines(input), id, 5);
     saveSection("opening", openingSection.lines(input), id, 4);
     saveSection("vision", visionSection.lines(input), id, 7);

@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.read;
 
+import com.ako.dbuff.dao.model.EndGameSummaryDomain;
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightExplanationDomain;
 import com.ako.dbuff.dao.model.FightImportanceDomain;
@@ -18,6 +19,7 @@ import com.ako.dbuff.dao.model.TeamCompositionDomain;
 import com.ako.dbuff.dao.model.TeamLaneSwapDomain;
 import com.ako.dbuff.dao.model.TeamRotationDomain;
 import com.ako.dbuff.dao.model.TeamSplitStretchDomain;
+import com.ako.dbuff.dao.repo.EndGameSummaryRepo;
 import com.ako.dbuff.dao.repo.FightExplanationRepo;
 import com.ako.dbuff.dao.repo.FightImportanceRepo;
 import com.ako.dbuff.dao.repo.FightReasonRepo;
@@ -62,6 +64,7 @@ import static org.assertj.core.api.Assertions.tuple;
   RunesSectionReader.class,
   LanesSectionReader.class,
   ItemsSectionReader.class,
+  EndGameSectionReader.class,
   BehaviourSectionReader.class,
   FightExplanationReader.class,
   FightLossProperties.class
@@ -76,6 +79,8 @@ class SectionReadersTest {
   @Autowired private RunesSectionReader runes;
   @Autowired private LanesSectionReader lanes;
   @Autowired private ItemsSectionReader items;
+  @Autowired private EndGameSectionReader endGame;
+  @Autowired private EndGameSummaryRepo endGameRepo;
   @Autowired private BehaviourSectionReader behaviour;
 
   @Autowired private PlayerRoleRepo roleRepo;
@@ -107,6 +112,7 @@ class SectionReadersTest {
     assertThat(runes.read(OTHER, null).openings()).isEmpty();
     assertThat(lanes.read(OTHER, null).results()).isEmpty();
     assertThat(items.read(OTHER, null)).isEmpty();
+    assertThat(endGame.read(OTHER, null)).isEmpty();
     Behaviour none = behaviour.read(OTHER, null);
     assertThat(none.rotations()).isEmpty();
     assertThat(none.splitStretches()).isEmpty();
@@ -320,6 +326,30 @@ class SectionReadersTest {
     assertThat(read.results().get(0).slots()).containsExactlyInAnyOrder(1L, 3L);
     assertThat(read.results().get(0).margin()).isEqualTo(0.42);
     assertThat(read.results().get(0).reasons()).extracting("code").containsExactly("CREEP_EDGE");
+  }
+
+  @Test
+  void endGame_listsTheSummaryOfTheMatchOnly() {
+    endGameRepo.save(
+        EndGameSummaryDomain.builder()
+            .matchId(MATCH)
+            .winnerTeam("RADIANT")
+            .peakLeadGold(8300L)
+            .thrown(true)
+            .direBuybacks(3)
+            .build());
+    endGameRepo.save(EndGameSummaryDomain.builder().matchId(OTHER).winnerTeam("DIRE").build());
+
+    assertThat(endGame.read(MATCH, null))
+        .singleElement()
+        .satisfies(
+            e -> {
+              assertThat(e.winnerTeam()).isEqualTo("RADIANT");
+              assertThat(e.peakLeadGold()).isEqualTo(8300L);
+              assertThat(e.thrown()).isTrue();
+              assertThat(e.direBuybacks()).isEqualTo(3);
+            });
+    assertThat(endGame.name()).isEqualTo("endgame");
   }
 
   @Test

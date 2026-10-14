@@ -35,6 +35,7 @@ class SectionSwitchContextTest {
           RotationsSection.class,
           SmokeSection.class,
           ObjectivesSection.class,
+          EndGameSection.class,
           OpeningSection.class,
           VisionSection.class,
           ItemsSection.class);
@@ -46,6 +47,7 @@ class SectionSwitchContextTest {
           "rotations",
           "smoke",
           "objectives",
+          "endgame",
           "opening",
           "vision",
           "items");
@@ -103,6 +105,7 @@ class SectionSwitchContextTest {
                       "rotations",
                       "smoke",
                       "objectives",
+                      "endgame",
                       "opening",
                       "vision",
                       "items");
