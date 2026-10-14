@@ -176,6 +176,7 @@ class MatchCommandTest {
     Mockito.verify(stageService)
         .refresh(Mockito.argThat(m -> m.getId().equals(MATCH_ID)), Mockito.any());
     Mockito.verify(replayReportService).redeliver(MATCH_ID, "instance-1");
+    Mockito.verifyNoInteractions(orchestrator);
     assertThat(context.getPosts()).containsExactly("Header refreshed. Replay report posted again.");
   }
 

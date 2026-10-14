@@ -158,7 +158,10 @@ public class MatchReportOrchestrator {
     return new PartialReportResult(thread.getIdLong(), headerMessage.getIdLong());
   }
 
-  /** Phase 2: Send full-data reports to an existing Discord thread and update header. */
+  /**
+   * Phase 2: update the header and, with stages off, send the full-data reports to the thread. With
+   * stages on the old report is not posted; {@link #analyzeMatch} serves it on demand.
+   */
   public void processAndReportFull(
       MatchDomain match, DbufInstanceConfigDomain config, long threadId, long headerMessageId) {
     if (config.getDiscordChannelId() == null) {
@@ -173,6 +176,10 @@ public class MatchReportOrchestrator {
       String winLoss = determineWinLoss(context);
       String fullHeader = headerRenderer.legacyParsed(match, winLoss);
       discordMessageService.editMessage(config.getDiscordChannelId(), headerMessageId, fullHeader);
+    }
+
+    if (stageService.enabled()) {
+      return;
     }
 
     List<ReportAnalyzer> fullAnalyzers =

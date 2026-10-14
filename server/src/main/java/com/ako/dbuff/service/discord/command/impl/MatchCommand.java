@@ -149,8 +149,9 @@ public class MatchCommand implements DbuffCommand {
     try {
       log.info(
           "Rerunning report for match {} in channel {}", matchId, config.getDiscordChannelId());
-      matchReportOrchestrator.processAndReport(List.of(match.get()), config);
-      if (stageService.enabled()) {
+      if (!stageService.enabled()) {
+        matchReportOrchestrator.processAndReport(List.of(match.get()), config);
+      } else {
         String note = refreshForTesting(match.get(), config);
         if (!note.isEmpty()) {
           reply.post(note);
