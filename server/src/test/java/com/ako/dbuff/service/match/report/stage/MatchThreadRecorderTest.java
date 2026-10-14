@@ -58,7 +58,8 @@ class MatchThreadRecorderTest {
             .advance(
                 MatchReportThreadDomain.builder().id(1L).build(),
                 MatchReportStage.REQUESTED,
-                new MatchFacts(1L, null, new MatchFacts.Result(0, 0), null, null, null));
+                new MatchFacts(
+                    1L, null, new MatchFacts.Result(0, 0), null, null, null, null, null));
 
     assertThat(moved).isFalse();
     Mockito.verifyNoInteractions(repo);

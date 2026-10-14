@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** What each tracked player drafted in an Ability Draft and where in his team's order. */
+/** What each tracked player drafted in an Ability Draft and in which overall pick. */
 @Component
 @RequiredArgsConstructor
 public class DraftSection implements ReplayReportSection {
@@ -55,15 +55,7 @@ public class DraftSection implements ReplayReportSection {
           picks.stream()
               .filter(p -> player.getKey().equals(p.getPlayerSlot()) && p.getAbilityName() != null)
               .sorted(Comparator.comparingInt(AbilityDraftPickDomain::getPickOrder))
-              .map(
-                  p ->
-                      labels.label(p.getAbilityName())
-                          + " ("
-                          + ordinal(
-                              p.getTeamPickIndex() == null
-                                  ? p.getPickOrder()
-                                  : p.getTeamPickIndex())
-                          + ")")
+              .map(p -> labels.label(p.getAbilityName()) + " (pick " + p.getPickOrder() + ")")
               .collect(Collectors.joining(", "));
       if (!chosen.isEmpty()) {
         lines.add(player.getValue() + " drafted " + chosen);
@@ -74,19 +66,5 @@ public class DraftSection implements ReplayReportSection {
     }
     lines.addFirst("**Draft**");
     return lines;
-  }
-
-  private static String ordinal(int n) {
-    int lastTwo = n % 100;
-    if (lastTwo >= 11 && lastTwo <= 13) {
-      return n + "th";
-    }
-    return n
-        + switch (n % 10) {
-          case 1 -> "st";
-          case 2 -> "nd";
-          case 3 -> "rd";
-          default -> "th";
-        };
   }
 }

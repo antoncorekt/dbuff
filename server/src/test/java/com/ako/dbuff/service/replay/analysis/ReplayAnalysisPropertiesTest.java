@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,5 +48,24 @@ class ReplayAnalysisPropertiesTest {
     properties.setFeederSharePercent(10);
     properties.setFeederMinutes(-5);
     assertThatThrownBy(properties::validate).hasMessageContaining("feeder-minutes");
+  }
+
+  @Test
+  void theDefaultIgnoredItemsHoldTheNonCombatOnesAndPassValidation() {
+    properties.validate();
+
+    assertThat(properties.fightAbilityIgnoredItems())
+        .contains("item_quelling_blade", "item_tango", "item_cheese", "item_tpscroll")
+        .doesNotContain("item_black_king_bar");
+  }
+
+  @Test
+  void rejectsAnIgnoredItemThatIsNotAnItemName() {
+    for (String bad : new String[] {"quelling_blade", "item_Tango", "item_", "", " item_x"}) {
+      properties.getFightAbility().setIgnoredItems(List.of(bad));
+      assertThatThrownBy(properties::validate).hasMessageContaining("ignored-items");
+    }
+    properties.getFightAbility().setIgnoredItems(null);
+    assertThatThrownBy(properties::validate).hasMessageContaining("ignored-items");
   }
 }
