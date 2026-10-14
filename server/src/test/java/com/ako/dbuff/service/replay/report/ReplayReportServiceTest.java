@@ -926,4 +926,60 @@ class ReplayReportServiceTest {
     verify(discord, Mockito.atLeast(2)).sendThreadComponentsBlocking(any(), any());
     verify(postedRepo).save(any());
   }
+
+  @Test
+  void deliverSection_refusesASectionHiddenByTheKillSwitch() {
+    storedRun(ReplayStatus.DONE);
+    ReplayReportProperties.SectionToggle toggle = new ReplayReportProperties.SectionToggle();
+    toggle.setEnabled(false);
+    properties.getSections().put("beta", toggle);
+    service = serviceWith(named("alpha", true), named("beta", false));
+
+    assertThat(service.deliverSection(1L, "i1", "beta")).isEqualTo(ReportDelivery.SECTION_HIDDEN);
+    assertThat(service.deliverSection(1L, "i1", "alpha")).isEqualTo(ReportDelivery.POSTED);
+
+    assertThat(posted()).doesNotContain("line of beta");
+  }
+
+  @Test
+  void automaticDelivery_followsTheGlobalListWhenItIsSet() {
+    properties.setDefaultSections(List.of("beta"));
+    service = serviceWith(named("alpha", true), named("beta", false));
+
+    service.deliver(1L);
+
+    assertThat(posted()).contains("line of beta").doesNotContain("line of alpha");
+  }
+
+  @Test
+  void automaticDelivery_channelListBeatsTheGlobalList() {
+    properties.setDefaultSections(List.of("beta"));
+    when(instanceRepo.findActiveByPlayerId(5L))
+        .thenReturn(List.of(instance(InstanceSettings.builder().sections("alpha").build())));
+    service = serviceWith(named("alpha", false), named("beta", true));
+
+    service.deliver(1L);
+
+    assertThat(posted()).contains("line of alpha").doesNotContain("line of beta");
+  }
+
+  @Test
+  void automaticDelivery_withNoListKeepsEachSectionsOwnDefault() {
+    service = serviceWith(named("alpha", true), named("beta", false));
+
+    service.deliver(1L);
+
+    assertThat(posted()).contains("line of alpha").doesNotContain("line of beta");
+  }
+
+  @Test
+  void automaticDelivery_anEmptyChannelListPostsNothing() {
+    when(instanceRepo.findActiveByPlayerId(5L))
+        .thenReturn(List.of(instance(InstanceSettings.builder().sections("").build())));
+    service = serviceWith(named("alpha", true));
+
+    service.deliver(1L);
+
+    verify(discord, never()).sendThreadMessageBlocking(any(), any());
+  }
 }

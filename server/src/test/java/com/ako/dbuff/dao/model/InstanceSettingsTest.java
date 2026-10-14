@@ -55,4 +55,13 @@ class InstanceSettingsTest {
     assertThat(domain.effectiveSettings()).isNotNull();
     assertThat(domain.effectiveSettings().isAiSummaryOn()).isTrue();
   }
+
+  @Test
+  void sectionNames_nullFollowsTheServerAndBlankMeansNone() {
+    assertThat(new InstanceSettings().sectionNames()).isEmpty();
+    assertThat(InstanceSettings.builder().sections("").build().sectionNames())
+        .contains(java.util.List.of());
+    assertThat(InstanceSettings.builder().sections("lanes, swing").build().sectionNames())
+        .contains(java.util.List.of("lanes", "swing"));
+  }
 }

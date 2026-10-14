@@ -3,6 +3,7 @@ package com.ako.dbuff.service.ai.reasons;
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.service.discord.command.AsyncReply;
 import com.ako.dbuff.service.discord.command.CommandContext;
+import com.ako.dbuff.service.replay.report.OnDemandCooldown;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
 import com.ako.dbuff.service.replay.report.ReportDelivery;
 import lombok.extern.slf4j.Slf4j;
@@ -20,10 +21,13 @@ public class AiReasonsCommandHandler {
 
   private final AiReasonsService service;
   private final ReplayReportService reports;
+  private final OnDemandCooldown cooldown;
 
-  public AiReasonsCommandHandler(AiReasonsService service, @Lazy ReplayReportService reports) {
+  public AiReasonsCommandHandler(
+      AiReasonsService service, @Lazy ReplayReportService reports, OnDemandCooldown cooldown) {
     this.service = service;
     this.reports = reports;
+    this.cooldown = cooldown;
   }
 
   public void handle(CommandContext context, long matchId, DbufInstanceConfigDomain config) {
@@ -47,6 +51,12 @@ public class AiReasonsCommandHandler {
           "❌ Match "
               + matchId
               + " has no stored replay analysis yet (the replay run must be done or partial).");
+      return;
+    }
+    long wait = cooldown.acquire(context.getChannelId());
+    if (wait > 0) {
+      context.replyEphemeral(
+          "⏳ This thread just had a report or AI card. Try again in " + wait + " s.");
       return;
     }
     AsyncReply reply =

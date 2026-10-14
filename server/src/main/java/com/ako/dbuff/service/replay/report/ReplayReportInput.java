@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.report;
 
+import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import java.util.Map;
 import java.util.Set;
@@ -12,6 +13,7 @@ import java.util.Set;
  * @param maxFindings the most findings the section may list
  * @param modelOverride the AI model a person asked for in an on-demand request, null for the
  *     default; only the AI sections read it
+ * @param instance the channel the report is for, null when a caller has none
  */
 public record ReplayReportInput(
     long matchId,
@@ -19,7 +21,18 @@ public record ReplayReportInput(
     Set<Long> focusSlots,
     Map<Long, String> namesBySlot,
     int maxFindings,
-    String modelOverride) {
+    String modelOverride,
+    DbufInstanceConfigDomain instance) {
+
+  public ReplayReportInput(
+      long matchId,
+      MatchDomain match,
+      Set<Long> focusSlots,
+      Map<Long, String> namesBySlot,
+      int maxFindings,
+      String modelOverride) {
+    this(matchId, match, focusSlots, namesBySlot, maxFindings, modelOverride, null);
+  }
 
   public ReplayReportInput(
       long matchId,
@@ -27,10 +40,21 @@ public record ReplayReportInput(
       Set<Long> focusSlots,
       Map<Long, String> namesBySlot,
       int maxFindings) {
-    this(matchId, match, focusSlots, namesBySlot, maxFindings, null);
+    this(matchId, match, focusSlots, namesBySlot, maxFindings, null, null);
   }
 
   public ReplayReportInput withModelOverride(String model) {
-    return new ReplayReportInput(matchId, match, focusSlots, namesBySlot, maxFindings, model);
+    return new ReplayReportInput(
+        matchId, match, focusSlots, namesBySlot, maxFindings, model, instance);
+  }
+
+  public ReplayReportInput withInstance(DbufInstanceConfigDomain channel) {
+    return new ReplayReportInput(
+        matchId, match, focusSlots, namesBySlot, maxFindings, modelOverride, channel);
+  }
+
+  /** The language the channel chose for AI text; null when it follows the server's. */
+  public String channelLanguage() {
+    return instance == null ? null : instance.effectiveSettings().getLanguage();
   }
 }

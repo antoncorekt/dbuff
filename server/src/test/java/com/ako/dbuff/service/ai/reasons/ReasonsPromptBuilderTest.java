@@ -54,4 +54,13 @@ class ReasonsPromptBuilderTest {
 
     assertThat(builder.build(facts(0)).system()).contains("in Russian");
   }
+
+  @Test
+  void theChannelLanguageOverridesTheServerOneOnlyWhenSet() {
+    assertThat(builder.build(facts(0), "Russian").system())
+        .contains("in Russian")
+        .doesNotContain("in English");
+    assertThat(builder.build(facts(0), null).system()).contains("in English");
+    assertThat(builder.build(facts(0), " ").system()).contains("in English");
+  }
 }
