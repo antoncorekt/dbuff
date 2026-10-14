@@ -5,7 +5,12 @@ import com.ako.dbuff.dao.model.MatchReportStage;
 import com.ako.dbuff.service.match.report.stage.MatchFacts.Result;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.ReportMessage;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
@@ -18,10 +23,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class HeaderRendererTest {
 
+  private static final long START = 1792005120L;
+
   private final HeaderRenderer renderer = new HeaderRenderer();
 
   private static MatchFacts facts(Result result, Long radiant, Long dire) {
-    return new MatchFacts(77L, "ability draft", result, 2100L, radiant, dire);
+    return new MatchFacts(
+        77L, "ability draft", result, 2100L, radiant, dire, START, ZoneOffset.UTC);
   }
 
   static Stream<Arguments> titles() {
@@ -30,28 +38,30 @@ class HeaderRendererTest {
         Arguments.of(
             MatchReportStage.REQUESTED,
             win,
-            "Match 77 · ability draft · Win · 35 min · OpenDota parse requested"),
+            "Match 77 · 14 Oct 19:12 · ability draft · Win · 35 min · OpenDota parse requested"),
         Arguments.of(
             MatchReportStage.PARSED,
             win,
-            "Match 77 · ability draft · Win (40-25) · 35 min · OpenDota data ready"),
+            "Match 77 · 14 Oct 19:12 · ability draft · Win (40-25) · 35 min · OpenDota data ready"),
         Arguments.of(
             MatchReportStage.REPLAY_PENDING,
             new Result(0, 1),
-            "Match 77 · ability draft · Loss (40-25) · 35 min · replay processing"),
+            "Match 77 · 14 Oct 19:12 · ability draft · Loss (40-25) · 35 min · replay processing"),
         Arguments.of(
             MatchReportStage.PARSE_TIMED_OUT,
             new Result(1, 1),
-            "Match 77 · ability draft · Mixed (1W/1L) (40-25) · 35 min · OpenDota did not parse"
-                + " this match"),
+            "Match 77 · 14 Oct 19:12 · ability draft · Mixed (1W/1L) (40-25) · 35 min · OpenDota"
+                + " did not parse this match"),
         Arguments.of(
             MatchReportStage.REPLAY_DONE,
             win,
-            "Match 77 · ability draft · Win (40-25) · 35 min · replay analysis ready"),
+            "Match 77 · 14 Oct 19:12 · ability draft · Win (40-25) · 35 min · replay analysis"
+                + " ready"),
         Arguments.of(
             MatchReportStage.REPLAY_UNAVAILABLE,
             win,
-            "Match 77 · ability draft · Win (40-25) · 35 min · replay analysis not available"));
+            "Match 77 · 14 Oct 19:12 · ability draft · Win (40-25) · 35 min · replay analysis not"
+                + " available"));
   }
 
   @ParameterizedTest
@@ -79,10 +89,40 @@ class HeaderRendererTest {
 
   @Test
   void missingFactsAreLeftOutOfTheTitle() {
-    MatchFacts bare = new MatchFacts(5L, null, new Result(0, 0), null, null, null);
+    MatchFacts bare = new MatchFacts(5L, null, new Result(0, 0), null, null, null, null, null);
 
     assertThat(renderer.title(StageTarget.at(MatchReportStage.PARSED), bare))
         .isEqualTo("Match 5 · OpenDota data ready");
+  }
+
+  @Test
+  void theStartIsShownInTheZoneOfTheInstance() {
+    MatchFacts kyiv =
+        new MatchFacts(
+            5L, null, new Result(0, 0), null, null, null, START, ZoneId.of("Europe/Kyiv"));
+
+    assertThat(renderer.title(StageTarget.at(MatchReportStage.PARSED), kyiv))
+        .isEqualTo("Match 5 · 14 Oct 22:12 · OpenDota data ready");
+  }
+
+  @Test
+  void aMissingZoneFallsBackToTheServerZone() {
+    MatchFacts noZone = new MatchFacts(5L, null, new Result(0, 0), null, null, null, START, null);
+    String expected =
+        Instant.ofEpochSecond(START)
+            .atZone(ZoneId.systemDefault())
+            .format(DateTimeFormatter.ofPattern("d MMM HH:mm", Locale.ENGLISH));
+
+    assertThat(renderer.title(StageTarget.at(MatchReportStage.PARSED), noZone))
+        .isEqualTo("Match 5 · " + expected + " · OpenDota data ready");
+  }
+
+  @Test
+  void theStartIsInThePlainFallbackToo() {
+    ReportMessage.Components header =
+        renderer.render(StageTarget.at(MatchReportStage.PARSED), facts(new Result(1, 0), 4L, 2L));
+
+    assertThat(header.fallback()).startsWith("Match 77 · 14 Oct 19:12 · ability draft");
   }
 
   static Stream<Arguments> accents() {

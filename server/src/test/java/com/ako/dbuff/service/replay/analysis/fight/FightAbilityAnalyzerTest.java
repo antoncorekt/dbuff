@@ -79,10 +79,42 @@ class FightAbilityAnalyzerTest {
     assertThat(cast.getManaCost()).isEqualTo(100);
     assertThat(cast.getManaAtStart()).isEqualTo(400);
     assertThat(cast.getNonCastReason()).isNull();
+    assertThat(cast.getAnalysisVersion()).isEqualTo(3);
     FightAbilityUseDomain missed =
         uses.stream().filter(u -> u.getPlayerSlot() == 128L).findFirst().orElseThrow();
     assertThat(missed.getCasts()).isZero();
     assertThat(missed.getNonCastReason()).isEqualTo("DEAD_EARLY");
+  }
+
+  @Test
+  void analyze_leavesAnIgnoredItemOutAndKeepsAnotherItem() {
+    stored();
+    item("item_quelling_blade", StateChangeKind.ITEM_ADDED, 1.0, null);
+    item("item_quelling_blade", StateChangeKind.COOLDOWN, 50.0, 400.0);
+    item("item_blink", StateChangeKind.ITEM_ADDED, 1.0, null);
+    item("item_blink", StateChangeKind.COOLDOWN, 50.0, 400.0);
+    fightAnalyzer.analyze(MATCH);
+
+    analyzer.analyze(MATCH);
+
+    assertThat(useRepo.findAll())
+        .filteredOn(u -> "ITEM".equals(u.getKind()))
+        .extracting(FightAbilityUseDomain::getAbilityName)
+        .contains("item_blink")
+        .doesNotContain("item_quelling_blade");
+  }
+
+  private void item(String name, StateChangeKind kind, double at, Double readyAt) {
+    stateRepo.saveAndFlush(
+        ReplayStateChangeDomain.builder()
+            .matchId(MATCH)
+            .playerSlot(0L)
+            .gameSeconds(at)
+            .kind(kind.name())
+            .name(name)
+            .readyAtSeconds(readyAt)
+            .cooldownLength(readyAt == null ? null : 15.0)
+            .build());
   }
 
   @Test

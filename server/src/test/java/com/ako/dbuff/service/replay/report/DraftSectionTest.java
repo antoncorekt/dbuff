@@ -43,8 +43,8 @@ class DraftSectionTest {
     assertThat(lines)
         .containsExactly(
             "**Draft**",
-            "Anton drafted Faceless Void Chronosphere (2nd), Sven Gods Strength (6th), Sven Storm"
-                + " Bolt (11th)");
+            "Anton drafted Faceless Void Chronosphere (pick 3), Sven Gods Strength (pick 12), Sven"
+                + " Storm Bolt (pick 22)");
   }
 
   @Test
@@ -55,7 +55,8 @@ class DraftSectionTest {
     DraftSection real = new DraftSection(repo, new AbilityDraftProfile(), TestLabels.labels());
 
     assertThat(real.lines(new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3)))
-        .containsExactly("**Draft**", "Anton drafted Metamorphosis (2nd), Gods Strength (6th)");
+        .containsExactly(
+            "**Draft**", "Anton drafted Metamorphosis (pick 3), Gods Strength (pick 12)");
   }
 
   @Test
@@ -64,5 +65,35 @@ class DraftSectionTest {
 
     assertThat(section.lines(new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3)))
         .isEmpty();
+  }
+
+  @Test
+  void lines_printTheOverallPickAsStoredFromOne() {
+    when(repo.findByMatchId(1L))
+        .thenReturn(List.of(pick(1, 0, "sven_gods_strength"), pick(40, 0, "sven_storm_bolt")));
+
+    assertThat(section.lines(new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3)))
+        .containsExactly(
+            "**Draft**", "Anton drafted Sven Gods Strength (pick 1), Sven Storm Bolt (pick 40)");
+  }
+
+  @Test
+  void lines_fallBackToTheTeamPickWhenTheOverallOrderIsNullAndSortThoseLast() {
+    AbilityDraftPickDomain unordered =
+        AbilityDraftPickDomain.builder()
+            .teamPickIndex(2)
+            .playerSlot(0L)
+            .abilityName("sven_storm_bolt")
+            .build();
+    AbilityDraftPickDomain bare =
+        AbilityDraftPickDomain.builder().playerSlot(0L).abilityName("sven_great_cleave").build();
+    when(repo.findByMatchId(1L))
+        .thenReturn(List.of(unordered, bare, pick(5, 0, "sven_gods_strength")));
+
+    assertThat(section.lines(new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3)))
+        .containsExactly(
+            "**Draft**",
+            "Anton drafted Sven Gods Strength (pick 5), Sven Storm Bolt (team pick 2), Sven Great"
+                + " Cleave");
   }
 }

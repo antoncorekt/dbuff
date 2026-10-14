@@ -7,6 +7,7 @@ import com.ako.dbuff.dao.model.MatchReportThreadDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
+import com.ako.dbuff.dao.repo.DbufInstanceConfigRepository;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.MatchReportThreadRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
@@ -65,7 +66,8 @@ class MatchReportStageReplayTest {
     service =
         new MatchReportStageService(
             properties,
-            new MatchFactsFactory(mock(ConstantsManagers.class), statRepo),
+            new MatchFactsFactory(
+                mock(ConstantsManagers.class), statRepo, mock(DbufInstanceConfigRepository.class)),
             new HeaderRenderer(),
             new ReportHeaderPublisher(discord),
             new StageOneCardBuilder(mock(ConstantsManagers.class)),

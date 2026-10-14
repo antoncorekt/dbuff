@@ -3,10 +3,12 @@ package com.ako.dbuff.service.replay.analysis.fight;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.StateChangeKind;
+import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -17,7 +19,8 @@ class FightAbilityAssessorTest {
   private static final String GOD = "sven_gods_strength";
   private static final String PASSIVE = "sven_great_cleave";
 
-  private final FightAbilityAssessor assessor = new FightAbilityAssessor(5);
+  private final FightAbilityAssessor assessor =
+      new FightAbilityAssessor(5, new ReplayAnalysisProperties().fightAbilityIgnoredItems());
 
   @Test
   void assess_countsCastsAndDamageInTheFightAndLeavesPassivesOut() {
@@ -87,6 +90,38 @@ class FightAbilityAssessorTest {
     var uses = assessor.assess(100, 120, state, 400, Map.of(), List.of());
 
     assertThat(uses).noneMatch(FightAbilityAssessor.Use::item);
+  }
+
+  @Test
+  void assess_leavesOutAQuellingBladeThatWasUsedOnTreesButListsAnotherItem() {
+    HeroStateTimeline state = state();
+    state.add(change(StateChangeKind.ITEM_ADDED, "item_quelling_blade", 0, 0));
+    state.add(change(StateChangeKind.ITEM_ADDED, "item_blink", 0, 0));
+    state.add(change(StateChangeKind.COOLDOWN, "item_blink", 50, 60));
+    Map<String, List<CombatEvent>> events = new HashMap<>();
+    events.put(
+        "item_quelling_blade", List.of(cast(CombatEventKind.ITEM, 40, "item_quelling_blade")));
+
+    var uses = assessor.assess(100, 120, state, 400, events, List.of());
+
+    assertThat(uses)
+        .filteredOn(FightAbilityAssessor.Use::item)
+        .extracting(FightAbilityAssessor.Use::name)
+        .containsExactly("item_blink");
+  }
+
+  @Test
+  void assess_listsAnItemAgainOnceItIsNotInTheIgnoreList() {
+    var open = new FightAbilityAssessor(5, Set.of());
+    HeroStateTimeline state = state();
+    state.add(change(StateChangeKind.ITEM_ADDED, "item_quelling_blade", 0, 0));
+    Map<String, List<CombatEvent>> events =
+        Map.of(
+            "item_quelling_blade", List.of(cast(CombatEventKind.ITEM, 40, "item_quelling_blade")));
+
+    assertThat(open.assess(100, 120, state, 400, events, List.of()))
+        .extracting(FightAbilityAssessor.Use::name)
+        .contains("item_quelling_blade");
   }
 
   private NonCastReason reason(

@@ -93,7 +93,7 @@ public class MatchReportStageService {
     ReportHeaderPublisher.Posted header;
     MatchFacts facts;
     try {
-      facts = factsFactory.fromSummary(match.getId(), summary);
+      facts = factsFactory.fromSummary(match, config, summary);
       header =
           publisher.create(
               config.getDiscordChannelId(),
@@ -165,7 +165,7 @@ public class MatchReportStageService {
   }
 
   private void timedOut(MatchReportThreadDomain row, MatchDomain match) {
-    MatchFacts facts = MatchFacts.fromRow(row, match);
+    MatchFacts facts = factsFactory.fromRow(row, match);
     if (ownsHeader(row)) {
       retitle(row, MatchReportStage.PARSE_TIMED_OUT, facts);
     } else if (properties.isEnabled()
@@ -238,7 +238,7 @@ public class MatchReportStageService {
     for (MatchReportThreadDomain row : rows) {
       try {
         if (ownsHeader(row)) {
-          retitle(row, target, MatchFacts.fromRow(row, match), false);
+          retitle(row, target, factsFactory.fromRow(row, match), false);
         }
       } catch (RuntimeException e) {
         log.warn(

@@ -43,6 +43,7 @@ import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import net.dv8tion.jda.api.components.MessageTopLevelComponent;
@@ -77,6 +78,7 @@ class ReplayReportServiceTest {
   private final DiscordMessageService discord = mock(DiscordMessageService.class);
   private final QuietHoursGuard quiet = mock(QuietHoursGuard.class);
   private final ThreadChannel thread = mock(ThreadChannel.class);
+  private final ReportHeroNames heroNames = mock(ReportHeroNames.class);
   private ReplayReportService service;
 
   private DbufInstanceConfigDomain instance(InstanceSettings settings) {
@@ -158,6 +160,24 @@ class ReplayReportServiceTest {
   }
 
   @Test
+  void deliver_namesATrackedPlayerWithHisHero() {
+    when(heroNames.bySlot(1L)).thenReturn(Map.of(0L, "Nature's Prophet"));
+
+    service.deliver(1L);
+
+    assertThat(posted()).contains("Anton (Nature's Prophet) did something");
+  }
+
+  @Test
+  void deliver_namesATrackedPlayerAloneWhenHisHeroIsUnknown() {
+    when(heroNames.bySlot(1L)).thenReturn(Map.of(128L, "Axe"));
+
+    service.deliver(1L);
+
+    assertThat(posted()).contains("Anton did something").doesNotContain("Anton (");
+  }
+
+  @Test
   void deliver_leavesOutASectionThatDoesNotApplyToTheMatchMode() {
     service = serviceWith(new AbilityDraftOnlySection());
     when(matchRepo.findById(2L))
@@ -211,7 +231,8 @@ class ReplayReportServiceTest {
         quiet,
         TestModes.registry(),
         new ReplayMetrics(registry, mock(ReplayRunCounts.class)),
-        new ComponentsViewRenderer(new PlainViewRenderer()));
+        new ComponentsViewRenderer(new PlainViewRenderer()),
+        heroNames);
   }
 
   private static ReplayReportSection named(String name, boolean defaultEnabled) {
@@ -588,6 +609,59 @@ class ReplayReportServiceTest {
         ArgumentCaptor.forClass(ReplayReportPostedDomain.class);
     verify(postedRepo, Mockito.times(2)).save(saved.capture());
     assertThat(saved.getAllValues().get(1).getId()).isEqualTo(3L);
+  }
+
+  @Test
+  void deliverSection_postsOnlyThatSectionEvenWhenItIsOffAndTheReportIsOff() {
+    storedRun(ReplayStatus.DONE);
+    properties.setEnabled(false);
+    service = serviceWith(named("alpha", true), named("beta", false));
+
+    assertThat(service.deliverSection(1L, "i1", "beta")).isEqualTo(ReportDelivery.POSTED);
+
+    String text = posted();
+    assertThat(text).contains("line of beta").doesNotContain("line of alpha");
+    verify(postedRepo, never()).save(any());
+  }
+
+  @Test
+  void deliverSection_componentsFormatPostsTheCard() {
+    storedRun(ReplayStatus.DONE);
+    properties.setFormat(ReportFormat.COMPONENTS);
+    service = serviceWith(named("beta", false));
+
+    assertThat(service.deliverSection(1L, "i1", "beta")).isEqualTo(ReportDelivery.POSTED);
+
+    verify(discord).sendThreadComponentsBlocking(Mockito.eq(thread), any());
+  }
+
+  @Test
+  void deliverSection_saysWhyNothingWasPosted() {
+    storedRun(ReplayStatus.DONE);
+    service = serviceWith(named("alpha", true), emptySection("quiet"));
+
+    assertThat(service.deliverSection(1L, "i1", "quiet")).isEqualTo(ReportDelivery.SECTION_EMPTY);
+    assertThat(service.deliverSection(1L, "i1", "missing")).isEqualTo(ReportDelivery.NO_INSTANCE);
+    when(threadRepo.findByMatchIdAndInstanceId(1L, "i1")).thenReturn(Optional.empty());
+    assertThat(service.deliverSection(1L, "i1", "alpha")).isEqualTo(ReportDelivery.NO_THREAD);
+    when(runRepo.findByMatchIdAndParserVersion(any(), any())).thenReturn(Optional.empty());
+    assertThat(service.deliverSection(1L, "i1", "alpha")).isEqualTo(ReportDelivery.NOT_STORED);
+
+    verify(discord, never()).sendThreadMessageBlocking(any(), any());
+  }
+
+  private static ReplayReportSection emptySection(String name) {
+    return new ReplaySection() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public List<String> lines(ReplayReportInput input) {
+        return List.of();
+      }
+    };
   }
 
   @Test

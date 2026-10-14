@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.repo.DbufInstanceConfigRepository;
 import com.ako.dbuff.dao.repo.MatchRepo;
+import com.ako.dbuff.service.ai.reasons.AiReasonsCommandHandler;
 import com.ako.dbuff.service.discord.command.FakeCommandContext;
 import com.ako.dbuff.service.match.DotaApiParseRequestService;
 import com.ako.dbuff.service.match.MatchDeletionService;
@@ -34,6 +35,7 @@ class MatchCommandTest {
   private MatchParseSchedulerService schedulerService;
   private MatchReportStageService stageService;
   private ReplayReportService replayReportService;
+  private AiReasonsCommandHandler aiReasons;
   private MatchCommand command;
 
   @BeforeEach
@@ -46,6 +48,7 @@ class MatchCommandTest {
     schedulerService = Mockito.mock(MatchParseSchedulerService.class);
     stageService = Mockito.mock(MatchReportStageService.class);
     replayReportService = Mockito.mock(ReplayReportService.class);
+    aiReasons = Mockito.mock(AiReasonsCommandHandler.class);
 
     command =
         new MatchCommand(
@@ -56,7 +59,8 @@ class MatchCommandTest {
             parseRequestService,
             schedulerService,
             stageService,
-            replayReportService);
+            replayReportService,
+            aiReasons);
 
     Mockito.when(instanceConfigRepo.findByDiscordChannelId(Mockito.anyString()))
         .thenReturn(Optional.of(config()));
@@ -83,14 +87,53 @@ class MatchCommandTest {
   void definitionExposesRerunAndRetry() {
     assertThat(command.getDefinition().getSubcommands())
         .extracting(subcommand -> subcommand.getName())
-        .containsExactlyInAnyOrder("rerun", "retry");
+        .containsExactlyInAnyOrder("rerun", "retry", "ai");
   }
 
   @Test
   void theAliasesAreTheSubcommandNames() {
-    assertThat(command.getTextAliases()).containsExactlyInAnyOrder("rerun", "retry");
+    assertThat(command.getTextAliases()).containsExactlyInAnyOrder("rerun", "retry", "ai");
+    assertThat(command.resolveTextSubcommand("ai", null)).isEqualTo("ai");
     assertThat(command.resolveTextSubcommand("rerun", null)).isEqualTo("rerun");
     assertThat(command.resolveTextSubcommand("retry", null)).isEqualTo("retry");
+  }
+
+  @Test
+  void ai_inAThreadHandsTheMatchToTheReasonsHandlerAndTouchesNothingElse() {
+    FakeCommandContext context = inThread();
+
+    command.execute("ai", context);
+
+    Mockito.verify(aiReasons).handle(context, MATCH_ID, config());
+    Mockito.verifyNoInteractions(orchestrator, replayReportService, matchDeletionService);
+  }
+
+  @Test
+  void theTextFormOfAiTakesAnOptionalModel() {
+    assertThat(command.parseTextArguments("ai", null, "")).isEmpty();
+    assertThat(command.parseTextArguments("ai", "gpt-4o", "")).containsEntry("model", "gpt-4o");
+    assertThat(command.parseTextArguments("rerun", null, "")).isEmpty();
+    assertThat(command.getDefinition().getSubcommands())
+        .filteredOn(s -> s.getName().equals("ai"))
+        .singleElement()
+        .satisfies(
+            s -> {
+              assertThat(s.getOptions()).hasSize(1);
+              assertThat(s.getOptions().get(0).getName()).isEqualTo("model");
+              assertThat(s.getOptions().get(0).isAutoComplete()).isTrue();
+              assertThat(s.getOptions().get(0).isRequired()).isFalse();
+            });
+  }
+
+  @Test
+  void ai_outsideAThreadIsRefusedInOneLine() {
+    FakeCommandContext context = FakeCommandContext.builder().build();
+
+    command.execute("ai", context);
+
+    assertThat(context.getEphemeralReplies()).hasSize(1);
+    assertThat(context.getEphemeralReplies().get(0)).contains("/match ai");
+    Mockito.verifyNoInteractions(aiReasons);
   }
 
   @Test
@@ -176,6 +219,7 @@ class MatchCommandTest {
     Mockito.verify(stageService)
         .refresh(Mockito.argThat(m -> m.getId().equals(MATCH_ID)), Mockito.any());
     Mockito.verify(replayReportService).redeliver(MATCH_ID, "instance-1");
+    Mockito.verifyNoInteractions(orchestrator);
     assertThat(context.getPosts()).containsExactly("Header refreshed. Replay report posted again.");
   }
 
@@ -189,7 +233,9 @@ class MatchCommandTest {
     command.execute("rerun", context);
 
     assertThat(context.getPosts())
-        .containsExactly("Replay report not posted: no replay analysis is stored for this match.");
+        .containsExactly(
+            "Header not changed (plain header, no stored thread or the edit failed). Replay report"
+                + " not posted: no replay analysis is stored for this match.");
     assertThat(context.getFailures()).isEmpty();
   }
 
@@ -203,7 +249,23 @@ class MatchCommandTest {
     command.execute("rerun", context);
 
     assertThat(context.getFailures()).isEmpty();
-    assertThat(context.getPosts()).isEmpty();
+    assertThat(context.getPosts()).hasSize(1);
+    assertThat(context.getPosts().get(0)).startsWith("Header not changed");
+  }
+
+  @Test
+  void rerun_withTheStagesOn_neverLeavesTheUserWithoutALine() {
+    Mockito.when(stageService.enabled()).thenReturn(true);
+    Mockito.when(replayReportService.redeliver(MATCH_ID, "instance-1"))
+        .thenThrow(new IllegalStateException("db down"));
+
+    FakeCommandContext context = inThread();
+    command.execute("rerun", context);
+
+    assertThat(context.getPosts())
+        .containsExactly(
+            "Header not changed (plain header, no stored thread or the edit failed). Replay report"
+                + " repost failed.");
   }
 
   @Test
@@ -217,7 +279,10 @@ class MatchCommandTest {
     FakeCommandContext context = inThread();
     command.execute("rerun", context);
 
-    assertThat(context.getPosts()).containsExactly("Replay report posted again.");
+    assertThat(context.getPosts())
+        .containsExactly(
+            "Header not changed (plain header, no stored thread or the edit failed). Replay report"
+                + " posted again.");
   }
 
   @Test
