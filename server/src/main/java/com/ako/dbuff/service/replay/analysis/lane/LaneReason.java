@@ -12,6 +12,9 @@ package com.ako.dbuff.service.replay.analysis.lane;
 public record LaneReason(
     String code, Direction direction, Long subjectSlot, double severity, String evidence) {
 
+  /** The code of the reason that one side had the ultimate level at lane end and the other not. */
+  public static final String NO_ULTIMATE_AT_LANE_END = "NO_ULTIMATE_AT_LANE_END";
+
   public enum Direction {
     HELPED,
     HURT

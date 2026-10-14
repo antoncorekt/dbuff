@@ -13,6 +13,9 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "replay.report")
 public class ReplayReportProperties {
   private static final int MAX_IMPORTANT_FIGHT_LINES = 15;
+  private static final int MIN_LANE_LINE_LENGTH = 60;
+  private static final int MAX_LANE_LINE_LENGTH = 600;
+  private static final double MAX_LANE_MARGIN = 2;
 
   /** The server-wide switch; nothing is posted until it is turned on. */
   private boolean enabled = false;
@@ -38,6 +41,15 @@ public class ReplayReportProperties {
   /** The most lines the important fights section lists. */
   private int maxImportantFightLines = 6;
 
+  /** The margin of a lane from which its winner is said to have won clearly. */
+  private double laneClearMargin = LaneWording.CLEAR_MARGIN;
+
+  /** The margin from which a lane was won by a lot; smaller margins are narrow wins. */
+  private double laneBigMargin = LaneWording.BIG_MARGIN;
+
+  /** The longest a lane's line may be; a longer one ends in an ellipsis. */
+  private int maxLaneLineLength = 400;
+
   /** How far back a finished replay run is looked at for an analysis not yet posted. */
   private int lookbackHours = 48;
 
@@ -46,7 +58,7 @@ public class ReplayReportProperties {
 
   /**
    * Fails at startup on an important fights cap that leaves the section empty or too long for a
-   * message.
+   * message, and on lane settings that cannot cut a line or tell narrow from clear wins.
    */
   @PostConstruct
   public void validate() {
@@ -56,6 +68,26 @@ public class ReplayReportProperties {
               + MAX_IMPORTANT_FIGHT_LINES
               + ", got "
               + maxImportantFightLines);
+    }
+    if (maxLaneLineLength < MIN_LANE_LINE_LENGTH || maxLaneLineLength > MAX_LANE_LINE_LENGTH) {
+      throw new IllegalStateException(
+          "replay.report.max-lane-line-length must be "
+              + MIN_LANE_LINE_LENGTH
+              + " to "
+              + MAX_LANE_LINE_LENGTH
+              + ", got "
+              + maxLaneLineLength);
+    }
+    if (!(laneClearMargin > 0
+        && laneClearMargin < laneBigMargin
+        && laneBigMargin <= MAX_LANE_MARGIN)) {
+      throw new IllegalStateException(
+          "replay.report.lane-clear-margin and lane-big-margin must satisfy 0 < clear < big <= "
+              + MAX_LANE_MARGIN
+              + ", got "
+              + laneClearMargin
+              + " and "
+              + laneBigMargin);
     }
   }
 

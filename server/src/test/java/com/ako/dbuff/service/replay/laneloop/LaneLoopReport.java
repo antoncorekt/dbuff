@@ -10,6 +10,7 @@ import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
+import com.ako.dbuff.service.replay.report.LaneWording;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -30,9 +31,6 @@ final class LaneLoopReport {
   static final String LANES = "Lanes";
   static final String PLAYERS = "Players in the lane";
   static final String WHY = "Why";
-
-  private static final double CLEAR = 0.3;
-  private static final double BIG = 0.6;
 
   private static final String HOW_TO_READ =
       "Each hero's lane is the lane he spent most time in during the first 4 minutes (a hero with"
@@ -123,9 +121,9 @@ final class LaneLoopReport {
     return "even";
   }
 
+  /** The report section reads the same cut-offs from replay.report properties. */
   private static String strength(double margin) {
-    double abs = Math.abs(margin);
-    String how = abs >= BIG ? "by a lot" : abs >= CLEAR ? "clearly" : "narrowly";
+    String how = LaneWording.strength(margin, LaneWording.CLEAR_MARGIN, LaneWording.BIG_MARGIN);
     return "%s (%s)".formatted(how, signed(margin));
   }
 
@@ -154,16 +152,7 @@ final class LaneLoopReport {
         .filter(a -> Objects.equals(a.getPairId(), pairId) && team.equals(a.getTeam()))
         .sorted(Comparator.comparing(LaneAssignmentDomain::getPlayerSlot))
         .map(a -> LoopWording.hero(d.heroNames(), a.getPlayerSlot()))
-        .collect(Collectors.collectingAndThen(Collectors.toList(), LaneLoopReport::joinNames));
-  }
-
-  private static String joinNames(List<String> names) {
-    if (names.size() <= 1) {
-      return String.join("", names);
-    }
-    return String.join(", ", names.subList(0, names.size() - 1))
-        + " and "
-        + names.get(names.size() - 1);
+        .collect(Collectors.collectingAndThen(Collectors.toList(), LaneWording::joinNames));
   }
 
   private static List<String> lanesTable(MatchData d) {
@@ -406,10 +395,7 @@ final class LaneLoopReport {
 
   private static String sentence(MatchData d, LaneReasonDomain r, String result) {
     String evidence = r.getEvidence() == null ? "" : r.getEvidence();
-    String lead =
-        evidence.isEmpty()
-            ? evidence
-            : Character.toUpperCase(evidence.charAt(0)) + evidence.substring(1);
+    String lead = LaneWording.capitalised(evidence);
     return "%s %s lane (%s) was %s: %s"
         .formatted(
             LoopWording.team(r.getTeam()),
