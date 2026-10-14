@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.itemloop;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
+import com.ako.dbuff.service.replay.report.ItemWording;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -10,21 +11,7 @@ import java.util.function.Function;
 final class StickWording implements Wording {
   @Override
   public String result(ItemEfficiency row, Function<String, String> itemNames) {
-    if (row.count() == 0) {
-      return "bought, never used" + Wording.limits(row.flags());
-    }
-    Map<String, Double> f = row.figures();
-    long saves = Math.round(f.getOrDefault("saves", 0.0));
-    long died = Math.round(f.getOrDefault("diedSoon", 0.0));
-    return "%s, restored %s HP and %s mana, %s%s, worth %s its cost%s"
-        .formatted(
-            Wording.plural(row.count(), "use"),
-            LoopWording.gold(f.get("hp")),
-            LoopWording.gold(f.get("mana")),
-            saves == 0 ? "no saves" : saves == 1 ? "1 save" : saves + " saves",
-            died == 0 ? "" : ", died within 10 s after %d of them".formatted(died),
-            ItemLoopReport.ratio(row.ratio()),
-            Wording.limits(row.flags()));
+    return ItemWording.stick(row);
   }
 
   @Override
