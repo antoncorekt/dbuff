@@ -32,6 +32,16 @@ public class FightSection implements ReplayReportSection {
   private final FightAbilityUseRepo abilityRepo;
 
   @Override
+  public String name() {
+    return "fights";
+  }
+
+  @Override
+  public boolean defaultEnabled() {
+    return true;
+  }
+
+  @Override
   public int order() {
     return 40;
   }
