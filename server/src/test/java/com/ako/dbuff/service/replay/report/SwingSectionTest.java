@@ -32,7 +32,13 @@ class SwingSectionTest {
   private final ReportHeroNames heroNames = mock(ReportHeroNames.class);
   private final ReplayReportProperties properties = new ReplayReportProperties();
   private final SwingSection section =
-      new SwingSection(spikeRepo, factorRepo, reader, heroNames, properties);
+      new SwingSection(
+          spikeRepo,
+          factorRepo,
+          reader,
+          heroNames,
+          new ReasonWording(Prettify::ability),
+          properties);
 
   SwingSectionTest() {
     when(reader.read(anyLong(), anyInt(), anyInt()))
@@ -93,6 +99,35 @@ class SwingSectionTest {
         .directionChange(flip)
         .primaryCause(cause)
         .build();
+  }
+
+  @Test
+  void lines_nameACooldownAbilityByItsDisplayName() {
+    heroes();
+    when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spike(0, 1380, 5000, "FIGHT_WIN", false)));
+    explain(
+        0,
+        lost(
+            1,
+            1390,
+            null,
+            ranked(
+                1,
+                "PLAYER",
+                2L,
+                "ABILITY_ON_COOLDOWN",
+                "terrorblade_metamorphosis, sven_gods_strength")));
+    SwingSection real =
+        new SwingSection(
+            spikeRepo,
+            factorRepo,
+            reader,
+            heroNames,
+            new ReasonWording(TestLabels.labels()),
+            properties);
+
+    assertThat(real.lines(input()))
+        .anyMatch(l -> l.endsWith("Terrorblade had Metamorphosis and Gods Strength on cooldown"));
   }
 
   @Test

@@ -30,6 +30,7 @@ public class FightSection implements ReplayReportSection {
   private final FightRepo fightRepo;
   private final FightPlayerRepo fightPlayerRepo;
   private final FightAbilityUseRepo abilityRepo;
+  private final AbilityLabels labels;
 
   @Override
   public String name() {
@@ -123,7 +124,7 @@ public class FightSection implements ReplayReportSection {
   }
 
   /** "Ravage ready, not cast in 3 of 5 fights", for the worst such ability. */
-  private static java.util.Optional<String> unusedAbilityLine(
+  private java.util.Optional<String> unusedAbilityLine(
       String name, long slot, List<FightAbilityUseDomain> uses) {
     Map<String, List<FightAbilityUseDomain>> byAbility =
         uses.stream()
@@ -144,7 +145,7 @@ public class FightSection implements ReplayReportSection {
                 "%s had %s ready and did not cast it in %d of %d fights."
                     .formatted(
                         name,
-                        Prettify.ability(e.getKey()),
+                        labels.label(e.getKey()),
                         e.getValue(),
                         byAbility.get(e.getKey()).size()));
   }

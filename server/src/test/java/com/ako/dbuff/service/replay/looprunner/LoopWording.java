@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.rune.RuneType;
+import com.ako.dbuff.service.replay.report.AbilityLabels;
 import com.ako.dbuff.service.replay.report.Prettify;
 import com.ako.dbuff.service.replay.report.ReasonWording;
 import java.util.Arrays;
@@ -21,6 +22,8 @@ import java.util.stream.IntStream;
  * through here.
  */
 public final class LoopWording {
+  private static volatile AbilityLabels labels = Prettify::ability;
+  private static volatile ReasonWording wording = new ReasonWording(labels);
   private static final String UNKNOWN = "?";
   private static final long THOUSAND = 1000;
   private static final List<String> ROLES =
@@ -153,9 +156,15 @@ public final class LoopWording {
         .collect(Collectors.joining(", "));
   }
 
+  /** Words abilities as production does, from the given constants. */
+  public static void useLabels(AbilityLabels real) {
+    labels = real;
+    wording = new ReasonWording(real);
+  }
+
   /** A reason as a sentence about the hero, for example "Mirana stood too far in front". */
   public static String reason(FightReasonDomain reason, String hero) {
-    return ReasonWording.phrase(reason, hero);
+    return wording.phrase(reason, hero);
   }
 
   /** What a stored code says about the hero, without the hero: "had no teleport". */
@@ -196,6 +205,6 @@ public final class LoopWording {
 
   /** A drafted or used ability by its readable name. */
   public static String ability(String internalName) {
-    return Prettify.ability(internalName);
+    return labels.label(internalName);
   }
 }

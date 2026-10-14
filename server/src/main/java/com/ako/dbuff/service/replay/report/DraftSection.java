@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 public class DraftSection implements ReplayReportSection {
   private final AbilityDraftPickRepo pickRepo;
   private final AbilityDraftProfile profile;
+  private final AbilityLabels labels;
 
   @Override
   public boolean supports(GameModeProfile mode) {
@@ -56,7 +57,7 @@ public class DraftSection implements ReplayReportSection {
               .sorted(Comparator.comparingInt(AbilityDraftPickDomain::getPickOrder))
               .map(
                   p ->
-                      Prettify.ability(p.getAbilityName())
+                      labels.label(p.getAbilityName())
                           + " ("
                           + ordinal(
                               p.getTeamPickIndex() == null

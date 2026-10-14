@@ -21,7 +21,8 @@ class FightSectionTest {
   private final FightRepo fightRepo = mock(FightRepo.class);
   private final FightPlayerRepo partRepo = mock(FightPlayerRepo.class);
   private final FightAbilityUseRepo abilityRepo = mock(FightAbilityUseRepo.class);
-  private final FightSection section = new FightSection(fightRepo, partRepo, abilityRepo);
+  private final FightSection section =
+      new FightSection(fightRepo, partRepo, abilityRepo, Prettify::ability);
 
   private ReplayReportInput input() {
     return new ReplayReportInput(1L, null, Set.of(128L), Map.of(128L, "Anton"), 3);
