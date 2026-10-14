@@ -1,7 +1,7 @@
 package com.ako.dbuff.dao.repo;
 
-import com.ako.dbuff.dao.model.MatchReportThreadDomain;
 import com.ako.dbuff.dao.model.MatchReportStage;
+import com.ako.dbuff.dao.model.MatchReportThreadDomain;
 import java.util.Collection;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
