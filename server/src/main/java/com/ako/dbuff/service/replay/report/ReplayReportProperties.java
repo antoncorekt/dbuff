@@ -17,6 +17,7 @@ public class ReplayReportProperties {
   private static final int MAX_LANE_LINE_LENGTH = 600;
   private static final double MAX_LANE_MARGIN = 2;
   private static final int MAX_BEHAVIOUR_LINES = 10;
+  private static final double MAX_OBJECTIVE_DISTANCE = 20000;
 
   /** The server-wide switch; nothing is posted until it is turned on. */
   private boolean enabled = false;
@@ -57,6 +58,15 @@ public class ReplayReportProperties {
   /** The most lines the smoke section lists. */
   private int maxSmokeLines = 3;
 
+  /** The most lines the objectives section lists for missed objectives. */
+  private int maxObjectiveLines = 3;
+
+  /** A missed objective's closest hero is said to be close to the tower within this many units. */
+  private double objectiveCloseDistance = 1500;
+
+  /** From this many units the closest hero is said to be far from the tower. */
+  private double objectiveFarDistance = 4000;
+
   /** The longest a rotation or smoke line may be; a longer one ends in an ellipsis. */
   private int maxBehaviourLineLength = 400;
 
@@ -75,6 +85,19 @@ public class ReplayReportProperties {
     requireRange("max-important-fight-lines", maxImportantFightLines, 1, MAX_IMPORTANT_FIGHT_LINES);
     requireRange("max-rotation-lines", maxRotationLines, 1, MAX_BEHAVIOUR_LINES);
     requireRange("max-smoke-lines", maxSmokeLines, 1, MAX_BEHAVIOUR_LINES);
+    requireRange("max-objective-lines", maxObjectiveLines, 1, MAX_BEHAVIOUR_LINES);
+    if (!(objectiveCloseDistance > 0
+        && objectiveCloseDistance < objectiveFarDistance
+        && objectiveFarDistance <= MAX_OBJECTIVE_DISTANCE)) {
+      throw new IllegalStateException(
+          "replay.report.objective-close-distance and objective-far-distance must satisfy 0 <"
+              + " close < far <= "
+              + MAX_OBJECTIVE_DISTANCE
+              + ", got "
+              + objectiveCloseDistance
+              + " and "
+              + objectiveFarDistance);
+    }
     requireRange(
         "max-behaviour-line-length",
         maxBehaviourLineLength,

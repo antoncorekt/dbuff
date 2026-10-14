@@ -13,6 +13,20 @@ import java.util.function.Function;
 final class BehaviourLines {
   private BehaviourLines() {}
 
+  /** The rows to list: the {@code cap} best by worth, in time order; nulls never. */
+  static <T> List<T> pick(
+      List<T> rows, Comparator<T> byWorth, Comparator<T> chronological, int cap) {
+    if (rows == null) {
+      return List.of();
+    }
+    return rows.stream()
+        .filter(Objects::nonNull)
+        .sorted(byWorth)
+        .limit(cap)
+        .sorted(chronological)
+        .toList();
+  }
+
   static <T> List<String> render(
       String header,
       List<T> rows,
@@ -21,16 +35,7 @@ final class BehaviourLines {
       int cap,
       int maxLength,
       Function<T, String> line) {
-    if (rows == null) {
-      return List.of();
-    }
-    List<T> listed =
-        rows.stream()
-            .filter(Objects::nonNull)
-            .sorted(byWorth)
-            .limit(cap)
-            .sorted(chronological)
-            .toList();
+    List<T> listed = pick(rows, byWorth, chronological, cap);
     if (listed.isEmpty()) {
       return List.of();
     }
