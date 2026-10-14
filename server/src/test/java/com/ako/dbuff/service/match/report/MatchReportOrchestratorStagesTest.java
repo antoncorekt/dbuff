@@ -183,6 +183,31 @@ class MatchReportOrchestratorStagesTest {
   }
 
   @Test
+  void switchedOn_aPlainHeaderIsEditedAsTextButNoOldReportIsPosted() {
+    fullDataStored();
+    when(stages.enabled()).thenReturn(true);
+    when(stages.headerKind(9L, "i")).thenReturn(HeaderKind.PLAIN);
+
+    orchestrator.processAndReportFull(MatchDomain.builder().id(9L).build(), config, 6L, 5L);
+
+    verify(discord).editMessage(eq("c"), eq(5L), anyString());
+    verify(formatter, never()).formatForDiscord(anyList(), any());
+    verify(discord, never()).sendThreadMessageBlocking(any(), anyString());
+  }
+
+  @Test
+  void switchedOn_aStagedOrUnknownHeaderDoesNothingAtAll() {
+    fullDataStored();
+    when(stages.enabled()).thenReturn(true);
+    when(stages.headerKind(9L, "i")).thenReturn(HeaderKind.UNKNOWN);
+
+    orchestrator.processAndReportFull(MatchDomain.builder().id(9L).build(), config, 6L, 5L);
+
+    verify(discord, never()).editMessage(anyString(), Mockito.anyLong(), anyString());
+    verify(discord, never()).sendThreadMessageBlocking(any(), anyString());
+  }
+
+  @Test
   void analyzeMatch_staysAvailableOnDemandWhateverTheSwitch() {
     when(stages.enabled()).thenReturn(true);
 

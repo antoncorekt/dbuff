@@ -168,17 +168,23 @@ public class MatchReportOrchestrator {
       return;
     }
 
+    boolean staged = stageService.enabled();
+    boolean editHeader =
+        headerMessageId > 0 && mayEditHeaderAsText(match.getId(), config.getId(), staged);
+    if (staged && !editHeader) {
+      return;
+    }
+
     Set<Long> focusPlayerIds = config.getPlayerIds();
     MatchReportContext context = buildContext(match, config, focusPlayerIds);
 
-    // Update header with full match info
-    if (headerMessageId > 0 && mayEditHeaderAsText(match.getId(), config.getId())) {
+    if (editHeader) {
       String winLoss = determineWinLoss(context);
       String fullHeader = headerRenderer.legacyParsed(match, winLoss);
       discordMessageService.editMessage(config.getDiscordChannelId(), headerMessageId, fullHeader);
     }
 
-    if (stageService.enabled()) {
+    if (staged) {
       return;
     }
 
@@ -216,9 +222,9 @@ public class MatchReportOrchestrator {
    * A plain header is edited as text. When the lookup failed the header is left alone, except with
    * stages off, where the old code always edited it.
    */
-  private boolean mayEditHeaderAsText(long matchId, String instanceId) {
+  private boolean mayEditHeaderAsText(long matchId, String instanceId, boolean staged) {
     HeaderKind kind = stageService.headerKind(matchId, instanceId);
-    return kind == HeaderKind.PLAIN || (kind == HeaderKind.UNKNOWN && !stageService.enabled());
+    return kind == HeaderKind.PLAIN || (kind == HeaderKind.UNKNOWN && !staged);
   }
 
   /** The analyzers this channel's settings allow. */
