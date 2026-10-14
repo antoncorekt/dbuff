@@ -85,6 +85,9 @@ public class ReplayReportProperties {
    */
   private int maxOpeningLineLength = 400;
 
+  /** The longest a line of the end game section may be; a longer one ends in an ellipsis. */
+  private int maxEndGameLineLength = 400;
+
   /** The mid lane runes of the opening section are those taken in this many first minutes. */
   private int openingRuneMinutes = 10;
 
@@ -123,6 +126,7 @@ public class ReplayReportProperties {
     requireRange("opening-rune-minutes", openingRuneMinutes, 1, MAX_OPENING_RUNE_MINUTES);
     requireLineLength("max-opening-line-length", maxOpeningLineLength);
     requireLineLength("max-lane-line-length", maxLaneLineLength);
+    requireLineLength("max-end-game-line-length", maxEndGameLineLength);
     if (!(laneClearMargin > 0
         && laneClearMargin < laneBigMargin
         && laneBigMargin <= MAX_LANE_MARGIN)) {
