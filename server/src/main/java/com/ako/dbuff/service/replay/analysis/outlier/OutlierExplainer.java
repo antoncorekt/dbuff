@@ -36,8 +36,8 @@ final class OutlierExplainer {
   /**
    * @param own his net worth at each minute from 0
    * @param mates his teammates' net worth at each minute from 0
-   * @param startMinute first minute of the outlier stretch
-   * @param endMinute last minute of the stretch
+   * @param startMinute first minute of the outlier stretch, inclusive
+   * @param endMinute last minute of the stretch, inclusive
    */
   Explanation explain(
       boolean feeder,
@@ -53,18 +53,23 @@ final class OutlierExplainer {
             own,
             mates,
             !feeder,
-            Math.max(1, properties.getIncomeBreakMinutes()),
+            properties.getIncomeBreakMinutes(),
             properties.getIncomeBreakShare(),
             startMinute,
             endMinute);
     Optional<IncomeSource.Main> main =
-        IncomeSource.main(
-            minutesBySlot.getOrDefault(slot, List.of()),
-            breakMinute.orElse(startMinute),
-            endMinute + 1);
+        breakMinute.isEmpty()
+            ? Optional.empty()
+            : IncomeSource.main(
+                minutesBySlot.getOrDefault(slot, List.of()),
+                Math.max(breakMinute.getAsInt(), startMinute),
+                endMinute + 1);
     List<DeathAnalysisDomain> windowDeaths = windowDeaths(slot, startMinute, endMinute);
     Map<String, Integer> byReason = new HashMap<>();
-    windowDeaths.forEach(d -> byReason.merge(String.valueOf(d.getReason()), 1, Integer::sum));
+    windowDeaths.stream()
+        .filter(d -> OutlierWording.hasDeathWording(d.getReason()))
+        .forEach(d -> byReason.merge(d.getReason(), 1, Integer::sum));
+    // The commonest worded reason; a tie goes to the reason that comes first alphabetically.
     Map.Entry<String, Integer> top =
         byReason.entrySet().stream()
             .max(

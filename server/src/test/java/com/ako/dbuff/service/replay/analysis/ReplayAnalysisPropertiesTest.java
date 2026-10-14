@@ -31,4 +31,21 @@ class ReplayAnalysisPropertiesTest {
       assertThatThrownBy(properties::validate).hasMessageContaining("income-break-share");
     }
   }
+
+  @Test
+  void rejectsSiblingOutlierSettingsOutOfRange() {
+    properties.setOutlierSharePercent(0);
+    assertThatThrownBy(properties::validate).hasMessageContaining("outlier-share-percent");
+    properties.setOutlierSharePercent(101);
+    assertThatThrownBy(properties::validate).hasMessageContaining("outlier-share-percent");
+    properties.setOutlierSharePercent(35);
+    properties.setOutlierMinutes(0);
+    assertThatThrownBy(properties::validate).hasMessageContaining("outlier-minutes");
+    properties.setOutlierMinutes(3);
+    properties.setFeederSharePercent(-1);
+    assertThatThrownBy(properties::validate).hasMessageContaining("feeder-share-percent");
+    properties.setFeederSharePercent(10);
+    properties.setFeederMinutes(-5);
+    assertThatThrownBy(properties::validate).hasMessageContaining("feeder-minutes");
+  }
 }

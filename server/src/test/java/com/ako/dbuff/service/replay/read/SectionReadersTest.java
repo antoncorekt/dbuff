@@ -122,7 +122,7 @@ class SectionReadersTest {
   }
 
   @Test
-  void outliers_listRowsBySlotAndStartWithNullsKept() {
+  void outliers_listRowsInTimeOrderWithNullsKept() {
     outlierRepo.save(
         PlayerOutlierDomain.builder()
             .matchId(MATCH)
@@ -154,8 +154,8 @@ class SectionReadersTest {
             o -> o.mainIncomeSource(),
             o -> o.explanation())
         .containsExactly(
-            tuple(1L, "NW_OUTLIER", null, null, null),
-            tuple(129L, "FEEDER", 480, "LANE_CREEPS", "he died 9 times in that stretch"));
+            tuple(129L, "FEEDER", 480, "LANE_CREEPS", "he died 9 times in that stretch"),
+            tuple(1L, "NW_OUTLIER", null, null, null));
   }
 
   @Test

@@ -71,4 +71,24 @@ class IncomeBreakTest {
     assertThat(IncomeBreak.find(own, List.of(series(0, 100, 100, 100)), true, 3, 0.25, 0, 2))
         .hasValue(0);
   }
+
+  @Test
+  void ofSeveralStretchesTouchingTheWindowTheLatestStartingWins() {
+    double[] own = series(0, 300, 300, 300, 100, 100, 300, 300, 300);
+    double[] steady = series(0, 100, 100, 100, 100, 100, 100, 100, 100);
+
+    assertThat(IncomeBreak.find(own, List.of(steady), true, 3, 0.25, 0, 8)).hasValue(5);
+    assertThat(IncomeBreak.find(own, List.of(steady), true, 3, 0.25, 0, 4)).hasValue(0);
+  }
+
+  @Test
+  void theWindowBoundsAreInclusiveMinuteIndexes() {
+    double[] early = series(0, 300, 300, 300, 100, 100, 100, 100);
+    double[] late = series(0, 100, 100, 100, 100, 300, 300, 300);
+
+    assertThat(IncomeBreak.find(early, List.of(STEADY), true, 3, 0.25, 2, 7)).hasValue(0);
+    assertThat(IncomeBreak.find(early, List.of(STEADY), true, 3, 0.25, 3, 7)).isEmpty();
+    assertThat(IncomeBreak.find(late, List.of(STEADY), true, 3, 0.25, 0, 4)).hasValue(4);
+    assertThat(IncomeBreak.find(late, List.of(STEADY), true, 3, 0.25, 0, 3)).isEmpty();
+  }
 }

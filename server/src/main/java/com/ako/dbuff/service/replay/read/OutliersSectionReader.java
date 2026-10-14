@@ -1,7 +1,7 @@
 package com.ako.dbuff.service.replay.read;
 
-import com.ako.dbuff.dao.model.PlayerOutlierDomain;
 import com.ako.dbuff.dao.repo.PlayerOutlierRepo;
+import com.ako.dbuff.service.replay.analysis.outlier.OutlierRowOrder;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.annotation.Order;
@@ -38,11 +38,7 @@ class OutliersSectionReader implements AnalysisSectionReader {
   @Override
   public List<Outlier> read(long matchId, RunStatus run) {
     return outlierRepo.findByMatchId(matchId).stream()
-        .sorted(
-            RowOrder.nullsLast(PlayerOutlierDomain::getPlayerSlot)
-                .thenComparing(RowOrder.nullsLast(PlayerOutlierDomain::getStartSeconds))
-                .thenComparing(RowOrder.nullsLast(PlayerOutlierDomain::getKind))
-                .thenComparing(RowOrder.nullsLast(PlayerOutlierDomain::getId)))
+        .sorted(OutlierRowOrder.CHRONOLOGICAL)
         .map(
             o ->
                 new Outlier(

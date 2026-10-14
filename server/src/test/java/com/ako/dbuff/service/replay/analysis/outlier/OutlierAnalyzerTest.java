@@ -172,8 +172,8 @@ class OutlierAnalyzerTest {
     assertThat(row.getAnalysisVersion()).isEqualTo(2);
     assertThat(row.getExplanation())
         .isEqualTo(
-            "his income rose from minute 3 and came mostly from jungle creeps; he joined 0 of 4"
-                + " fights, fewer than the team median of 4");
+            "his income rose from minute 3; his gold came mostly from jungle creeps; he joined 0 of"
+                + " 4 fights, fewer than the team median of 4");
   }
 
   @Test
@@ -194,7 +194,82 @@ class OutlierAnalyzerTest {
   }
 
   @Test
-  void requires_namesWhatItReads() {
-    assertThat(analyzer.requires()).containsExactlyInAnyOrder("fights", "deaths", "minutes");
+  void requires_isUnchanged_soTheOpenDotaOutliersSurviveAFailedMinuteExtractorOrDeathAnalyzer() {
+    assertThat(analyzer.requires()).isEmpty();
+  }
+
+  @Test
+  void analyze_writesTheOutliersWithoutMinuteRowsAndDeathRows() {
+    stored();
+    deathRepo.deleteAll();
+    deathRepo.flush();
+
+    analyzer.analyze(MATCH);
+
+    List<PlayerOutlierDomain> rows = outlierRepo.findByMatchId(MATCH);
+    assertThat(rows).extracting("kind").containsExactly("NW_OUTLIER");
+    assertThat(rows.getFirst().getMainIncomeSource()).isNull();
+    assertThat(rows.getFirst().getExplanation())
+        .isEqualTo("he joined 0 of 4 fights, fewer than the team median of 4");
+  }
+
+  @Test
+  void analyze_namesTheCommonestReasonWithWording_aTieGoesToTheFirstAlphabetically() {
+    stored();
+    deathRepo.deleteAll();
+    deathRepo.flush();
+    String[] reasons = {
+      "CAUGHT_OUT", "BURST", "CAUGHT_OUT", "BURST", "OTHER", "OTHER", "OTHER", null
+    };
+    for (int i = 0; i < reasons.length; i++) {
+      deathRepo.save(
+          DeathAnalysisDomain.builder()
+              .matchId(MATCH)
+              .playerSlot(4L)
+              .deathIndex(i)
+              .deathSeconds(130.0 + i)
+              .reason(reasons[i])
+              .build());
+    }
+    deathRepo.flush();
+
+    analyzer.analyze(MATCH);
+
+    PlayerOutlierDomain feeder =
+        outlierRepo.findByMatchId(MATCH).stream()
+            .filter(r -> r.getKind().equals("FEEDER"))
+            .findFirst()
+            .orElseThrow();
+    assertThat(feeder.getExplanation())
+        .startsWith("he died 8 times in that stretch, 2 of them burst down; he joined");
+  }
+
+  @Test
+  void analyze_findsNoBreakAndNoSourceWhenTheIncomeNeverBrokeAway() {
+    stored();
+    minuteRepo.save(
+        ReplayPlayerMinuteDomain.builder()
+            .matchId(MATCH)
+            .playerSlot(0L)
+            .gameMinute(2)
+            .creepKillGold(0L)
+            .build());
+    minuteRepo.save(
+        ReplayPlayerMinuteDomain.builder()
+            .matchId(MATCH)
+            .playerSlot(0L)
+            .gameMinute(9)
+            .creepKillGold(5000L)
+            .build());
+
+    analyzer.analyze(MATCH);
+
+    PlayerOutlierDomain big =
+        outlierRepo.findByMatchId(MATCH).stream()
+            .filter(r -> r.getKind().equals("NW_OUTLIER"))
+            .findFirst()
+            .orElseThrow();
+    assertThat(big.getIncomeBreakSeconds()).isNull();
+    assertThat(big.getMainIncomeSource()).isNull();
   }
 }

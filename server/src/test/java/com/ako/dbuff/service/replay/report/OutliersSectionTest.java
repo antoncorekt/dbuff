@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class OutliersSectionTest {
@@ -49,11 +51,16 @@ class OutliersSectionTest {
   }
 
   private void rotation(long slot, int start, String verdict) {
+    rotation(slot, start, null, verdict);
+  }
+
+  private void rotation(long slot, int start, Integer end, String verdict) {
     rotations.add(
         TeamRotationDomain.builder()
             .id(nextId++)
             .playerSlot(slot)
             .startSeconds(start)
+            .endSeconds(end)
             .verdict(verdict)
             .build());
   }
@@ -103,6 +110,27 @@ class OutliersSectionTest {
             "**Net worth outliers**",
             "Mirana held only 7% of the net worth of Dire from 10:00 (he died 9 times in that"
                 + " stretch; 2 of his 3 rotations were wasted or ended in a death)");
+  }
+
+  @Test
+  void aRotationOverlappingTheWindowCountsAndOneEndingBeforeItDoesNot() {
+    outlier(129, "FEEDER", 600, 900, 7.0).setExplanation("he died 9 times in that stretch");
+    rotation(129, 500, 650, "WASTED");
+    rotation(129, 300, 599, "WASTED");
+    rotation(129, 960, 1000, "DIED");
+    rotation(129, 961, 1000, "DIED");
+
+    assertThat(section.lines(input()).get(1))
+        .endsWith("2 of his 2 rotations were wasted or ended in a death)");
+  }
+
+  @Test
+  void rotationsAreLoadedOnlyForAFeederLine() {
+    outlier(0, "NW_OUTLIER", 1440, 1800, 41);
+
+    section.lines(input());
+
+    verify(rotationRepo, never()).findByMatchId(1L);
   }
 
   @Test

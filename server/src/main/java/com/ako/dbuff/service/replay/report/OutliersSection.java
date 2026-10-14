@@ -6,6 +6,7 @@ import com.ako.dbuff.dao.model.TeamRotationDomain;
 import com.ako.dbuff.dao.repo.PlayerOutlierRepo;
 import com.ako.dbuff.dao.repo.TeamRotationRepo;
 import com.ako.dbuff.service.replay.analysis.behaviour.RotationVerdict;
+import com.ako.dbuff.service.replay.analysis.outlier.OutlierRowOrder;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import java.util.Comparator;
 import java.util.List;
@@ -27,14 +28,27 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class OutliersSection implements ReplayReportSection {
   private static final Comparator<PlayerOutlierDomain> CHRONOLOGICAL =
-      Comparator.comparing(
-              PlayerOutlierDomain::getStartSeconds, Comparator.nullsLast(Comparator.naturalOrder()))
-          .thenComparing(
-              PlayerOutlierDomain::getPlayerSlot, Comparator.nullsLast(Comparator.naturalOrder()))
-          .thenComparing(
-              PlayerOutlierDomain::getKind, Comparator.nullsLast(Comparator.naturalOrder()))
-          .thenComparing(
-              PlayerOutlierDomain::getId, Comparator.nullsLast(Comparator.naturalOrder()));
+      OutlierRowOrder.CHRONOLOGICAL;
+
+  /** An outlier stretch lasts to the end of its last minute. */
+  private static final int LAST_MINUTE_SECONDS = 60;
+
+  /** Reads the rotations the first time a line needs them. */
+  private final class LazyRotations {
+    private final long matchId;
+    private List<TeamRotationDomain> loaded;
+
+    private LazyRotations(long matchId) {
+      this.matchId = matchId;
+    }
+
+    private List<TeamRotationDomain> get() {
+      if (loaded == null) {
+        loaded = rotationRepo.findByMatchId(matchId);
+      }
+      return loaded;
+    }
+  }
 
   private final PlayerOutlierRepo outlierRepo;
   private final TeamRotationRepo rotationRepo;
@@ -64,7 +78,7 @@ public class OutliersSection implements ReplayReportSection {
     }
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
-    List<TeamRotationDomain> rotations = rotationRepo.findByMatchId(input.matchId());
+    LazyRotations rotations = new LazyRotations(input.matchId());
     Comparator<PlayerOutlierDomain> byWorth =
         Comparator.comparingInt(
                 (PlayerOutlierDomain o) -> TeamSide.ofSlot(o.getPlayerSlot()) == yours ? 0 : 1)
@@ -91,11 +105,8 @@ public class OutliersSection implements ReplayReportSection {
         && o.getKind() != null;
   }
 
-  private static String line(
-      PlayerOutlierDomain o,
-      Map<Long, String> heroes,
-      TeamSide yours,
-      List<TeamRotationDomain> rotations) {
+  private String line(
+      PlayerOutlierDomain o, Map<Long, String> heroes, TeamSide yours, LazyRotations rotations) {
     String team = Prettify.teamOf(TeamSide.ofSlot(o.getPlayerSlot()).name(), yours);
     String hero = BehaviourWording.hero(heroes, o.getPlayerSlot());
     boolean feeder = "FEEDER".equals(o.getKind());
@@ -109,7 +120,7 @@ public class OutliersSection implements ReplayReportSection {
             team,
             GameTime.clock(o.getStartSeconds()));
     String why = o.getExplanation();
-    String wasted = feeder ? wastedRotations(o, rotations) : null;
+    String wasted = feeder ? wastedRotations(o, rotations.get()) : null;
     if (why == null && wasted == null) {
       return share;
     }
@@ -117,7 +128,7 @@ public class OutliersSection implements ReplayReportSection {
     return share + " (" + inside + ")";
   }
 
-  private static String wastedRotations(PlayerOutlierDomain o, List<TeamRotationDomain> rotations) {
+  private String wastedRotations(PlayerOutlierDomain o, List<TeamRotationDomain> rotations) {
     if (rotations == null) {
       return null;
     }
@@ -127,8 +138,9 @@ public class OutliersSection implements ReplayReportSection {
             .filter(r -> r.getStartSeconds() != null)
             .filter(
                 r ->
-                    r.getStartSeconds() >= o.getStartSeconds()
-                        && r.getStartSeconds() <= o.getEndSeconds() + 60)
+                    r.getStartSeconds() <= o.getEndSeconds() + LAST_MINUTE_SECONDS
+                        && (r.getEndSeconds() == null ? r.getStartSeconds() : r.getEndSeconds())
+                            >= o.getStartSeconds())
             .toList();
     long bad =
         his.stream()

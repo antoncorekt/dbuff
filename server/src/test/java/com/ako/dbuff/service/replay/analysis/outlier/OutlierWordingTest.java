@@ -15,18 +15,33 @@ class OutlierWordingTest {
 
     assertThat(text)
         .isEqualTo(
-            "his income rose from minute 12 and came mostly from lane creeps; he joined 4 of 12"
-                + " fights, fewer than the team median of 8");
+            "his income rose from minute 12; his gold came mostly from lane creeps; he joined 4 of"
+                + " 12 fights, fewer than the team median of 8");
   }
 
   @Test
-  void aSmallShareOfTheGainIsMainlyAndAHalfMedianKeepsItsDecimal() {
+  void aSmallShareOfTheGainIsMainlyAndAHalfMedianKeepsItsDecimal_andASourceNeedsABreak() {
     var main = new IncomeSource.Main(IncomeSource.BUILDINGS, 0.4);
 
     assertThat(OutlierWording.sentence(new Facts(false, null, main, 8, 11, 7.5, 0, null, 0)))
+        .isEqualTo("he joined 8 of 11 fights, more than the team median of 7.5");
+    assertThat(OutlierWording.sentence(new Facts(false, 6, main, 8, 11, 7.5, 0, null, 0)))
         .isEqualTo(
-            "his income came mainly from buildings; he joined 8 of 11 fights, more than the team"
-                + " median of 7.5");
+            "his income rose from minute 6; his gold came mainly from buildings; he joined 8 of 11"
+                + " fights, more than the team median of 7.5");
+  }
+
+  @Test
+  void aFeedersBreakAndSourceAreTwoSeparateStatements() {
+    assertThat(OutlierWording.sentence(new Facts(true, 8, LANE, 5, 0, 5, 0, null, 0)))
+        .isEqualTo("his income fell behind from minute 8; his gold came mostly from lane creeps");
+  }
+
+  @Test
+  void onlyReasonsWithWordingCanBeNamed() {
+    assertThat(OutlierWording.hasDeathWording("CAUGHT_OUT")).isTrue();
+    assertThat(OutlierWording.hasDeathWording("OTHER")).isFalse();
+    assertThat(OutlierWording.hasDeathWording(null)).isFalse();
   }
 
   @Test

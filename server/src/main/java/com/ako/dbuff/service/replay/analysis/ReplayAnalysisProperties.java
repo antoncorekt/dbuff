@@ -16,6 +16,8 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "replay.analysis")
 public class ReplayAnalysisProperties {
   private static final int MAX_INCOME_BREAK_MINUTES = 30;
+  private static final int MAX_PERCENT = 100;
+  private static final int MAX_STRETCH_MINUTES = 240;
   private static final double MAX_INCOME_BREAK_SHARE = 5;
 
   /** A creep last hit up to this long before a sample, or during it, counts the hero as farming. */
@@ -124,19 +126,24 @@ public class ReplayAnalysisProperties {
   /** Fails at startup on an income break setting that could not tell a break from noise. */
   @PostConstruct
   void validate() {
-    if (incomeBreakMinutes < 1 || incomeBreakMinutes > MAX_INCOME_BREAK_MINUTES) {
-      throw new IllegalStateException(
-          "replay.analysis.income-break-minutes must be 1 to "
-              + MAX_INCOME_BREAK_MINUTES
-              + ", got "
-              + incomeBreakMinutes);
-    }
+    requireRange("outlier-share-percent", outlierSharePercent, 1, MAX_PERCENT);
+    requireRange("outlier-minutes", outlierMinutes, 1, MAX_STRETCH_MINUTES);
+    requireRange("feeder-share-percent", feederSharePercent, 1, MAX_PERCENT);
+    requireRange("feeder-minutes", feederMinutes, 1, MAX_STRETCH_MINUTES);
+    requireRange("income-break-minutes", incomeBreakMinutes, 1, MAX_INCOME_BREAK_MINUTES);
     if (!(incomeBreakShare > 0 && incomeBreakShare <= MAX_INCOME_BREAK_SHARE)) {
       throw new IllegalStateException(
           "replay.analysis.income-break-share must be above 0 and at most "
               + MAX_INCOME_BREAK_SHARE
               + ", got "
               + incomeBreakShare);
+    }
+  }
+
+  private static void requireRange(String name, int value, int min, int max) {
+    if (value < min || value > max) {
+      throw new IllegalStateException(
+          "replay.analysis." + name + " must be " + min + " to " + max + ", got " + value);
     }
   }
 

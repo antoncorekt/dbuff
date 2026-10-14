@@ -30,6 +30,11 @@ public final class OutlierWording {
 
   private OutlierWording() {}
 
+  /** Whether a death reason has wording; the others count as deaths but are never named. */
+  public static boolean hasDeathWording(String reason) {
+    return reason != null && DEATH_REASONS.containsKey(reason);
+  }
+
   /**
    * @param feeder whether the outlier is a feeder, else a net worth outlier
    * @param breakMinute the minute his income broke from the team's; null if not found
@@ -57,9 +62,11 @@ public final class OutlierWording {
     if (f.feeder() && f.windowDeaths() > 0) {
       parts.add(deaths(f));
     }
-    String income = income(f);
-    if (income != null) {
-      parts.add(income);
+    if (f.breakMinute() != null) {
+      parts.add(incomeBreak(f));
+      if (f.main() != null) {
+        parts.add(source(f));
+      }
     }
     if (f.totalFights() > 0) {
       parts.add(fights(f));
@@ -84,23 +91,18 @@ public final class OutlierWording {
     return text + ", " + count + " of them " + reason;
   }
 
-  private static String income(Facts f) {
-    String verb = f.feeder() ? "fell behind" : "rose";
-    String source =
-        f.main() == null
-            ? null
-            : "came "
-                + (f.main().share() >= MOSTLY_SHARE ? "mostly" : "mainly")
-                + " from "
-                + f.main().source().phrase();
-    if (f.breakMinute() != null) {
-      return "his income "
-          + verb
-          + " from minute "
-          + f.breakMinute()
-          + (source == null ? "" : " and " + source);
-    }
-    return source == null ? null : "his income " + source;
+  private static String incomeBreak(Facts f) {
+    return "his income "
+        + (f.feeder() ? "fell behind" : "rose")
+        + " from minute "
+        + f.breakMinute();
+  }
+
+  private static String source(Facts f) {
+    return "his gold came "
+        + (f.main().share() >= MOSTLY_SHARE ? "mostly" : "mainly")
+        + " from "
+        + f.main().source().phrase();
   }
 
   private static String fights(Facts f) {
