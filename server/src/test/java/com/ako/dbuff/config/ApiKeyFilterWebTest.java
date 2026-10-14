@@ -1,5 +1,8 @@
 package com.ako.dbuff.config;
 
+import com.ako.dbuff.dao.model.ReplayParseRunDomain;
+import com.ako.dbuff.dao.model.ReplayStatus;
+import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.service.constant.ConstantPrecacheStarter;
 import java.io.IOException;
 import java.net.URI;
@@ -8,6 +11,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import net.dv8tion.jda.api.JDA;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -27,6 +31,10 @@ class ApiKeyFilterWebTest {
 
   @MockBean private JDA jda;
   @MockBean private ConstantPrecacheStarter constantPrecacheStarter;
+
+  @Autowired private ReplayParseRunRepo runRepo;
+
+  private static final long MATCH = 9_000_000_001L;
 
   @LocalServerPort private int port;
 
@@ -70,6 +78,23 @@ class ApiKeyFilterWebTest {
   @Test
   void theApiAnswersACallerWithTheKey() throws Exception {
     assertThat(status("/api/v1/register", "test-key")).isNotEqualTo(401);
+  }
+
+  @Test
+  void theAnalysisEndpointNeedsTheKey() throws Exception {
+    runRepo.save(
+        ReplayParseRunDomain.builder()
+            .matchId(MATCH)
+            .parserVersion(1)
+            .status(ReplayStatus.DONE)
+            .attempts(1)
+            .build());
+    try {
+      assertThat(status("/api/v1/replay/" + MATCH + "/analysis", null)).isEqualTo(401);
+      assertThat(status("/api/v1/replay/" + MATCH + "/analysis", "test-key")).isEqualTo(200);
+    } finally {
+      runRepo.deleteAll();
+    }
   }
 
   @Test

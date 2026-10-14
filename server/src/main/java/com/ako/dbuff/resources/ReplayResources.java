@@ -7,7 +7,11 @@ import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisService;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.StoredMatchModes;
-import java.util.LinkedHashMap;
+import com.ako.dbuff.service.replay.read.AnalysisAssembler;
+import com.ako.dbuff.service.replay.read.InvalidSectionsException;
+import com.ako.dbuff.service.replay.read.MatchNotStoredException;
+import com.ako.dbuff.service.replay.read.RunStatus;
+import com.ako.dbuff.service.replay.read.RunStatusReader;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -15,11 +19,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -47,24 +53,37 @@ public class ReplayResources {
   private final ReplayAnalysisService analysis;
   private final StoredMatchModes matchModes;
   private final ReplayProcessingProperties properties;
+  private final RunStatusReader runStatus;
+  private final AnalysisAssembler assembler;
 
   /** How the replay run of a match ended. */
   @GetMapping("/{matchId}")
-  public ResponseEntity<Map<String, Object>> run(@PathVariable long matchId) {
-    return runRepo
-        .findByMatchIdAndParserVersion(matchId, properties.getParserVersion())
-        .map(
-            run -> {
-              Map<String, Object> body = new LinkedHashMap<>();
-              body.put("matchId", run.getMatchId());
-              body.put("status", run.getStatus());
-              body.put("attempts", run.getAttempts());
-              body.put("error", run.getError());
-              body.put("mapVersion", run.getMapVersion());
-              return ResponseEntity.ok(body);
-            })
+  public ResponseEntity<RunStatus> run(@PathVariable long matchId) {
+    return runStatus
+        .read(matchId)
+        .map(ResponseEntity::ok)
         .orElse(ResponseEntity.notFound().build());
   }
+
+  /**
+   * The stored analysis of a match as one JSON document, read from the tables only. {@code
+   * sections} is a comma separated list of section names, all when absent.
+   */
+  @GetMapping("/{matchId}/analysis")
+  public Map<String, Object> analysis(
+      @PathVariable long matchId, @RequestParam(required = false) String sections) {
+    return assembler.assemble(matchId, sections);
+  }
+
+  @ExceptionHandler(InvalidSectionsException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public Map<String, String> invalidSections(InvalidSectionsException e) {
+    return Map.of("error", e.getMessage());
+  }
+
+  @ExceptionHandler(MatchNotStoredException.class)
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public void notStored() {}
 
   /** Runs every analyzer again for one match from what is stored. */
   @PostMapping("/{matchId}/reanalyze")

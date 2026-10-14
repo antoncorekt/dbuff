@@ -7,6 +7,10 @@ import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisService;
 import com.ako.dbuff.service.replay.mode.StoredMatchModes;
 import com.ako.dbuff.service.replay.mode.TestModes;
+import com.ako.dbuff.service.replay.read.AnalysisAssembler;
+import com.ako.dbuff.service.replay.read.AnalysisSectionReader;
+import com.ako.dbuff.service.replay.read.RunStatus;
+import com.ako.dbuff.service.replay.read.RunStatusReader;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,14 +36,36 @@ class ReplayResourcesTest {
   private final ReplayParseRunRepo runRepo = mock(ReplayParseRunRepo.class);
   private final ReplayAnalysisService analysis = mock(ReplayAnalysisService.class);
   private final StoredMatchModes matchModes = mock(StoredMatchModes.class);
+  private final ReplayProcessingProperties properties = new ReplayProcessingProperties();
+  private final RunStatusReader statusReader = new RunStatusReader(runRepo, properties);
   private MockMvc mvc;
+
+  private static AnalysisSectionReader section(String name, Object value) {
+    return new AnalysisSectionReader() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public Object read(long matchId, RunStatus run) {
+        return value;
+      }
+    };
+  }
 
   @BeforeEach
   void setUp() {
     mvc =
         MockMvcBuilders.standaloneSetup(
                 new ReplayResources(
-                    runRepo, analysis, matchModes, new ReplayProcessingProperties()))
+                    runRepo,
+                    analysis,
+                    matchModes,
+                    properties,
+                    statusReader,
+                    new AnalysisAssembler(
+                        List.of(section("run", 1), section("roles", 2)), statusReader)))
             .build();
   }
 
@@ -55,8 +81,41 @@ class ReplayResourcesTest {
 
     mvc.perform(get("/api/v1/replay/5"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("PARTIAL"));
+        .andExpect(jsonPath("$.matchId").value(5))
+        .andExpect(jsonPath("$.status").value("PARTIAL"))
+        .andExpect(jsonPath("$.attempts").value(1))
+        .andExpect(jsonPath("$", org.hamcrest.Matchers.hasKey("error")))
+        .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$", org.hamcrest.Matchers.hasKey("mapVersion")))
+        .andExpect(jsonPath("$.*", org.hamcrest.Matchers.hasSize(5)));
     mvc.perform(get("/api/v1/replay/6")).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void analysis_answersEverySectionBySelectionOr400ForAnUnknownOne_404ForAnUnstoredMatch()
+      throws Exception {
+    when(runRepo.findByMatchIdAndParserVersion(5L, 1))
+        .thenReturn(Optional.of(run(5L, ReplayStatus.DONE)));
+    when(runRepo.findByMatchIdAndParserVersion(6L, 1)).thenReturn(Optional.empty());
+
+    mvc.perform(get("/api/v1/replay/5/analysis"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.run").value(1))
+        .andExpect(jsonPath("$.roles").value(2));
+    mvc.perform(get("/api/v1/replay/5/analysis").param("sections", "roles"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.roles").value(2))
+        .andExpect(jsonPath("$.run").doesNotExist());
+    mvc.perform(get("/api/v1/replay/5/analysis").param("sections", "roles,nope"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("nope")))
+        .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("run, roles")));
+    mvc.perform(get("/api/v1/replay/5/analysis").param("sections", "run,,roles"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("empty entry")));
+    mvc.perform(get("/api/v1/replay/5/analysis").param("sections", ","))
+        .andExpect(status().isBadRequest());
+    mvc.perform(get("/api/v1/replay/6/analysis")).andExpect(status().isNotFound());
   }
 
   @Test
