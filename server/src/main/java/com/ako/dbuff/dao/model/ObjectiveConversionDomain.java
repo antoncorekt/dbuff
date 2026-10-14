@@ -75,5 +75,10 @@ public class ObjectiveConversionDomain {
   /** EXPECTED, GAMBLE or EVEN for a Roshan kill; null otherwise or when the state is unknown. */
   private String roshanCall;
 
+  /**
+   * The window after the fight this row was judged with; null on rows stored before it was kept.
+   */
+  private Integer windowSeconds;
+
   private Integer analysisVersion;
 }

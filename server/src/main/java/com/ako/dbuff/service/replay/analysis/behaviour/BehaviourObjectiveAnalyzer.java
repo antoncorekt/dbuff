@@ -56,7 +56,7 @@ public class BehaviourObjectiveAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 1;
+    return 2;
   }
 
   @Override
@@ -150,6 +150,7 @@ public class BehaviourObjectiveAnalyzer implements ReplayAnalyzer {
                     .map(String::valueOf)
                     .collect(Collectors.joining(",")))
         .roshanCall(roshan == null ? null : name(roshan.call()))
+        .windowSeconds(properties.getObjectiveWindowSeconds())
         .analysisVersion(version())
         .build();
   }

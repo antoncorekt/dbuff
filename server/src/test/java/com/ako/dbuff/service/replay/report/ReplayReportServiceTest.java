@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.InstanceSettings;
 import com.ako.dbuff.dao.model.LaneResultDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.MatchReportThreadDomain;
+import com.ako.dbuff.dao.model.ObjectiveConversionDomain;
 import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
@@ -14,11 +15,14 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.model.SmokeUseDomain;
 import com.ako.dbuff.dao.model.TeamRotationDomain;
 import com.ako.dbuff.dao.repo.DbufInstanceConfigRepository;
+import com.ako.dbuff.dao.repo.FightImportanceRepo;
+import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.LaneAssignmentRepo;
 import com.ako.dbuff.dao.repo.LaneReasonRepo;
 import com.ako.dbuff.dao.repo.LaneResultRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.MatchReportThreadRepo;
+import com.ako.dbuff.dao.repo.ObjectiveConversionRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayReportPostedRepo;
@@ -367,6 +371,36 @@ class ReplayReportServiceTest {
     enable("smoke", true);
     service.deliver(1L);
     assertThat(posted()).contains("Smoke of Deceit").contains("paid off");
+  }
+
+  @Test
+  void deliver_theObjectivesSectionPostsNothingUntilItsPropertyIsTrueAndIsIndependentOfSmoke() {
+    ObjectiveConversionRepo objectives = Mockito.mock(ObjectiveConversionRepo.class);
+    when(objectives.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                ObjectiveConversionDomain.builder()
+                    .id(1L)
+                    .fightIndex(0)
+                    .winnerTeam("RADIANT")
+                    .result("MISSED")
+                    .build()));
+    ObjectivesSection section =
+        new ObjectivesSection(
+            objectives,
+            Mockito.mock(FightRepo.class),
+            Mockito.mock(FightImportanceRepo.class),
+            Mockito.mock(ReportHeroNames.class),
+            properties);
+    service = serviceWith(named("alpha", true), section);
+    enable("smoke", true);
+    service.deliver(1L);
+    assertThat(posted()).doesNotContain("Won fights turned into objectives");
+
+    Mockito.clearInvocations(discord, postedRepo);
+    enable("objectives", true);
+    service.deliver(1L);
+    assertThat(posted()).contains("Won fights turned into objectives: 0 of 1");
   }
 
   @Test

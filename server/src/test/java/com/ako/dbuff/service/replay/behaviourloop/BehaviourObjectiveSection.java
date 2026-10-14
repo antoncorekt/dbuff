@@ -5,11 +5,12 @@ import com.ako.dbuff.dao.model.ObjectiveConversionDomain;
 import com.ako.dbuff.service.replay.analysis.behaviour.BehaviourProperties;
 import com.ako.dbuff.service.replay.analysis.behaviour.ObjectiveKind;
 import com.ako.dbuff.service.replay.analysis.behaviour.ObjectiveResult;
-import com.ako.dbuff.service.replay.analysis.behaviour.RoshanCall;
 import com.ako.dbuff.service.replay.analysis.building.BuildingName;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
+import com.ako.dbuff.service.replay.report.BehaviourWording;
+import com.ako.dbuff.service.replay.report.ObjectiveWording;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -70,10 +71,7 @@ final class BehaviourObjectiveSection {
   }
 
   static List<String> table(
-      List<ObjectiveConversionDomain> rows,
-      List<FightDomain> fights,
-      Map<Long, String> heroNames,
-      BehaviourProperties properties) {
+      List<ObjectiveConversionDomain> rows, List<FightDomain> fights, Map<Long, String> heroNames) {
     Map<Integer, FightDomain> byIndex =
         fights.stream()
             .filter(f -> f.getFightIndex() != null)
@@ -96,7 +94,7 @@ final class BehaviourObjectiveSection {
                             fightCell(byIndex.get(r.getFightIndex())),
                             LoopWording.team(r.getWinnerTeam()),
                             LoopWording.words(r.getResult()),
-                            ReviewLoopReport.tableCell(happened(r, heroNames, properties)))));
+                            ReviewLoopReport.tableCell(happened(r, heroNames)))));
     return out;
   }
 
@@ -116,19 +114,19 @@ final class BehaviourObjectiveSection {
             LoopWording.clock(fight.getStartSeconds()), LoopWording.clock(fight.getEndSeconds()));
   }
 
-  private static String happened(
-      ObjectiveConversionDomain r, Map<Long, String> heroNames, BehaviourProperties properties) {
+  private static String happened(ObjectiveConversionDomain r, Map<Long, String> heroNames) {
     String winner = LoopWording.team(r.getWinnerTeam());
     ObjectiveKind kind = Enums.find(ObjectiveKind.class, r.getObjectiveKind());
     if (kind == null) {
-      return missed(r, heroNames, properties);
+      return missed(r, heroNames);
     }
     String when =
         r.getSecondsAfter() == null || r.getSecondsAfter() == 0
             ? "during the fight"
             : "%d s after it ended".formatted(r.getSecondsAfter());
     if (kind == ObjectiveKind.ROSHAN) {
-      return "%s killed Roshan %s; %s".formatted(winner, when, roshan(r, heroNames));
+      return "%s killed Roshan %s; %s"
+          .formatted(winner, when, ObjectiveWording.roshanNote(r, heroNames));
     }
     return "%s took %s %s".formatted(winner, building(r, kind), when);
   }
@@ -152,32 +150,13 @@ final class BehaviourObjectiveSection {
     return name.kind().endsWith("MELEE") ? "melee barracks" : "ranged barracks";
   }
 
-  private static String roshan(ObjectiveConversionDomain r, Map<Long, String> heroNames) {
-    String near =
-        r.getRoshanNearSlots() == null
-            ? "where the killer stood is not known"
-            : r.getRoshanNearSlots().isBlank()
-                ? "no winner hero was found at the pit"
-                : Arrays.stream(r.getRoshanNearSlots().split(","))
-                        .map(Long::parseLong)
-                        .map(slot -> LoopWording.hero(heroNames, slot))
-                        .collect(Collectors.joining(", "))
-                    + " stood at the pit";
-    RoshanCall call = Enums.find(RoshanCall.class, r.getRoshanCall());
-    return near + "; " + (call == null ? "the state before the fight is not known" : call.words());
-  }
-
-  private static String missed(
-      ObjectiveConversionDomain r, Map<Long, String> heroNames, BehaviourProperties properties) {
-    String took = "took nothing in %d s".formatted(properties.getObjectiveWindowSeconds());
+  private static String missed(ObjectiveConversionDomain r, Map<Long, String> heroNames) {
+    Integer window = ObjectiveWording.window(r);
+    String took =
+        window == null ? "took nothing soon after" : "took nothing in %d s".formatted(window);
     if (r.getNearestTower() == null) {
-      return "%s took nothing in %d s; %s"
-          .formatted(
-              LoopWording.team(r.getWinnerTeam()),
-              properties.getObjectiveWindowSeconds(),
-              r.getWinnersAlive() != null && r.getWinnersAlive() == 0
-                  ? "no hero of the winner was alive when the fight ended"
-                  : "no enemy lane tower was left to measure from");
+      return "%s %s; %s"
+          .formatted(LoopWording.team(r.getWinnerTeam()), took, ObjectiveWording.noTowerReason(r));
     }
     String tier =
         BuildingName.parse(r.getNearestTower())
@@ -192,7 +171,7 @@ final class BehaviourObjectiveSection {
             tier,
             lane,
             r.getTowerDistance(),
-            LoopWording.hero(heroNames, r.getNearestHeroSlot()),
+            BehaviourWording.hero(heroNames, r.getNearestHeroSlot()),
             LoopWording.place(r.getHeroZone(), r.getHeroLane()),
             r.getWinnersAlive());
   }
