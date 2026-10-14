@@ -11,8 +11,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -67,7 +65,7 @@ public class ImportantFightsSection implements ReplayReportSection {
             listed.stream().map(l -> l.fight().getFightIndex()).toList(),
             MAX_REASONS);
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
-    TeamSide yours = yourTeam(input.focusSlots());
+    TeamSide yours = TeamSide.commonSide(input.focusSlots());
     List<String> lines = new ArrayList<>();
     lines.add("**Important fights**");
     for (LostFight fight : listed) {
@@ -107,11 +105,5 @@ public class ImportantFightsSection implements ReplayReportSection {
             && Boolean.TRUE.equals(importance.getFlipToWinner());
     return (tenths > 0 ? String.format(Locale.ROOT, ", %.1fk net worth swing", tenths / 10.0) : "")
         + (lead ? ", took the lead" : "");
-  }
-
-  /** The tracked players' side when they are all on one, otherwise null. */
-  private static TeamSide yourTeam(Set<Long> focusSlots) {
-    Set<TeamSide> sides = focusSlots.stream().map(TeamSide::ofSlot).collect(Collectors.toSet());
-    return sides.size() == 1 ? sides.iterator().next() : null;
   }
 }

@@ -68,6 +68,7 @@ import com.ako.dbuff.service.replay.report.DeathSection;
 import com.ako.dbuff.service.replay.report.DraftSection;
 import com.ako.dbuff.service.replay.report.FightSection;
 import com.ako.dbuff.service.replay.report.ImportantFightsSection;
+import com.ako.dbuff.service.replay.report.LanesSection;
 import com.ako.dbuff.service.replay.report.MovementSection;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.SwingSection;
@@ -150,6 +151,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private TeamCompositionRepo compositionRepo;
   @Autowired private SwingSection swingSection;
   @Autowired private ImportantFightsSection importantFightsSection;
+  @Autowired private LanesSection lanesSection;
   @Autowired private DeathSection deathSection;
   @Autowired private FightSection fightSection;
   @Autowired private MovementSection movementSection;
@@ -611,6 +613,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
         .as("%s: swings fit a message", id)
         .hasSizeLessThan(2000);
     saveImportantFights(id, matchId);
+    saveLanes(id, matchId);
     System.out.println(
         "FIGHT LOSS "
             + id
@@ -634,6 +637,28 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
       Files.createDirectories(dir);
       Files.writeString(dir.resolve("section-important-fights-" + id + ".txt"), text + "\n");
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  private void saveLanes(String id, long matchId) {
+    List<String> lines =
+        lanesSection.lines(new ReplayReportInput(matchId, null, Set.of(), Map.of(), 3));
+    String text = String.join("\n", lines);
+    System.out.println("LANES " + id + "\n" + text);
+    assertThat(lines).as("%s: lanes", id).hasSizeBetween(2, 4);
+    assertThat(text).as("%s: lanes fit a message", id).hasSizeLessThan(2000);
+    List<String> tracked =
+        lanesSection.lines(new ReplayReportInput(matchId, null, Set.of(0L), Map.of(), 3));
+    String trackedText = String.join("\n", tracked);
+    System.out.println("LANES (slot 0 tracked) " + id + "\n" + trackedText);
+    assertThat(trackedText).as("%s: your team marker", id).contains("(your team)");
+    try {
+      Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
+      Files.createDirectories(dir);
+      Files.writeString(dir.resolve("section-lanes-" + id + ".txt"), text + "\n");
+      Files.writeString(dir.resolve("section-lanes-" + id + "-your-team.txt"), trackedText + "\n");
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }

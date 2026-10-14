@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.dao.model.InstanceSettings;
+import com.ako.dbuff.dao.model.LaneResultDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.MatchReportThreadDomain;
 import com.ako.dbuff.dao.model.PlayerDomain;
@@ -11,6 +12,9 @@ import com.ako.dbuff.dao.model.ReplayReportPostedDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.DbufInstanceConfigRepository;
+import com.ako.dbuff.dao.repo.LaneAssignmentRepo;
+import com.ako.dbuff.dao.repo.LaneReasonRepo;
+import com.ako.dbuff.dao.repo.LaneResultRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.MatchReportThreadRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
@@ -19,6 +23,7 @@ import com.ako.dbuff.dao.repo.ReplayReportPostedRepo;
 import com.ako.dbuff.service.discord.DiscordMessageService;
 import com.ako.dbuff.service.match.report.formatter.DiscordReportFormatter;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
+import com.ako.dbuff.service.replay.analysis.lane.LaneProperties;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
@@ -270,6 +275,37 @@ class ReplayReportServiceTest {
     enable("fresh", true);
     service.deliver(1L);
     assertThat(posted()).contains("line of fresh");
+  }
+
+  @Test
+  void deliver_theLanesSectionPostsNothingUntilItsPropertyIsTrue() {
+    LaneResultRepo lanes = Mockito.mock(LaneResultRepo.class);
+    when(lanes.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                LaneResultDomain.builder()
+                    .pairId(0)
+                    .lane("TOP")
+                    .team("RADIANT")
+                    .result("WON")
+                    .margin(0.5)
+                    .build()));
+    LanesSection section =
+        new LanesSection(
+            lanes,
+            Mockito.mock(LaneAssignmentRepo.class),
+            Mockito.mock(LaneReasonRepo.class),
+            Mockito.mock(ReportHeroNames.class),
+            new LaneProperties(),
+            properties);
+    service = serviceWith(named("alpha", true), section);
+    service.deliver(1L);
+    assertThat(posted()).contains("line of alpha").doesNotContain("Top lane");
+
+    Mockito.clearInvocations(discord, postedRepo);
+    enable("lanes", true);
+    service.deliver(1L);
+    assertThat(posted()).contains("Top lane").contains("Radiant (your team) won clearly");
   }
 
   @Test

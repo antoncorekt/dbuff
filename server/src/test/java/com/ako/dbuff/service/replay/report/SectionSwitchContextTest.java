@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -29,7 +30,8 @@ class SectionSwitchContextTest {
           MovementSection.class,
           DraftSection.class,
           CompositionSection.class,
-          ImportantFightsSection.class);
+          ImportantFightsSection.class,
+          LanesSection.class);
 
   @Configuration
   @EnableConfigurationProperties(ReplayReportProperties.class)
@@ -79,11 +81,13 @@ class SectionSwitchContextTest {
                       "movement",
                       "draft",
                       "composition",
-                      "important-fights");
+                      "important-fights",
+                      "lanes");
               assertThat(byName.values())
-                  .filteredOn(s -> !s.name().equals("important-fights"))
+                  .filteredOn(s -> !Set.of("important-fights", "lanes").contains(s.name()))
                   .allMatch(ReplayReportSection::defaultEnabled);
               assertThat(byName.get("important-fights").defaultEnabled()).isFalse();
+              assertThat(byName.get("lanes").defaultEnabled()).isFalse();
             });
   }
 

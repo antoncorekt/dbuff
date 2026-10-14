@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 class UltimateContributor implements LaneReasonContributor {
-  static final String CODE = "NO_ULTIMATE_AT_LANE_END";
+  static final String CODE = LaneReason.NO_ULTIMATE_AT_LANE_END;
 
   @Override
   public List<LaneReason> contribute(LaneContext c) {
