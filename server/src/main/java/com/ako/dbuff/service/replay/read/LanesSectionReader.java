@@ -83,22 +83,24 @@ class LanesSectionReader implements AnalysisSectionReader {
 
   @Override
   @Transactional(readOnly = true)
-  public Lanes read(long matchId) {
+  public Lanes read(long matchId, RunStatus run) {
     List<LaneAssignmentDomain> assignments =
-        Sorted.of(
-            assignmentRepo.findByMatchId(matchId),
-            Sorted.by(
-                LaneAssignmentDomain::getPairId,
-                LaneAssignmentDomain::getTeam,
-                LaneAssignmentDomain::getStartSeconds,
-                LaneAssignmentDomain::getPlayerSlot));
+        assignmentRepo.findByMatchId(matchId).stream()
+            .sorted(
+                RowOrder.nullsLast(LaneAssignmentDomain::getPairId)
+                    .thenComparing(RowOrder.nullsLast(LaneAssignmentDomain::getTeam))
+                    .thenComparing(RowOrder.nullsLast(LaneAssignmentDomain::getStartSeconds))
+                    .thenComparing(RowOrder.nullsLast(LaneAssignmentDomain::getPlayerSlot))
+                    .thenComparing(RowOrder.nullsLast(LaneAssignmentDomain::getId)))
+            .toList();
     List<LaneReasonDomain> reasons = reasonRepo.findByMatchId(matchId);
     return new Lanes(
         assignments.stream().map(LanesSectionReader::assignment).toList(),
-        Sorted.of(
-                resultRepo.findByMatchId(matchId),
-                Sorted.by(LaneResultDomain::getPairId, LaneResultDomain::getTeam))
-            .stream()
+        resultRepo.findByMatchId(matchId).stream()
+            .sorted(
+                RowOrder.nullsLast(LaneResultDomain::getPairId)
+                    .thenComparing(RowOrder.nullsLast(LaneResultDomain::getTeam))
+                    .thenComparing(RowOrder.nullsLast(LaneResultDomain::getId)))
             .map(r -> result(r, assignments, reasons))
             .toList());
   }
@@ -125,13 +127,12 @@ class LanesSectionReader implements AnalysisSectionReader {
             .distinct()
             .toList();
     List<Reason> own =
-        Sorted.of(
-                reasons.stream()
-                    .filter(x -> Objects.equals(x.getPairId(), r.getPairId()))
-                    .filter(x -> Objects.equals(x.getTeam(), r.getTeam()))
-                    .toList(),
-                Sorted.by(LaneReasonDomain::getRank))
-            .stream()
+        reasons.stream()
+            .filter(x -> Objects.equals(x.getPairId(), r.getPairId()))
+            .filter(x -> Objects.equals(x.getTeam(), r.getTeam()))
+            .sorted(
+                RowOrder.nullsLast(LaneReasonDomain::getRank)
+                    .thenComparing(RowOrder.nullsLast(LaneReasonDomain::getId)))
             .map(
                 x ->
                     new Reason(

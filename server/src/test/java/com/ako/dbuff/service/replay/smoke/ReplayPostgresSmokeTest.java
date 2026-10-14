@@ -279,7 +279,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   }
 
   private void assertAnalysisDocument(String id, long matchId) throws Exception {
-    Map<String, Object> document = analysisAssembler.assemble(matchId, null).orElseThrow();
+    Map<String, Object> document = analysisAssembler.assemble(matchId, null);
     assertThat(document.keySet())
         .as("%s: every section", id)
         .containsExactly(

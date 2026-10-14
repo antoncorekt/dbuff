@@ -8,9 +8,10 @@ import com.ako.dbuff.service.replay.analysis.ReplayAnalysisService;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.StoredMatchModes;
 import com.ako.dbuff.service.replay.read.AnalysisAssembler;
+import com.ako.dbuff.service.replay.read.InvalidSectionsException;
+import com.ako.dbuff.service.replay.read.MatchNotStoredException;
 import com.ako.dbuff.service.replay.read.RunStatus;
 import com.ako.dbuff.service.replay.read.RunStatusReader;
-import com.ako.dbuff.service.replay.read.UnknownSectionException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -18,11 +19,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -67,17 +70,20 @@ public class ReplayResources {
    * sections} is a comma separated list of section names, all when absent.
    */
   @GetMapping("/{matchId}/analysis")
-  public ResponseEntity<Object> analysis(
+  public Map<String, Object> analysis(
       @PathVariable long matchId, @RequestParam(required = false) String sections) {
-    try {
-      return assembler
-          .assemble(matchId, sections)
-          .<ResponseEntity<Object>>map(ResponseEntity::ok)
-          .orElse(ResponseEntity.notFound().build());
-    } catch (UnknownSectionException e) {
-      return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-    }
+    return assembler.assemble(matchId, sections);
   }
+
+  @ExceptionHandler(InvalidSectionsException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public Map<String, String> invalidSections(InvalidSectionsException e) {
+    return Map.of("error", e.getMessage());
+  }
+
+  @ExceptionHandler(MatchNotStoredException.class)
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public void notStored() {}
 
   /** Runs every analyzer again for one match from what is stored. */
   @PostMapping("/{matchId}/reanalyze")

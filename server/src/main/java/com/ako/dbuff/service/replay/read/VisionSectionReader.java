@@ -41,11 +41,12 @@ class VisionSectionReader implements AnalysisSectionReader {
   }
 
   @Override
-  public List<FightVision> read(long matchId) {
-    return Sorted.of(
-            visionRepo.findByMatchId(matchId),
-            Sorted.by(FightVisionDomain::getFightIndex, FightVisionDomain::getTeam))
-        .stream()
+  public List<FightVision> read(long matchId, RunStatus run) {
+    return visionRepo.findByMatchId(matchId).stream()
+        .sorted(
+            RowOrder.nullsLast(FightVisionDomain::getFightIndex)
+                .thenComparing(RowOrder.nullsLast(FightVisionDomain::getTeam))
+                .thenComparing(RowOrder.nullsLast(FightVisionDomain::getId)))
         .map(
             v ->
                 new FightVision(

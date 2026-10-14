@@ -10,10 +10,12 @@ import com.ako.dbuff.dao.repo.FightImportanceRepo;
 import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -118,13 +120,7 @@ public class FightExplanationReader {
    */
   @Transactional(readOnly = true)
   public List<LostFight> importantFights(long matchId) {
-    return importantFights(matchId, 0);
-  }
-
-  /** As {@link #importantFights(long)}, each with its {@code topReasons} ranked reasons. */
-  @Transactional(readOnly = true)
-  public List<LostFight> importantFights(long matchId, int topReasons) {
-    MatchExplanation all = readAll(matchId, topReasons, Integer.MAX_VALUE);
+    MatchExplanation all = readAll(matchId, 0, Integer.MAX_VALUE);
     return Stream.concat(
             all.swings().stream().flatMap(s -> s.fights().stream()), all.otherFights().stream())
         .filter(l -> l.importance() != null && l.importance().isImportant())
@@ -134,6 +130,44 @@ public class FightExplanationReader {
         .values()
         .stream()
         .toList();
+  }
+
+  /**
+   * The lost fights among {@code fightIndexes} by fight index, with their ranked reasons; a fight
+   * without an explanation row is absent. No swing structure is built.
+   */
+  @Transactional(readOnly = true)
+  public Map<Integer, LostFight> lostFights(
+      long matchId, Collection<Integer> fightIndexes, int topReasons) {
+    Set<Integer> wanted = Set.copyOf(fightIndexes);
+    Map<Integer, FightDomain> fights =
+        fightRepo.findByMatchId(matchId).stream()
+            .filter(f -> f.getFightIndex() != null && wanted.contains(f.getFightIndex()))
+            .collect(
+                Collectors.toMap(FightDomain::getFightIndex, Function.identity(), (a, b) -> a));
+    Map<Integer, FightImportanceDomain> importance =
+        importanceRepo.findByMatchId(matchId).stream()
+            .filter(i -> fights.containsKey(i.getFightIndex()))
+            .collect(
+                Collectors.toMap(
+                    FightImportanceDomain::getFightIndex, Function.identity(), (a, b) -> a));
+    Map<Integer, List<FightReasonDomain>> reasons =
+        reasonRepo.findByMatchId(matchId).stream()
+            .filter(r -> r.getFightIndex() != null && fights.containsKey(r.getFightIndex()))
+            .collect(Collectors.groupingBy(FightReasonDomain::getFightIndex));
+    return explanationRepo.findByMatchId(matchId).stream()
+        .filter(e -> fights.containsKey(e.getFightIndex()))
+        .collect(
+            Collectors.toMap(
+                FightExplanationDomain::getFightIndex,
+                e ->
+                    lostFight(
+                        fights.get(e.getFightIndex()),
+                        e,
+                        reasons,
+                        topReasons,
+                        importanceOf(e, importance)),
+                (a, b) -> a));
   }
 
   /** Every lost fight, each with its importance; for readers that list the unimportant ones. */

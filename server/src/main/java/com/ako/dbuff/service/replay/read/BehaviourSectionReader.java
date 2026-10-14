@@ -123,44 +123,43 @@ class BehaviourSectionReader implements AnalysisSectionReader {
 
   @Override
   @Transactional(readOnly = true)
-  public Behaviour read(long matchId) {
+  public Behaviour read(long matchId, RunStatus run) {
     return new Behaviour(
-        Sorted.of(
-                rotationRepo.findByMatchId(matchId),
-                Sorted.by(
-                    TeamRotationDomain::getStartSeconds,
-                    TeamRotationDomain::getTeam,
-                    TeamRotationDomain::getPlayerSlot))
-            .stream()
+        rotationRepo.findByMatchId(matchId).stream()
+            .sorted(
+                RowOrder.nullsLast(TeamRotationDomain::getStartSeconds)
+                    .thenComparing(RowOrder.nullsLast(TeamRotationDomain::getTeam))
+                    .thenComparing(RowOrder.nullsLast(TeamRotationDomain::getPlayerSlot))
+                    .thenComparing(RowOrder.nullsLast(TeamRotationDomain::getId)))
             .map(BehaviourSectionReader::rotation)
             .toList(),
-        Sorted.of(
-                stretchRepo.findByMatchId(matchId),
-                Sorted.by(TeamSplitStretchDomain::getStartSeconds, TeamSplitStretchDomain::getTeam))
-            .stream()
+        stretchRepo.findByMatchId(matchId).stream()
+            .sorted(
+                RowOrder.nullsLast(TeamSplitStretchDomain::getStartSeconds)
+                    .thenComparing(RowOrder.nullsLast(TeamSplitStretchDomain::getTeam))
+                    .thenComparing(RowOrder.nullsLast(TeamSplitStretchDomain::getId)))
             .map(BehaviourSectionReader::stretch)
             .toList(),
-        Sorted.of(
-                swapRepo.findByMatchId(matchId),
-                Sorted.by(
-                    TeamLaneSwapDomain::getFromSeconds,
-                    TeamLaneSwapDomain::getTeam,
-                    TeamLaneSwapDomain::getPlayerSlot))
-            .stream()
+        swapRepo.findByMatchId(matchId).stream()
+            .sorted(
+                RowOrder.nullsLast(TeamLaneSwapDomain::getFromSeconds)
+                    .thenComparing(RowOrder.nullsLast(TeamLaneSwapDomain::getTeam))
+                    .thenComparing(RowOrder.nullsLast(TeamLaneSwapDomain::getPlayerSlot))
+                    .thenComparing(RowOrder.nullsLast(TeamLaneSwapDomain::getId)))
             .map(BehaviourSectionReader::swap)
             .toList(),
-        Sorted.of(
-                smokeRepo.findByMatchId(matchId),
-                Sorted.by(SmokeUseDomain::getStartSeconds, SmokeUseDomain::getTeam))
-            .stream()
+        smokeRepo.findByMatchId(matchId).stream()
+            .sorted(
+                RowOrder.nullsLast(SmokeUseDomain::getStartSeconds)
+                    .thenComparing(RowOrder.nullsLast(SmokeUseDomain::getTeam))
+                    .thenComparing(RowOrder.nullsLast(SmokeUseDomain::getId)))
             .map(BehaviourSectionReader::smoke)
             .toList(),
-        Sorted.of(
-                objectiveRepo.findByMatchId(matchId),
-                Sorted.by(
-                    ObjectiveConversionDomain::getFightIndex,
-                    ObjectiveConversionDomain::getSecondsAfter))
-            .stream()
+        objectiveRepo.findByMatchId(matchId).stream()
+            .sorted(
+                RowOrder.nullsLast(ObjectiveConversionDomain::getFightIndex)
+                    .thenComparing(RowOrder.nullsLast(ObjectiveConversionDomain::getSecondsAfter))
+                    .thenComparing(RowOrder.nullsLast(ObjectiveConversionDomain::getId)))
             .map(BehaviourSectionReader::objective)
             .toList());
   }

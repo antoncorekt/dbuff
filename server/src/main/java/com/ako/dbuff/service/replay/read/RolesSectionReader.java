@@ -30,19 +30,22 @@ class RolesSectionReader implements AnalysisSectionReader {
 
   @Override
   @Transactional(readOnly = true)
-  public Roles read(long matchId) {
+  public Roles read(long matchId, RunStatus run) {
     return new Roles(
-        Sorted.of(roleRepo.findByMatchId(matchId), Sorted.by(PlayerRoleDomain::getPlayerSlot))
-            .stream()
+        roleRepo.findByMatchId(matchId).stream()
+            .sorted(
+                RowOrder.nullsLast(PlayerRoleDomain::getPlayerSlot)
+                    .thenComparing(RowOrder.nullsLast(PlayerRoleDomain::getId)))
             .map(
                 r ->
                     new PlayerRole(
                         r.getPlayerSlot(), r.getRole(), r.getSource(), r.getConfidence()))
             .toList(),
-        Sorted.of(
-                compositionRepo.findByMatchId(matchId),
-                Sorted.by(TeamCompositionDomain::getTeam, TeamCompositionDomain::getStage))
-            .stream()
+        compositionRepo.findByMatchId(matchId).stream()
+            .sorted(
+                RowOrder.nullsLast(TeamCompositionDomain::getTeam)
+                    .thenComparing(RowOrder.nullsLast(TeamCompositionDomain::getStage))
+                    .thenComparing(RowOrder.nullsLast(TeamCompositionDomain::getId)))
             .map(c -> new Composition(c.getTeam(), c.getStage(), c.getTokens()))
             .toList());
   }

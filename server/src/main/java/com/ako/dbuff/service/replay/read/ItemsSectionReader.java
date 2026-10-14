@@ -32,14 +32,13 @@ class ItemsSectionReader implements AnalysisSectionReader {
   }
 
   @Override
-  public List<ItemEfficiency> read(long matchId) {
-    return Sorted.of(
-            efficiencyRepo.findByMatchId(matchId),
-            Sorted.by(
-                ItemEfficiencyDomain::getPlayerSlot,
-                ItemEfficiencyDomain::getPurchaseSeconds,
-                ItemEfficiencyDomain::getEntryKey))
-        .stream()
+  public List<ItemEfficiency> read(long matchId, RunStatus run) {
+    return efficiencyRepo.findByMatchId(matchId).stream()
+        .sorted(
+            RowOrder.nullsLast(ItemEfficiencyDomain::getPlayerSlot)
+                .thenComparing(RowOrder.nullsLast(ItemEfficiencyDomain::getPurchaseSeconds))
+                .thenComparing(RowOrder.nullsLast(ItemEfficiencyDomain::getEntryKey))
+                .thenComparing(RowOrder.nullsLast(ItemEfficiencyDomain::getId)))
         .map(
             i ->
                 new ItemEfficiency(

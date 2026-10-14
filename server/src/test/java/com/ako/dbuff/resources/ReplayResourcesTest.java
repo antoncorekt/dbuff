@@ -9,6 +9,7 @@ import com.ako.dbuff.service.replay.mode.StoredMatchModes;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import com.ako.dbuff.service.replay.read.AnalysisAssembler;
 import com.ako.dbuff.service.replay.read.AnalysisSectionReader;
+import com.ako.dbuff.service.replay.read.RunStatus;
 import com.ako.dbuff.service.replay.read.RunStatusReader;
 import java.util.List;
 import java.util.Optional;
@@ -47,7 +48,7 @@ class ReplayResourcesTest {
       }
 
       @Override
-      public Object read(long matchId) {
+      public Object read(long matchId, RunStatus run) {
         return value;
       }
     };
@@ -80,7 +81,13 @@ class ReplayResourcesTest {
 
     mvc.perform(get("/api/v1/replay/5"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("PARTIAL"));
+        .andExpect(jsonPath("$.matchId").value(5))
+        .andExpect(jsonPath("$.status").value("PARTIAL"))
+        .andExpect(jsonPath("$.attempts").value(1))
+        .andExpect(jsonPath("$", org.hamcrest.Matchers.hasKey("error")))
+        .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$", org.hamcrest.Matchers.hasKey("mapVersion")))
+        .andExpect(jsonPath("$.*", org.hamcrest.Matchers.hasSize(5)));
     mvc.perform(get("/api/v1/replay/6")).andExpect(status().isNotFound());
   }
 
@@ -103,6 +110,11 @@ class ReplayResourcesTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("nope")))
         .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("run, roles")));
+    mvc.perform(get("/api/v1/replay/5/analysis").param("sections", "run,,roles"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("empty entry")));
+    mvc.perform(get("/api/v1/replay/5/analysis").param("sections", ","))
+        .andExpect(status().isBadRequest());
     mvc.perform(get("/api/v1/replay/6/analysis")).andExpect(status().isNotFound());
   }
 

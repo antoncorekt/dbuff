@@ -99,15 +99,15 @@ class SectionReadersTest {
 
   @Test
   void aMatchWithNoRowsGivesEmptyListsForEverySection() {
-    assertThat(roles.read(OTHER).players()).isEmpty();
-    assertThat(roles.read(OTHER).compositions()).isEmpty();
-    assertThat(fights.read(OTHER)).isEmpty();
-    assertThat(vision.read(OTHER)).isEmpty();
-    assertThat(runes.read(OTHER).pickups()).isEmpty();
-    assertThat(runes.read(OTHER).openings()).isEmpty();
-    assertThat(lanes.read(OTHER).results()).isEmpty();
-    assertThat(items.read(OTHER)).isEmpty();
-    Behaviour none = behaviour.read(OTHER);
+    assertThat(roles.read(OTHER, null).players()).isEmpty();
+    assertThat(roles.read(OTHER, null).compositions()).isEmpty();
+    assertThat(fights.read(OTHER, null)).isEmpty();
+    assertThat(vision.read(OTHER, null)).isEmpty();
+    assertThat(runes.read(OTHER, null).pickups()).isEmpty();
+    assertThat(runes.read(OTHER, null).openings()).isEmpty();
+    assertThat(lanes.read(OTHER, null).results()).isEmpty();
+    assertThat(items.read(OTHER, null)).isEmpty();
+    Behaviour none = behaviour.read(OTHER, null);
     assertThat(none.rotations()).isEmpty();
     assertThat(none.splitStretches()).isEmpty();
     assertThat(none.laneSwaps()).isEmpty();
@@ -137,7 +137,7 @@ class SectionReadersTest {
             .summary("s")
             .build());
 
-    Roles read = roles.read(MATCH);
+    Roles read = roles.read(MATCH, null);
 
     assertThat(read.players())
         .extracting("slot", "role")
@@ -164,7 +164,7 @@ class SectionReadersTest {
             .evidence("{}")
             .build());
 
-    List<ImportantFight> read = fights.read(MATCH);
+    List<ImportantFight> read = fights.read(MATCH, null);
 
     assertThat(read).hasSize(1);
     ImportantFight first = read.get(0);
@@ -173,6 +173,8 @@ class SectionReadersTest {
     assertThat(first.goldLost()).isEqualTo(900L);
     assertThat(first.importance().goldChange()).isEqualTo(1500L);
     assertThat(first.importance().leadFlip()).isTrue();
+    assertThat(first.reasonsShown()).isEqualTo(1);
+    assertThat(first.totalReasons()).isEqualTo(1);
     assertThat(first.reasons()).hasSize(1);
     assertThat(first.reasons().get(0).rank()).isEqualTo(1);
     assertThat(first.reasons().get(0).code()).isEqualTo("DEAD_EARLY");
@@ -180,11 +182,90 @@ class SectionReadersTest {
   }
 
   @Test
+  void fights_anImportantFightWithoutAnExplanationStillAppears() {
+    fightRepo.save(FightDomain.builder().matchId(MATCH).fightIndex(7).type("SKIRMISH").build());
+    importanceRepo.save(
+        FightImportanceDomain.builder()
+            .matchId(MATCH)
+            .fightIndex(7)
+            .winningTeam("DIRE")
+            .important(true)
+            .build());
+    fightRepo.save(FightDomain.builder().matchId(MATCH).fightIndex(8).build());
+    importanceRepo.save(
+        FightImportanceDomain.builder().matchId(MATCH).fightIndex(8).important(false).build());
+
+    List<ImportantFight> read = fights.read(MATCH, null);
+
+    assertThat(read).hasSize(1);
+    assertThat(read.get(0).fightIndex()).isEqualTo(7);
+    assertThat(read.get(0).losingTeam()).isNull();
+    assertThat(read.get(0).goldLost()).isNull();
+    assertThat(read.get(0).totalReasons()).isZero();
+    assertThat(read.get(0).reasonsShown()).isZero();
+    assertThat(read.get(0).reasons()).isEmpty();
+    assertThat(read.get(0).importance().winningTeam()).isEqualTo("DIRE");
+  }
+
+  @Test
+  void fights_cutTheReasonsToTheTopFiveAndSayHowManyWereShown() {
+    fight(1, true);
+    for (int i = 0; i < 8; i++) {
+      reason(1, 10L + i, "R" + i, 0.9 - i * 0.01);
+    }
+
+    ImportantFight first = fights.read(MATCH, null).get(0);
+
+    assertThat(first.totalReasons()).isEqualTo(8);
+    assertThat(first.reasonsShown()).isEqualTo(FightsSectionReader.TOP_REASONS);
+    assertThat(first.reasons()).hasSize(FightsSectionReader.TOP_REASONS);
+  }
+
+  @Test
+  void rowsWithEqualSortKeys_keepTheOrderTheyWereStored() {
+    for (String verdict : List.of("FIRST", "SECOND", "THIRD")) {
+      rotationRepo.save(
+          TeamRotationDomain.builder()
+              .matchId(MATCH)
+              .team("DIRE")
+              .playerSlot(130L)
+              .startSeconds(600)
+              .verdict(verdict)
+              .build());
+      smokeRepo.save(
+          SmokeUseDomain.builder()
+              .matchId(MATCH)
+              .team("DIRE")
+              .startSeconds(5)
+              .outcome(verdict)
+              .build());
+      laneReasonRepo.save(
+          LaneReasonDomain.builder()
+              .matchId(MATCH)
+              .pairId(1)
+              .team("RADIANT")
+              .rank(1)
+              .code(verdict)
+              .build());
+    }
+    resultRepo.save(
+        LaneResultDomain.builder().matchId(MATCH).pairId(1).team("RADIANT").lane("TOP").build());
+
+    Behaviour read = behaviour.read(MATCH, null);
+
+    assertThat(read.rotations()).extracting("verdict").containsExactly("FIRST", "SECOND", "THIRD");
+    assertThat(read.smokes()).extracting("outcome").containsExactly("FIRST", "SECOND", "THIRD");
+    assertThat(lanes.read(MATCH, null).results().get(0).reasons())
+        .extracting("code")
+        .containsExactly("FIRST", "SECOND", "THIRD");
+  }
+
+  @Test
   void vision_listsRowsByFightAndTeam() {
     visionRepo.save(vision(2, "DIRE"));
     visionRepo.save(vision(1, "RADIANT"));
 
-    assertThat(vision.read(MATCH))
+    assertThat(vision.read(MATCH, null))
         .extracting("fightIndex", "team", "lost")
         .containsExactly(tuple(1, "RADIANT", true), tuple(2, "DIRE", true));
   }
@@ -202,7 +283,7 @@ class SectionReadersTest {
             .result("AHEAD")
             .build());
 
-    Runes read = runes.read(MATCH);
+    Runes read = runes.read(MATCH, null);
 
     assertThat(read.pickups()).extracting("seconds").containsExactly(120, 240);
     assertThat(read.openings()).extracting("balance").containsExactly(300L);
@@ -232,7 +313,7 @@ class SectionReadersTest {
             .severity(0.5)
             .build());
 
-    Lanes read = lanes.read(MATCH);
+    Lanes read = lanes.read(MATCH, null);
 
     assertThat(read.assignments()).hasSize(3);
     assertThat(read.results()).hasSize(1);
@@ -253,7 +334,7 @@ class SectionReadersTest {
             .ratio(0.5)
             .build());
 
-    assertThat(items.read(MATCH))
+    assertThat(items.read(MATCH, null))
         .extracting("itemKey", "ratio")
         .containsExactly(tuple("magic_stick", 0.5));
   }
@@ -299,7 +380,7 @@ class SectionReadersTest {
             .objectiveKind("TOWER")
             .build());
 
-    Behaviour read = behaviour.read(MATCH);
+    Behaviour read = behaviour.read(MATCH, null);
 
     assertThat(read.rotations())
         .extracting("reasons", "verdict")
@@ -308,6 +389,20 @@ class SectionReadersTest {
     assertThat(read.laneSwaps()).extracting("laneAfter").containsExactly("BOTTOM");
     assertThat(read.smokes()).extracting("outcome").containsExactly("KILL");
     assertThat(read.objectiveConversions()).extracting("objectiveKind").containsExactly("TOWER");
+  }
+
+  private void reason(int fight, long slot, String code, double severity) {
+    reasonRepo.save(
+        FightReasonDomain.builder()
+            .matchId(MATCH)
+            .fightIndex(fight)
+            .team("RADIANT")
+            .scope("PLAYER")
+            .subjectSlot(slot)
+            .code(code)
+            .severity(severity)
+            .evidence("e")
+            .build());
   }
 
   private void fight(int index, boolean important) {

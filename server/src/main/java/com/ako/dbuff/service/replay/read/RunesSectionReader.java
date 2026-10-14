@@ -53,15 +53,14 @@ class RunesSectionReader implements AnalysisSectionReader {
 
   @Override
   @Transactional(readOnly = true)
-  public Runes read(long matchId) {
+  public Runes read(long matchId, RunStatus run) {
     return new Runes(
-        Sorted.of(
-                pickupRepo.findByMatchId(matchId),
-                Sorted.by(
-                    RunePickupDomain::getSeconds,
-                    RunePickupDomain::getRuneIndex,
-                    RunePickupDomain::getPlayerSlot))
-            .stream()
+        pickupRepo.findByMatchId(matchId).stream()
+            .sorted(
+                RowOrder.nullsLast(RunePickupDomain::getSeconds)
+                    .thenComparing(RowOrder.nullsLast(RunePickupDomain::getRuneIndex))
+                    .thenComparing(RowOrder.nullsLast(RunePickupDomain::getPlayerSlot))
+                    .thenComparing(RowOrder.nullsLast(RunePickupDomain::getId)))
             .map(
                 p ->
                     new Pickup(
@@ -76,8 +75,10 @@ class RunesSectionReader implements AnalysisSectionReader {
                         p.getEffectEndSeconds(),
                         p.getMidLane()))
             .toList(),
-        Sorted.of(openingRepo.findByMatchId(matchId), Sorted.by(OpeningSummaryDomain::getTeam))
-            .stream()
+        openingRepo.findByMatchId(matchId).stream()
+            .sorted(
+                RowOrder.nullsLast(OpeningSummaryDomain::getTeam)
+                    .thenComparing(RowOrder.nullsLast(OpeningSummaryDomain::getId)))
             .map(
                 o ->
                     new Opening(
