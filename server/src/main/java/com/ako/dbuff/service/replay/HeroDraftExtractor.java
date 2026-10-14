@@ -8,6 +8,7 @@ import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -34,18 +35,17 @@ public class HeroDraftExtractor implements ReplayExtractor {
   }
 
   /**
-   * A match with no hero draft, or one of an unexpected shape, stores nothing rather than a part.
+   * A match with no hero draft, one of an unexpected shape or one naming an unknown player stores
+   * nothing, and what an earlier run stored stays until a valid draft replaces it.
    */
   @Override
   @Transactional
   public void extract(ReplayFacts facts, MatchDomain match) {
-    deleteByMatchId(match.getId());
     HeroDraftFacts draft = facts.heroDraft();
     if (draft == null) {
       return;
     }
-    if (draft.pool().size() != profile.heroPoolSize()
-        || draft.picks().size() != profile.heroPicks()) {
+    if (!DraftShape.heroesComplete(draft, profile)) {
       log.warn(
           "Match {} draft has {} heroes and {} hero picks, expected {} and {}; not stored",
           match.getId(),
@@ -55,7 +55,19 @@ public class HeroDraftExtractor implements ReplayExtractor {
           profile.heroPicks());
       return;
     }
-    repo.saveAll(rows(match.getId(), facts, draft));
+    Map<Integer, ReplayPlayerFact> players = facts.playersById();
+    Optional<DraftPick> stranger =
+        draft.picks().stream().filter(p -> !players.containsKey(p.replayPlayerId())).findFirst();
+    if (stranger.isPresent()) {
+      log.warn(
+          "Match {} hero pick {} belongs to unknown player {}; not stored",
+          match.getId(),
+          stranger.get().order(),
+          stranger.get().replayPlayerId());
+      return;
+    }
+    repo.deleteByMatchId(match.getId());
+    repo.saveAll(rows(match.getId(), facts, draft, players));
   }
 
   @Override
@@ -64,31 +76,27 @@ public class HeroDraftExtractor implements ReplayExtractor {
     repo.deleteByMatchId(matchId);
   }
 
-  private List<HeroDraftPickDomain> rows(long matchId, ReplayFacts facts, HeroDraftFacts draft) {
-    Map<Integer, ReplayPlayerFact> players = facts.playersById();
-    DraftTimeline.Turns turns = DraftTimeline.turns(facts.draft(), draft);
+  private List<HeroDraftPickDomain> rows(
+      long matchId,
+      ReplayFacts facts,
+      HeroDraftFacts draft,
+      Map<Integer, ReplayPlayerFact> players) {
+    DraftTimeline.Turns turns = DraftTimeline.turns(matchId, facts.draft(), draft, profile);
     Map<Integer, DraftPick> byPoolIndex = new HashMap<>();
     draft.picks().forEach(p -> byPoolIndex.put(p.poolIndex(), p));
     return draft.pool().stream()
         .map(
             entry -> {
-              DraftPick pick = byPoolIndex.get(entry.poolIndex());
               HeroDraftPickDomain.HeroDraftPickDomainBuilder row =
                   HeroDraftPickDomain.builder()
                       .matchId(matchId)
                       .poolIndex(entry.poolIndex())
                       .heroId((long) entry.heroId());
+              DraftPick pick = byPoolIndex.get(entry.poolIndex());
               if (pick == null) {
                 return row.build();
               }
               ReplayPlayerFact player = players.get(pick.replayPlayerId());
-              if (player == null) {
-                throw new IllegalStateException(
-                    "Hero pick "
-                        + pick.order()
-                        + " belongs to unknown player "
-                        + pick.replayPlayerId());
-              }
               return row.playerSlot(player.playerSlot())
                   .team(player.teamNum() == RADIANT ? 0 : 1)
                   .turnNumber(turns.hero(pick.order()))

@@ -11,8 +11,8 @@ import skadistats.clarity.model.Entity;
 final class AbilityDraftReader extends PoolDraftReader<AbilityDraftFacts> {
   private static final String DRAFT = "m_pGameRules.m_AbilityDraftAbilities.";
 
-  AbilityDraftReader() {
-    super("m_AbilityDraftAbilities");
+  AbilityDraftReader(int expectedPicks) {
+    super("m_AbilityDraftAbilities", expectedPicks);
   }
 
   /** The final pool, read when the game starts so that moved skills show their final slot. */

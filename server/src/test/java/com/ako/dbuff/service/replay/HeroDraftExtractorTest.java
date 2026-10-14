@@ -75,7 +75,7 @@ class HeroDraftExtractorTest {
             .filter(r -> r.getPlayerSlot() != null)
             .sorted(Comparator.comparing(HeroDraftPickDomain::getPickTick))
             .toList();
-    assertThat(picked).extracting(HeroDraftPickDomain::getTurnNumber).startsWith(2, 4, 6);
+    assertThat(picked).extracting(HeroDraftPickDomain::getTurnNumber).startsWith(3, 6, 9);
   }
 
   @Test
@@ -86,16 +86,26 @@ class HeroDraftExtractorTest {
   }
 
   @Test
-  void extract_storesNothingWithoutAHeroDraftOrOfAnUnexpectedShape() {
-    extractor.extract(facts(fullHeroes(), null), MATCH);
-
+  void extract_storesNothingForAMatchWithoutAHeroDraftOrOfAnUnexpectedShape() {
     extractor.extract(facts(null, null), MATCH);
-    assertThat(repo.findAll()).isEmpty();
-
     HeroDraftFacts full = fullHeroes();
     extractor.extract(
         facts(new HeroDraftFacts(full.pool(), full.picks().subList(0, 9)), null), MATCH);
+
     assertThat(repo.findAll()).isEmpty();
+  }
+
+  @Test
+  void extract_keepsTheOldRowsWhenTheNewDraftIsInvalidOrNamesAnUnknownPlayer() {
+    extractor.extract(facts(fullHeroes(), null), MATCH);
+    HeroDraftFacts full = fullHeroes();
+
+    extractor.extract(
+        facts(new HeroDraftFacts(full.pool(), full.picks().subList(0, 9)), null), MATCH);
+    players.removeLast();
+    extractor.extract(facts(fullHeroes(), null), MATCH);
+
+    assertThat(repo.findAll()).hasSize(12);
   }
 
   @Test
@@ -138,13 +148,17 @@ class HeroDraftExtractorTest {
     return new HeroDraftFacts(pool, picks);
   }
 
-  /** One skill pick 150 ticks before each hero pick, so heroes take turns 2, 4, 6 and so on. */
+  /** 40 skill picks every 150 ticks, so two of them come before each hero pick. */
   private static AbilityDraftFacts skillsBetweenTheHeroPicks() {
+    List<DraftPoolEntry> pool = new ArrayList<>();
     List<DraftPick> picks = new ArrayList<>();
-    for (int i = 0; i < 10; i++) {
-      picks.add(new DraftPick(i + 1, i, 0, CLOCK_START - 450 + i * 300));
+    for (int i = 0; i < 48; i++) {
+      pool.add(new DraftPoolEntry(i, 100 + i, -1, 0));
     }
-    return new AbilityDraftFacts(List.of(), picks);
+    for (int i = 0; i < 40; i++) {
+      picks.add(new DraftPick(i + 1, i, 0, CLOCK_START - 451 + i * 150));
+    }
+    return new AbilityDraftFacts(pool, picks);
   }
 
   private static MatchDomain match() {

@@ -11,8 +11,8 @@ import skadistats.clarity.model.Entity;
 final class HeroDraftReader extends PoolDraftReader<HeroDraftFacts> {
   private static final String DRAFT = "m_pGameRules.m_AbilityDraftHeroes.";
 
-  HeroDraftReader() {
-    super("m_AbilityDraftHeroes");
+  HeroDraftReader(int expectedPicks) {
+    super("m_AbilityDraftHeroes", expectedPicks);
   }
 
   @Override

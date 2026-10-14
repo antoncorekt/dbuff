@@ -162,6 +162,9 @@ public class ClarityReplayParser implements ReplayParser {
     private long ticksSeen;
     private long gameOverTick = -1;
     private final GameClock clock = new GameClock();
+    private int tickNow;
+    private final IntSupplier draftTick = () -> (int) clock.gameTick(tickNow);
+    private boolean draftOpen = true;
 
     Collector(
         BooleanSupplier cancelled,
@@ -192,9 +195,9 @@ public class ClarityReplayParser implements ReplayParser {
 
     @OnEntityUpdated(classPattern = "CDOTAGamerulesProxy")
     public void rulesUpdated(Context ctx, Entity rules, FieldPath[] paths, int count) {
-      IntSupplier tick = () -> (int) clock.gameTick(ctx.getTick());
-      draftReader.observe(rules, paths, count, tick);
-      heroDraftReader.observe(rules, paths, count, tick);
+      if (draftOpen && !(draftReader.done() && heroDraftReader.done())) {
+        observeDraft(ctx, rules, paths, count);
+      }
       if (rules.hasProperty(PAUSED) && rules.getProperty(PAUSED) instanceof Boolean paused) {
         clock.paused(paused, ctx.getTick());
       }
@@ -202,6 +205,9 @@ public class ClarityReplayParser implements ReplayParser {
         return;
       }
       int state = rules.getProperty(STATE);
+      if (state >= PRE_GAME) {
+        draftOpen = false;
+      }
       if (state == PRE_GAME) {
         recorder().preGameStarted(clock.gameTick(ctx.getTick()));
       } else if (state == POST_GAME || state == POST_GAME_SCORES) {
@@ -224,6 +230,16 @@ public class ClarityReplayParser implements ReplayParser {
                 .build();
         recorder().gameStarted(clock.gameTick(ctx.getTick()));
         map = MapReader.read(entities, stringTables.forName("EntityNames"), rules);
+      }
+    }
+
+    /** The name of a path is built once for both readers, and only while a pick can still come. */
+    private void observeDraft(Context ctx, Entity rules, FieldPath[] paths, int count) {
+      tickNow = ctx.getTick();
+      for (int i = 0; i < count; i++) {
+        String name = rules.getNameForFieldPath(paths[i]);
+        draftReader.observe(rules, paths[i], name, draftTick);
+        heroDraftReader.observe(rules, paths[i], name, draftTick);
       }
     }
 

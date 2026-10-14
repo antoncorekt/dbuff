@@ -6,6 +6,12 @@ import org.springframework.stereotype.Component;
 
 @Component
 class AbilityDraftReaderFactory implements DraftReaderFactory<AbilityDraftFacts> {
+  private final AbilityDraftProfile profile;
+
+  AbilityDraftReaderFactory(AbilityDraftProfile profile) {
+    this.profile = profile;
+  }
+
   @Override
   public long gameModeId() {
     return AbilityDraftProfile.MODE_ID;
@@ -13,6 +19,6 @@ class AbilityDraftReaderFactory implements DraftReaderFactory<AbilityDraftFacts>
 
   @Override
   public DraftReader<AbilityDraftFacts> create() {
-    return new AbilityDraftReader();
+    return new AbilityDraftReader(profile.picks());
   }
 }

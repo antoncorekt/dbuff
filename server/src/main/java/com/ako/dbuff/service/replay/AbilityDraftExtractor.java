@@ -48,7 +48,7 @@ public class AbilityDraftExtractor implements ReplayExtractor {
     if (draft == null) {
       return;
     }
-    if (draft.pool().size() != profile.poolSize() || draft.picks().size() != profile.picks()) {
+    if (!DraftShape.skillsComplete(draft, profile)) {
       log.warn(
           "Match {} draft has {} skills and {} picks, expected {} and {}; not stored",
           match.getId(),
@@ -59,7 +59,8 @@ public class AbilityDraftExtractor implements ReplayExtractor {
       return;
     }
     Map<Integer, ReplayPlayerFact> players = facts.playersById();
-    DraftTimeline.Turns turns = DraftTimeline.turns(draft, facts.heroDraft());
+    DraftTimeline.Turns turns =
+        DraftTimeline.turns(match.getId(), draft, facts.heroDraft(), profile);
     List<AbilityDraftPickDomain> picks =
         pickRows(match.getId(), draft, players, turns, facts.clockStartTick());
     pickRepo.saveAll(picks);
@@ -100,7 +101,8 @@ public class AbilityDraftExtractor implements ReplayExtractor {
               .teamPickIndex(picksPerTeam.merge(team, 1, Integer::sum))
               .pickTick(pick.tick())
               .turnNumber(turns.skill(pick.order()))
-              .clockSeconds(DraftTimeline.clockSeconds(pick.tick(), clockStartTick))
+              .clockSeconds(
+                  turns.known() ? DraftTimeline.clockSeconds(pick.tick(), clockStartTick) : null)
               .secondsIntoDraft((pick.tick() - firstTick) / DraftTimeline.TICKS_PER_SECOND)
               .secondsSincePrevPick(
                   pick.order() == 1

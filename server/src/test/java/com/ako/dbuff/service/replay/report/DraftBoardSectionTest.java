@@ -203,6 +203,52 @@ class DraftBoardSectionTest {
   }
 
   @Test
+  void view_showsASkillWithoutANameAndAPickerWhoseSkillsAreAllUnnamed() {
+    draft();
+    when(skillRepo.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                AbilityDraftPickDomain.builder()
+                    .pickOrder(1)
+                    .turnNumber(1)
+                    .playerSlot(0L)
+                    .abilityId(5156L)
+                    .build()));
+
+    SectionView view = section.view(input(Set.of(), Map.of())).orElseThrow();
+
+    assertThat(view.bullets().get(1).lines().toList())
+        .containsExactly("**Skill picks**", "Sniper: Skill 5156 (1)");
+  }
+
+  @Test
+  void view_showsNoTurnForASkillWithoutOneAndSaysTheOrderIsUnknown() {
+    draft();
+    when(skillRepo.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                AbilityDraftPickDomain.builder()
+                    .pickOrder(7)
+                    .playerSlot(0L)
+                    .abilityName("sniper_take_aim")
+                    .build()));
+
+    SectionView view = section.view(input(Set.of(), Map.of())).orElseThrow();
+
+    assertThat(view.bullets().get(1).lines().toList())
+        .containsExactly("**Skill picks**", "Sniper: Sniper Take Aim");
+    assertThat(view.footnote()).contains("order is not known");
+  }
+
+  @Test
+  void view_leavesTheUnknownOrderNoteOutWhenEveryTurnIsKnown() {
+    draft();
+
+    assertThat(section.view(input(Set.of(), Map.of())).orElseThrow().footnote())
+        .doesNotContain("not known");
+  }
+
+  @Test
   void supports_onlyAbilityDraft() {
     assertThat(section.supports(TestModes.ABILITY_DRAFT)).isTrue();
     assertThat(section.supports(TestModes.ALL_PICK)).isFalse();

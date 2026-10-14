@@ -7,7 +7,12 @@ import skadistats.clarity.model.FieldPath;
 /** For a mode without a draft part to read. */
 final class NoDraftReader<T> implements DraftReader<T> {
   @Override
-  public void observe(Entity rules, FieldPath[] paths, int count, IntSupplier gameTick) {}
+  public boolean done() {
+    return true;
+  }
+
+  @Override
+  public void observe(Entity rules, FieldPath path, String name, IntSupplier gameTick) {}
 
   @Override
   public T read(Entity rules) {

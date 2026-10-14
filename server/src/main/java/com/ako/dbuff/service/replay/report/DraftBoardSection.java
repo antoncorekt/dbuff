@@ -34,6 +34,7 @@ import org.springframework.stereotype.Component;
 public class DraftBoardSection implements ReplayReportSection {
   private static final String FOOTNOTE =
       "Turns count skill and hero picks together; times are on the game clock, before the horn.";
+  private static final String ORDER_UNKNOWN = " Where no turn is shown, the order is not known.";
 
   private final HeroDraftPickRepo heroRepo;
   private final AbilityDraftPickRepo skillRepo;
@@ -86,7 +87,16 @@ public class DraftBoardSection implements ReplayReportSection {
       cards.add(board.skillPicks(skills));
     }
     board.leftOver(pool).ifPresent(cards::add);
-    return Optional.of(new SectionView("Draft board", null, Accent.INFO, cards, FOOTNOTE));
+    boolean numbersMissing =
+        heroes.stream().anyMatch(h -> h.getPlayerSlot() != null && h.getTurnNumber() == null)
+            || skills.stream().anyMatch(s -> s.getTurnNumber() == null);
+    return Optional.of(
+        new SectionView(
+            "Draft board",
+            null,
+            Accent.INFO,
+            cards,
+            numbersMissing ? FOOTNOTE + ORDER_UNKNOWN : FOOTNOTE));
   }
 
   private final class Board {
@@ -130,7 +140,7 @@ public class DraftBoardSection implements ReplayReportSection {
     String skillPicks(List<AbilityDraftPickDomain> skills) {
       Map<Long, List<AbilityDraftPickDomain>> bySlot =
           skills.stream()
-              .filter(s -> s.getPlayerSlot() != null && s.getAbilityName() != null)
+              .filter(s -> s.getPlayerSlot() != null)
               .collect(Collectors.groupingBy(AbilityDraftPickDomain::getPlayerSlot));
       TeamSide yours = TeamSide.commonSide(input.focusSlots());
       Comparator<Long> order =
@@ -154,10 +164,8 @@ public class DraftBoardSection implements ReplayReportSection {
               .sorted(Comparator.comparingInt(AbilityDraftPickDomain::getPickOrder))
               .map(
                   p ->
-                      labels.label(p.getAbilityName())
-                          + " ("
-                          + (p.getTurnNumber() == null ? p.getPickOrder() : p.getTurnNumber())
-                          + ")")
+                      skillName(p.getAbilityName(), p.getAbilityId())
+                          + (p.getTurnNumber() == null ? "" : " (" + p.getTurnNumber() + ")"))
               .collect(Collectors.joining(", "));
       return who + ": " + chosen;
     }
@@ -172,11 +180,7 @@ public class DraftBoardSection implements ReplayReportSection {
           pool.stream()
               .filter(p -> p.getPickedBySlot() == null)
               .sorted(Comparator.comparing(AbilityDraftPoolDomain::getPoolIndex))
-              .map(
-                  p ->
-                      p.getAbilityName() == null
-                          ? "Skill " + p.getAbilityId()
-                          : labels.label(p.getAbilityName()))
+              .map(p -> skillName(p.getAbilityName(), p.getAbilityId()))
               .toList();
       List<String> rows = new ArrayList<>();
       if (!leftHeroes.isEmpty()) {
@@ -188,6 +192,10 @@ public class DraftBoardSection implements ReplayReportSection {
       return rows.isEmpty()
           ? Optional.empty()
           : Optional.of("**Left over**\n" + String.join("\n", rows));
+    }
+
+    private String skillName(String abilityName, Long abilityId) {
+      return abilityName == null ? "Skill " + abilityId : labels.label(abilityName);
     }
 
     private String team(long slot) {
