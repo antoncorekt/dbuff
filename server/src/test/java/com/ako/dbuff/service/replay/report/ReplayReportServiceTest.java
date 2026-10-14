@@ -724,7 +724,7 @@ class ReplayReportServiceTest {
   void deliver_otherFailuresOfAComponentsMessageAreNotRetriedAsPlainText() {
     properties.setFormat(ReportFormat.COMPONENTS);
     service = serviceWith(bulky("a"));
-    Mockito.doThrow(new IllegalStateException("timeout"))
+    Mockito.doThrow(new java.io.UncheckedIOException(new java.io.IOException("timeout")))
         .when(discord)
         .sendThreadComponentsBlocking(any(), any());
     service.deliver(1L);
@@ -733,6 +733,22 @@ class ReplayReportServiceTest {
     service.deliver(1L);
 
     verify(discord, never()).sendThreadMessageBlocking(any(), any());
+  }
+
+  @Test
+  void deliver_aPayloadJdaRejectsLocallyAlsoFallsBackToPlainText() {
+    properties.setFormat(ReportFormat.COMPONENTS);
+    service = serviceWith(bulky("a"));
+    Mockito.doThrow(new IllegalArgumentException("too long"))
+        .when(discord)
+        .sendThreadComponentsBlocking(any(), any());
+    service.deliver(1L);
+    Mockito.doThrow(new IllegalStateException("too many"))
+        .when(discord)
+        .sendThreadComponentsBlocking(any(), any());
+    service.deliver(1L);
+
+    verify(discord, Mockito.atLeast(2)).sendThreadMessageBlocking(Mockito.eq(thread), any());
   }
 
   @Test

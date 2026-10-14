@@ -47,6 +47,11 @@ class ReplayReportSectionViewTest {
   }
 
   @Test
+  void aTitleLineWithBlanksAroundItIsStillATitle() {
+    assertThat(of("  **Deaths**  ", "x").view(null).orElseThrow().title()).isEqualTo("Deaths");
+  }
+
+  @Test
   void aLineWithBoldInsideIsNotATitleAndNoLinesIsNoView() {
     assertThat(of("**a** and **b**", "x").view(null).orElseThrow().title()).isEmpty();
     assertThat(of().view(null)).isEmpty();

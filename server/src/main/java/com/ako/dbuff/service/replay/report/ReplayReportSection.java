@@ -2,19 +2,15 @@ package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
-import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * One part of the replay analysis posted in a match thread. A section reads the tables the replay
  * analyzers filled and writes plain statements with their game times; it never reads the replay.
  */
 public interface ReplayReportSection {
-  Pattern TITLE_LINE = Pattern.compile("\\*\\*([^*]+)\\*\\*");
 
   /**
    * The stable name of the section, unique among sections; {@code
@@ -53,14 +49,6 @@ public interface ReplayReportSection {
     if (lines.isEmpty()) {
       return Optional.empty();
     }
-    Matcher title = TITLE_LINE.matcher(lines.get(0));
-    boolean titled = title.matches();
-    return Optional.of(
-        new SectionView(
-            titled ? title.group(1) : "",
-            null,
-            Accent.INFO,
-            titled ? lines.subList(1, lines.size()) : lines,
-            null));
+    return Optional.of(SectionView.ofLines(lines));
   }
 }

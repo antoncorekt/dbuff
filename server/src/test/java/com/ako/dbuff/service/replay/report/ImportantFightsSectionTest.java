@@ -178,7 +178,9 @@ class ImportantFightsSectionTest {
   void viewIsNeutralWhenTheTrackedTeamSplitsOrBothTeamsAreTracked() {
     stored(fight(1, 600, "DIRE", 1200L, false), fight(2, 900, "RADIANT", 1200L, false));
 
-    assertThat(section.view(input(0L)).orElseThrow().accent()).isEqualTo(Accent.NEUTRAL);
+    SectionView tied = section.view(input(0L)).orElseThrow();
+    assertThat(tied.accent()).isEqualTo(Accent.NEUTRAL);
+    assertThat(tied.verdict()).isEqualTo("Radiant (your team) split 1 to 1 in important fights");
     SectionView both = section.view(input(2L, 130L)).orElseThrow();
     assertThat(both.accent()).isEqualTo(Accent.NEUTRAL);
     assertThat(both.verdict()).isEqualTo("Radiant and Dire won 1 each");
@@ -217,7 +219,7 @@ class ImportantFightsSectionTest {
     SectionView view = section.view(input(0L)).orElseThrow();
 
     assertThat(view.bullets()).hasSize(3);
-    assertThat(view.verdict()).isEqualTo("Radiant (your team) won 3 of 6 important fights");
+    assertThat(view.verdict()).isEqualTo("Radiant (your team) split 3 to 3 in important fights");
     assertThat(view.accent()).isEqualTo(Accent.NEUTRAL);
   }
 

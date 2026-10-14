@@ -181,8 +181,8 @@ public class ReplayReportService {
       case ReportMessage.Components cards -> {
         try {
           discord.sendThreadComponentsBlocking(channel, cards.components());
-        } catch (ErrorResponseException e) {
-          if (e.getErrorResponse() != ErrorResponse.INVALID_FORM_BODY) {
+        } catch (RuntimeException e) {
+          if (!payloadRejected(e)) {
             throw e;
           }
           log.warn(
@@ -193,6 +193,14 @@ public class ReplayReportService {
         }
       }
     }
+  }
+
+  /** Discord, or JDA before sending, found the components payload itself invalid. */
+  private static boolean payloadRejected(RuntimeException e) {
+    return e instanceof IllegalArgumentException
+        || e instanceof IllegalStateException
+        || (e instanceof ErrorResponseException r
+            && r.getErrorResponse() == ErrorResponse.INVALID_FORM_BODY);
   }
 
   private List<String> plainTexts(String text) {
