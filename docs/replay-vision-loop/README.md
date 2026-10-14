@@ -33,6 +33,7 @@ Recorded hypotheses, not handled in this version:
 - Ward events come from OpenDota's match import, not from an extractor, so the analyzer cannot declare them as a requirement; a match without them gets no rows.
 - Invisibility is taken from the modifier span or the use of an ability or item; its real duration, and invisibility cast on an ally (for example Lycan's wolves), are not modelled.
 - Dust or a sentry held in the stash or by a hero not in the fight is not counted; dust held by a hero in the fight is counted even when he could not have used it.
+- Towers, creeps and nearby heroes are not counted as vision (owner decision), so "no vision" means no ward; the Discord `vision` section (off by default) says the same.
 
 ## Commands
 
