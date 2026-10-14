@@ -2,21 +2,30 @@ package com.ako.dbuff.service.replay.analysis.spike;
 
 import com.ako.dbuff.dao.model.BuildingKillContextDomain;
 import com.ako.dbuff.dao.model.FightDomain;
+import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.GameSpikeDomain;
 import com.ako.dbuff.dao.model.GameSpikeFactorDomain;
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerMinuteDomain;
+import com.ako.dbuff.dao.model.ReplayStateChangeDomain;
 import com.ako.dbuff.dao.repo.BuildingKillContextRepo;
+import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.GameSpikeFactorRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerMinuteRepo;
+import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
+import com.ako.dbuff.service.constant.data.ItemConstant;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
+import com.ako.dbuff.service.replay.analysis.item.ItemKits;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -24,11 +33,30 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @ActiveProfiles("test")
-@Import({SpikeAnalyzer.class, ReplayAnalysisProperties.class})
+@Import({
+  SpikeAnalyzer.class,
+  ReplayAnalysisProperties.class,
+  KeyItemFinder.class,
+  SpikeProperties.class,
+  SpikeAnalyzerTest.Kits.class
+})
 class SpikeAnalyzerTest {
 
   private static final long MATCH = 17L;
 
+  @TestConfiguration
+  static class Kits {
+    @Bean
+    ItemKits kits() {
+      return key ->
+          "black_king_bar".equals(key)
+              ? Optional.of(ItemConstant.builder().cost(3975L).build())
+              : Optional.empty();
+    }
+  }
+
+  @Autowired private FightPlayerRepo fightPlayerRepo;
+  @Autowired private ReplayStateChangeRepo stateRepo;
   @Autowired private SpikeAnalyzer analyzer;
   @Autowired private PlayerTimelineRepo timelineRepo;
   @Autowired private ReplayPlayerMinuteRepo minuteRepo;
@@ -60,6 +88,57 @@ class SpikeAnalyzerTest {
         .filteredOn(f -> f.getFactorType().equals("SOURCE"))
         .extracting("ref", "goldValue")
         .containsExactly(org.assertj.core.groups.Tuple.tuple("HERO_KILLS", 3000L));
+  }
+
+  @Test
+  void analyze_writesOneItemRowForTheKeyItem_andRewritesItOnRerun() {
+    stored(true);
+    fightPlayerRepo.save(
+        FightPlayerDomain.builder()
+            .matchId(MATCH)
+            .fightIndex(0)
+            .playerSlot(3L)
+            .presence("ACTIVE")
+            .build());
+    stateRepo.save(item(3L, "item_black_king_bar", 120.0));
+    stateRepo.save(item(4L, "item_black_king_bar", 125.0));
+    stateRepo.save(item(3L, "item_unknown", 130.0));
+
+    analyzer.analyze(MATCH);
+    analyzer.analyze(MATCH);
+
+    assertThat(factorRepo.findByMatchId(MATCH))
+        .filteredOn(f -> f.getFactorType().equals("ITEM"))
+        .singleElement()
+        .satisfies(
+            f -> {
+              assertThat(f.getRef()).isEqualTo("black_king_bar");
+              assertThat(f.getPlayerSlot()).isEqualTo(3L);
+              assertThat(f.getGoldValue()).isEqualTo(3975L);
+              assertThat(f.getSharePercent()).isNull();
+              assertThat(f.getDetail()).isEqualTo("120");
+            });
+    assertThat(spikeRepo.findByMatchId(MATCH).getFirst().getAnalysisVersion()).isEqualTo(2);
+  }
+
+  @Test
+  void analyze_writesNoItemRowWhenTheOwnerWasNotActive() {
+    stored(true);
+    stateRepo.save(item(3L, "item_black_king_bar", 120.0));
+
+    analyzer.analyze(MATCH);
+
+    assertThat(factorRepo.findByMatchId(MATCH)).extracting("factorType").doesNotContain("ITEM");
+  }
+
+  private ReplayStateChangeDomain item(long slot, String name, double seconds) {
+    return ReplayStateChangeDomain.builder()
+        .matchId(MATCH)
+        .playerSlot(slot)
+        .name(name)
+        .gameSeconds(seconds)
+        .kind("ITEM_ADDED")
+        .build();
   }
 
   @Test

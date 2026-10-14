@@ -14,7 +14,8 @@ import lombok.NoArgsConstructor;
 
 /**
  * One piece of evidence for a swing: a source of gold that moved, or a fight, a building or a
- * buyback inside it. Shares overlap, so they are evidence, not an exact split of the swing.
+ * buyback inside it, or the item completed just before it. Shares overlap, so they are evidence,
+ * not an exact split of the swing. Readers must ignore a factor type they do not know.
  */
 @Entity
 @Table(indexes = @Index(name = "idx_game_spike_factor_match", columnList = "matchId, spikeIndex"))
@@ -34,21 +35,23 @@ public class GameSpikeFactorDomain {
   private Long matchId;
   private Integer spikeIndex;
 
-  /** SOURCE, FIGHT, OBJECTIVE or BUYBACK. */
+  /** SOURCE, FIGHT, OBJECTIVE, BUYBACK or ITEM. */
   private String factorType;
 
-  /** What it refers to: a gold source, a fight index or a building name. */
+  /** What it refers to: a gold source, a fight index, a building name or an item name. */
   private String ref;
 
   /** The player it concerns, when it concerns one. */
   private Long playerSlot;
 
-  /** The gold it is worth to the benefiting team, null for a fight. */
+  /** The gold it is worth to the benefiting team, null for a fight; the cost of an ITEM. */
   private Long goldValue;
 
   /** Its share of the swing; null when it has no gold value. */
   private Double sharePercent;
 
+  /** Extra text; for an ITEM the second it was completed, as a number. */
   private String detail;
+
   private Integer analysisVersion;
 }
