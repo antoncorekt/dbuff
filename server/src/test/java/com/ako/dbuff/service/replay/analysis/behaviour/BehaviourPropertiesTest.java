@@ -45,5 +45,7 @@ class BehaviourPropertiesTest {
     rejects(p -> p.setSmokeGroupSeconds(-1), "smoke-group-seconds");
     rejects(p -> p.setSmokeExpirySlackSeconds(-0.5), "smoke-expiry-slack-seconds");
     rejects(p -> p.setSmokeOutcomeSeconds(0), "smoke-outcome-seconds");
+    rejects(p -> p.setObjectiveWindowSeconds(0), "objective-window-seconds");
+    rejects(p -> p.setRoshanNearRadius(0), "roshan-near-radius");
   }
 }

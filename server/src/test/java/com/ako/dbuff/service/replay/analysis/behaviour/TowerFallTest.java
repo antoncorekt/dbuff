@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.BuildingKillContextDomain;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.map.Zone;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,8 +27,8 @@ class TowerFallTest {
 
     assertThat(falls)
         .containsExactly(
-            new TowerFall(TeamSide.DIRE, 100.0, Zone.Lane.TOP, true),
-            new TowerFall(TeamSide.DIRE, 100.0, null, false));
+            new TowerFall(TeamSide.DIRE, 100.0, Zone.Lane.TOP, true, Set.of(), "TOWER", null, null),
+            new TowerFall(TeamSide.DIRE, 100.0, null, false, Set.of(), "TOWER", null, null));
   }
 
   @Test

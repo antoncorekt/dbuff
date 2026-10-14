@@ -66,6 +66,12 @@ public class BehaviourProperties {
   /** A smoke is judged by what its group did from its start to this long after its end. */
   private int smokeOutcomeSeconds = 20;
 
+  /** A won important fight counts as converted when an objective falls this long after it. */
+  private int objectiveWindowSeconds = 90;
+
+  /** Heroes of the winner this close to the hero who killed Roshan were at the pit. */
+  private int roshanNearRadius = 1500;
+
   @PostConstruct
   void validate() {
     require(minClusterSize >= 2, "min-cluster-size must be at least 2, not " + minClusterSize);
@@ -108,6 +114,11 @@ public class BehaviourProperties {
     require(
         smokeOutcomeSeconds >= 1,
         "smoke-outcome-seconds must be at least 1, not " + smokeOutcomeSeconds);
+    require(
+        objectiveWindowSeconds >= 1,
+        "objective-window-seconds must be at least 1, not " + objectiveWindowSeconds);
+    require(
+        roshanNearRadius >= 1, "roshan-near-radius must be at least 1, not " + roshanNearRadius);
   }
 
   private static void require(boolean ok, String message) {

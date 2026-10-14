@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.behaviourloop;
 import com.ako.dbuff.dao.model.PlayerRoleDomain;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
+import com.ako.dbuff.dao.repo.ObjectiveConversionRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleRepo;
 import com.ako.dbuff.dao.repo.SmokeUseRepo;
 import com.ako.dbuff.dao.repo.TeamLaneSwapRepo;
@@ -24,7 +25,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * The team behaviour learning loop: rotations of heroes away from their team's group, group or
- * split stretches, lane swaps, smoke uses.
+ * split stretches, lane swaps, smoke uses, objectives after won fights.
  */
 @Component
 @RequiredArgsConstructor
@@ -35,7 +36,8 @@ class BehaviourLoopTopic implements ReviewLoopTopic {
           new Section(BehaviourLoopReport.ROTATIONS, "", 1),
           new Section(BehaviourSplitSections.STRETCHES, "", 1),
           new Section(BehaviourSplitSections.SWAPS, "", 1),
-          new Section(BehaviourSmokeSection.SMOKE, "", 1));
+          new Section(BehaviourSmokeSection.SMOKE, "", 1),
+          new Section(BehaviourObjectiveSection.OBJECTIVES, "", 1));
 
   private final StoredMatchModes matchModes;
   private final MatchRepo matchRepo;
@@ -45,6 +47,7 @@ class BehaviourLoopTopic implements ReviewLoopTopic {
   private final TeamSplitStretchRepo stretchRepo;
   private final TeamLaneSwapRepo swapRepo;
   private final SmokeUseRepo smokeRepo;
+  private final ObjectiveConversionRepo objectiveRepo;
   private final PlayerRoleRepo roleRepo;
   private final BehaviourProperties properties;
 
@@ -83,6 +86,7 @@ class BehaviourLoopTopic implements ReviewLoopTopic {
             stretchRepo.findByMatchId(matchId),
             swapRepo.findByMatchId(matchId),
             smokeRepo.findByMatchId(matchId),
+            objectiveRepo.findByMatchId(matchId),
             roles(matchId),
             properties));
   }
