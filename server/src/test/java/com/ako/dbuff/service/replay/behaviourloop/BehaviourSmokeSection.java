@@ -7,6 +7,7 @@ import com.ako.dbuff.service.replay.analysis.behaviour.SmokeUse;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
+import com.ako.dbuff.service.replay.report.BehaviourWording;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -90,9 +91,9 @@ final class BehaviourSmokeSection {
                             LoopWording.team(s.getTeam()),
                             LoopWording.hero(heroNames, s.getUserSlot()),
                             LoopWording.clock(s.getStartSeconds()),
-                            ReviewLoopReport.tableCell(group(s, heroNames)),
+                            ReviewLoopReport.tableCell(BehaviourWording.group(s, heroNames)),
                             ReviewLoopReport.tableCell(span(s)),
-                            ReviewLoopReport.tableCell(where(s)),
+                            ReviewLoopReport.tableCell(BehaviourWording.smokeWhere(s)),
                             outcome(s),
                             ReviewLoopReport.tableCell(happened(s, heroNames)))));
     return out;
@@ -103,13 +104,6 @@ final class BehaviourSmokeSection {
     return smokes.stream().filter(s -> value.equals(column.apply(s))).count();
   }
 
-  private static String group(SmokeUseDomain s, Map<Long, String> heroNames) {
-    return Arrays.stream(s.getGroupSlots().split(","))
-        .map(Long::parseLong)
-        .map(slot -> LoopWording.hero(heroNames, slot))
-        .collect(Collectors.joining(", "));
-  }
-
   private static String span(SmokeUseDomain s) {
     SmokeUse.End end = Enums.find(SmokeUse.End.class, s.getEndReason());
     return "%s to %s (%d s), the smoke %s"
@@ -118,21 +112,6 @@ final class BehaviourSmokeSection {
             LoopWording.clock(s.getEndSeconds()),
             s.getEndSeconds() - s.getStartSeconds(),
             end == null ? "?" : end.words());
-  }
-
-  private static String where(SmokeUseDomain s) {
-    boolean startKnown = s.getStartZone() != null;
-    boolean endKnown = s.getEndZone() != null;
-    String start = LoopWording.place(s.getStartZone(), s.getStartLane());
-    String end = LoopWording.place(s.getEndZone(), s.getEndLane());
-    if (!startKnown || !endKnown) {
-      return startKnown
-          ? "started in the %s, end not known".formatted(start)
-          : endKnown ? "start not known, ended in the %s".formatted(end) : "not known";
-    }
-    return start.equals(end)
-        ? "stayed in the " + start
-        : "from the %s to the %s".formatted(start, end);
   }
 
   private static String outcome(SmokeUseDomain s) {

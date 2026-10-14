@@ -37,7 +37,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class LanesSection implements ReplayReportSection {
   private static final int MAX_REASONS = 2;
-  private static final String ELLIPSIS = "...";
   private static final String UNKNOWN_HERO = "an unknown hero";
 
   private final LaneResultRepo resultRepo;
@@ -154,7 +153,7 @@ public class LanesSection implements ReplayReportSection {
     String fixed = heroLine.isEmpty() ? head.toString() : head + " " + heroLine;
     List<String> why = why(pair.sides(), reasons);
     String note = levelNote(reasons).map(n -> " " + n + ".").orElse("");
-    int max = Math.max(ELLIPSIS.length() + 1, properties.getMaxLaneLineLength());
+    int max = Math.max(LineText.ELLIPSIS.length() + 1, properties.getMaxLaneLineLength());
     for (int count = why.size(); count >= 0; count--) {
       String line =
           fixed
@@ -164,21 +163,7 @@ public class LanesSection implements ReplayReportSection {
         return line;
       }
     }
-    return cut(fixed + note, max);
-  }
-
-  static String cut(String line, int max) {
-    if (line.length() <= max) {
-      return line;
-    }
-    int end = max - ELLIPSIS.length();
-    int space = line.lastIndexOf(' ', end);
-    if (space > 0) {
-      end = space;
-    } else if (Character.isHighSurrogate(line.charAt(end - 1))) {
-      end--;
-    }
-    return line.substring(0, end).stripTrailing() + ELLIPSIS;
+    return LineText.cut(fixed + note, max);
   }
 
   private static Optional<String> duration(LaneResultDomain row) {

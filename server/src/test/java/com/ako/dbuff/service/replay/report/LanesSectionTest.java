@@ -254,7 +254,7 @@ class LanesSectionTest {
     String text = "X".repeat(10) + "\uD83D\uDE00".repeat(20);
 
     for (int max = 8; max < 30; max++) {
-      String cut = LanesSection.cut(text, max);
+      String cut = LineText.cut(text, max);
       assertThat(cut).hasSizeLessThanOrEqualTo(max).endsWith("...");
       assertThat(Character.isHighSurrogate(cut.charAt(cut.length() - 4))).isFalse();
     }

@@ -16,6 +16,7 @@ public class ReplayReportProperties {
   private static final int MIN_LANE_LINE_LENGTH = 60;
   private static final int MAX_LANE_LINE_LENGTH = 600;
   private static final double MAX_LANE_MARGIN = 2;
+  private static final int MAX_BEHAVIOUR_LINES = 10;
 
   /** The server-wide switch; nothing is posted until it is turned on. */
   private boolean enabled = false;
@@ -50,6 +51,15 @@ public class ReplayReportProperties {
   /** The longest a lane's line may be; a longer one ends in an ellipsis. */
   private int maxLaneLineLength = 400;
 
+  /** The most lines the team rotations section lists. */
+  private int maxRotationLines = 4;
+
+  /** The most lines the smoke section lists. */
+  private int maxSmokeLines = 3;
+
+  /** The longest a rotation or smoke line may be; a longer one ends in an ellipsis. */
+  private int maxBehaviourLineLength = 400;
+
   /** How far back a finished replay run is looked at for an analysis not yet posted. */
   private int lookbackHours = 48;
 
@@ -62,22 +72,16 @@ public class ReplayReportProperties {
    */
   @PostConstruct
   public void validate() {
-    if (maxImportantFightLines < 1 || maxImportantFightLines > MAX_IMPORTANT_FIGHT_LINES) {
-      throw new IllegalStateException(
-          "replay.report.max-important-fight-lines must be 1 to "
-              + MAX_IMPORTANT_FIGHT_LINES
-              + ", got "
-              + maxImportantFightLines);
-    }
-    if (maxLaneLineLength < MIN_LANE_LINE_LENGTH || maxLaneLineLength > MAX_LANE_LINE_LENGTH) {
-      throw new IllegalStateException(
-          "replay.report.max-lane-line-length must be "
-              + MIN_LANE_LINE_LENGTH
-              + " to "
-              + MAX_LANE_LINE_LENGTH
-              + ", got "
-              + maxLaneLineLength);
-    }
+    requireRange("max-important-fight-lines", maxImportantFightLines, 1, MAX_IMPORTANT_FIGHT_LINES);
+    requireRange("max-rotation-lines", maxRotationLines, 1, MAX_BEHAVIOUR_LINES);
+    requireRange("max-smoke-lines", maxSmokeLines, 1, MAX_BEHAVIOUR_LINES);
+    requireRange(
+        "max-behaviour-line-length",
+        maxBehaviourLineLength,
+        MIN_LANE_LINE_LENGTH,
+        MAX_LANE_LINE_LENGTH);
+    requireRange(
+        "max-lane-line-length", maxLaneLineLength, MIN_LANE_LINE_LENGTH, MAX_LANE_LINE_LENGTH);
     if (!(laneClearMargin > 0
         && laneClearMargin < laneBigMargin
         && laneBigMargin <= MAX_LANE_MARGIN)) {
@@ -88,6 +92,13 @@ public class ReplayReportProperties {
               + laneClearMargin
               + " and "
               + laneBigMargin);
+    }
+  }
+
+  private static void requireRange(String name, int value, int min, int max) {
+    if (value < min || value > max) {
+      throw new IllegalStateException(
+          "replay.report." + name + " must be " + min + " to " + max + ", got " + value);
     }
   }
 
