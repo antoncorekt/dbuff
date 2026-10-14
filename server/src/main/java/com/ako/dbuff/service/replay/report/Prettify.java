@@ -21,6 +21,11 @@ public final class Prettify {
     return words(name);
   }
 
+  /** {@code RADIANT} to {@code Radiant}; any other value is the Dire side. */
+  static String team(String stored) {
+    return "RADIANT".equals(stored) ? "Radiant" : "Dire";
+  }
+
   /** A replay entity name: {@code PhantomAssassin} to {@code Phantom Assassin}. */
   static String entity(String camelCase) {
     return camelCase == null ? "" : camelCase.replaceAll("([a-z0-9])([A-Z])", "$1 $2");

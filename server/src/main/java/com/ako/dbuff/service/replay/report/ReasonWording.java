@@ -2,11 +2,13 @@ package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
+import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.RankedReason;
 import com.ako.dbuff.service.replay.analysis.rune.RuneEvidence;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -64,6 +66,28 @@ public final class ReasonWording {
       return hero + " " + code.toLowerCase(Locale.ROOT).replace('_', ' ');
     }
     return evidence.startsWith(hero) ? evidence : hero + ": " + evidence;
+  }
+
+  /**
+   * The phrase of a reason with its hero looked up by slot; empty for a player reason whose hero is
+   * not known.
+   */
+  public static Optional<String> phrase(FightReasonDomain reason, Map<Long, String> heroes) {
+    String hero = reason.getSubjectSlot() == null ? null : heroes.get(reason.getSubjectSlot());
+    if (hero == null && !TEAM_REASON.equals(reason.getScope())) {
+      return Optional.empty();
+    }
+    return Optional.of(phrase(reason, hero));
+  }
+
+  /** The first {@code limit} ranked reasons that can be worded, joined with commas. */
+  public static String ranked(List<RankedReason> reasons, Map<Long, String> heroes, int limit) {
+    return reasons.stream()
+        .filter(RankedReason::ranked)
+        .map(r -> phrase(r.reason(), heroes))
+        .flatMap(Optional::stream)
+        .limit(limit)
+        .collect(Collectors.joining(", "));
   }
 
   private static String teamPhrase(String code, String evidence) {

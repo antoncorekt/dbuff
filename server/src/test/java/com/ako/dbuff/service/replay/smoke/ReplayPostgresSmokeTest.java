@@ -67,11 +67,16 @@ import com.ako.dbuff.service.replay.report.CompositionSection;
 import com.ako.dbuff.service.replay.report.DeathSection;
 import com.ako.dbuff.service.replay.report.DraftSection;
 import com.ako.dbuff.service.replay.report.FightSection;
+import com.ako.dbuff.service.replay.report.ImportantFightsSection;
 import com.ako.dbuff.service.replay.report.MovementSection;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.SwingSection;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -144,6 +149,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private PlayerRoleProfileRepo roleProfileRepo;
   @Autowired private TeamCompositionRepo compositionRepo;
   @Autowired private SwingSection swingSection;
+  @Autowired private ImportantFightsSection importantFightsSection;
   @Autowired private DeathSection deathSection;
   @Autowired private FightSection fightSection;
   @Autowired private MovementSection movementSection;
@@ -583,6 +589,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(String.join("\n", swingLines))
         .as("%s: swings fit a message", id)
         .hasSizeLessThan(2000);
+    saveImportantFights(id, matchId);
     System.out.println(
         "FIGHT LOSS "
             + id
@@ -591,6 +598,21 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
             + " lost fights, "
             + explanations.stream().filter(e -> e.getReasonCount() == 0).count()
             + " without a reason");
+  }
+
+  private void saveImportantFights(String id, long matchId) {
+    List<String> lines =
+        importantFightsSection.lines(new ReplayReportInput(matchId, null, Set.of(), Map.of(), 3));
+    String text = String.join("\n", lines);
+    System.out.println("IMPORTANT FIGHTS " + id + "\n" + text);
+    assertThat(text).as("%s: important fights fit a message", id).hasSizeLessThan(2000);
+    try {
+      Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
+      Files.createDirectories(dir);
+      Files.writeString(dir.resolve("section-important-fights-" + id + ".txt"), text + "\n");
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   /** Derives the expected rows from the stored roles, fight players and compositions. */
