@@ -200,12 +200,12 @@ public class LastMatchesProcessorService {
 
       // Send partial report (header + thread + partial-data analyzers)
       RecentMatch recent = recentMatches.get(match.getId());
-      var partialResult =
-          matchReportOrchestrator.processAndReportPartial(
-              match,
-              config,
-              new NewMatchSummary(
-                  recent.duration(), recent.gameMode(), linesByMatch.get(match.getId())));
+      NewMatchSummary summary =
+          recent == null
+              ? NewMatchSummary.empty()
+              : new NewMatchSummary(
+                  recent.duration(), recent.gameMode(), linesByMatch.get(match.getId()));
+      var partialResult = matchReportOrchestrator.processAndReportPartial(match, config, summary);
 
       // Schedule parse-wait job with discord thread ID and header message ID for full report later
       Long discordThreadId = partialResult != null ? partialResult.threadId() : null;

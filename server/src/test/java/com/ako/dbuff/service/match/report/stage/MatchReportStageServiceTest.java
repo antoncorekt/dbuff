@@ -103,6 +103,10 @@ class MatchReportStageServiceTest {
         .build();
   }
 
+  private static MatchDomain timedOutMatch() {
+    return MatchDomain.builder().id(MATCH).build();
+  }
+
   private static MatchDomain parsedMatch() {
     return MatchDomain.builder()
         .id(MATCH)
@@ -250,7 +254,8 @@ class MatchReportStageServiceTest {
         .editComponentsMessage(anyString(), anyLong(), anyList());
 
     assertThatCode(() -> service.parsed(parsedMatch(), config)).doesNotThrowAnyException();
-    assertThatCode(() -> service.parseTimedOut(MATCH, INSTANCE)).doesNotThrowAnyException();
+    assertThatCode(() -> service.parseTimedOut(timedOutMatch(), INSTANCE))
+        .doesNotThrowAnyException();
   }
 
   @Test
@@ -261,7 +266,7 @@ class MatchReportStageServiceTest {
         .when(discord)
         .editComponentsMessage(anyString(), anyLong(), anyList());
 
-    service.parseTimedOut(MATCH, INSTANCE);
+    service.parseTimedOut(timedOutMatch(), INSTANCE);
 
     verify(discord)
         .editMessage(eq(CHANNEL), eq(500L), org.mockito.ArgumentMatchers.contains("did not parse"));
@@ -272,7 +277,7 @@ class MatchReportStageServiceTest {
     MatchReportThreadDomain row = row(MatchReportStage.REQUESTED);
     when(threadRepo.findByMatchIdAndInstanceId(MATCH, INSTANCE)).thenReturn(Optional.of(row));
 
-    service.parseTimedOut(MATCH, INSTANCE);
+    service.parseTimedOut(timedOutMatch(), INSTANCE);
 
     assertThat(editedTitle())
         .isEqualTo(
@@ -281,11 +286,87 @@ class MatchReportStageServiceTest {
   }
 
   @Test
+  void aLegacyRowIsNeverEditedAsV2_butTheTimeoutIsToldInPlainText() {
+    MatchReportThreadDomain legacy = row(null);
+    when(threadRepo.findByMatchIdAndInstanceId(MATCH, INSTANCE)).thenReturn(Optional.of(legacy));
+    statsOfTrackedPlayer();
+
+    service.parsed(parsedMatch(), config);
+    service.parseTimedOut(timedOutMatch(), INSTANCE);
+
+    verify(discord, never()).editComponentsMessage(anyString(), anyLong(), anyList());
+    verify(discord)
+        .editMessage(eq(CHANNEL), eq(500L), org.mockito.ArgumentMatchers.contains("did not parse"));
+    assertThat(legacy.getStage()).isNull();
+    assertThat(service.ownsHeader(MATCH, INSTANCE)).isFalse();
+  }
+
+  @Test
+  void aStagedRowOwnsItsHeaderOnlyWhileTheSwitchIsOn() {
+    when(threadRepo.findByMatchIdAndInstanceId(MATCH, INSTANCE))
+        .thenReturn(Optional.of(row(MatchReportStage.REQUESTED)));
+
+    assertThat(service.ownsHeader(MATCH, INSTANCE)).isTrue();
+    properties.setEnabled(false);
+    assertThat(service.ownsHeader(MATCH, INSTANCE)).isFalse();
+  }
+
+  @Test
+  void theStageNeverMovesBackwards() {
+    statsOfTrackedPlayer();
+    MatchReportThreadDomain done = row(MatchReportStage.REPLAY_DONE);
+    when(threadRepo.findByMatchIdAndInstanceId(MATCH, INSTANCE)).thenReturn(Optional.of(done));
+    when(forecast.isExpected(any())).thenReturn(true);
+
+    service.parsed(parsedMatch(), config);
+    service.parseTimedOut(timedOutMatch(), INSTANCE);
+
+    verify(discord, never()).editComponentsMessage(anyString(), anyLong(), anyList());
+    verify(threadRepo, never()).save(any());
+    assertThat(done.getStage()).isEqualTo(MatchReportStage.REPLAY_DONE);
+  }
+
+  @Test
+  void theStageIsStoredOnlyWhenDiscordShowsTheNewTitle() {
+    statsOfTrackedPlayer();
+    MatchReportThreadDomain row = row(MatchReportStage.REQUESTED);
+    when(threadRepo.findByMatchIdAndInstanceId(MATCH, INSTANCE)).thenReturn(Optional.of(row));
+    org.mockito.Mockito.doThrow(new RuntimeException("Unknown Message"))
+        .when(discord)
+        .editComponentsMessage(anyString(), anyLong(), anyList());
+
+    service.parsed(parsedMatch(), config);
+
+    assertThat(row.getStage()).isEqualTo(MatchReportStage.REQUESTED);
+    verify(threadRepo, never()).save(any());
+  }
+
+  @Test
+  void theTimeoutTitleKeepsTheScoreOnceKnown() {
+    MatchReportThreadDomain row = row(MatchReportStage.REQUESTED);
+    when(threadRepo.findByMatchIdAndInstanceId(MATCH, INSTANCE)).thenReturn(Optional.of(row));
+
+    service.parseTimedOut(parsedMatch(), INSTANCE);
+
+    assertThat(editedTitle()).contains("(40-25)");
+  }
+
+  @Test
+  void stageOne_keepsTheHeaderIdWhenTheThreadCannotBeMade() {
+    when(discord.createThread(any(), anyString())).thenThrow(new RuntimeException("no permission"));
+
+    PartialReportResult result =
+        service.start(MatchDomain.builder().id(MATCH).build(), config, summary(), Map.of());
+
+    assertThat(result).isEqualTo(new PartialReportResult(0L, 500L));
+  }
+
+  @Test
   void switchedOff_nothingIsEditedOrLookedUp() {
     properties.setEnabled(false);
 
     service.parsed(parsedMatch(), config);
-    service.parseTimedOut(MATCH, INSTANCE);
+    service.parseTimedOut(timedOutMatch(), INSTANCE);
 
     org.mockito.Mockito.verifyNoInteractions(discord, threadRepo);
     assertThat(service.enabled()).isFalse();

@@ -42,8 +42,8 @@ class HeaderRendererTest {
         Arguments.of(
             MatchReportStage.PARSE_TIMED_OUT,
             new Result(1, 1),
-            "Match 77 · ability draft · Mixed (1W/1L) · 35 min · OpenDota did not parse this"
-                + " match"),
+            "Match 77 · ability draft · Mixed (1W/1L) (40-25) · 35 min · OpenDota did not parse"
+                + " this match"),
         Arguments.of(
             MatchReportStage.REPLAY_DONE,
             win,
@@ -133,5 +133,19 @@ class HeaderRendererTest {
   void readableModeStripsThePrefix() {
     assertThat(MatchFacts.readableMode("game_mode_all_draft")).isEqualTo("all draft");
     assertThat(MatchFacts.readableMode(null)).isNull();
+  }
+
+  @Test
+  void stagesMoveOnlyForward() {
+    assertThat(MatchReportStage.PARSED.mayFollow(MatchReportStage.REQUESTED)).isTrue();
+    assertThat(MatchReportStage.REPLAY_DONE.mayFollow(MatchReportStage.REPLAY_PENDING)).isTrue();
+    assertThat(MatchReportStage.REPLAY_PENDING.mayFollow(MatchReportStage.REPLAY_DONE)).isFalse();
+    assertThat(MatchReportStage.PARSED.mayFollow(MatchReportStage.PARSED)).isFalse();
+    assertThat(MatchReportStage.REPLAY_UNAVAILABLE.mayFollow(MatchReportStage.REPLAY_DONE))
+        .isFalse();
+    assertThat(MatchReportStage.PARSE_TIMED_OUT.mayFollow(MatchReportStage.REQUESTED)).isTrue();
+    assertThat(MatchReportStage.PARSE_TIMED_OUT.mayFollow(MatchReportStage.PARSED)).isFalse();
+    assertThat(MatchReportStage.PARSED.mayFollow(MatchReportStage.PARSE_TIMED_OUT)).isFalse();
+    assertThat(MatchReportStage.PARSED.mayFollow(null)).isFalse();
   }
 }

@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.match.report.stage;
 
+import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.MatchReportThreadDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.service.match.DotaApiLastMatchesService.PlayerLine;
@@ -74,13 +75,19 @@ public record MatchFacts(
     return name.replace('_', ' ');
   }
 
-  public static MatchFacts fromRow(MatchReportThreadDomain row) {
+  /** The facts kept on the row, with the scores of the match when it is known. */
+  public static MatchFacts fromRow(MatchReportThreadDomain row, MatchDomain match) {
     Result result =
         row.getWins() == null || row.getLosses() == null
             ? new Result(0, 0)
             : new Result(row.getWins(), row.getLosses());
     return new MatchFacts(
-        row.getMatchId(), row.getModeName(), result, row.getDurationSeconds(), null, null);
+        row.getMatchId(),
+        row.getModeName(),
+        result,
+        row.getDurationSeconds(),
+        match == null ? null : match.getRadiantScore(),
+        match == null ? null : match.getDireScore());
   }
 
   public Accent accent() {

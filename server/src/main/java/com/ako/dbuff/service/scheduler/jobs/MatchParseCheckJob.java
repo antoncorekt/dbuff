@@ -58,7 +58,7 @@ public class MatchParseCheckJob implements Job {
       match.setError("Parse timeout exceeded");
       match.setEndProcess(LocalDateTime.now());
       matchRepo.save(match);
-      stageService.parseTimedOut(matchId, instanceId);
+      stageService.parseTimedOut(match, instanceId);
       matchParseSchedulerService.unscheduleParseWait(matchId);
       return;
     }

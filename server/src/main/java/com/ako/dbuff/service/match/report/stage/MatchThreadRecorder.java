@@ -43,12 +43,10 @@ public class MatchThreadRecorder {
       row.setHeaderMessageId(headerMessage.getIdLong());
       row.setCreatedAt(LocalDateTime.now());
       row.setStage(stage);
-      if (facts != null) {
-        row.setModeName(facts.mode());
-        row.setWins(facts.result().wins());
-        row.setLosses(facts.result().losses());
-        row.setDurationSeconds(facts.durationSeconds());
-      }
+      row.setModeName(facts == null ? null : facts.mode());
+      row.setWins(facts == null ? null : facts.result().wins());
+      row.setLosses(facts == null ? null : facts.result().losses());
+      row.setDurationSeconds(facts == null ? null : facts.durationSeconds());
       threadRepo.save(row);
     } catch (RuntimeException e) {
       log.warn("Could not remember the thread of match {}", match.getId(), e);

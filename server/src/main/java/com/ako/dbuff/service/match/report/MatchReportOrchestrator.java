@@ -163,7 +163,7 @@ public class MatchReportOrchestrator {
     MatchReportContext context = buildContext(match, config, focusPlayerIds);
 
     // Update header with full match info
-    if (headerMessageId > 0 && !stageService.enabled()) {
+    if (headerMessageId > 0 && !stageService.ownsHeader(match.getId(), config.getId())) {
       String winLoss = determineWinLoss(context);
       String fullHeader = headerRenderer.legacyParsed(match, winLoss);
       discordMessageService.editMessage(config.getDiscordChannelId(), headerMessageId, fullHeader);

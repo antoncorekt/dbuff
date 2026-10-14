@@ -42,29 +42,61 @@ public class MatchReportStageService {
     return properties.isEnabled();
   }
 
-  /** Stage 1: header, thread and card. Null when the header could not be posted. */
+  /**
+   * Whether the staged header of the match is a Components V2 message this service retitles. False
+   * with the switch off and for a thread whose header was posted as plain text before the switch
+   * was turned on (a row without a stage): that one is only ever edited as text.
+   */
+  public boolean ownsHeader(long matchId, String instanceId) {
+    if (!properties.isEnabled() || instanceId == null) {
+      return false;
+    }
+    try {
+      return recorder.find(matchId, instanceId).map(this::ownsHeader).orElse(false);
+    } catch (RuntimeException e) {
+      log.warn("Could not look up the thread of match {}: {}", matchId, e.getMessage());
+      return false;
+    }
+  }
+
+  private boolean ownsHeader(MatchReportThreadDomain row) {
+    return row.getStage() != null;
+  }
+
+  /**
+   * Stage 1: header, thread and card. Null when the header could not be posted; the thread id is 0
+   * when the header exists but its thread could not be made.
+   */
   public PartialReportResult start(
       MatchDomain match,
       DbufInstanceConfigDomain config,
       NewMatchSummary summary,
       Map<Long, String> playerNames) {
+    Message header;
+    MatchFacts facts;
     try {
-      MatchFacts facts = factsFactory.fromSummary(match.getId(), summary);
-      Message header =
+      facts = factsFactory.fromSummary(match.getId(), summary);
+      header =
           publisher.create(
               config.getDiscordChannelId(), headers.render(MatchReportStage.REQUESTED, facts));
-      if (header == null) {
-        log.warn("Failed to send header for match {}", match.getId());
-        return null;
-      }
+    } catch (RuntimeException e) {
+      log.warn("Stage 1 of match {} failed: {}", match.getId(), e.getMessage(), e);
+      return null;
+    }
+    if (header == null) {
+      log.warn("Failed to send header for match {}", match.getId());
+      return null;
+    }
+    try {
       ThreadChannel thread = discord.createThread(header, "Match " + match.getId());
       recorder.remember(match, config, thread, header, MatchReportStage.REQUESTED, facts);
       postCard(thread, cardBuilder.build(facts, summary.lines(), playerNames));
       log.info("Stage 1 sent for match {} in thread {}", match.getId(), thread.getIdLong());
       return new PartialReportResult(thread.getIdLong(), header.getIdLong());
     } catch (RuntimeException e) {
-      log.warn("Stage 1 of match {} failed: {}", match.getId(), e.getMessage(), e);
-      return null;
+      log.warn(
+          "Stage 1 of match {} went on without its thread: {}", match.getId(), e.getMessage(), e);
+      return new PartialReportResult(0L, header.getIdLong());
     }
   }
 
@@ -76,43 +108,68 @@ public class MatchReportStageService {
     try {
       MatchReportStage stage =
           forecast.isExpected(match) ? MatchReportStage.REPLAY_PENDING : MatchReportStage.PARSED;
-      retitle(match.getId(), config.getId(), stage, factsFactory.fromParsed(match, config));
+      recorder
+          .find(match.getId(), config.getId())
+          .ifPresentOrElse(
+              row -> {
+                if (ownsHeader(row)) {
+                  retitle(row, stage, factsFactory.fromParsed(match, config));
+                }
+              },
+              () ->
+                  log.debug("No thread of match {} in instance {}", match.getId(), config.getId()));
     } catch (RuntimeException e) {
       log.warn("Stage 2 of match {} failed: {}", match.getId(), e.getMessage(), e);
     }
   }
 
   /** OpenDota never parsed the match; the header keeps what stage 1 said and states that. */
-  public void parseTimedOut(long matchId, String instanceId) {
+  public void parseTimedOut(MatchDomain match, String instanceId) {
     if (!properties.isEnabled() || instanceId == null) {
       return;
     }
     try {
       recorder
-          .find(matchId, instanceId)
+          .find(match.getId(), instanceId)
           .ifPresentOrElse(
-              row -> edit(row, MatchReportStage.PARSE_TIMED_OUT, MatchFacts.fromRow(row)),
-              () -> log.debug("No thread of match {} in instance {}", matchId, instanceId));
+              row -> timedOut(row, match),
+              () -> log.debug("No thread of match {} in instance {}", match.getId(), instanceId));
     } catch (RuntimeException e) {
-      log.warn("Timeout title of match {} failed: {}", matchId, e.getMessage(), e);
+      log.warn("Timeout title of match {} failed: {}", match.getId(), e.getMessage(), e);
     }
   }
 
-  private void retitle(long matchId, String instanceId, MatchReportStage stage, MatchFacts facts) {
-    recorder
-        .find(matchId, instanceId)
-        .ifPresentOrElse(
-            row -> edit(row, stage, facts),
-            () -> log.debug("No thread of match {} in instance {}", matchId, instanceId));
+  private void timedOut(MatchReportThreadDomain row, MatchDomain match) {
+    MatchFacts facts = MatchFacts.fromRow(row, match);
+    if (ownsHeader(row)) {
+      retitle(row, MatchReportStage.PARSE_TIMED_OUT, facts);
+    } else if (row.getHeaderMessageId() != null && row.getChannelId() != null) {
+      editPlain(row, headers.title(MatchReportStage.PARSE_TIMED_OUT, facts));
+    }
   }
 
-  private void edit(MatchReportThreadDomain row, MatchReportStage stage, MatchFacts facts) {
+  private void editPlain(MatchReportThreadDomain row, String title) {
+    try {
+      discord.editMessage(row.getChannelId(), row.getHeaderMessageId(), title);
+    } catch (RuntimeException e) {
+      log.warn("Could not edit header message {}: {}", row.getHeaderMessageId(), e.getMessage());
+    }
+  }
+
+  /** The stored stage moves only forward, and only once Discord shows the new title. */
+  private void retitle(MatchReportThreadDomain row, MatchReportStage stage, MatchFacts facts) {
+    if (!stage.mayFollow(row.getStage())) {
+      log.debug("Match {} stays at {}, not {}", row.getMatchId(), row.getStage(), stage);
+      return;
+    }
     if (row.getHeaderMessageId() == null || row.getChannelId() == null) {
       log.debug("Match {} has no header message to retitle", row.getMatchId());
-    } else {
-      publisher.edit(row.getChannelId(), row.getHeaderMessageId(), headers.render(stage, facts));
+      return;
     }
-    recorder.setStage(row, stage);
+    if (publisher.edit(
+        row.getChannelId(), row.getHeaderMessageId(), headers.render(stage, facts))) {
+      recorder.setStage(row, stage);
+    }
   }
 
   private void postCard(ThreadChannel thread, SectionView card) {

@@ -91,13 +91,24 @@ class MatchReportOrchestratorStagesTest {
   }
 
   @Test
-  void switchedOn_theLegacyFullReportDoesNotEditTheV2HeaderAsText() {
+  void aStagedHeader_isNotEditedAsTextByTheLegacyFullReport() {
     when(stages.enabled()).thenReturn(true);
+    when(stages.ownsHeader(9L, "i")).thenReturn(true);
     Mockito.when(discord.getThreadById(6L)).thenReturn(null);
 
     orchestrator.processAndReportFull(MatchDomain.builder().id(9L).build(), config, 6L, 5L);
 
     verify(discord, never()).editMessage(anyString(), Mockito.anyLong(), anyString());
+  }
+
+  @Test
+  void aLegacyPlainHeader_isStillEditedAsTextWhileStagesAreOn() {
+    when(stages.enabled()).thenReturn(true);
+    when(stages.ownsHeader(9L, "i")).thenReturn(false);
+
+    orchestrator.processAndReportFull(MatchDomain.builder().id(9L).build(), config, 6L, 5L);
+
+    verify(discord).editMessage(eq("c"), eq(5L), anyString());
   }
 
   @Test

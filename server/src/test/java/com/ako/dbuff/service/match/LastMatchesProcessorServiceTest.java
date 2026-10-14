@@ -244,4 +244,28 @@ class LastMatchesProcessorServiceTest {
 
     Mockito.verify(parseRequests).submitParseRequest(8L);
   }
+
+  @Test
+  void aLiveMatchIsReportedWithWhatTheRecentMatchesListSaid() {
+    instance(TRACKING_SINCE, Set.of());
+    DotaApiLastMatchesService.PlayerLine line =
+        new DotaApiLastMatchesService.PlayerLine(PLAYER, 0L, 14L, 1L, 2L, 3L, 400L, 500L, true);
+    Mockito.when(lastMatches.fetchLastMatches(PLAYER))
+        .thenReturn(
+            List.of(
+                new RecentMatch(
+                    3, epoch(TRACKING_SINCE.plusMinutes(10)), 1800L, ABILITY_DRAFT, line)));
+
+    service.processLastMatchesForInstance("instance-1");
+
+    Mockito.verify(orchestrator)
+        .processAndReportPartial(
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.argThat(
+                summary ->
+                    summary.duration() == 1800L
+                        && summary.gameMode() == ABILITY_DRAFT
+                        && summary.lines().equals(List.of(line))));
+  }
 }

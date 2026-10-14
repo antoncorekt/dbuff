@@ -85,7 +85,7 @@ class MatchParseCheckJobTest {
 
     job.execute(context);
 
-    verify(stages).parseTimedOut(MATCH, INSTANCE);
+    verify(stages).parseTimedOut(match, INSTANCE);
     verify(matchRepo).save(match);
     assertThat(match.getError()).isEqualTo("Parse timeout exceeded");
     assertThat(match.getEndProcess()).isNotNull();
@@ -98,7 +98,7 @@ class MatchParseCheckJobTest {
 
     job.execute(context);
 
-    verify(stages).parseTimedOut(MATCH, INSTANCE);
+    verify(stages).parseTimedOut(match, INSTANCE);
     verify(parseRequests, never()).isMatchParsed(Mockito.anyLong());
     verify(scheduler).unscheduleParseWait(MATCH);
   }
@@ -111,7 +111,7 @@ class MatchParseCheckJobTest {
     job.execute(context);
 
     verify(parseRequests, never()).isMatchParsed(Mockito.anyLong());
-    verify(stages, never()).parseTimedOut(Mockito.anyLong(), any());
+    verify(stages, never()).parseTimedOut(any(), any());
     verify(scheduler, never()).unscheduleParseWait(Mockito.anyLong());
   }
 
@@ -122,7 +122,7 @@ class MatchParseCheckJobTest {
 
     job.execute(context);
 
-    verify(stages, never()).parseTimedOut(Mockito.anyLong(), any());
+    verify(stages, never()).parseTimedOut(any(), any());
     verify(scheduler).unscheduleParseWait(MATCH);
   }
 

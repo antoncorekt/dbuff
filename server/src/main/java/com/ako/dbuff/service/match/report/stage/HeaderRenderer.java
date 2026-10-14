@@ -67,9 +67,9 @@ public class HeaderRenderer {
   }
 
   private static String score(MatchReportStage stage, MatchFacts facts) {
-    boolean shown =
-        stage != MatchReportStage.REQUESTED && stage != MatchReportStage.PARSE_TIMED_OUT;
-    if (!shown || facts.radiantScore() == null || facts.direScore() == null) {
+    if (stage == MatchReportStage.REQUESTED
+        || facts.radiantScore() == null
+        || facts.direScore() == null) {
       return "";
     }
     return " (" + facts.radiantScore() + "-" + facts.direScore() + ")";
