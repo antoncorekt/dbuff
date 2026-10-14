@@ -10,14 +10,22 @@ import org.springframework.stereotype.Component;
 @Component
 public class OpenAiClientProvider {
   private final OpenAIClient client;
+  private final OpenAIClient noRetryClient;
 
   public OpenAiClientProvider(OpenAiConfig config) {
     String key = config.getApiKey();
-    this.client =
-        key == null || key.isBlank() ? null : OpenAIOkHttpClient.builder().apiKey(key).build();
+    boolean keyed = key != null && !key.isBlank();
+    this.client = keyed ? OpenAIOkHttpClient.builder().apiKey(key).build() : null;
+    this.noRetryClient =
+        keyed ? OpenAIOkHttpClient.builder().apiKey(key).maxRetries(0).build() : null;
   }
 
   public Optional<OpenAIClient> client() {
     return Optional.ofNullable(client);
+  }
+
+  /** A client that never retries, so a request's timeout is the most a call can take. */
+  public Optional<OpenAIClient> noRetryClient() {
+    return Optional.ofNullable(noRetryClient);
   }
 }

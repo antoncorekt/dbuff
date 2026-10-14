@@ -58,6 +58,20 @@ class ReplayReportAiPropertiesTest {
   }
 
   @Test
+  void reasoningModelsTakeNoTemperatureByDefault_andTheOutputLimitIsChecked() {
+    ReplayReportAiProperties properties = new ReplayReportAiProperties();
+    assertThat(properties.getNoTemperatureModelPrefixes())
+        .containsExactly("o1", "o3", "o4", "gpt-5");
+    ReplayReportAiProperties blank = new ReplayReportAiProperties();
+    blank.setNoTemperatureModelPrefixes(java.util.Arrays.asList("o3", ""));
+    ReplayReportAiProperties tiny = new ReplayReportAiProperties();
+    tiny.setMaxOutputTokens(10);
+
+    assertThatThrownBy(blank::validate).hasMessageContaining("no-temperature-model-prefixes");
+    assertThatThrownBy(tiny::validate).hasMessageContaining("max-output-tokens");
+  }
+
+  @Test
   void rejectsValuesThatCannotWork() {
     ReplayReportAiProperties tiny = new ReplayReportAiProperties();
     tiny.setFactsTokenBudget(10);

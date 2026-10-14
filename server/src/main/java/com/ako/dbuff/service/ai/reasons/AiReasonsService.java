@@ -17,8 +17,10 @@ import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +37,6 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class AiReasonsService {
-  private static final int LOCKS = 16;
   private static final TypeReference<List<Reason>> REASONS = new TypeReference<>() {};
 
   private final ReplayReportAiProperties properties;
@@ -47,16 +48,8 @@ public class AiReasonsService {
   private final MatchAiReasonsRepo repo;
   private final ObjectMapper mapper;
 
-  private final Object[] matchLocks = newLocks();
+  private final Map<Long, Object> matchLocks = new ConcurrentHashMap<>();
   private final AtomicBoolean warnedNoKey = new AtomicBoolean();
-
-  private static Object[] newLocks() {
-    Object[] locks = new Object[LOCKS];
-    for (int i = 0; i < LOCKS; i++) {
-      locks[i] = new Object();
-    }
-    return locks;
-  }
 
   public AiReasonsAvailability availability() {
     if (!properties.isEnabled()) {
@@ -75,18 +68,19 @@ public class AiReasonsService {
     return List.copyOf(allowed);
   }
 
-  /** The reasons by the default model. */
-  public ReasonsResult reasons(ReplayReportInput input) {
-    return reasons(input, null);
+  /** Whether the model may be asked for; null or blank means the default model, always allowed. */
+  public boolean isModelAllowed(String modelName) {
+    return modelName == null || modelName.isBlank() || allowedModels().contains(modelName.strip());
   }
 
   /**
-   * The reasons by the named model, which must be allowed; null or blank is the default model. The
-   * stored answer of another model is never reused.
+   * The reasons by the model the input names, else the default one. A model outside the allow-list
+   * is refused; the stored answer of another model is never reused.
    */
-  public ReasonsResult reasons(ReplayReportInput input, String modelName) {
+  public ReasonsResult reasons(ReplayReportInput input) {
+    String requested = input.modelOverride();
     String chosen =
-        modelName == null || modelName.isBlank() ? model.defaultModel() : modelName.strip();
+        requested == null || requested.isBlank() ? model.defaultModel() : requested.strip();
     AiReasonsAvailability availability = availability();
     if (availability == AiReasonsAvailability.SWITCHED_OFF) {
       return ReasonsResult.of(Status.SWITCHED_OFF);
@@ -97,7 +91,7 @@ public class AiReasonsService {
       }
       return ReasonsResult.of(Status.NO_API_KEY);
     }
-    if (!allowedModels().contains(chosen)) {
+    if (!isModelAllowed(chosen)) {
       return ReasonsResult.of(Status.MODEL_NOT_ALLOWED);
     }
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
@@ -111,7 +105,7 @@ public class AiReasonsService {
     FactTrimmer.Trimmed trimmed = trimmer.trim(facts, properties.getFactsTokenBudget());
     ReasonsPrompt prompt = promptBuilder.build(trimmed);
     String hash = hash(prompt, chosen);
-    synchronized (matchLocks[(int) Math.floorMod(input.matchId(), (long) LOCKS)]) {
+    synchronized (matchLocks.computeIfAbsent(input.matchId(), id -> new Object())) {
       return answer(input.matchId(), yours, trimmed, prompt, hash, chosen);
     }
   }
@@ -142,9 +136,6 @@ public class AiReasonsService {
     try {
       ModelAnswer answer = model.ask(prompt, chosen);
       List<Reason> reasons = parser.parse(answer.text(), ids);
-      if (reasons.isEmpty()) {
-        throw new IllegalArgumentException("no reason has valid evidence");
-      }
       save(matchId, yours, hash, answer, toJson(reasons), AiReasonsStatus.DONE);
       log.info("AI reasons of match {}: {} reasons", matchId, reasons.size());
       return new ReasonsResult(Status.READY, reasons, answer.model());

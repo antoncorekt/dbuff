@@ -28,7 +28,8 @@ public record ReasonsResult(Status status, List<Reason> reasons, String model) {
     return new ReasonsResult(status, List.of(), null);
   }
 
-  public boolean hasReasons() {
+  /** Whether a model answered, with no reasons when the facts did not support any. */
+  public boolean answered() {
     return status == Status.READY || status == Status.CACHED;
   }
 }

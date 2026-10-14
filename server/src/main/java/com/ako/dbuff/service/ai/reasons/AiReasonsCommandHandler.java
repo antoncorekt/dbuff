@@ -19,13 +19,10 @@ public class AiReasonsCommandHandler {
   public static final String MODEL_OPTION = "model";
 
   private final AiReasonsService service;
-  private final AiReasonsSection section;
   private final ReplayReportService reports;
 
-  public AiReasonsCommandHandler(
-      AiReasonsService service, AiReasonsSection section, @Lazy ReplayReportService reports) {
+  public AiReasonsCommandHandler(AiReasonsService service, @Lazy ReplayReportService reports) {
     this.service = service;
-    this.section = section;
     this.reports = reports;
   }
 
@@ -36,7 +33,7 @@ public class AiReasonsCommandHandler {
       context.replyEphemeral("❌ Not available: " + availability.reason() + ".");
       return;
     }
-    if (model != null && !model.isBlank() && !service.allowedModels().contains(model.strip())) {
+    if (!service.isModelAllowed(model)) {
       context.replyEphemeral(
           "❌ Model `"
               + model.strip()
@@ -57,7 +54,7 @@ public class AiReasonsCommandHandler {
             "🔄 Working out the top reasons for match " + matchId + "…", "Match " + matchId);
     try {
       ReportDelivery delivery =
-          reports.deliverSection(matchId, config.getId(), section.forModel(model));
+          reports.deliverSection(matchId, config.getId(), AiReasonsSection.NAME, model);
       if (delivery != ReportDelivery.POSTED) {
         reply.post("The top reasons were not posted: " + delivery.reason() + ".");
       }

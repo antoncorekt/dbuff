@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AiReasonsSection implements ReplayReportSection {
   public static final String NAME = "ai-reasons";
+  static final String NOT_ENOUGH_DATA = "Not enough data to explain this match.";
 
   private final AiReasonsService service;
   private final PlainViewRenderer plain;
@@ -50,43 +51,8 @@ public class AiReasonsSection implements ReplayReportSection {
 
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
-    return view(input, null);
-  }
-
-  /** The same section asking the named model, for one on-demand post. */
-  public ReplayReportSection forModel(String model) {
-    AiReasonsSection self = this;
-    return new ReplayReportSection() {
-      @Override
-      public String name() {
-        return self.name();
-      }
-
-      @Override
-      public int order() {
-        return self.order();
-      }
-
-      @Override
-      public ReportDetail minimumDetail() {
-        return self.minimumDetail();
-      }
-
-      @Override
-      public List<String> lines(ReplayReportInput input) {
-        return view(input).map(v -> plain.lines(v, true)).orElse(List.of());
-      }
-
-      @Override
-      public Optional<SectionView> view(ReplayReportInput input) {
-        return self.view(input, model);
-      }
-    };
-  }
-
-  private Optional<SectionView> view(ReplayReportInput input, String model) {
-    ReasonsResult result = service.reasons(input, model);
-    if (!result.hasReasons()) {
+    ReasonsResult result = service.reasons(input);
+    if (!result.answered()) {
       return Optional.empty();
     }
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
@@ -95,8 +61,11 @@ public class AiReasonsSection implements ReplayReportSection {
       bullets.add(bullet(reason));
     }
     int count = result.reasons().size();
+    if (count == 0) {
+      bullets.add(NOT_ENOUGH_DATA);
+    }
     String footnote =
-        (count < ReplayReportAiProperties.MAX_REASONS
+        (count > 0 && count < ReplayReportAiProperties.MAX_REASONS
                 ? "Only " + count + " reasons had enough supporting data. "
                 : "")
             + "Written by "

@@ -156,7 +156,8 @@ class AiReasonsServiceTest {
 
   @Test
   void aModelOutsideTheAllowListIsRefusedWithNoCall() {
-    ReasonsResult result = service.reasons(ReasonsFixtures.input(), "gpt-expensive");
+    ReasonsResult result =
+        service.reasons(ReasonsFixtures.input().withModelOverride("gpt-expensive"));
 
     assertThat(result.status()).isEqualTo(Status.MODEL_NOT_ALLOWED);
     assertThat(model.asked).isEmpty();
@@ -176,7 +177,7 @@ class AiReasonsServiceTest {
   void anAllowedOverrideIsUsedForThatCallOnly_andNamedInTheResult() {
     properties.setAllowedModels(List.of("big"));
 
-    ReasonsResult result = service.reasons(ReasonsFixtures.input(), "big");
+    ReasonsResult result = service.reasons(ReasonsFixtures.input().withModelOverride("big"));
     service.reasons(ReasonsFixtures.input());
 
     assertThat(result.status()).isEqualTo(Status.READY);
@@ -187,7 +188,7 @@ class AiReasonsServiceTest {
   @Test
   void theCacheKeyIncludesTheModel() {
     properties.setAllowedModels(List.of("big"));
-    service.reasons(ReasonsFixtures.input(), "big");
+    service.reasons(ReasonsFixtures.input().withModelOverride("big"));
     service.reasons(ReasonsFixtures.input());
     ArgumentCaptor<MatchAiReasonsDomain> saved =
         ArgumentCaptor.forClass(MatchAiReasonsDomain.class);
@@ -196,6 +197,16 @@ class AiReasonsServiceTest {
     assertThat(saved.getAllValues().get(0).getFactsHash())
         .isNotEqualTo(saved.getAllValues().get(1).getFactsHash());
     assertThat(saved.getAllValues().get(0).getModel()).isEqualTo("big");
+  }
+
+  @Test
+  void aBlankOrAllowedModelPassesTheSingleAllowCheck() {
+    properties.setAllowedModels(List.of("big"));
+
+    assertThat(service.isModelAllowed(null)).isTrue();
+    assertThat(service.isModelAllowed(" ")).isTrue();
+    assertThat(service.isModelAllowed(" big ")).isTrue();
+    assertThat(service.isModelAllowed("other")).isFalse();
   }
 
   @Test
@@ -228,18 +239,49 @@ class AiReasonsServiceTest {
   }
 
   @Test
-  void anAnswerWithBadJsonOrNoValidEvidenceFails() {
+  void anAnswerWithBadJsonFails() {
     model.answer = "sorry, I cannot";
-    assertThat(service.reasons(ReasonsFixtures.input()).status()).isEqualTo(Status.FAILED);
 
-    model.answer =
-        "[{\"rank\":1,\"title\":\"T\",\"explanation\":\"E\",\"evidence\":[\"MADE_UP\"]}]";
     assertThat(service.reasons(ReasonsFixtures.input()).status()).isEqualTo(Status.FAILED);
 
     ArgumentCaptor<MatchAiReasonsDomain> saved =
         ArgumentCaptor.forClass(MatchAiReasonsDomain.class);
+    verify(repo).save(saved.capture());
+    assertThat(saved.getValue().getStatus()).isEqualTo(AiReasonsStatus.FAILED);
+  }
+
+  @Test
+  void aValidAnswerWithNoReasonsOrNoValidEvidenceIsStoredAsDoneWithZeroReasons() {
+    for (String answer :
+        List.of(
+            "[]",
+            "[{\"rank\":1,\"title\":\"T\",\"explanation\":\"E\",\"evidence\":[\"MADE_UP\"]}]")) {
+      model.answer = answer;
+
+      ReasonsResult result = service.reasons(ReasonsFixtures.input());
+
+      assertThat(result.status()).isEqualTo(Status.READY);
+      assertThat(result.answered()).isTrue();
+      assertThat(result.reasons()).isEmpty();
+    }
+    ArgumentCaptor<MatchAiReasonsDomain> saved =
+        ArgumentCaptor.forClass(MatchAiReasonsDomain.class);
     verify(repo, org.mockito.Mockito.times(2)).save(saved.capture());
-    assertThat(saved.getAllValues()).allMatch(r -> r.getStatus() == AiReasonsStatus.FAILED);
+    assertThat(saved.getAllValues())
+        .allMatch(r -> r.getStatus() == AiReasonsStatus.DONE && "[]".equals(r.getReasonsJson()));
+  }
+
+  @Test
+  void aStoredEmptyAnswerIsReusedWithNoCall() {
+    when(repo.findFirstByMatchIdAndSideAndFactsHashAndStatusOrderByCreatedAtDesc(
+            anyLong(), any(), any(), eq(AiReasonsStatus.DONE)))
+        .thenReturn(Optional.of(MatchAiReasonsDomain.builder().reasonsJson("[]").build()));
+
+    ReasonsResult result = service.reasons(ReasonsFixtures.input());
+
+    assertThat(result.status()).isEqualTo(Status.CACHED);
+    assertThat(result.reasons()).isEmpty();
+    assertThat(model.asked).isEmpty();
   }
 
   @Test

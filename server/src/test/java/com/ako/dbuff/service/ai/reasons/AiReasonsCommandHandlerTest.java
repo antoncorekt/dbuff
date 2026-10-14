@@ -2,7 +2,6 @@ package com.ako.dbuff.service.ai.reasons;
 
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.service.discord.command.FakeCommandContext;
-import com.ako.dbuff.service.replay.report.ReplayReportSection;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
 import com.ako.dbuff.service.replay.report.ReportDelivery;
 import java.util.List;
@@ -21,10 +20,7 @@ class AiReasonsCommandHandlerTest {
 
   private final AiReasonsService service = mock(AiReasonsService.class);
   private final ReplayReportService reports = mock(ReplayReportService.class);
-  private final AiReasonsSection section = mock(AiReasonsSection.class);
-  private final ReplayReportSection forModel = mock(ReplayReportSection.class);
-  private final AiReasonsCommandHandler handler =
-      new AiReasonsCommandHandler(service, section, reports);
+  private final AiReasonsCommandHandler handler = new AiReasonsCommandHandler(service, reports);
   private final DbufInstanceConfigDomain config = new DbufInstanceConfigDomain();
 
   @BeforeEach
@@ -33,7 +29,11 @@ class AiReasonsCommandHandlerTest {
     when(service.availability()).thenReturn(AiReasonsAvailability.AVAILABLE);
     when(reports.hasStoredAnalysis(MATCH)).thenReturn(true);
     when(service.allowedModels()).thenReturn(List.of("fake-model", "big"));
-    when(section.forModel(any())).thenReturn(forModel);
+    when(service.isModelAllowed(any()))
+        .thenAnswer(
+            c ->
+                c.getArgument(0) == null
+                    || List.of("fake-model", "big").contains(((String) c.getArgument(0)).strip()));
   }
 
   private static FakeCommandContext context() {
@@ -50,7 +50,7 @@ class AiReasonsCommandHandlerTest {
     assertThat(context.getEphemeralReplies()).hasSize(1);
     assertThat(context.getEphemeralReplies().get(0)).contains("switched off");
     assertThat(context.getAcknowledgeSummary()).isNull();
-    verify(reports, never()).deliverSection(MATCH, "i1", "ai-reasons");
+    verify(reports, never()).deliverSection(MATCH, "i1", "ai-reasons", null);
   }
 
   @Test
@@ -76,12 +76,12 @@ class AiReasonsCommandHandlerTest {
         .asString()
         .contains("no stored replay analysis");
     assertThat(context.getAcknowledgeSummary()).isNull();
-    verify(reports, never()).deliverSection(MATCH, "i1", "ai-reasons");
+    verify(reports, never()).deliverSection(MATCH, "i1", "ai-reasons", null);
   }
 
   @Test
   void success_acknowledgesAndPostsTheSectionCard() {
-    when(reports.deliverSection(MATCH, "i1", forModel)).thenReturn(ReportDelivery.POSTED);
+    when(reports.deliverSection(MATCH, "i1", "ai-reasons", null)).thenReturn(ReportDelivery.POSTED);
     FakeCommandContext context = context();
 
     handler.handle(context, MATCH, config);
@@ -94,7 +94,8 @@ class AiReasonsCommandHandlerTest {
 
   @Test
   void nothingToPost_saysWhyInOneLine() {
-    when(reports.deliverSection(MATCH, "i1", forModel)).thenReturn(ReportDelivery.SECTION_EMPTY);
+    when(reports.deliverSection(MATCH, "i1", "ai-reasons", null))
+        .thenReturn(ReportDelivery.SECTION_EMPTY);
     FakeCommandContext context = context();
 
     handler.handle(context, MATCH, config);
@@ -119,25 +120,26 @@ class AiReasonsCommandHandlerTest {
         .contains("fake-model, big");
     assertThat(context.getAcknowledgeSummary()).isNull();
     verify(reports, never())
-        .deliverSection(
-            org.mockito.ArgumentMatchers.anyLong(), any(), any(ReplayReportSection.class));
+        .deliverSection(org.mockito.ArgumentMatchers.anyLong(), any(), any(), any());
   }
 
   @Test
   void anAllowedModelOptionIsPassedOnForThatPostOnly() {
-    when(reports.deliverSection(MATCH, "i1", forModel)).thenReturn(ReportDelivery.POSTED);
+    when(reports.deliverSection(MATCH, "i1", "ai-reasons", " big "))
+        .thenReturn(ReportDelivery.POSTED);
     FakeCommandContext context =
         FakeCommandContext.builder().threadName("Match " + MATCH).option("model", " big ").build();
 
     handler.handle(context, MATCH, config);
 
-    verify(section).forModel(" big ");
+    verify(reports).deliverSection(MATCH, "i1", "ai-reasons", " big ");
     assertThat(context.getAcknowledgeSummary()).isNotNull();
   }
 
   @Test
   void anUnexpectedFailureIsReportedInTheThread() {
-    when(reports.deliverSection(MATCH, "i1", forModel)).thenThrow(new IllegalStateException("x"));
+    when(reports.deliverSection(MATCH, "i1", "ai-reasons", null))
+        .thenThrow(new IllegalStateException("x"));
     FakeCommandContext context = context();
 
     handler.handle(context, MATCH, config);

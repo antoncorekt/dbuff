@@ -51,7 +51,7 @@ class AiReasonsSectionTest {
 
   @Test
   void aWonMatchGivesAGreenCardWithNumberedBulletsAndPlainEvidenceLabels() {
-    when(service.reasons(ReasonsFixtures.input(), null))
+    when(service.reasons(ReasonsFixtures.input()))
         .thenReturn(
             new ReasonsResult(
                 Status.READY,
@@ -85,7 +85,7 @@ class AiReasonsSectionTest {
             java.util.Set.of(0L),
             java.util.Map.of(),
             3);
-    when(service.reasons(lost, null))
+    when(service.reasons(lost))
         .thenReturn(
             new ReasonsResult(Status.CACHED, List.of(reason(1, "F1"), reason(2, "F1")), "m2"));
 
@@ -97,14 +97,23 @@ class AiReasonsSectionTest {
   }
 
   @Test
-  void aSectionForAModelAsksThatModel() {
-    when(service.reasons(ReasonsFixtures.input(), "big"))
+  void anAnswerWithNoReasonsShowsANotEnoughDataCard() {
+    when(service.reasons(ReasonsFixtures.input()))
+        .thenReturn(new ReasonsResult(Status.READY, List.of(), "m"));
+
+    SectionView view = section.view(ReasonsFixtures.input()).orElseThrow();
+
+    assertThat(view.bullets()).containsExactly("Not enough data to explain this match.");
+    assertThat(view.footnote()).startsWith("Written by m");
+  }
+
+  @Test
+  void theModelAPersonAskedForTravelsInTheInputAndIsNamedInTheFootnote() {
+    var input = ReasonsFixtures.input().withModelOverride("big");
+    when(service.reasons(input))
         .thenReturn(new ReasonsResult(Status.READY, List.of(reason(1, "F1")), "big"));
 
-    SectionView view = section.forModel("big").view(ReasonsFixtures.input()).orElseThrow();
-
-    assertThat(view.footnote()).contains("Written by big");
-    assertThat(section.forModel("big").name()).isEqualTo("ai-reasons");
+    assertThat(section.view(input).orElseThrow().footnote()).contains("Written by big");
   }
 
   @Test
@@ -116,7 +125,7 @@ class AiReasonsSectionTest {
             java.util.Set.of(0L),
             java.util.Map.of(),
             3);
-    when(service.reasons(unknown, null))
+    when(service.reasons(unknown))
         .thenReturn(new ReasonsResult(Status.READY, List.of(reason(1, "F1")), "m"));
 
     SectionView view = section.view(unknown).orElseThrow();
@@ -129,7 +138,7 @@ class AiReasonsSectionTest {
   void withoutReasonsTheSectionSaysNothing() {
     for (Status status :
         List.of(Status.SWITCHED_OFF, Status.NO_API_KEY, Status.CALL_LIMIT, Status.FAILED)) {
-      when(service.reasons(ReasonsFixtures.input(), null)).thenReturn(ReasonsResult.of(status));
+      when(service.reasons(ReasonsFixtures.input())).thenReturn(ReasonsResult.of(status));
 
       assertThat(section.view(ReasonsFixtures.input())).isEqualTo(Optional.empty());
       assertThat(section.lines(ReasonsFixtures.input())).isEmpty();

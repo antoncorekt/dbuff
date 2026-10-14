@@ -57,6 +57,21 @@ class FactTrimmerTest {
   }
 
   @Test
+  void identicalFactsAreEachCountedAndDroppedOnce() {
+    Fact twin = fact("SMOKE_1", FactKind.SMOKE, 200);
+    List<Fact> facts = List.of(fact("RESULT", FactKind.RESULT, 40), twin, twin);
+
+    FactTrimmer.Trimmed trimmed = trimmer.trim(facts, 30);
+
+    assertThat(trimmed.dropped()).isEqualTo(2);
+    assertThat(trimmed.kept()).extracting(Fact::id).containsExactly("RESULT");
+
+    FactTrimmer.Trimmed one = trimmer.trim(facts, 90);
+    assertThat(one.dropped()).isEqualTo(1);
+    assertThat(one.kept()).hasSize(2);
+  }
+
+  @Test
   void anEmptyListTrimsToNothing() {
     FactTrimmer.Trimmed trimmed = trimmer.trim(List.of(), 10);
 

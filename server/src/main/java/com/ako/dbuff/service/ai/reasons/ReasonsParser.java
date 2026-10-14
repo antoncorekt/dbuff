@@ -8,6 +8,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ReasonsParser {
   private static final String ELLIPSIS = "…";
+  private static final Pattern FENCE = Pattern.compile("```[a-zA-Z]*");
 
   private final ObjectMapper mapper;
 
@@ -52,22 +54,56 @@ public class ReasonsParser {
     return List.copyOf(reasons);
   }
 
+  /** The first JSON array of objects (or an empty one) in the text, whatever surrounds it. */
   private JsonNode array(String raw) {
-    String text = raw == null ? "" : raw;
-    int start = text.indexOf('[');
-    int end = text.lastIndexOf(']');
-    if (start < 0 || end <= start) {
-      throw new IllegalArgumentException("the answer holds no JSON array");
-    }
-    try {
-      JsonNode node = mapper.readTree(text.substring(start, end + 1));
-      if (!node.isArray()) {
-        throw new IllegalArgumentException("the answer is not a JSON array");
+    String text = raw == null ? "" : FENCE.matcher(raw).replaceAll("");
+    for (int start = text.indexOf('['); start >= 0; start = text.indexOf('[', start + 1)) {
+      int end = matchingBracket(text, start);
+      if (end < 0) {
+        continue;
       }
-      return node;
-    } catch (JsonProcessingException e) {
-      throw new IllegalArgumentException("the answer is not valid JSON: " + e.getOriginalMessage());
+      try {
+        JsonNode node = mapper.readTree(text.substring(start, end + 1));
+        if (node.isArray() && allObjects(node)) {
+          return node;
+        }
+      } catch (JsonProcessingException e) {
+        // not a JSON array; try the next bracket
+      }
     }
+    throw new IllegalArgumentException("the answer holds no JSON array of reasons");
+  }
+
+  private static boolean allObjects(JsonNode array) {
+    for (JsonNode element : array) {
+      if (!element.isObject()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** The index of the bracket closing the one at {@code start}, skipping strings; -1 if none. */
+  private static int matchingBracket(String text, int start) {
+    int depth = 0;
+    boolean inString = false;
+    for (int i = start; i < text.length(); i++) {
+      char c = text.charAt(i);
+      if (inString) {
+        if (c == '\\') {
+          i++;
+        } else if (c == '"') {
+          inString = false;
+        }
+      } else if (c == '"') {
+        inString = true;
+      } else if (c == '[') {
+        depth++;
+      } else if (c == ']' && --depth == 0) {
+        return i;
+      }
+    }
+    return -1;
   }
 
   private static Reason reason(JsonNode node, Set<String> factIds) {

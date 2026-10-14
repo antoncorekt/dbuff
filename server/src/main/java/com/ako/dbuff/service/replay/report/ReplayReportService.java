@@ -155,24 +155,21 @@ public class ReplayReportService {
    * for automatic posting can still be asked for.
    */
   public ReportDelivery deliverSection(long matchId, String instanceId, String sectionName) {
-    return deliverSection(
-        matchId,
-        instanceId,
-        sections.stream().filter(s -> s.name().equals(sectionName)).findFirst().orElse(null));
+    return deliverSection(matchId, instanceId, sectionName, null);
   }
 
-  /** The same for a section that is not a bean, such as a bean's variant for one request. */
+  /**
+   * The same, with an AI model a person chose for this request; the AI sections ask it instead of
+   * the default one.
+   */
   public ReportDelivery deliverSection(
-      long matchId, String instanceId, ReplayReportSection section) {
-    return deliverSectionOf(matchId, instanceId, section);
-  }
-
-  private ReportDelivery deliverSectionOf(
-      long matchId, String instanceId, ReplayReportSection section) {
+      long matchId, String instanceId, String sectionName, String modelOverride) {
     try {
       if (!hasStoredAnalysis(matchId)) {
         return logSkipped(matchId, ReportDelivery.NOT_STORED);
       }
+      ReplayReportSection section =
+          sections.stream().filter(s -> s.name().equals(sectionName)).findFirst().orElse(null);
       MatchDomain match = matchRepo.findById(matchId).orElse(null);
       DbufInstanceConfigDomain instance = instanceRepo.findById(instanceId).orElse(null);
       if (section == null || match == null || instance == null) {
@@ -184,11 +181,14 @@ public class ReplayReportService {
           postToThread(
               match,
               instance,
-              () -> render(List.of(section), input(match, stats, instance)),
+              () ->
+                  render(
+                      List.of(section),
+                      input(match, stats, instance).withModelOverride(modelOverride)),
               ReportDelivery.SECTION_EMPTY,
               false));
     } catch (RuntimeException e) {
-      log.warn("Section {} of match {} failed: {}", section.name(), matchId, e.getMessage(), e);
+      log.warn("Section {} of match {} failed: {}", sectionName, matchId, e.getMessage(), e);
       return ReportDelivery.FAILED;
     }
   }

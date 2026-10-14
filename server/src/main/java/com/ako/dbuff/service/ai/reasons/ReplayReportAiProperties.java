@@ -43,6 +43,15 @@ public class ReplayReportAiProperties {
    */
   private List<String> allowedModels;
 
+  /**
+   * Models whose names start with one of these take no {@code temperature} (reasoning families
+   * accept only their default); the request omits it for them.
+   */
+  private List<String> noTemperatureModelPrefixes = List.of("o1", "o3", "o4", "gpt-5");
+
+  /** The most tokens of the answer, reasoning tokens of the reasoning models included. */
+  private int maxOutputTokens = 4000;
+
   /** The most paid model calls per match in a day; stored answers are reused without a call. */
   private int maxCallsPerMatchPerDay = 3;
 
@@ -73,6 +82,16 @@ public class ReplayReportAiProperties {
       throw new IllegalStateException(
           "replay.report.ai.allowed-models must list at least one model and no blank one, got "
               + allowedModels);
+    }
+    if (noTemperatureModelPrefixes == null
+        || noTemperatureModelPrefixes.stream().anyMatch(p -> p == null || p.isBlank())) {
+      throw new IllegalStateException(
+          "replay.report.ai.no-temperature-model-prefixes must not hold a blank prefix, got "
+              + noTemperatureModelPrefixes);
+    }
+    if (maxOutputTokens < 200 || maxOutputTokens > 32_000) {
+      throw new IllegalStateException(
+          "replay.report.ai.max-output-tokens must be 200 to 32000, got " + maxOutputTokens);
     }
     if (maxCallsPerMatchPerDay < 1 || maxCallsPerMatchPerDay > MAX_CALLS_PER_DAY) {
       throw new IllegalStateException(

@@ -90,6 +90,33 @@ class ReasonsParserTest {
   }
 
   @Test
+  void trailingProseWithBracketsAndBracketsInsideStringsDoNotBreakTheScan() {
+    String raw =
+        "```json\n[{\"rank\":1,\"title\":\"A [x] ]\",\"explanation\":\"say \\\"[\\\" ok\","
+            + "\"evidence\":[\"F1\"]}]\n```\nNote [see F3] for more";
+
+    List<Reason> reasons = parser.parse(raw, IDS);
+
+    assertThat(reasons).hasSize(1);
+    assertThat(reasons.get(0).title()).isEqualTo("A [x] ]");
+    assertThat(reasons.get(0).explanation()).isEqualTo("say \"[\" ok");
+  }
+
+  @Test
+  void leadingBracketedProseIsSkippedAndTheFirstOfTwoArraysWins() {
+    String raw =
+        "Sure [here it is]: [" + reason(1, "\"F1\"") + "] and also [" + reason(2, "\"F3\"") + "]";
+
+    assertThat(parser.parse(raw, IDS)).extracting(Reason::title).containsExactly("T1");
+  }
+
+  @Test
+  void anArrayOfNonObjectsIsNotTheAnswer() {
+    assertThatThrownBy(() -> parser.parse("[1, 2, 3]", IDS))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
   void aMissingRankKeepsTheOrderOfTheAnswer() {
     String raw =
         "[{\"title\":\"A\",\"explanation\":\"a\",\"evidence\":[\"F1\"]},"
