@@ -110,10 +110,7 @@ public class FightLossAnalyzer implements ReplayAnalyzer {
               .goldLost(gold.lost())
               .unmatchedDeaths(gold.unmatched())
               .reasonCount(
-                  (int)
-                      reasons.getOrDefault(index, List.of()).stream()
-                          .filter(r -> loser.name().equals(r.getTeam()))
-                          .count())
+                  ReasonRanking.countOfTeam(reasons.getOrDefault(index, List.of()), loser.name()))
               .analysisVersion(version())
               .build());
     }

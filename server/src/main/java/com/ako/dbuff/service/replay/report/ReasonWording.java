@@ -10,6 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -50,7 +51,20 @@ public class ReasonWording {
           Map.entry("TOWER", (w, e) -> "died to a tower"),
           Map.entry("BURST", (w, e) -> "was burst down"),
           Map.entry("OUT_OF_POSITION", (w, e) -> "stood too far in front"),
-          Map.entry("NO_BKB", (w, e) -> "had no Black King Bar"));
+          Map.entry("NO_BKB", (w, e) -> "had no Black King Bar"),
+          Map.entry(
+              "ROTATION_WASTED_BEFORE_FIGHT",
+              (w, e) -> "had just wasted a rotation and missed the fight"),
+          Map.entry(
+              "ROTATION_DIED_BEFORE_FIGHT",
+              (w, e) -> "died on a rotation just before the fight and missed it"));
+
+  private static final Map<String, Function<String, String>> VISION_PHRASES =
+      Map.of(
+          "NO_VISION_BEFORE_FIGHT", e -> "the team had no vision near the fight, the enemy did",
+          "NO_DETECTION_VS_INVISIBLE",
+              e -> "the team had no detection against an invisible enemy hero",
+          "LATE_WARD", e -> "the team's ward near the fight went down too late");
 
   private final AbilityLabels labels;
 
@@ -108,6 +122,10 @@ public class ReasonWording {
                           "%s took %s %s rune %s"
                               .formatted(r.hero(), article(r.rune()), r.rune(), r.timing()))
                   .collect(Collectors.joining(", "));
+    }
+    Function<String, String> vision = code == null ? null : VISION_PHRASES.get(code);
+    if (vision != null) {
+      return vision.apply(evidence == null ? "" : evidence.trim());
     }
     if (!CompositionToken.isToken(code)) {
       String note = evidence == null ? "" : evidence.trim();
