@@ -21,6 +21,11 @@ public class ReportHeroNames {
   private final ReplayPlayerRepo replayPlayerRepo;
   private final HeroKits heroKits;
 
+  /** "Name (Hero)", or the name alone where the hero is not known. */
+  public static String label(String name, String hero) {
+    return hero == null || hero.isBlank() ? name : name + " (" + hero + ")";
+  }
+
   /** The stored hero name; the replay's entity name, split into words, where it is not known. */
   public Map<Long, String> bySlot(long matchId) {
     Map<Long, String> names = new HashMap<>();

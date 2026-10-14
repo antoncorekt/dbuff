@@ -87,7 +87,8 @@ class FightAbilityReplayTest {
             .toList();
     var fights =
         new FightDetector(new ReplayAnalysisProperties().fightTuning()).detect(events, playerOf);
-    var assessor = new FightAbilityAssessor(5);
+    var assessor =
+        new FightAbilityAssessor(5, new ReplayAnalysisProperties().fightAbilityIgnoredItems());
 
     List<FightAbilityAssessor.Use> all = new ArrayList<>();
     for (var fight : fights) {

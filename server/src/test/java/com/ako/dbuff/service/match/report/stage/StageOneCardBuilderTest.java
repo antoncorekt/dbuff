@@ -28,7 +28,8 @@ class StageOneCardBuilderTest {
     PlayerLine won = new PlayerLine(1, 0L, 14L, 10L, 2L, 5L, 512L, 640L, true);
     PlayerLine lost = new PlayerLine(2, 130L, 14L, 1L, 9L, 3L, 300L, 400L, true);
     MatchFacts facts =
-        new MatchFacts(1L, null, MatchFacts.Result.ofLines(List.of(won, lost)), null, null, null);
+        new MatchFacts(
+            1L, null, MatchFacts.Result.ofLines(List.of(won, lost)), null, null, null, null, null);
 
     SectionView card = builder.build(facts, List.of(won, lost), Map.of(1L, "Tigress", 2L, "Rex"));
 
@@ -64,6 +65,6 @@ class StageOneCardBuilderTest {
   }
 
   private static MatchFacts facts() {
-    return new MatchFacts(1L, null, new MatchFacts.Result(0, 0), null, null, null);
+    return new MatchFacts(1L, null, new MatchFacts.Result(0, 0), null, null, null, null, null);
   }
 }

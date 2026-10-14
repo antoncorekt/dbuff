@@ -8,6 +8,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import net.dv8tion.jda.api.components.MessageTopLevelComponent;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.container.ContainerChildComponent;
@@ -24,6 +25,8 @@ public class HeaderRenderer {
   private static final String SEPARATOR = " · ";
   private static final String LINK_PREFIX = "-# ";
   private static final int SECONDS_PER_MINUTE = 60;
+  private static final DateTimeFormatter START_FORMATTER =
+      DateTimeFormatter.ofPattern("d MMM HH:mm", Locale.ENGLISH);
   private static final DateTimeFormatter DATE_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -42,6 +45,9 @@ public class HeaderRenderer {
   public String title(StageTarget target, MatchFacts facts) {
     List<String> parts = new ArrayList<>();
     parts.add("Match " + facts.matchId());
+    if (facts.startSeconds() != null) {
+      parts.add(started(facts));
+    }
     if (facts.mode() != null) {
       parts.add(facts.mode());
     }
@@ -53,6 +59,11 @@ public class HeaderRenderer {
     }
     parts.add(status(target));
     return String.join(SEPARATOR, parts);
+  }
+
+  private static String started(MatchFacts facts) {
+    ZoneId zone = facts.zone() == null ? ZoneId.systemDefault() : facts.zone();
+    return Instant.ofEpochSecond(facts.startSeconds()).atZone(zone).format(START_FORMATTER);
   }
 
   private static String status(StageTarget target) {
