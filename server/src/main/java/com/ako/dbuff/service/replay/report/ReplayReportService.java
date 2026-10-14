@@ -36,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -123,12 +124,7 @@ public class ReplayReportService {
       return logSkipped(matchId, ReportDelivery.REPORT_SWITCHED_OFF);
     }
     try {
-      boolean stored =
-          runRepo
-              .findByMatchIdAndParserVersion(matchId, processing.getParserVersion())
-              .filter(run -> run.getStatus().hasAnalysis())
-              .isPresent();
-      if (!stored) {
+      if (!hasStoredAnalysis(matchId)) {
         return logSkipped(matchId, ReportDelivery.NOT_STORED);
       }
       MatchDomain match = matchRepo.findById(matchId).orElse(null);
@@ -141,6 +137,59 @@ public class ReplayReportService {
           deliverTo(match, statRepo.findAllByMatchId(matchId), instance, Trigger.REQUESTED));
     } catch (RuntimeException e) {
       log.warn("Replay report of match {} for instance {} failed", matchId, instanceId, e);
+      return ReportDelivery.FAILED;
+    }
+  }
+
+  /** Whether the match has a stored replay analysis, a run that ended DONE or PARTIAL. */
+  public boolean hasStoredAnalysis(long matchId) {
+    return runRepo
+        .findByMatchIdAndParserVersion(matchId, processing.getParserVersion())
+        .filter(run -> run.getStatus().hasAnalysis())
+        .isPresent();
+  }
+
+  /**
+   * Posts one section of a match with a stored replay into one channel's thread for a person who
+   * asked for it, in the report's format. Only the section's own output decides; the report and
+   * section switches, the detail level and the quiet hours do not apply, so a section that is off
+   * for automatic posting can still be asked for.
+   */
+  public ReportDelivery deliverSection(long matchId, String instanceId, String sectionName) {
+    return deliverSection(matchId, instanceId, sectionName, null);
+  }
+
+  /**
+   * The same, with an AI model a person chose for this request; the AI sections ask it instead of
+   * the default one.
+   */
+  public ReportDelivery deliverSection(
+      long matchId, String instanceId, String sectionName, String modelOverride) {
+    try {
+      if (!hasStoredAnalysis(matchId)) {
+        return logSkipped(matchId, ReportDelivery.NOT_STORED);
+      }
+      ReplayReportSection section =
+          sections.stream().filter(s -> s.name().equals(sectionName)).findFirst().orElse(null);
+      MatchDomain match = matchRepo.findById(matchId).orElse(null);
+      DbufInstanceConfigDomain instance = instanceRepo.findById(instanceId).orElse(null);
+      if (section == null || match == null || instance == null) {
+        return logSkipped(matchId, ReportDelivery.NO_INSTANCE);
+      }
+      List<PlayerMatchStatisticDomain> stats = statRepo.findAllByMatchId(matchId);
+      return logSkipped(
+          matchId,
+          postToThread(
+              match,
+              instance,
+              () ->
+                  render(
+                      List.of(section),
+                      input(match, stats, instance).withModelOverride(modelOverride)),
+              ReportDelivery.SECTION_EMPTY,
+              false));
+    } catch (RuntimeException e) {
+      log.warn("Section {} of match {} failed: {}", sectionName, matchId, e.getMessage(), e);
       return ReportDelivery.FAILED;
     }
   }
@@ -196,6 +245,20 @@ public class ReplayReportService {
         return ReportDelivery.QUIET_HOURS;
       }
     }
+    return postToThread(
+        match,
+        instance,
+        () -> messages(match, stats, instance, settings),
+        ReportDelivery.NO_SECTIONS,
+        true);
+  }
+
+  private ReportDelivery postToThread(
+      MatchDomain match,
+      DbufInstanceConfigDomain instance,
+      Supplier<List<ReportMessage>> build,
+      ReportDelivery whenEmpty,
+      boolean markPosted) {
     MatchReportThreadDomain thread =
         threadRepo.findByMatchIdAndInstanceId(match.getId(), instance.getId()).orElse(null);
     if (thread == null || thread.getThreadId() == null) {
@@ -205,9 +268,9 @@ public class ReplayReportService {
           instance.getId());
       return ReportDelivery.NO_THREAD;
     }
-    List<ReportMessage> messages = messages(match, stats, instance, settings);
+    List<ReportMessage> messages = build.get();
     if (messages.isEmpty()) {
-      return ReportDelivery.NO_SECTIONS;
+      return whenEmpty;
     }
     ThreadChannel channel = discord.getThreadById(thread.getThreadId());
     if (channel == null) {
@@ -217,7 +280,9 @@ public class ReplayReportService {
           match.getId());
       return ReportDelivery.THREAD_NOT_FOUND;
     }
-    recordPosted(match.getId(), instance.getId(), messages.size());
+    if (markPosted) {
+      recordPosted(match.getId(), instance.getId(), messages.size());
+    }
     messages.forEach(message -> send(match.getId(), channel, message));
     metrics.reportPosted();
     log.info("Replay report of match {} posted in {} messages", match.getId(), messages.size());
@@ -293,10 +358,7 @@ public class ReplayReportService {
             .filter(s -> settings.detail().includes(s.minimumDetail()))
             .sorted(Comparator.comparingInt(ReplayReportSection::order))
             .toList();
-    List<ReportMessage> all =
-        properties.getFormat() == ReportFormat.COMPONENTS
-            ? components(active, input)
-            : plain(active, input);
+    List<ReportMessage> all = render(active, input);
     int cap =
         Math.max(
             1,
@@ -304,6 +366,12 @@ public class ReplayReportService {
                 ? properties.getMaxMessages()
                 : properties.getStandardMaxMessages());
     return MessageCap.apply(all, cap);
+  }
+
+  private List<ReportMessage> render(List<ReplayReportSection> active, ReplayReportInput input) {
+    return properties.getFormat() == ReportFormat.COMPONENTS
+        ? components(active, input)
+        : plain(active, input);
   }
 
   private List<ReportMessage> plain(List<ReplayReportSection> active, ReplayReportInput input) {

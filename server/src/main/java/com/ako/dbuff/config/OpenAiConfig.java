@@ -39,4 +39,9 @@ public class OpenAiConfig {
 
   /** Approximate characters per token ratio. English text averages ~4 characters per token. */
   private Double charsPerToken = 4.0;
+
+  /** The estimated tokens of a text of the given length, by {@link #charsPerToken}. */
+  public int estimateTokens(int chars) {
+    return chars <= 0 ? 0 : (int) Math.ceil(chars / charsPerToken);
+  }
 }

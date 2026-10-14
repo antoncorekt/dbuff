@@ -126,6 +126,7 @@ The explanations (income drop reasons, Midas payback, key item behind a swing) a
 5. Icons: constants `img` field, download and storage, emoji sync job, `discord_icon` table, `IconService` with the fallback chain, used by the card and the sections; heroes, abilities and items.
 6. Move the remaining sections to `SectionView`, a few per PR.
 7. AI top-5 reasons.
+   Built (branch `feature/ai-top-reasons`, switch `replay.report.ai.enabled`, off by default): `AiMatchFactsBuilder` and `FactTrimmer` (facts from the existing section views and the stored match stats, `facts-token-budget`), `ReasonsModel` with the OpenAI implementation on a shared `OpenAiClientProvider`, `ReasonsParser` (validation, at most five, evidence ids checked), `AiReasonsService` with the `match_ai_reasons` cache and the per-match daily call limit, the `ai-reasons` section (default off) and `/match ai` with the text alias `ai`, posted through `ReplayReportService.deliverSection`. Not built: the per-channel `language` setting (the language is the server property `replay.report.ai.language`, English) and the per-thread cooldown, both belong to step 4. Not verified: a real model call and a real-channel look at the card.
 8. Graphs: advantage, then income, then farm.
 
 Order matters: 3 builds on 2 (one Components V2 renderer, not two); 4 needs 2; 5 needs 2 and 3 (icons are used by the card); 7 needs 2 and 4 (`/match ai`, cooldown, language); 8 needs 2.

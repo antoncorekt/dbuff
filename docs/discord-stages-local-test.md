@@ -137,4 +137,19 @@ Log lines to look at (the terminal that runs the jar): `Stage 1 sent for match`,
 
 ## 10. Switch it off again
 
-Stop the app, unset the variables (or open a new terminal; the `~` prefix export lives only in the terminal you set it in, and starting the app without it makes both bots answer `!rerun`) and start it as usual: with `DISCORD_REPORT_STAGES_ENABLED` false, new matches get the old plain header and no title edits or reposts run. A thread whose header is staged keeps being editable only through the staged code, which is off then.
+Stop the app, unset the variables, the `REPLAY_REPORT_AI_*` and `OPENAI_API_KEY` ones too if you set them (or open a new terminal; the `~` prefix export lives only in the terminal you set it in, and starting the app without it makes both bots answer `!rerun`) and start it as usual: with `DISCORD_REPORT_STAGES_ENABLED` false, new matches get the old plain header and no title edits or reposts run. A thread whose header is staged keeps being editable only through the staged code, which is off then.
+
+## 11. Try the AI top 5 reasons (optional, costs money)
+
+Off by default everywhere. It sends a few thousand tokens of match facts to OpenAI per match (a few cents at the default `gpt-4o-mini`); the same facts are answered from the database the second time, and at most 3 paid calls per match per day are made.
+
+1. Add to the start-up lines of step 3 (a real key is needed; the old `openai.api-key` setting is the same one):
+   ```
+   export OPENAI_API_KEY='paste-your-key-here'
+   export REPLAY_REPORT_AI_ENABLED=true
+   export REPLAY_REPORT_SECTIONS_AIREASONS_ENABLED=true
+   ```
+   Without the second line the section does not post; the third makes it post after the other sections when the report is delivered. Optional: `REPLAY_REPORT_AI_ALLOWED_MODELS=gpt-4o-mini,gpt-4o` (the models `~ai` may be told to use), `REPLAY_REPORT_AI_LANGUAGE=Russian`, `REPLAY_REPORT_AI_FACTS_TOKEN_BUDGET`, `REPLAY_REPORT_AI_MODEL`, `REPLAY_REPORT_AI_MAX_CALLS_PER_MATCH_PER_DAY`.
+2. On demand, in a `Match <id>` thread of a match with a DONE or PARTIAL run, send `~ai` (or `/match ai`). `~ai gpt-4o` or `/match ai model:gpt-4o` uses that model for the one call (it must be in the allowed list, otherwise one refusal line; a stored answer of another model is not reused; the card footnote names the model). Without the second switch it still works, it only does not post by itself. Refusals are one line each: switched off, no API key, no stored replay analysis.
+3. What to look at: the card `Top 5 reasons` with `Dire won; your team won/lost`, numbered reasons that end with `(based on: ...)`, and the line saying how many reasons had enough data when fewer than five. Send `~ai` again: no second paid call (log has no new `AI reasons of match ... reasons` line, and the card is the same).
+4. A failure (bad key, timeout, unusable answer) posts nothing in the thread and logs a WARN `AI reasons of match <id> failed`.

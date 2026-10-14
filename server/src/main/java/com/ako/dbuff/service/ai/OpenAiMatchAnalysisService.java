@@ -9,7 +9,6 @@ import com.ako.dbuff.service.ai.config.AiPromptFieldConfig;
 import com.ako.dbuff.service.ai.model.MatchAnalysisRequest;
 import com.ako.dbuff.service.ai.model.MatchWithPlayerStatistics;
 import com.openai.client.OpenAIClient;
-import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.models.ChatCompletion;
 import com.openai.models.ChatCompletionCreateParams;
 import com.openai.models.ChatCompletionMessageParam;
@@ -37,15 +36,14 @@ public class OpenAiMatchAnalysisService implements MatchAnalysisAiService {
   public OpenAiMatchAnalysisService(
       OpenAiConfig openAiConfig,
       MatchAnalysisRepo matchAnalysisRepo,
-      AiPromptBuilder aiPromptBuilder) {
+      AiPromptBuilder aiPromptBuilder,
+      OpenAiClientProvider clientProvider) {
     this.openAiConfig = openAiConfig;
     this.matchAnalysisRepo = matchAnalysisRepo;
     this.aiPromptBuilder = aiPromptBuilder;
 
-    if (openAiConfig.getApiKey() != null && !openAiConfig.getApiKey().isBlank()) {
-      this.openAIClient = OpenAIOkHttpClient.builder().apiKey(openAiConfig.getApiKey()).build();
-    } else {
-      this.openAIClient = null;
+    this.openAIClient = clientProvider.client().orElse(null);
+    if (openAIClient == null) {
       log.warn("OpenAI API key not configured. OpenAI service will not be available.");
     }
   }
@@ -210,10 +208,7 @@ public class OpenAiMatchAnalysisService implements MatchAnalysisAiService {
    * (approximately 4 chars per token for English).
    */
   private int estimateTokenCount(String text) {
-    if (text == null || text.isEmpty()) {
-      return 0;
-    }
-    return (int) Math.ceil(text.length() / openAiConfig.getCharsPerToken());
+    return openAiConfig.estimateTokens(text == null ? 0 : text.length());
   }
 
   /**

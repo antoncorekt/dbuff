@@ -612,6 +612,59 @@ class ReplayReportServiceTest {
   }
 
   @Test
+  void deliverSection_postsOnlyThatSectionEvenWhenItIsOffAndTheReportIsOff() {
+    storedRun(ReplayStatus.DONE);
+    properties.setEnabled(false);
+    service = serviceWith(named("alpha", true), named("beta", false));
+
+    assertThat(service.deliverSection(1L, "i1", "beta")).isEqualTo(ReportDelivery.POSTED);
+
+    String text = posted();
+    assertThat(text).contains("line of beta").doesNotContain("line of alpha");
+    verify(postedRepo, never()).save(any());
+  }
+
+  @Test
+  void deliverSection_componentsFormatPostsTheCard() {
+    storedRun(ReplayStatus.DONE);
+    properties.setFormat(ReportFormat.COMPONENTS);
+    service = serviceWith(named("beta", false));
+
+    assertThat(service.deliverSection(1L, "i1", "beta")).isEqualTo(ReportDelivery.POSTED);
+
+    verify(discord).sendThreadComponentsBlocking(Mockito.eq(thread), any());
+  }
+
+  @Test
+  void deliverSection_saysWhyNothingWasPosted() {
+    storedRun(ReplayStatus.DONE);
+    service = serviceWith(named("alpha", true), emptySection("quiet"));
+
+    assertThat(service.deliverSection(1L, "i1", "quiet")).isEqualTo(ReportDelivery.SECTION_EMPTY);
+    assertThat(service.deliverSection(1L, "i1", "missing")).isEqualTo(ReportDelivery.NO_INSTANCE);
+    when(threadRepo.findByMatchIdAndInstanceId(1L, "i1")).thenReturn(Optional.empty());
+    assertThat(service.deliverSection(1L, "i1", "alpha")).isEqualTo(ReportDelivery.NO_THREAD);
+    when(runRepo.findByMatchIdAndParserVersion(any(), any())).thenReturn(Optional.empty());
+    assertThat(service.deliverSection(1L, "i1", "alpha")).isEqualTo(ReportDelivery.NOT_STORED);
+
+    verify(discord, never()).sendThreadMessageBlocking(any(), any());
+  }
+
+  private static ReplayReportSection emptySection(String name) {
+    return new ReplaySection() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public List<String> lines(ReplayReportInput input) {
+        return List.of();
+      }
+    };
+  }
+
+  @Test
   void redeliver_ignoresQuietHoursButHonoursTheOtherGates() {
     storedRun(ReplayStatus.PARTIAL);
     when(quiet.isQuietTime(any())).thenReturn(true);
