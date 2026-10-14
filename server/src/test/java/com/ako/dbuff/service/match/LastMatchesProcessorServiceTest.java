@@ -164,7 +164,7 @@ class LastMatchesProcessorServiceTest {
     Mockito.verify(orchestrator).sendBackfillNotice(Mockito.any(), Mockito.eq(1));
     Mockito.verify(parseRequests, Mockito.never()).submitParseRequest(Mockito.anyLong());
     Mockito.verify(orchestrator, Mockito.never())
-        .processAndReportPartial(Mockito.any(), Mockito.any());
+        .processAndReportPartial(Mockito.any(), Mockito.any(), Mockito.any());
   }
 
   @Test
@@ -175,7 +175,8 @@ class LastMatchesProcessorServiceTest {
     service.processLastMatchesForInstance("instance-1");
 
     Mockito.verify(parseRequests).submitParseRequest(2L);
-    Mockito.verify(orchestrator).processAndReportPartial(Mockito.any(), Mockito.any());
+    Mockito.verify(orchestrator)
+        .processAndReportPartial(Mockito.any(), Mockito.any(), Mockito.any());
     Mockito.verify(matchProcessor, Mockito.never()).process(Mockito.anyList());
   }
 

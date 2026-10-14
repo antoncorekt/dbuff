@@ -14,6 +14,9 @@ import com.ako.dbuff.service.match.report.analyzer.PartialDataAvailable;
 import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.ReportAnalyzer;
 import com.ako.dbuff.service.match.report.formatter.ReportFormatter;
+import com.ako.dbuff.service.match.report.stage.HeaderRenderer;
+import com.ako.dbuff.service.match.report.stage.MatchReportStageService;
+import com.ako.dbuff.service.match.report.stage.MatchThreadRecorder;
 import java.util.ArrayList;
 import java.util.List;
 import net.dv8tion.jda.api.entities.Message;
@@ -95,7 +98,9 @@ class MatchReportOrchestratorSettingsTest {
             Mockito.mock(AbilityRepo.class),
             Mockito.mock(ItemRepository.class),
             Mockito.mock(KillLogRepo.class),
-            Mockito.mock(MatchReportThreadRepo.class));
+            new MatchThreadRecorder(Mockito.mock(MatchReportThreadRepo.class)),
+            new HeaderRenderer(),
+            Mockito.mock(MatchReportStageService.class));
   }
 
   private void report(InstanceSettings settings) {

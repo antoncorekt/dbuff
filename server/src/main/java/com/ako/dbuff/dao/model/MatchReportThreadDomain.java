@@ -1,6 +1,8 @@
 package com.ako.dbuff.dao.model;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -38,4 +40,15 @@ public class MatchReportThreadDomain {
   private Long threadId;
   private Long headerMessageId;
   private LocalDateTime createdAt;
+
+  /** Null for a row written before the header had stages. */
+  @Enumerated(EnumType.STRING)
+  private MatchReportStage stage;
+
+  /** What the first header said, kept so that a later title can repeat it. All null if unknown. */
+  private String modeName;
+
+  private Integer wins;
+  private Integer losses;
+  private Long durationSeconds;
 }
