@@ -10,6 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -26,6 +27,7 @@ public class ReasonWording {
   private static final String TEAM_REASON = "TEAM";
   private static final String ENEMY_RUNE = "ENEMY_RUNE_ADVANTAGE";
   private static final Pattern ABOUT_A_TEAM = Pattern.compile("^(Radiant|Dire) ");
+  private static final Pattern INVISIBLE = Pattern.compile("^(.+?) (?:was|were) invisible");
   private static final Pattern FARMING = Pattern.compile("was (farming [a-z ]+?) when");
 
   private static final Map<String, BiFunction<ReasonWording, String, String>> PLAYER_PHRASES =
@@ -50,7 +52,14 @@ public class ReasonWording {
           Map.entry("TOWER", (w, e) -> "died to a tower"),
           Map.entry("BURST", (w, e) -> "was burst down"),
           Map.entry("OUT_OF_POSITION", (w, e) -> "stood too far in front"),
-          Map.entry("NO_BKB", (w, e) -> "had no Black King Bar"));
+          Map.entry("NO_BKB", (w, e) -> "had no Black King Bar"),
+          Map.entry("ROTATION_WASTED_BEFORE_FIGHT", (w, e) -> wastedRotation(e)));
+
+  private static final Map<String, Function<String, String>> VISION_PHRASES =
+      Map.of(
+          "NO_VISION_BEFORE_FIGHT", e -> "the team had no vision near the fight, the enemy did",
+          "NO_DETECTION_VS_INVISIBLE", ReasonWording::noDetection,
+          "LATE_WARD", e -> "the team's ward near the fight went down too late");
 
   private final AbilityLabels labels;
 
@@ -109,6 +118,10 @@ public class ReasonWording {
                               .formatted(r.hero(), article(r.rune()), r.rune(), r.timing()))
                   .collect(Collectors.joining(", "));
     }
+    Function<String, String> vision = code == null ? null : VISION_PHRASES.get(code);
+    if (vision != null) {
+      return vision.apply(evidence == null ? "" : evidence.trim());
+    }
     if (!CompositionToken.isToken(code)) {
       String note = evidence == null ? "" : evidence.trim();
       if (note.isEmpty()) {
@@ -130,6 +143,19 @@ public class ReasonWording {
         + runes.stream()
             .map(r -> "%s %s rune %s".formatted(article(r.rune()), r.rune(), r.timing()))
             .collect(Collectors.joining(" and "));
+  }
+
+  private static String wastedRotation(String evidence) {
+    return evidence.contains("he died on it")
+        ? "died on a rotation just before the fight"
+        : "had just wasted a rotation and missed the fight";
+  }
+
+  private static String noDetection(String evidence) {
+    Matcher m = INVISIBLE.matcher(evidence);
+    String who = m.find() ? m.group(1) : "an enemy hero";
+    return "the team had no detection against "
+        + (who.startsWith("An enemy") ? "an enemy hero" : who);
   }
 
   private static String article(String word) {

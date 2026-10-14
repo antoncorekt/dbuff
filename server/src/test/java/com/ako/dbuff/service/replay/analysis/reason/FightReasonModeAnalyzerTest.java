@@ -40,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestPropertySource(properties = "replay.analysis.reasons.strong-skill-left.enabled=true")
 @Import({
   FightReasonAnalyzer.class,
+  FightContextLoader.class,
   IntentNotPlayedContributor.class,
   WeakCombinationContributor.class,
   StrongSkillLeftContributor.class,

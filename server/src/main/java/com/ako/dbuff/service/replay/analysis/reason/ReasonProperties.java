@@ -1,13 +1,17 @@
 package com.ako.dbuff.service.replay.analysis.reason;
 
+import com.ako.dbuff.service.replay.analysis.behaviour.RotationVerdict;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
 import com.ako.dbuff.service.replay.analysis.death.DeathReason;
 import com.ako.dbuff.service.replay.analysis.fight.AbsenceReason;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
 import com.ako.dbuff.service.replay.analysis.role.RoleFunction;
 import com.ako.dbuff.service.replay.analysis.rune.RuneType;
+import com.ako.dbuff.service.replay.analysis.vision.VisionVerdict;
+import jakarta.annotation.PostConstruct;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.Data;
@@ -150,6 +154,62 @@ public class ReasonProperties {
 
   /** Added to the severity for each further rune in the same rune reason of one fight. */
   private double runeAdvantageExtraStep = 0.1;
+
+  /**
+   * Vision at an important fight, by verdict of the losing team. NO_VISION counts only against a
+   * winner who had vision; a late ward is a weak factor.
+   */
+  private Map<VisionVerdict, Double> visionSeverity =
+      new EnumMap<>(
+          Map.of(
+              VisionVerdict.NO_VISION, 0.4,
+              VisionVerdict.INVISIBLE_HERO_NO_DETECTION, 0.4,
+              VisionVerdict.LATE_WARD, 0.15));
+
+  /** A wasted or fatal rotation of a hero of the losing team who then missed the fight. */
+  private Map<RotationVerdict, Double> rotationSeverity =
+      new EnumMap<>(Map.of(RotationVerdict.WASTED, 0.4, RotationVerdict.DIED, 0.5));
+
+  /** A rotation that ended this many seconds before the fight began, or overlapped it, counts. */
+  private int rotationWindowSeconds = 60;
+
+  @PostConstruct
+  public void validate() {
+    requireSeverities(
+        "vision-severity",
+        visionSeverity,
+        List.of(
+            VisionVerdict.NO_VISION,
+            VisionVerdict.INVISIBLE_HERO_NO_DETECTION,
+            VisionVerdict.LATE_WARD));
+    requireSeverities(
+        "rotation-severity",
+        rotationSeverity,
+        List.of(RotationVerdict.WASTED, RotationVerdict.DIED));
+    if (rotationWindowSeconds < 0) {
+      throw new IllegalStateException(
+          "replay.analysis.reasons.rotation-window-seconds must not be negative");
+    }
+  }
+
+  private static <E extends Enum<E>> void requireSeverities(
+      String property, Map<E, Double> severities, List<E> required) {
+    for (E verdict : required) {
+      Double value = severities.get(verdict);
+      if (value == null || value < 0 || value > 1) {
+        throw new IllegalStateException(
+            "replay.analysis.reasons." + property + " needs a value from 0 to 1 for " + verdict);
+      }
+    }
+  }
+
+  public double severity(VisionVerdict verdict) {
+    return visionSeverity.getOrDefault(verdict, defaultSeverity);
+  }
+
+  public double severity(RotationVerdict verdict) {
+    return rotationSeverity.getOrDefault(verdict, defaultSeverity);
+  }
 
   /** The severity of a reason about a player, lowered when he was near the fight but passive. */
   public double byPresence(double severity, Presence presence) {
