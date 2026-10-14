@@ -93,6 +93,7 @@ class OpeningSectionTest {
     rune(129, "HASTE", 600, null, false);
     rune(1, "WATER", 240, null, true);
     rune(0, "ARCANE", 700, null, true);
+    rune(0, "SHIELD", 601, null, true);
     rune(0, "REGENERATION", 130, null, true);
 
     List<String> lines = section.lines(input());
@@ -101,10 +102,10 @@ class OpeningSectionTest {
         .containsExactly(
             "**Opening and runes**",
             "Radiant won the opening by 1.2k gold and XP; kills 3 to 1.",
-            "Bounty runes: Radiant took 2 (230 gold to each hero), the first was Axe at 0:00; Dire"
-                + " took 1 (100 gold to each hero), the first was Sven at 0:02.",
-            "In the mid lane: Lion took water runes at 2:00 and 4:00; Pudge took a double damage"
-                + " rune at 9:20; Axe took an arcane rune at 11:40.");
+            "Radiant took 2 bounty runes worth 230 gold in total, the first was Axe at 0:00; Dire"
+                + " took 1 bounty rune worth 100 gold in total, the first was Sven at 0:02.",
+            "In the mid lane in the first 10 minutes: Lion took water runes at 2:00 and 4:00; Pudge"
+                + " took a double damage rune at 9:20.");
   }
 
   @Test
@@ -123,7 +124,7 @@ class OpeningSectionTest {
 
     assertThat(section.lines(input()))
         .containsExactly(
-            "**Opening and runes**", "The opening was a draw: gold, XP and kills were level.");
+            "**Opening and runes**", "The opening was level: gold, XP and kills were level.");
   }
 
   @Test
@@ -157,7 +158,7 @@ class OpeningSectionTest {
 
     assertThat(lines).hasSize(3);
     assertThat(lines.get(1)).isEqualTo("Radiant won the opening by 300 gold and XP.");
-    assertThat(lines.get(2)).isEqualTo("Bounty runes: Radiant took 2, the first was Axe at 0:00.");
+    assertThat(lines.get(2)).isEqualTo("Radiant took 2 bounty runes, the first was Axe at 0:00.");
   }
 
   @Test
@@ -177,8 +178,7 @@ class OpeningSectionTest {
 
     List<String> lines = section.lines(new ReplayReportInput(1L, null, null, null, 3));
 
-    assertThat(lines.get(0)).isEqualTo("**Opening and runes**");
-    assertThat(lines.get(1)).isEqualTo("In the mid lane: ? took a haste rune at ?.");
+    assertThat(lines).isEmpty();
   }
 
   @Test
@@ -203,6 +203,56 @@ class OpeningSectionTest {
     List<String> lines = section.lines(input());
 
     assertThat(lines.get(2)).hasSizeLessThanOrEqualTo(60).endsWith("...");
+  }
+
+  @Test
+  void aLostRowAloneNamesTheOtherTeamAsTheWinner() {
+    summary("DIRE", "LOST", -500, 2);
+
+    assertThat(section.lines(input(0L)))
+        .containsExactly(
+            "**Opening and runes**", "Radiant (your team) won the opening by 500 gold and XP.");
+  }
+
+  @Test
+  void aLevelBalanceWithEqualOrUnknownKillsIsLevelNotWonOnKills() {
+    summary("RADIANT", "WON", 0, 2);
+    summary("DIRE", "LOST", 0, 2);
+    assertThat(section.lines(input()).get(1)).startsWith("The opening was level");
+
+    summaries.clear();
+    summary("RADIANT", "WON", 0, 2);
+    summaries.get(0).setKills(null);
+    assertThat(section.lines(input()).get(1)).isEqualTo("The opening was level in gold and XP.");
+  }
+
+  @Test
+  void theEnemyKillsAreThoseOfTheOppositeTeamWhateverTheRowOrder() {
+    summary("DIRE", "LOST", -300, 5);
+    summary("RADIANT", "WON", 300, 1);
+
+    assertThat(section.lines(input()).get(1)).endsWith("; kills 1 to 5.");
+  }
+
+  @Test
+  void midLaneRunesAreOnlyThoseOfTheFirstConfiguredMinutes() {
+    properties.setOpeningRuneMinutes(5);
+    summary("RADIANT", "WON", 300, 1);
+    rune(0, "WATER", 300, null, true);
+    rune(0, "WATER", 301, null, true);
+
+    assertThat(section.lines(input()).get(2))
+        .isEqualTo("In the mid lane in the first 5 minutes: Axe took a water rune at 5:00.");
+  }
+
+  @Test
+  void validatesTheRuneMinutes() {
+    for (int bad : new int[] {0, 31}) {
+      properties.setOpeningRuneMinutes(bad);
+      assertThatThrownBy(properties::validate).hasMessageContaining("opening-rune-minutes");
+    }
+    properties.setOpeningRuneMinutes(30);
+    properties.validate();
   }
 
   @Test

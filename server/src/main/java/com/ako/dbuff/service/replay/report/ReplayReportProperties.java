@@ -13,9 +13,10 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "replay.report")
 public class ReplayReportProperties {
   private static final int MAX_IMPORTANT_FIGHT_LINES = 15;
-  private static final int MIN_LANE_LINE_LENGTH = 60;
-  private static final int MAX_LANE_LINE_LENGTH = 600;
+  private static final int MIN_LINE_LENGTH = 60;
+  private static final int MAX_LINE_LENGTH = 600;
   private static final double MAX_LANE_MARGIN = 2;
+  private static final int MAX_OPENING_RUNE_MINUTES = 30;
   private static final int MAX_BEHAVIOUR_LINES = 10;
   private static final double MAX_OBJECTIVE_DISTANCE = 20000;
 
@@ -75,6 +76,9 @@ public class ReplayReportProperties {
    */
   private int maxOpeningLineLength = 400;
 
+  /** The mid lane runes of the opening section are those taken in this many first minutes. */
+  private int openingRuneMinutes = 10;
+
   /** How far back a finished replay run is looked at for an analysis not yet posted. */
   private int lookbackHours = 48;
 
@@ -103,18 +107,10 @@ public class ReplayReportProperties {
               + " and "
               + objectiveFarDistance);
     }
-    requireRange(
-        "max-behaviour-line-length",
-        maxBehaviourLineLength,
-        MIN_LANE_LINE_LENGTH,
-        MAX_LANE_LINE_LENGTH);
-    requireRange(
-        "max-opening-line-length",
-        maxOpeningLineLength,
-        MIN_LANE_LINE_LENGTH,
-        MAX_LANE_LINE_LENGTH);
-    requireRange(
-        "max-lane-line-length", maxLaneLineLength, MIN_LANE_LINE_LENGTH, MAX_LANE_LINE_LENGTH);
+    requireLineLength("max-behaviour-line-length", maxBehaviourLineLength);
+    requireRange("opening-rune-minutes", openingRuneMinutes, 1, MAX_OPENING_RUNE_MINUTES);
+    requireLineLength("max-opening-line-length", maxOpeningLineLength);
+    requireLineLength("max-lane-line-length", maxLaneLineLength);
     if (!(laneClearMargin > 0
         && laneClearMargin < laneBigMargin
         && laneBigMargin <= MAX_LANE_MARGIN)) {
@@ -126,6 +122,10 @@ public class ReplayReportProperties {
               + " and "
               + laneBigMargin);
     }
+  }
+
+  private static void requireLineLength(String name, int value) {
+    requireRange(name, value, MIN_LINE_LENGTH, MAX_LINE_LENGTH);
   }
 
   private static void requireRange(String name, int value, int min, int max) {

@@ -1,8 +1,5 @@
 package com.ako.dbuff.service.replay.report;
 
-import com.ako.dbuff.service.replay.analysis.reason.Enums;
-import com.ako.dbuff.service.replay.analysis.role.TeamSide;
-
 /** The words of the opening of the game that the Discord section and the rune loop report share. */
 public final class OpeningWording {
   private static final String UNKNOWN = "?";
@@ -24,11 +21,5 @@ public final class OpeningWording {
       return UNKNOWN;
     }
     return (value > 0 ? "+" : value < 0 ? "-" : "") + BehaviourWording.gold(Math.abs(value));
-  }
-
-  /** {@code Radiant}, or {@code Radiant (your team)} for the team being reported to. */
-  public static String team(String stored, TeamSide yours) {
-    TeamSide side = Enums.find(TeamSide.class, stored);
-    return Prettify.team(stored) + (side != null && side == yours ? " (your team)" : "");
   }
 }

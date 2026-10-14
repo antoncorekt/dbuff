@@ -36,6 +36,9 @@ public class OpeningSection implements ReplayReportSection {
               RunePickupDomain::getRuneIndex, Comparator.nullsLast(Comparator.naturalOrder()))
           .thenComparing(RunePickupDomain::getId, Comparator.nullsLast(Comparator.naturalOrder()));
 
+  private static final int SECONDS_PER_MINUTE = 60;
+  private static final String LEVEL = "The opening was level: gold, XP and kills were level.";
+
   private final OpeningSummaryRepo summaryRepo;
   private final RunePickupRepo pickupRepo;
   private final ReportHeroNames heroNames;
@@ -66,11 +69,16 @@ public class OpeningSection implements ReplayReportSection {
         present(pickupRepo.findByMatchId(input.matchId())).stream().sorted(CHRONOLOGICAL).toList();
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
+    List<String> body = new ArrayList<>();
+    result(summaries, yours).ifPresent(body::add);
+    bounty(pickups, heroes, yours).ifPresent(body::add);
+    midLane(pickups, heroes, properties.getOpeningRuneMinutes()).ifPresent(body::add);
+    if (body.isEmpty()) {
+      return List.of();
+    }
     List<String> lines = new ArrayList<>();
     lines.add("**Opening and runes**");
-    result(summaries, yours).ifPresent(lines::add);
-    bounty(pickups, heroes, yours).ifPresent(lines::add);
-    midLane(pickups, heroes).ifPresent(lines::add);
+    lines.addAll(body);
     int max = Math.max(LineText.ELLIPSIS.length() + 1, properties.getMaxOpeningLineLength());
     return lines.stream().map(line -> LineText.cut(line, max)).toList();
   }
@@ -80,55 +88,70 @@ public class OpeningSection implements ReplayReportSection {
   }
 
   private static Optional<String> result(List<OpeningSummaryDomain> summaries, TeamSide yours) {
-    OpeningSummaryDomain winner = winner(summaries);
-    if (winner == null) {
-      boolean drew = summaries.stream().anyMatch(s -> "DRAW".equals(s.getResult()));
-      return drew
-          ? Optional.of("The opening was a draw: gold, XP and kills were level.")
+    OpeningSummaryDomain won = withResult(summaries, "WON");
+    OpeningSummaryDomain lost = withResult(summaries, "LOST");
+    if (won == null && lost == null) {
+      return summaries.stream().anyMatch(s -> "DRAW".equals(s.getResult()))
+          ? Optional.of(LEVEL)
           : Optional.empty();
     }
-    Integer enemyKills =
-        summaries.stream()
-            .filter(s -> s != winner)
-            .map(OpeningSummaryDomain::getKills)
-            .filter(Objects::nonNull)
-            .findFirst()
-            .orElse(null);
-    String kills =
-        winner.getKills() == null || enemyKills == null
-            ? ""
-            : "%d to %d".formatted(winner.getKills(), enemyKills);
-    String team = OpeningWording.team(winner.getTeam(), yours);
-    String won = OpeningWording.result(winner.getResult());
-    if (winner.getBalance() != null && winner.getBalance() == 0) {
-      return Optional.of(
-          kills.isEmpty()
-              ? "%s %s after gold and XP were level.".formatted(team, won)
-              : "%s %s on kills, %s, after gold and XP were level.".formatted(team, won, kills));
+    TeamSide winner =
+        won != null
+            ? Enums.find(TeamSide.class, won.getTeam())
+            : opponent(Enums.find(TeamSide.class, lost.getTeam()));
+    if (winner == null) {
+      return Optional.empty();
+    }
+    Integer winnerKills = killsOf(summaries, winner);
+    Integer enemyKills = killsOf(summaries, winner.opponent());
+    Long balance =
+        won != null ? won.getBalance() : lost.getBalance() == null ? null : -lost.getBalance();
+    boolean knownKills = winnerKills != null && enemyKills != null;
+    String kills = knownKills ? "%d to %d".formatted(winnerKills, enemyKills) : "";
+    String team = Prettify.teamOf(winner.name(), yours);
+    String took = OpeningWording.result("WON");
+    if (balance != null && balance == 0) {
+      if (!knownKills) {
+        return Optional.of("The opening was level in gold and XP.");
+      }
+      return winnerKills.equals(enemyKills)
+          ? Optional.of(LEVEL)
+          : Optional.of(
+              "%s %s on kills, %s, after gold and XP were level.".formatted(team, took, kills));
     }
     String by =
-        winner.getBalance() == null
+        balance == null
             ? ""
-            : " by %s gold and XP".formatted(BehaviourWording.gold(Math.abs(winner.getBalance())));
+            : " by %s gold and XP".formatted(BehaviourWording.gold(Math.abs(balance)));
     return Optional.of(
         kills.isEmpty()
-            ? "%s %s%s.".formatted(team, won, by)
-            : "%s %s%s; kills %s.".formatted(team, won, by, kills));
+            ? "%s %s%s.".formatted(team, took, by)
+            : "%s %s%s; kills %s.".formatted(team, took, by, kills));
   }
 
-  /** The team that won; the one the other team lost to when only the loser's row is stored. */
-  private static OpeningSummaryDomain winner(List<OpeningSummaryDomain> summaries) {
-    List<OpeningSummaryDomain> sorted =
-        summaries.stream()
-            .sorted(
-                Comparator.comparing(
-                        OpeningSummaryDomain::getTeam,
-                        Comparator.nullsLast(Comparator.naturalOrder()))
-                    .thenComparing(
-                        OpeningSummaryDomain::getId,
-                        Comparator.nullsLast(Comparator.naturalOrder())))
-            .toList();
-    return sorted.stream().filter(s -> "WON".equals(s.getResult())).findFirst().orElse(null);
+  private static TeamSide opponent(TeamSide side) {
+    return side == null ? null : side.opponent();
+  }
+
+  private static Integer killsOf(List<OpeningSummaryDomain> summaries, TeamSide side) {
+    return summaries.stream()
+        .filter(s -> Enums.find(TeamSide.class, s.getTeam()) == side)
+        .map(OpeningSummaryDomain::getKills)
+        .filter(Objects::nonNull)
+        .findFirst()
+        .orElse(null);
+  }
+
+  private static OpeningSummaryDomain withResult(
+      List<OpeningSummaryDomain> summaries, String result) {
+    return summaries.stream()
+        .filter(s -> result.equals(s.getResult()))
+        .min(
+            Comparator.comparing(
+                    OpeningSummaryDomain::getTeam, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(
+                    OpeningSummaryDomain::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+        .orElse(null);
   }
 
   private static Optional<String> bounty(
@@ -144,9 +167,7 @@ public class OpeningSection implements ReplayReportSection {
         parts.add(bountyOf(side, taken, heroes, yours));
       }
     }
-    return parts.isEmpty()
-        ? Optional.empty()
-        : Optional.of("Bounty runes: " + String.join("; ", parts) + ".");
+    return parts.isEmpty() ? Optional.empty() : Optional.of(String.join("; ", parts) + ".");
   }
 
   private static String bountyOf(
@@ -155,13 +176,14 @@ public class OpeningSection implements ReplayReportSection {
     String gold =
         golds.contains(null)
             ? ""
-            : " (%s gold to each hero)"
+            : " worth %s gold in total"
                 .formatted(BehaviourWording.gold(golds.stream().mapToInt(i -> i).sum()));
     RunePickupDomain first = taken.get(0);
-    return "%s took %d%s, the first was %s at %s"
+    return "%s took %d bounty %s%s, the first was %s at %s"
         .formatted(
-            OpeningWording.team(side.name(), yours),
+            Prettify.teamOf(side.name(), yours),
             taken.size(),
+            taken.size() == 1 ? "rune" : "runes",
             gold,
             BehaviourWording.hero(heroes, first.getPlayerSlot()),
             time(first.getSeconds()));
@@ -171,10 +193,11 @@ public class OpeningSection implements ReplayReportSection {
 
   /** One clause per hero and rune kind, in the order of the first pickup, times in order. */
   private static Optional<String> midLane(
-      List<RunePickupDomain> pickups, Map<Long, String> heroes) {
+      List<RunePickupDomain> pickups, Map<Long, String> heroes, int minutes) {
     Map<Taker, List<String>> times = new LinkedHashMap<>();
     pickups.stream()
         .filter(p -> Boolean.TRUE.equals(p.getMidLane()))
+        .filter(p -> p.getSeconds() != null && p.getSeconds() <= minutes * SECONDS_PER_MINUTE)
         .filter(OpeningSection::powerOrWater)
         .forEach(
             p ->
@@ -195,7 +218,10 @@ public class OpeningSection implements ReplayReportSection {
                         BehaviourWording.hero(heroes, taker.slot()),
                         runes(taker.type(), at.size()),
                         LaneWording.joinNames(at))));
-    return Optional.of("In the mid lane: " + String.join("; ", clauses) + ".");
+    return Optional.of(
+        "In the mid lane in the first %d minutes: ".formatted(minutes)
+            + String.join("; ", clauses)
+            + ".");
   }
 
   private static String runes(RuneType type, int count) {
