@@ -5,12 +5,15 @@ import com.ako.dbuff.dao.model.MatchReportThreadDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.service.match.DotaApiLastMatchesService.PlayerLine;
 import com.ako.dbuff.service.replay.report.view.Accent;
+import java.time.ZoneId;
 import java.util.Collection;
 
 /**
  * What a match header says about the match; any part may be null when it is not known yet.
  *
  * @param mode readable game mode, null when unknown
+ * @param startSeconds match start, epoch seconds, null when unknown
+ * @param zone the zone the start is shown in, null for the server's
  */
 public record MatchFacts(
     long matchId,
@@ -18,7 +21,9 @@ public record MatchFacts(
     Result result,
     Long durationSeconds,
     Long radiantScore,
-    Long direScore) {
+    Long direScore,
+    Long startSeconds,
+    ZoneId zone) {
 
   private static final String MODE_PREFIX = "game_mode_";
 
@@ -76,7 +81,7 @@ public record MatchFacts(
   }
 
   /** The facts kept on the row, with the scores of the match when it is known. */
-  public static MatchFacts fromRow(MatchReportThreadDomain row, MatchDomain match) {
+  public static MatchFacts fromRow(MatchReportThreadDomain row, MatchDomain match, ZoneId zone) {
     Result result =
         row.getWins() == null || row.getLosses() == null
             ? new Result(0, 0)
@@ -87,19 +92,23 @@ public record MatchFacts(
         result,
         row.getDurationSeconds(),
         match == null ? null : match.getRadiantScore(),
-        match == null ? null : match.getDireScore());
+        match == null ? null : match.getDireScore(),
+        match == null ? null : match.getStartTime(),
+        zone);
   }
 
   /** These facts, with what the row kept filling in whatever is still unknown. */
   public MatchFacts orFrom(MatchReportThreadDomain row) {
-    MatchFacts kept = fromRow(row, null);
+    MatchFacts kept = fromRow(row, null, zone);
     return new MatchFacts(
         matchId,
         mode != null ? mode : kept.mode(),
         result.known() ? result : kept.result(),
         durationSeconds != null ? durationSeconds : kept.durationSeconds(),
         radiantScore,
-        direScore);
+        direScore,
+        startSeconds,
+        zone);
   }
 
   public Accent accent() {

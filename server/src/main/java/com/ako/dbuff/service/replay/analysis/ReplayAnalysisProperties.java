@@ -6,6 +6,10 @@ import com.ako.dbuff.service.replay.analysis.fight.FightDetector;
 import com.ako.dbuff.service.replay.analysis.spike.SpikeDetector;
 import com.ako.dbuff.service.replay.analysis.team.TeamStateSegmenter;
 import jakarta.annotation.PostConstruct;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Pattern;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +23,7 @@ public class ReplayAnalysisProperties {
   private static final int MAX_PERCENT = 100;
   private static final int MAX_STRETCH_MINUTES = 240;
   private static final double MAX_INCOME_BREAK_SHARE = 5;
+  private static final Pattern ITEM_NAME = Pattern.compile("item_[a-z0-9]+(_[a-z0-9]+)*");
 
   /** A creep last hit up to this long before a sample, or during it, counts the hero as farming. */
   private int activityFarmLookbackSeconds = 10;
@@ -123,6 +128,37 @@ public class ReplayAnalysisProperties {
   /** ...by at least this share of the teammates' average gain per minute. */
   private double incomeBreakShare = 0.25;
 
+  private FightAbility fightAbility = new FightAbility();
+
+  /** Bound from {@code replay.analysis.fight-ability.*}. */
+  @Data
+  public static class FightAbility {
+    /** The built-in items never meant to be cast in a fight; not configurable, only extended. */
+    static final Set<String> DEFAULT_IGNORED_ITEMS =
+        Set.of(
+            "item_quelling_blade",
+            "item_tango",
+            "item_flask",
+            "item_clarity",
+            "item_faerie_fire",
+            "item_enchanted_mango",
+            "item_ward_observer",
+            "item_ward_sentry",
+            "item_ward_dispenser",
+            "item_tpscroll",
+            "item_travel_boots",
+            "item_travel_boots_2",
+            "item_bottle",
+            "item_cheese",
+            "item_smoke_of_deceit",
+            "item_power_treads",
+            "item_tranquil_boots",
+            "item_ring_of_basilius");
+
+    /** Items added to the built-in ones, so a setting can never bring a consumable back. */
+    private List<String> extraIgnoredItems = List.of();
+  }
+
   /** Fails at startup on an income break setting that could not tell a break from noise. */
   @PostConstruct
   void validate() {
@@ -131,6 +167,7 @@ public class ReplayAnalysisProperties {
     requireRange("feeder-share-percent", feederSharePercent, 1, MAX_PERCENT);
     requireRange("feeder-minutes", feederMinutes, 1, MAX_STRETCH_MINUTES);
     requireRange("income-break-minutes", incomeBreakMinutes, 1, MAX_INCOME_BREAK_MINUTES);
+    requireItemNames(fightAbility.getExtraIgnoredItems());
     if (!(incomeBreakShare > 0 && incomeBreakShare <= MAX_INCOME_BREAK_SHARE)) {
       throw new IllegalStateException(
           "replay.analysis.income-break-share must be above 0 and at most "
@@ -140,11 +177,32 @@ public class ReplayAnalysisProperties {
     }
   }
 
+  private static void requireItemNames(List<String> items) {
+    if (items == null) {
+      throw new IllegalStateException(
+          "replay.analysis.fight-ability.extra-ignored-items must be set");
+    }
+    for (String item : items) {
+      if (item == null || !ITEM_NAME.matcher(item).matches()) {
+        throw new IllegalStateException(
+            "replay.analysis.fight-ability.extra-ignored-items must hold item names in lower snake"
+                + " case starting with item_, got "
+                + item);
+      }
+    }
+  }
+
   private static void requireRange(String name, int value, int min, int max) {
     if (value < min || value > max) {
       throw new IllegalStateException(
           "replay.analysis." + name + " must be " + min + " to " + max + ", got " + value);
     }
+  }
+
+  public Set<String> fightAbilityIgnoredItems() {
+    Set<String> items = new HashSet<>(FightAbility.DEFAULT_IGNORED_ITEMS);
+    items.addAll(fightAbility.getExtraIgnoredItems());
+    return Set.copyOf(items);
   }
 
   public SpikeDetector.Tuning spikeTuning() {

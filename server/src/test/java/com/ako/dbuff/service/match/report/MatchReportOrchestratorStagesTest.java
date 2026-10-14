@@ -1,6 +1,8 @@
 package com.ako.dbuff.service.match.report;
 
+import com.ako.dbuff.dao.model.AbilityDomain;
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
+import com.ako.dbuff.dao.model.ItemDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.ItemRepository;
@@ -8,8 +10,10 @@ import com.ako.dbuff.dao.repo.KillLogRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.service.discord.DiscordMessageService;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator.PartialReportResult;
+import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.ReportAnalyzer;
 import com.ako.dbuff.service.match.report.formatter.ReportFormatter;
+import com.ako.dbuff.service.match.report.handlers.AiSummaryReportHandler;
 import com.ako.dbuff.service.match.report.stage.HeaderRenderer;
 import com.ako.dbuff.service.match.report.stage.MatchReportStageService;
 import com.ako.dbuff.service.match.report.stage.MatchReportStageService.HeaderKind;
@@ -20,6 +24,7 @@ import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +42,9 @@ class MatchReportOrchestratorStagesTest {
 
   private final DiscordMessageService discord = mock(DiscordMessageService.class);
   private final MatchReportStageService stages = mock(MatchReportStageService.class);
+  private final ReportFormatter formatter = mock(ReportFormatter.class);
+  private final AbilityRepo abilityRepo = mock(AbilityRepo.class);
+  private final ItemRepository itemRepository = mock(ItemRepository.class);
   private MatchReportOrchestrator orchestrator;
   private DbufInstanceConfigDomain config;
 
@@ -51,11 +59,11 @@ class MatchReportOrchestratorStagesTest {
     orchestrator =
         new MatchReportOrchestrator(
             discord,
-            List.<ReportAnalyzer>of(),
-            mock(ReportFormatter.class),
+            List.<ReportAnalyzer>of(new AiSummaryReportHandler()),
+            formatter,
             mock(PlayerGameStatisticRepo.class),
-            mock(AbilityRepo.class),
-            mock(ItemRepository.class),
+            abilityRepo,
+            itemRepository,
             mock(KillLogRepo.class),
             mock(MatchThreadRecorder.class),
             new HeaderRenderer(),
@@ -140,5 +148,69 @@ class MatchReportOrchestratorStagesTest {
     orchestrator.processAndReportFull(MatchDomain.builder().id(9L).build(), config, 6L, 5L);
 
     verify(discord).editMessage(eq("c"), eq(5L), anyString());
+  }
+
+  private void fullDataStored() {
+    when(abilityRepo.findAllByMatchId(9L)).thenReturn(List.of(mock(AbilityDomain.class)));
+    when(itemRepository.findAllByMatchId(9L)).thenReturn(List.of(mock(ItemDomain.class)));
+    when(formatter.formatForDiscord(anyList(), any())).thenReturn(List.of("old report"));
+    when(discord.getThreadById(6L)).thenReturn(mock(ThreadChannel.class));
+    when(stages.headerKind(9L, "i")).thenReturn(HeaderKind.STAGED);
+  }
+
+  @Test
+  void switchedOn_theFullStagePostsNoOldReportAndNoAiPlaceholder() {
+    fullDataStored();
+    when(stages.enabled()).thenReturn(true);
+
+    orchestrator.processAndReportFull(MatchDomain.builder().id(9L).build(), config, 6L, 5L);
+
+    verify(formatter, never()).formatForDiscord(anyList(), any());
+    verify(discord, never()).sendThreadMessageBlocking(any(), anyString());
+  }
+
+  @Test
+  void switchedOff_theFullStageStillPostsTheOldReportWithTheAiPlaceholder() {
+    fullDataStored();
+    when(stages.enabled()).thenReturn(false);
+
+    orchestrator.processAndReportFull(MatchDomain.builder().id(9L).build(), config, 6L, 5L);
+
+    ArgumentCaptor<List<Report>> reports = ArgumentCaptor.forClass(List.class);
+    verify(formatter).formatForDiscord(reports.capture(), any());
+    assertThat(reports.getValue()).hasSize(1);
+    verify(discord).sendThreadMessageBlocking(any(), eq("old report"));
+  }
+
+  @Test
+  void switchedOn_aPlainHeaderIsEditedAsTextButNoOldReportIsPosted() {
+    fullDataStored();
+    when(stages.enabled()).thenReturn(true);
+    when(stages.headerKind(9L, "i")).thenReturn(HeaderKind.PLAIN);
+
+    orchestrator.processAndReportFull(MatchDomain.builder().id(9L).build(), config, 6L, 5L);
+
+    verify(discord).editMessage(eq("c"), eq(5L), anyString());
+    verify(formatter, never()).formatForDiscord(anyList(), any());
+    verify(discord, never()).sendThreadMessageBlocking(any(), anyString());
+  }
+
+  @Test
+  void switchedOn_aStagedOrUnknownHeaderDoesNothingAtAll() {
+    fullDataStored();
+    when(stages.enabled()).thenReturn(true);
+    when(stages.headerKind(9L, "i")).thenReturn(HeaderKind.UNKNOWN);
+
+    orchestrator.processAndReportFull(MatchDomain.builder().id(9L).build(), config, 6L, 5L);
+
+    verify(discord, never()).editMessage(anyString(), Mockito.anyLong(), anyString());
+    verify(discord, never()).sendThreadMessageBlocking(any(), anyString());
+  }
+
+  @Test
+  void analyzeMatch_staysAvailableOnDemandWhateverTheSwitch() {
+    when(stages.enabled()).thenReturn(true);
+
+    assertThat(orchestrator.analyzeMatch(MatchDomain.builder().id(9L).build(), config)).hasSize(1);
   }
 }

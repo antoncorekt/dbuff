@@ -219,6 +219,7 @@ class MatchCommandTest {
     Mockito.verify(stageService)
         .refresh(Mockito.argThat(m -> m.getId().equals(MATCH_ID)), Mockito.any());
     Mockito.verify(replayReportService).redeliver(MATCH_ID, "instance-1");
+    Mockito.verifyNoInteractions(orchestrator);
     assertThat(context.getPosts()).containsExactly("Header refreshed. Replay report posted again.");
   }
 
@@ -232,7 +233,9 @@ class MatchCommandTest {
     command.execute("rerun", context);
 
     assertThat(context.getPosts())
-        .containsExactly("Replay report not posted: no replay analysis is stored for this match.");
+        .containsExactly(
+            "Header not changed (plain header, no stored thread or the edit failed). Replay report"
+                + " not posted: no replay analysis is stored for this match.");
     assertThat(context.getFailures()).isEmpty();
   }
 
@@ -246,7 +249,23 @@ class MatchCommandTest {
     command.execute("rerun", context);
 
     assertThat(context.getFailures()).isEmpty();
-    assertThat(context.getPosts()).isEmpty();
+    assertThat(context.getPosts()).hasSize(1);
+    assertThat(context.getPosts().get(0)).startsWith("Header not changed");
+  }
+
+  @Test
+  void rerun_withTheStagesOn_neverLeavesTheUserWithoutALine() {
+    Mockito.when(stageService.enabled()).thenReturn(true);
+    Mockito.when(replayReportService.redeliver(MATCH_ID, "instance-1"))
+        .thenThrow(new IllegalStateException("db down"));
+
+    FakeCommandContext context = inThread();
+    command.execute("rerun", context);
+
+    assertThat(context.getPosts())
+        .containsExactly(
+            "Header not changed (plain header, no stored thread or the edit failed). Replay report"
+                + " repost failed.");
   }
 
   @Test
@@ -260,7 +279,10 @@ class MatchCommandTest {
     FakeCommandContext context = inThread();
     command.execute("rerun", context);
 
-    assertThat(context.getPosts()).containsExactly("Replay report posted again.");
+    assertThat(context.getPosts())
+        .containsExactly(
+            "Header not changed (plain header, no stored thread or the edit failed). Replay report"
+                + " posted again.");
   }
 
   @Test

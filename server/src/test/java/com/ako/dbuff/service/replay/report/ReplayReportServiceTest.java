@@ -43,6 +43,7 @@ import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import net.dv8tion.jda.api.components.MessageTopLevelComponent;
@@ -77,6 +78,7 @@ class ReplayReportServiceTest {
   private final DiscordMessageService discord = mock(DiscordMessageService.class);
   private final QuietHoursGuard quiet = mock(QuietHoursGuard.class);
   private final ThreadChannel thread = mock(ThreadChannel.class);
+  private final ReportHeroNames heroNames = mock(ReportHeroNames.class);
   private ReplayReportService service;
 
   private DbufInstanceConfigDomain instance(InstanceSettings settings) {
@@ -158,6 +160,24 @@ class ReplayReportServiceTest {
   }
 
   @Test
+  void deliver_namesATrackedPlayerWithHisHero() {
+    when(heroNames.bySlot(1L)).thenReturn(Map.of(0L, "Nature's Prophet"));
+
+    service.deliver(1L);
+
+    assertThat(posted()).contains("Anton (Nature's Prophet) did something");
+  }
+
+  @Test
+  void deliver_namesATrackedPlayerAloneWhenHisHeroIsUnknown() {
+    when(heroNames.bySlot(1L)).thenReturn(Map.of(128L, "Axe"));
+
+    service.deliver(1L);
+
+    assertThat(posted()).contains("Anton did something").doesNotContain("Anton (");
+  }
+
+  @Test
   void deliver_leavesOutASectionThatDoesNotApplyToTheMatchMode() {
     service = serviceWith(new AbilityDraftOnlySection());
     when(matchRepo.findById(2L))
@@ -211,7 +231,8 @@ class ReplayReportServiceTest {
         quiet,
         TestModes.registry(),
         new ReplayMetrics(registry, mock(ReplayRunCounts.class)),
-        new ComponentsViewRenderer(new PlainViewRenderer()));
+        new ComponentsViewRenderer(new PlainViewRenderer()),
+        heroNames);
   }
 
   private static ReplayReportSection named(String name, boolean defaultEnabled) {

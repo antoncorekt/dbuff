@@ -17,33 +17,17 @@ import java.util.Set;
 public final class FightAbilityAssessor {
   private static final String ITEM_PREFIX = "item_";
 
-  /**
-   * Carried for upkeep, travel or as a toggle, not cast in a fight; teleports are covered by
-   * AbsenceReason.
-   */
-  private static final Set<String> NOT_FOR_FIGHTING =
-      Set.of(
-          "item_tpscroll",
-          "item_travel_boots",
-          "item_travel_boots_2",
-          "item_tango",
-          "item_flask",
-          "item_clarity",
-          "item_enchanted_mango",
-          "item_faerie_fire",
-          "item_smoke_of_deceit",
-          "item_ward_observer",
-          "item_ward_sentry",
-          "item_ward_dispenser",
-          "item_bottle",
-          "item_power_treads",
-          "item_tranquil_boots",
-          "item_ring_of_basilius");
-
   private final int earlyDeathSeconds;
 
-  public FightAbilityAssessor(int earlyDeathSeconds) {
+  private final Set<String> ignoredItems;
+
+  /**
+   * @param ignoredItems items never meant to be cast in a fight; teleports are covered by
+   *     AbsenceReason, which reads the state timeline
+   */
+  public FightAbilityAssessor(int earlyDeathSeconds, Set<String> ignoredItems) {
     this.earlyDeathSeconds = earlyDeathSeconds;
+    this.ignoredItems = ignoredItems;
   }
 
   /**
@@ -130,7 +114,7 @@ public final class FightAbilityAssessor {
   }
 
   /** The learned abilities and held items he was meant to use, abilities first. */
-  private static Set<String> meant(
+  private Set<String> meant(
       double start, HeroStateTimeline state, Map<String, List<CombatEvent>> byName) {
     Set<String> names = new LinkedHashSet<>();
     for (String ability : state.learnedAbilities()) {
@@ -139,7 +123,7 @@ public final class FightAbilityAssessor {
       }
     }
     for (String item : state.itemsAt(start)) {
-      if (!NOT_FOR_FIGHTING.contains(item) && usable(item, start, state, byName)) {
+      if (!ignoredItems.contains(item) && usable(item, start, state, byName)) {
         names.add(item);
       }
     }

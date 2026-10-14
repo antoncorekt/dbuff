@@ -70,6 +70,7 @@ public class ReplayReportService {
   private final GameModeRegistry modes;
   private final ReplayMetrics metrics;
   private final ComponentsViewRenderer componentsRenderer;
+  private final ReportHeroNames heroNames;
 
   /** Delivers what is waiting for the matches whose replay run finished lately. */
   public void deliverPending() {
@@ -408,11 +409,17 @@ public class ReplayReportService {
                 .collect(
                     Collectors.toMap(
                         PlayerDomain::getId, p -> String.valueOf(p.getName()), (a, b) -> a));
+    Map<Long, String> heroes = heroNames.bySlot(match.getId());
     Map<Long, String> namesBySlot = new HashMap<>();
     stats.stream()
         .filter(s -> focusIds.contains(s.getPlayerId()))
         .forEach(
-            s -> namesBySlot.put(s.getPlayerSlot(), names.getOrDefault(s.getPlayerId(), "Player")));
+            s ->
+                namesBySlot.put(
+                    s.getPlayerSlot(),
+                    ReportHeroNames.label(
+                        names.getOrDefault(s.getPlayerId(), "Player"),
+                        heroes.get(s.getPlayerSlot()))));
     return new ReplayReportInput(
         match.getId(),
         match,

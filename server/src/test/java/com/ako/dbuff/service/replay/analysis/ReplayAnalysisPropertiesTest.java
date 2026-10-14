@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,5 +48,34 @@ class ReplayAnalysisPropertiesTest {
     properties.setFeederSharePercent(10);
     properties.setFeederMinutes(-5);
     assertThatThrownBy(properties::validate).hasMessageContaining("feeder-minutes");
+  }
+
+  @Test
+  void theBuiltInIgnoredItemsHoldTheNonCombatOnesAndPassValidation() {
+    properties.validate();
+
+    assertThat(properties.fightAbilityIgnoredItems())
+        .contains("item_quelling_blade", "item_tango", "item_cheese", "item_tpscroll")
+        .doesNotContain("item_black_king_bar");
+  }
+
+  @Test
+  void extraIgnoredItemsAreAddedAndNeverReplaceTheBuiltInOnes() {
+    properties.getFightAbility().setExtraIgnoredItems(List.of("item_blink"));
+
+    properties.validate();
+
+    assertThat(properties.fightAbilityIgnoredItems())
+        .contains("item_blink", "item_tango", "item_ward_observer", "item_tpscroll");
+  }
+
+  @Test
+  void rejectsAnExtraIgnoredItemThatIsNotAnItemName() {
+    for (String bad : new String[] {"quelling_blade", "item_Tango", "item_", "", " item_x"}) {
+      properties.getFightAbility().setExtraIgnoredItems(List.of(bad));
+      assertThatThrownBy(properties::validate).hasMessageContaining("extra-ignored-items");
+    }
+    properties.getFightAbility().setExtraIgnoredItems(null);
+    assertThatThrownBy(properties::validate).hasMessageContaining("extra-ignored-items");
   }
 }
