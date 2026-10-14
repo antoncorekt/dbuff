@@ -4,7 +4,7 @@ Plan of 2026-10-14. Nothing here is built yet. Every new report or feature ships
 
 ## 1. What exists today
 
-- **Discord library:** JDA 6.3.0. The bot uses plain text, buttons and a few embeds. JDA 6.3 also has Components V2 (`Container`, `Section`, `TextDisplay`, `Separator`, `Thumbnail`, `MediaGallery`) and application emoji (checked in the jar, see section 6).
+- **Discord library:** JDA 6.3.0. The bot uses plain text, buttons and a few embeds. JDA 6.3 also has Components V2 (`Container`, `Section`, `TextDisplay`, `Separator`, `Thumbnail`, `MediaGallery`) and application emoji (checked in the jar, see section 5).
 - **Match lifecycle in the channel** (current code):
   - New match found (`LastMatchesProcessorService`): OpenDota parse request submitted, a plain-text header "Match N - waiting for parsed data..." is posted, a thread `Match N` is created with the partial-data analyzers, and a Quartz job (`MatchParseCheckJob`) polls OpenDota.
   - OpenDota parsed (`MatchParseCheckJob`): the header is edited with result and score and the full OpenDota-based report is posted into the thread (`processAndReportFull`).
@@ -17,18 +17,22 @@ Plan of 2026-10-14. Nothing here is built yet. Every new report or feature ships
 
 | Stage | Trigger | Header title | Thread content |
 |---|---|---|---|
-| 1 | New match seen; result known from the recent-matches list | Result, score, mode, duration; "OpenDota parse requested" | One basic card, always: kills, deaths, assists per tracked player, hero, chosen abilities |
-| 2 | OpenDota parse done, match stored, replay job queued | Same card; "replay processing" | Nothing new |
-| 3 | Replay run DONE or PARTIAL | "replay analysis ready" | The sections chosen by the global and channel settings (none by default) |
+| 1 | New match seen in the recent-matches list | Result, mode, duration; "OpenDota parse requested" | One basic card, always: result, hero, kills, deaths, assists per tracked player |
+| 2 | OpenDota parse done, match stored | Same card, now with abilities and score; "replay processing" when replay processing is on and the match is eligible, else "OpenDota data ready" | Nothing new (the card is edited, no new message) |
+| 3 | Replay run DONE, or PARTIAL with no retry left | "replay analysis ready" | The sections chosen by the global and channel settings (none by default) |
+| 3 (failed) | Replay run ends FAILED or SKIPPED with no retry left | "replay analysis not available" and the offer of `/match report` | Nothing |
+| Replay off | Replay processing disabled (production today) | Stage 2 title is the last one: "OpenDota data ready" | Old OpenDota report posted automatically at stage 2 |
 
+- **Where stage 1 data comes from.** The recent-matches list does not carry it today: `RecentMatch` holds only id, start time, duration and game mode. The OpenDota response (`PlayerRecentMatchesResponse`) does include `radiant_win`, `player_slot`, `hero_id`, kills, deaths, assists, GPM and XPM for the tracked player, so stage 1 extends `RecentMatch` with those fields; no extra request. It does not carry the chosen abilities or the other nine players: abilities and the score come from the match details at stage 2 (the card is edited then). Putting abilities into stage 1 would need an extra match-details request per new match; default: no, keep the card to what the list gives.
 - The old OpenDota "full" report stops being the default. Its analyzers (items, abilities, damage, lanes) become on-demand sections that work from stage 2 data, so a failed stage 3 can still be asked for.
 - Failure and gaps, every report is safe for missing data (a section with no data says "no data" or is skipped):
-  - Replay run FAILED or SKIPPED: the title says the replay analysis is not available and offers `/match report`.
-  - OpenDota never parses (timeout): the title says so; the basic card stays.
+  - Replay run FAILED or SKIPPED: the title says the replay analysis is not available and offers `/match report`. No hook exists for this today: `ReplayReportService.deliverFinished` acts only on DONE, or PARTIAL with `nextAttemptAt == null`, and `deliverTo` returns early when the channel has `replay_report` off, detail MINIMAL, the match already posted, or quiet hours. The title update is therefore new code kept outside those gates (a `HeaderStatusUpdater` called when a run reaches a terminal status), so a channel that posts no sections still sees "replay analysis ready" or "not available" instead of a title stuck on "replay processing". Quiet hours do not delay a title edit (it is a message edit, not a post).
+  - OpenDota never parses (timeout): the title says so; the basic card stays. `MatchParseCheckJob` returns during quiet hours before it reaches the timeout check, so the timeout check (and its title edit) moves ahead of the quiet-hours return.
   - Replay processing switched off (the situation in production today): the lifecycle ends at stage 2 and the title reads "OpenDota data ready", never promising a replay analysis.
-- One status model: `MatchReportStage` (REQUESTED, PARSED, REPLAY_PENDING, REPLAY_DONE, REPLAY_UNAVAILABLE, PARSE_TIMED_OUT) stored with the thread row. One `HeaderRenderer` builds the title from it; today the header text is built in three places in `MatchReportOrchestrator`.
+- **Stage 2 does not queue the replay.** `MatchParseCheckJob` only runs the match handler and the full report; replay runs are created separately by the scheduled replay job (`ReplayBatchService`, `ReplayRunService`). So "replay processing" at stage 2 is a forecast based on `replay.processing.enabled`, the game mode profile and `ReplayEligibility`, not a record that a job was queued; the real state follows from the run row, and stage 3 edits the title accordingly.
+- One status model: `MatchReportStage` (REQUESTED, PARSED, REPLAY_PENDING, REPLAY_DONE, REPLAY_UNAVAILABLE, PARSE_TIMED_OUT) stored with the thread row. One `HeaderRenderer` builds the title from it; today `MatchReportOrchestrator` has two header builders (`buildHeader`, `buildPartialHeader`) used at three call sites.
 - Open check: a plain-text message may not be editable into a Components V2 message (the flag cannot be removed and `content` is disabled). Safe route: create the header as V2 from the start; verify with a real send, including creating the thread from a V2 message.
-- Owner decision (default): while replay processing is off, the old OpenDota report is still posted automatically in stage 2 so channels do not lose it; once replay is on it becomes on-demand only.
+- Owner decision (default): while replay processing is off, the old OpenDota report is still posted automatically at stage 2 (the "Replay off" row above) so channels do not lose it; once replay processing is on it becomes on-demand only, and stage 2 posts nothing new.
 
 ## 3. How reports are shown
 
@@ -44,10 +48,10 @@ Plan of 2026-10-14. Nothing here is built yet. Every new report or feature ships
 
 ## 4. Settings and commands
 
-- Global default: `replay.report.default-sections` (list of section names; empty by default). The existing per-section `enabled` property stays as an override.
-- Per channel: `/dbuff settings sections:<list>` overrides the global list (new nullable column in `InstanceSettings`, created by `ddl-auto=update`).
+- Which sections post automatically (stage 3), in order of precedence: the channel's own list, else the global `replay.report.default-sections` (list of section names; empty by default, so nothing posts). Today there are 16 sections; ten have `defaultEnabled()` false and six (`swing`, `deaths`, `fights`, `movement`, `draft`, `composition`) return true. The plan makes the list the only automatic switch and removes `defaultEnabled()` as a source of automatic posting, so nothing posts by default. `replay.report.sections.<name>.enabled=false` stays as a kill switch: the section is hidden everywhere, on demand too. `SectionSwitch` and its start-up validation of unknown names are reused for the list.
+- Per channel: `/dbuff settings sections:<list>` overrides the global list (new nullable column in `InstanceSettings`, created by `ddl-auto=update`). AI language: new nullable `language` column, null meaning the current default of `AiPromptFieldConfig.responseLanguage` ("Russian"); no channel language setting exists today.
 - On demand inside a match thread: `/match report <section|all>` (autocomplete from section names) and `/match ai`; text aliases `!report <section>`. A request for a section whose data does not exist says so. A per-thread cooldown stops spam.
-- Default behaviour: no section posts automatically; the thread shows the stage 1 card and the title updates. Existing section names are reused (`important-fights`, `lanes`, `rotations`, `smoke`, `objectives`, `vision`, `opening`, `items`, `outliers`, `endgame`); on-demand OpenDota sections are added beside them.
+- Default behaviour: no section posts automatically; the thread shows the stage 1 card and the title updates. All 16 existing names are reused: `swing`, `deaths`, `fights`, `movement`, `draft`, `composition`, `important-fights`, `lanes`, `rotations`, `smoke`, `objectives`, `vision`, `opening`, `items`, `outliers`, `endgame`; on-demand OpenDota sections are added beside them. Autocomplete reads the names from the registered section beans, so a new section appears without an edit.
 
 ## 5. Hero, ability and item icons
 
@@ -105,29 +109,29 @@ The explanations (income drop reasons, Midas payback, key item behind a swing) a
 ## 7. AI: top 5 reasons the match was won or lost
 
 - **Input:** not raw data. A new `AiMatchFactsBuilder` builds labelled facts from the analysis tables (the same data as `GET /api/v1/replay/{id}/analysis`) and OpenDota: result and duration, draft, per-hero GPM, XPM, KDA and net worth, lane results, important fights with their stored reasons, vision, runes and opening, rotations and group or split, objectives, key item swings, end game (throw or comeback), outliers. Each fact has a stable id (`F3`, `LANE_BOT`) so the model can cite it.
-- **Context window:** not a problem for one match. Curated facts are about 1.5k to 7k tokens; a 128k model fits it many times. The real risks are cost, noise and invented patterns. A `facts-token-budget` property (default 6000) caps the input; when the facts exceed it a trimmer drops lowest-weight facts first (kept in order: result and duration, important fights, lane results, objectives, the rest). Summaries across many matches would hit the window; they are out of scope.
+- **Context window:** not a problem for one match. Curated facts are about 1.5k to 7k tokens (the full analysis JSON, about 6k tokens, is the upper reference; the rendered sections alone are about 1.2k); a 128k model fits that many times. The real risks are cost, noise and invented patterns. A `facts-token-budget` property (default 8000, above the expected range) caps the input; when the facts exceed it a trimmer drops lowest-weight facts first (kept in order: result and duration, important fights, lane results, objectives, the rest). Summaries across many matches would hit the window; they are out of scope.
 - **Output:** the model must return JSON, `[{rank, title, side, evidence: [factIds], explanation}]`, exactly five entries. The code validates it and drops any reason whose evidence ids do not exist in the input, so a reason with no real evidence is removed; fewer than five is reported as such. The Discord text is rendered by our code from the validated JSON.
-- **Prompt:** mode-agnostic (the current one is Ability Draft only): analyse the tracked players' team, give the five most decisive reasons, cite fact ids, use only the given facts, say "not enough data" instead of guessing, answer in the channel's language setting (`responseLanguage`).
+- **Prompt:** mode-agnostic (the current one is Ability Draft only): analyse the tracked players' team, give the five most decisive reasons, cite fact ids, use only the given facts, say "not enough data" instead of guessing, answer in the channel's language (the new nullable `language` setting from section 4, default as `AiPromptFieldConfig.responseLanguage`).
 - **Delivery:** a new section `ai-reasons` in the same framework, off globally and per channel, available through `/match ai`; its own switch `replay.report.ai.enabled`, default off. The old AI summary stays until the owner has compared the two and says to remove it.
 - **Cost and safety:** one call per match plus on-demand calls, with a per-match cap; the same facts (stored hash) reuse the stored answer at no cost; failures post nothing and log at WARN; `OPENAI_API_KEY` as today.
 
 ## 8. PR order
 
 1. This plan (docs).
-2. Stage model: `MatchReportStage`, `HeaderRenderer` in Components V2, stage 1 basic card, title changes at stages 2 and 3, replay-off and failure paths, old OpenDota report as on-demand sections (and automatic while replay is off). Includes the real-channel test of header editing and thread creation.
-3. Rendering seam (`SectionView`, `DiscordRenderer`, plain fallback), `important-fights` moved over.
-4. Settings and commands: global default list, per-channel `sections`, `/match report`, `!report`, cooldown.
+2. Rendering seam (`SectionView`, `DiscordRenderer` for Components V2, plain fallback), `important-fights` moved over. Includes the real-channel test of the V2 limits.
+3. Stage model: `MatchReportStage`, `HeaderRenderer` and the stage 1 card on the seam from step 2, `RecentMatch` extended, title changes at stages 2 and 3, replay-off and failure paths (`HeaderStatusUpdater`, timeout check before quiet hours), old OpenDota report as on-demand sections (and automatic while replay is off). Includes the real-channel test of header editing and thread creation.
+4. Settings and commands: global default list, per-channel `sections` and `language`, `/match report`, `!report`, cooldown.
 5. Icons: constants `img` field, download and storage, emoji sync job, `discord_icon` table, `IconService` with the fallback chain, used by the card and the sections; heroes, abilities and items.
 6. Move the remaining sections to `SectionView`, a few per PR.
 7. AI top-5 reasons.
 8. Graphs: advantage, then income, then farm.
 
-Steps 2 and 3 can run in parallel; 5 and 8 need 3.
+Order matters: 3 builds on 2 (one Components V2 renderer, not two); 4 needs 2; 5 needs 2 and 3 (icons are used by the card); 7 needs 2 and 4 (`/match ai`, cooldown, language); 8 needs 2.
 
 ## 9. Not yet verified
 
 - Components V2 per-block size limit and header edit or thread creation behaviour (a real send).
 - Emoji name rules, image size limit and the quota behaviour (a real create in a test application).
-- How the replay job is queued after stage 2 (read `ReplayRunService`).
+- Whether abilities can be known at stage 1 without an extra request (they are not in the recent-matches response).
 - Headless AWT and fonts in the deploy image.
 - Whether the old OpenDota report analyzers can run from stage 2 data alone for every mode.
