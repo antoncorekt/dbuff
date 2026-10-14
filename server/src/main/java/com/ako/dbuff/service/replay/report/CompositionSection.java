@@ -41,6 +41,11 @@ public class CompositionSection implements ReplayReportSection {
   private final ReplayReportProperties properties;
 
   @Override
+  public String name() {
+    return "composition";
+  }
+
+  @Override
   public int order() {
     return 12;
   }

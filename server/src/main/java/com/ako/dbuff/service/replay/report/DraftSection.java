@@ -26,6 +26,11 @@ public class DraftSection implements ReplayReportSection {
   }
 
   @Override
+  public String name() {
+    return "draft";
+  }
+
+  @Override
   public int order() {
     return 10;
   }

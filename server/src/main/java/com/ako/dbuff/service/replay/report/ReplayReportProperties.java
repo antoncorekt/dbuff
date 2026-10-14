@@ -1,5 +1,7 @@
 package com.ako.dbuff.service.replay.report;
 
+import java.util.HashMap;
+import java.util.Map;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -32,4 +34,12 @@ public class ReplayReportProperties {
 
   /** How far back a finished replay run is looked at for an analysis not yet posted. */
   private int lookbackHours = 48;
+
+  /** The per-section switches by section name; a section without one follows its own default. */
+  private Map<String, SectionToggle> sections = new HashMap<>();
+
+  @Data
+  public static class SectionToggle {
+    private Boolean enabled;
+  }
 }

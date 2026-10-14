@@ -60,6 +60,7 @@ public class ReplayReportService {
   private final MatchReportThreadRepo threadRepo;
   private final ReplayReportPostedRepo postedRepo;
   private final List<ReplayReportSection> sections;
+  private final SectionSwitch sectionSwitch;
   private final ReportFormatter formatter;
   private final DiscordMessageService discord;
   private final QuietHoursGuard quietHours;
@@ -182,6 +183,7 @@ public class ReplayReportService {
     ReplayReportInput input = input(match, stats, instance);
     List<Report> reports = new ArrayList<>();
     sections.stream()
+        .filter(sectionSwitch::isEnabled)
         .filter(s -> s.supports(mode))
         .filter(s -> settings.detail().includes(s.minimumDetail()))
         .sorted(Comparator.comparingInt(ReplayReportSection::order))

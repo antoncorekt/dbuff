@@ -10,6 +10,17 @@ import java.util.List;
  */
 public interface ReplayReportSection {
 
+  /**
+   * The stable name of the section, unique among sections; {@code
+   * replay.report.sections.<name>.enabled} switches it.
+   */
+  String name();
+
+  /** Whether the section posts while its property is not set; a new section ships off. */
+  default boolean defaultEnabled() {
+    return true;
+  }
+
   /** Whether the section applies to the mode; a common one keeps the default. */
   default boolean supports(GameModeProfile mode) {
     return true;

@@ -22,6 +22,11 @@ public class MovementSection implements ReplayReportSection {
   private final PlayerPhaseSummaryRepo summaryRepo;
 
   @Override
+  public String name() {
+    return "movement";
+  }
+
+  @Override
   public int order() {
     return 30;
   }

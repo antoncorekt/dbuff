@@ -56,6 +56,11 @@ public class SwingSection implements ReplayReportSection {
   private final ReplayReportProperties properties;
 
   @Override
+  public String name() {
+    return "swing";
+  }
+
+  @Override
   public int order() {
     return 60;
   }

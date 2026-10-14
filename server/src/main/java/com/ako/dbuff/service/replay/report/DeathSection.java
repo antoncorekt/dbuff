@@ -31,6 +31,11 @@ public class DeathSection implements ReplayReportSection {
   private final DeathAnalysisRepo deathRepo;
 
   @Override
+  public String name() {
+    return "deaths";
+  }
+
+  @Override
   public int order() {
     return 50;
   }
