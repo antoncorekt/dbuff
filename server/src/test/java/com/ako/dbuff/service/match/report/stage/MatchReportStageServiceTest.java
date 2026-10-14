@@ -25,6 +25,8 @@ import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -319,7 +321,8 @@ class MatchReportStageServiceTest {
     verify(discord)
         .editMessage(eq(CHANNEL), eq(500L), org.mockito.ArgumentMatchers.contains("did not parse"));
     verifyNotAdvanced();
-    assertThat(service.ownsHeader(MATCH, INSTANCE)).isFalse();
+    assertThat(service.headerKind(MATCH, INSTANCE))
+        .isEqualTo(MatchReportStageService.HeaderKind.PLAIN);
   }
 
   @Test
@@ -329,7 +332,8 @@ class MatchReportStageServiceTest {
     when(threadRepo.findByMatchIdAndInstanceId(MATCH, INSTANCE))
         .thenReturn(Optional.of(row(MatchReportStage.REQUESTED)));
 
-    assertThat(service.ownsHeader(MATCH, INSTANCE)).isTrue();
+    assertThat(service.headerKind(MATCH, INSTANCE))
+        .isEqualTo(MatchReportStageService.HeaderKind.STAGED);
     service.parsed(parsedMatch(), config);
 
     verifyAdvanced(MatchReportStage.PARSED);
@@ -401,14 +405,85 @@ class MatchReportStageServiceTest {
     assertThat(result).isEqualTo(new PartialReportResult(600L, 500L));
   }
 
+  private void matrix(boolean switchOn, MatchReportStage rowStage, boolean timeout) {
+    properties.setEnabled(switchOn);
+    statsOfTrackedPlayer();
+    when(threadRepo.findByMatchIdAndInstanceId(MATCH, INSTANCE))
+        .thenReturn(Optional.of(row(rowStage)));
+    if (timeout) {
+      service.parseTimedOut(timedOutMatch(), INSTANCE);
+    } else {
+      service.parsed(parsedMatch(), config);
+    }
+  }
+
+  @ParameterizedTest(name = "switch on={0}, staged={1}, timeout={2}")
+  @CsvSource({
+    "false, false, false, NOTHING",
+    "false, false, true, NOTHING",
+    "false, true, false, STAGED",
+    "false, true, true, STAGED",
+    "true, false, false, NOTHING",
+    "true, false, true, PLAIN",
+    "true, true, false, STAGED",
+    "true, true, true, STAGED"
+  })
+  void theSwitchAndTheRowDecideWhatIsEdited(
+      boolean switchOn, boolean staged, boolean timeout, String expected) {
+    matrix(switchOn, staged ? MatchReportStage.REQUESTED : null, timeout);
+
+    boolean v2 = false;
+    try {
+      verify(discord).editComponentsMessage(anyString(), anyLong(), anyList());
+      v2 = true;
+    } catch (AssertionError e) {
+      verify(discord, never()).editComponentsMessage(anyString(), anyLong(), anyList());
+    }
+    boolean plain = false;
+    try {
+      verify(discord).editMessage(anyString(), anyLong(), anyString());
+      plain = true;
+    } catch (AssertionError e) {
+      verify(discord, never()).editMessage(anyString(), anyLong(), anyString());
+    }
+    assertThat(v2 ? "STAGED" : plain ? "PLAIN" : "NOTHING").isEqualTo(expected);
+  }
+
   @Test
-  void switchedOff_aLegacyThreadIsNotRetitledAsV2() {
-    properties.setEnabled(false);
-    when(threadRepo.findByMatchIdAndInstanceId(MATCH, INSTANCE)).thenReturn(Optional.of(row(null)));
+  void aFailedRowLookupLeavesTheHeaderAlone() {
+    when(threadRepo.findByMatchIdAndInstanceId(MATCH, INSTANCE))
+        .thenThrow(new RuntimeException("db down"));
+
+    assertThat(service.headerKind(MATCH, INSTANCE))
+        .isEqualTo(MatchReportStageService.HeaderKind.UNKNOWN);
+  }
+
+  @Test
+  void stageTwo_withoutAStagedRowReadsNothingElse() {
+    when(threadRepo.findByMatchIdAndInstanceId(MATCH, INSTANCE)).thenReturn(Optional.empty());
 
     service.parsed(parsedMatch(), config);
 
-    verify(discord, never()).editComponentsMessage(anyString(), anyLong(), anyList());
-    assertThat(service.enabled()).isFalse();
+    org.mockito.Mockito.verifyNoInteractions(forecast, statRepo, discord);
+  }
+
+  @Test
+  void stageTwo_aParseWithoutTheTrackedPlayersKeepsTheKnownResult() {
+    when(statRepo.findAllByMatchId(MATCH)).thenReturn(List.of());
+    MatchReportThreadDomain row = row(MatchReportStage.REQUESTED);
+    when(threadRepo.findByMatchIdAndInstanceId(MATCH, INSTANCE)).thenReturn(Optional.of(row));
+
+    service.parsed(parsedMatch(), config);
+
+    assertThat(editedTitle()).contains("Win").doesNotContain("Unknown");
+    verify(threadRepo)
+        .advanceStage(
+            eq(9L),
+            eq(MatchReportStage.PARSED),
+            org.mockito.ArgumentMatchers.anyCollection(),
+            eq("ability draft"),
+            eq(1),
+            eq(0),
+            eq(2100L));
   }
 }

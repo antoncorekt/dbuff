@@ -21,6 +21,7 @@ import com.ako.dbuff.service.match.report.formatter.ReportFormatter;
 import com.ako.dbuff.service.match.report.stage.HeaderRenderer;
 import com.ako.dbuff.service.match.report.stage.MatchFacts;
 import com.ako.dbuff.service.match.report.stage.MatchReportStageService;
+import com.ako.dbuff.service.match.report.stage.MatchReportStageService.HeaderKind;
 import com.ako.dbuff.service.match.report.stage.MatchThreadRecorder;
 import com.ako.dbuff.service.match.report.stage.NewMatchSummary;
 import java.util.ArrayList;
@@ -168,7 +169,8 @@ public class MatchReportOrchestrator {
     MatchReportContext context = buildContext(match, config, focusPlayerIds);
 
     // Update header with full match info
-    if (headerMessageId > 0 && !stageService.ownsHeader(match.getId(), config.getId())) {
+    if (headerMessageId > 0
+        && stageService.headerKind(match.getId(), config.getId()) == HeaderKind.PLAIN) {
       String winLoss = determineWinLoss(context);
       String fullHeader = headerRenderer.legacyParsed(match, winLoss);
       discordMessageService.editMessage(config.getDiscordChannelId(), headerMessageId, fullHeader);

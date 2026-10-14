@@ -26,7 +26,7 @@ public interface MatchReportThreadRepo extends JpaRepository<MatchReportThreadDo
    * @return the rows changed, 0 when the stage was not one of {@code allowed}
    */
   @Transactional
-  @Modifying(clearAutomatically = true)
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query(
       "update MatchReportThreadDomain d set d.stage = :stage, d.modeName = :modeName,"
           + " d.wins = :wins, d.losses = :losses, d.durationSeconds = :durationSeconds"

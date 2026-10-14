@@ -12,6 +12,7 @@ import com.ako.dbuff.service.match.report.analyzer.ReportAnalyzer;
 import com.ako.dbuff.service.match.report.formatter.ReportFormatter;
 import com.ako.dbuff.service.match.report.stage.HeaderRenderer;
 import com.ako.dbuff.service.match.report.stage.MatchReportStageService;
+import com.ako.dbuff.service.match.report.stage.MatchReportStageService.HeaderKind;
 import com.ako.dbuff.service.match.report.stage.MatchThreadRecorder;
 import com.ako.dbuff.service.match.report.stage.NewMatchSummary;
 import java.util.List;
@@ -93,7 +94,7 @@ class MatchReportOrchestratorStagesTest {
   @Test
   void aStagedHeader_isNotEditedAsTextByTheLegacyFullReport() {
     when(stages.enabled()).thenReturn(true);
-    when(stages.ownsHeader(9L, "i")).thenReturn(true);
+    when(stages.headerKind(9L, "i")).thenReturn(HeaderKind.STAGED);
     Mockito.when(discord.getThreadById(6L)).thenReturn(null);
 
     orchestrator.processAndReportFull(MatchDomain.builder().id(9L).build(), config, 6L, 5L);
@@ -104,7 +105,7 @@ class MatchReportOrchestratorStagesTest {
   @Test
   void aLegacyPlainHeader_isStillEditedAsTextWhileStagesAreOn() {
     when(stages.enabled()).thenReturn(true);
-    when(stages.ownsHeader(9L, "i")).thenReturn(false);
+    when(stages.headerKind(9L, "i")).thenReturn(HeaderKind.PLAIN);
 
     orchestrator.processAndReportFull(MatchDomain.builder().id(9L).build(), config, 6L, 5L);
 
@@ -112,8 +113,19 @@ class MatchReportOrchestratorStagesTest {
   }
 
   @Test
+  void anUnknownHeader_isNotEditedByTheLegacyFullReport() {
+    when(stages.enabled()).thenReturn(true);
+    when(stages.headerKind(9L, "i")).thenReturn(HeaderKind.UNKNOWN);
+
+    orchestrator.processAndReportFull(MatchDomain.builder().id(9L).build(), config, 6L, 5L);
+
+    verify(discord, never()).editMessage(anyString(), Mockito.anyLong(), anyString());
+  }
+
+  @Test
   void switchedOff_theLegacyFullReportEditsTheHeader() {
     when(stages.enabled()).thenReturn(false);
+    when(stages.headerKind(9L, "i")).thenReturn(HeaderKind.PLAIN);
 
     orchestrator.processAndReportFull(MatchDomain.builder().id(9L).build(), config, 6L, 5L);
 

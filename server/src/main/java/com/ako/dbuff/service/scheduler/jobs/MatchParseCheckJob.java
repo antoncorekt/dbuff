@@ -44,13 +44,10 @@ public class MatchParseCheckJob implements Job {
     long discordThreadId = context.getJobDetail().getJobDataMap().getLong("discordThreadId");
     long headerMessageId = context.getJobDetail().getJobDataMap().getLong("headerMessageId");
 
+    DbufInstanceConfigDomain instance =
+        instanceId == null ? null : instanceConfigService.getDomainById(instanceId).orElse(null);
     InstanceSettings settings =
-        instanceId == null
-            ? new InstanceSettings()
-            : instanceConfigService
-                .getDomainById(instanceId)
-                .map(DbufInstanceConfigDomain::effectiveSettings)
-                .orElseGet(InstanceSettings::new);
+        instance == null ? new InstanceSettings() : instance.effectiveSettings();
     // With stages a timed-out match gets its title even in quiet hours; without them the order is
     // the one the job always had.
     boolean timeoutFirst = stageService.enabled();
@@ -88,7 +85,7 @@ public class MatchParseCheckJob implements Job {
     try {
       MatchDomain processed = matchParserHandler.handle(matchId);
       if (processed != null && instanceId != null) {
-        announceParsed(processed, instanceId);
+        announceParsed(processed, instance);
         triggerFullReport(processed, instanceId, discordThreadId, headerMessageId);
       }
     } catch (Exception e) {
@@ -97,11 +94,12 @@ public class MatchParseCheckJob implements Job {
     matchParseSchedulerService.unscheduleParseWait(matchId);
   }
 
-  private void announceParsed(MatchDomain match, String instanceId) {
+  private void announceParsed(MatchDomain match, DbufInstanceConfigDomain instance) {
+    if (instance == null) {
+      return;
+    }
     try {
-      instanceConfigService
-          .getDomainById(instanceId)
-          .ifPresent(instance -> stageService.parsed(match, instance));
+      stageService.parsed(match, instance);
     } catch (RuntimeException e) {
       log.warn("Could not retitle match {}: {}", match.getId(), e.getMessage(), e);
     }

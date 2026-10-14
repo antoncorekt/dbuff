@@ -90,6 +90,18 @@ public record MatchFacts(
         match == null ? null : match.getDireScore());
   }
 
+  /** These facts, with what the row kept filling in whatever is still unknown. */
+  public MatchFacts orFrom(MatchReportThreadDomain row) {
+    MatchFacts kept = fromRow(row, null);
+    return new MatchFacts(
+        matchId,
+        mode != null ? mode : kept.mode(),
+        result.known() ? result : kept.result(),
+        durationSeconds != null ? durationSeconds : kept.durationSeconds(),
+        radiantScore,
+        direScore);
+  }
+
   public Accent accent() {
     return result.accent();
   }

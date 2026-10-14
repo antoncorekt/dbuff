@@ -68,10 +68,10 @@ public class MatchThreadRecorder {
               row.getId(),
               stage,
               stage.predecessors(),
-              facts.mode() != null ? facts.mode() : row.getModeName(),
-              known ? facts.result().wins() : row.getWins(),
-              known ? facts.result().losses() : row.getLosses(),
-              facts.durationSeconds() != null ? facts.durationSeconds() : row.getDurationSeconds())
+              facts.mode(),
+              known ? facts.result().wins() : null,
+              known ? facts.result().losses() : null,
+              facts.durationSeconds())
           > 0;
     } catch (RuntimeException e) {
       log.warn("Could not store stage {} of match {}", stage, row.getMatchId(), e);

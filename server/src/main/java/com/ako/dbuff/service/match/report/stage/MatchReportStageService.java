@@ -41,21 +41,33 @@ public class MatchReportStageService {
     return properties.isEnabled();
   }
 
+  /** How the header of a match was posted, which decides how it may be edited. */
+  public enum HeaderKind {
+    /** A Components V2 message of the stages, edited only as components. */
+    STAGED,
+    /** Plain text, or no row at all, as before stages existed: edited only as text. */
+    PLAIN,
+    /** Not known, because the lookup failed: leave the header alone. */
+    UNKNOWN
+  }
+
   /**
-   * Whether the header of the match is a staged Components V2 message this service retitles. That
-   * depends on the row alone, not on the switch: the switch only decides how new headers are made.
-   * A row without a stage, including a header that fell back to plain text, is only ever edited as
-   * text.
+   * Which kind of header the match has. That depends on the row alone, not on the switch: the
+   * switch only decides how new headers are made. A row without a stage, including a header that
+   * fell back to plain text, is plain.
    */
-  public boolean ownsHeader(long matchId, String instanceId) {
+  public HeaderKind headerKind(long matchId, String instanceId) {
     if (instanceId == null) {
-      return false;
+      return HeaderKind.PLAIN;
     }
     try {
-      return recorder.find(matchId, instanceId).map(this::ownsHeader).orElse(false);
+      return recorder
+          .find(matchId, instanceId)
+          .map(row -> ownsHeader(row) ? HeaderKind.STAGED : HeaderKind.PLAIN)
+          .orElse(HeaderKind.PLAIN);
     } catch (RuntimeException e) {
       log.warn("Could not look up the thread of match {}: {}", matchId, e.getMessage());
-      return false;
+      return HeaderKind.UNKNOWN;
     }
   }
 
@@ -113,21 +125,20 @@ public class MatchReportStageService {
   /** Stage 2: OpenDota parsed the match; the header says whether a replay analysis follows. */
   public void parsed(MatchDomain match, DbufInstanceConfigDomain config) {
     try {
-      MatchReportStage stage =
-          forecast.isExpected(match) ? MatchReportStage.REPLAY_PENDING : MatchReportStage.PARSED;
       recorder
           .find(match.getId(), config.getId())
           .filter(this::ownsHeader)
-          .ifPresentOrElse(
-              row -> retitle(row, stage, factsFactory.fromParsed(match, config)),
-              () ->
-                  log.debug(
-                      "No staged thread of match {} in instance {}",
-                      match.getId(),
-                      config.getId()));
+          .ifPresent(row -> retitleParsed(row, match, config));
     } catch (RuntimeException e) {
       log.warn("Stage 2 of match {} failed: {}", match.getId(), e.getMessage(), e);
     }
+  }
+
+  private void retitleParsed(
+      MatchReportThreadDomain row, MatchDomain match, DbufInstanceConfigDomain config) {
+    MatchReportStage stage =
+        forecast.isExpected(match) ? MatchReportStage.REPLAY_PENDING : MatchReportStage.PARSED;
+    retitle(row, stage, factsFactory.fromParsed(match, config).orFrom(row));
   }
 
   /** OpenDota never parsed the match; the header keeps what stage 1 said and states that. */
@@ -150,7 +161,9 @@ public class MatchReportStageService {
     MatchFacts facts = MatchFacts.fromRow(row, match);
     if (ownsHeader(row)) {
       retitle(row, MatchReportStage.PARSE_TIMED_OUT, facts);
-    } else if (row.getHeaderMessageId() != null && row.getChannelId() != null) {
+    } else if (properties.isEnabled()
+        && row.getHeaderMessageId() != null
+        && row.getChannelId() != null) {
       editPlain(row, headers.title(MatchReportStage.PARSE_TIMED_OUT, facts));
     }
   }
