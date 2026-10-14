@@ -62,6 +62,7 @@ import com.ako.dbuff.service.replay.analysis.role.HeroKits;
 import com.ako.dbuff.service.replay.analysis.role.IntentProfileCalculator;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.rune.RuneType;
+import com.ako.dbuff.service.replay.read.AnalysisAssembler;
 import com.ako.dbuff.service.replay.report.CompositionSection;
 import com.ako.dbuff.service.replay.report.DeathSection;
 import com.ako.dbuff.service.replay.report.DraftSection;
@@ -134,6 +135,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private FightReasonRepo reasonRepo;
   @Autowired private FightExplanationRepo explanationRepo;
   @Autowired private FightExplanationReader explanationReader;
+  @Autowired private AnalysisAssembler analysisAssembler;
   @Autowired private BuybackEventRepo buybackRepo;
   @Autowired private PlayerPhaseSummaryRepo phaseRepo;
   @Autowired private GameSpikeRepo spikeRepo;
@@ -271,8 +273,23 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertLanes(id, match.getId());
       assertAbilityDraftReasons(id, match.getId());
       assertFightExplanations(id, match.getId());
+      assertAnalysisDocument(id, match.getId());
       printAbilityDraft(id, match.getId(), profiles);
     }
+  }
+
+  private void assertAnalysisDocument(String id, long matchId) throws Exception {
+    Map<String, Object> document = analysisAssembler.assemble(matchId, null).orElseThrow();
+    assertThat(document.keySet())
+        .as("%s: every section", id)
+        .containsExactly(
+            "run", "roles", "fights", "vision", "runes", "lanes", "items", "behaviour");
+    JsonNode json = new ObjectMapper().valueToTree(document);
+    assertThat(json.at("/run/status").asText()).isEqualTo("DONE");
+    assertThat(json.at("/roles/players")).as("%s roles", id).hasSize(10);
+    assertThat(json.at("/lanes/assignments")).as("%s lane assignments", id).isNotEmpty();
+    assertThat(json.at("/lanes/results")).as("%s lane results", id).isNotEmpty();
+    assertThat(json.at("/behaviour").findParents("team")).as("%s behaviour rows", id).isNotEmpty();
   }
 
   /** Per hero, the last hits and denies the stored creep kills give against OpenDota's totals. */

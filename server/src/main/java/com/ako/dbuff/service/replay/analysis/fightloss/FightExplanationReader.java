@@ -118,7 +118,13 @@ public class FightExplanationReader {
    */
   @Transactional(readOnly = true)
   public List<LostFight> importantFights(long matchId) {
-    MatchExplanation all = readAll(matchId, 0, Integer.MAX_VALUE);
+    return importantFights(matchId, 0);
+  }
+
+  /** As {@link #importantFights(long)}, each with its {@code topReasons} ranked reasons. */
+  @Transactional(readOnly = true)
+  public List<LostFight> importantFights(long matchId, int topReasons) {
+    MatchExplanation all = readAll(matchId, topReasons, Integer.MAX_VALUE);
     return Stream.concat(
             all.swings().stream().flatMap(s -> s.fights().stream()), all.otherFights().stream())
         .filter(l -> l.importance() != null && l.importance().isImportant())
