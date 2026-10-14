@@ -71,9 +71,9 @@ public abstract class ReplayPipelineFixture {
         exchange -> {
           String file = Path.of(exchange.getRequestURI().getPath()).getFileName().toString();
           String match = file.substring(0, file.indexOf('_'));
-          byte[] body = Files.readAllBytes(fixture(match + ".dem.zst"));
-          exchange.sendResponseHeaders(200, body.length);
-          exchange.getResponseBody().write(body);
+          Path replay = fixture(match + ".dem.zst");
+          exchange.sendResponseHeaders(200, Files.size(replay));
+          Files.copy(replay, exchange.getResponseBody());
           exchange.close();
         });
     server.start();

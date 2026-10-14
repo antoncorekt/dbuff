@@ -1,0 +1,23 @@
+# The matches of the replay load test (ReplayLoadTest): match ids, one per line, with a trailing comment of game mode and minutes.
+# Replays are not committed; see docs/replay-fixtures.md for fetching them into REPLAY_FIXTURE_DIR.
+
+9038725154 # Ability Draft 38
+9037038717 # Ability Draft 33
+9040892342 # All Pick 27
+9040889566 # All Pick 28
+9044252857 # Ability Draft 76
+9044256304 # Ability Draft 61
+9044256648 # Ability Draft 64
+9044276097 # Ability Draft 52
+9044276759 # Ability Draft 51
+9044278208 # All Pick 60
+9044279392 # All Pick 60
+9044286365 # All Pick 52
+9044286599 # Ability Draft 43
+9044286917 # All Pick 51
+9044287653 # All Pick 50
+9044288274 # Ability Draft 41
+9044293804 # Ability Draft 33
+9044294412 # Ability Draft 31
+9044296284 # All Pick 39
+9044296764 # All Pick 39
