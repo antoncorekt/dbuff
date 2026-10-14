@@ -89,10 +89,9 @@ public class ImportantFightsSection implements ReplayReportSection {
     String reasons = wording.ranked(withReasons.reasons(), heroes, MAX_REASONS);
     return String.format(
         Locale.ROOT,
-        "%s %s%s won the fight%s%s",
+        "%s %s won the fight%s%s",
         GameTime.clock(fight.fight().getStartSeconds()),
-        Prettify.team(winner.name()),
-        winner == yours ? " (your team)" : "",
+        Prettify.teamOf(winner.name(), yours),
         worthText(fight),
         reasons.isEmpty() ? "" : ": " + reasons);
   }

@@ -213,8 +213,7 @@ public class ObjectivesSection implements ReplayReportSection {
   }
 
   private static String winner(ObjectiveConversionDomain r, TeamSide yours) {
-    TeamSide side = Enums.find(TeamSide.class, r.getWinnerTeam());
-    return Prettify.team(r.getWinnerTeam()) + (side != null && side == yours ? " (your team)" : "");
+    return Prettify.teamOf(r.getWinnerTeam(), yours);
   }
 
   private static String enemy(String winner) {

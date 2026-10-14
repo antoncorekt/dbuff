@@ -12,6 +12,7 @@ import com.ako.dbuff.service.replay.analysis.rune.RuneProperties;
 import com.ako.dbuff.service.replay.analysis.rune.RuneType;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
+import com.ako.dbuff.service.replay.report.OpeningWording;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -157,7 +158,7 @@ final class RuneLoopReport {
                     "| %s | %s | %s | %d | %s | %s | %d | %s | %s | %s | | |"
                         .formatted(
                             LoopWording.team(s.getTeam()),
-                            resultText(s.getResult()),
+                            OpeningWording.result(s.getResult()),
                             firstRuneText(d, s, firstSecond),
                             s.getRunesTaken(),
                             LoopWording.gold(s.getBountyGold()),
@@ -165,16 +166,8 @@ final class RuneLoopReport {
                             s.getKills(),
                             LoopWording.gold(s.getGold()),
                             LoopWording.gold(s.getXp()),
-                            signed(s.getBalance()))));
+                            OpeningWording.signedGold(s.getBalance()))));
     return out;
-  }
-
-  private static String resultText(String result) {
-    return switch (result == null ? "" : result) {
-      case "WON" -> "won the opening";
-      case "LOST" -> "lost the opening";
-      default -> "drew the opening";
-    };
   }
 
   private static String firstRuneText(
@@ -190,13 +183,6 @@ final class RuneLoopReport {
     return firstSecond.isPresent() && firstSecond.get().equals(s.getFirstTakerSeconds())
         ? "first of the game: " + text
         : text;
-  }
-
-  private static String signed(Long value) {
-    if (value == null) {
-      return "?";
-    }
-    return (value > 0 ? "+" : value < 0 ? "-" : "") + LoopWording.gold(Math.abs(value));
   }
 
   private static List<String> runesTable(MatchData d, List<RunePickupDomain> pickups) {
