@@ -20,6 +20,6 @@ public class AbilitiesConstantService extends BaseApiConstantService<AbilityCons
 
   @Override
   protected int schemaVersion() {
-    return 1;
+    return 2;
   }
 }

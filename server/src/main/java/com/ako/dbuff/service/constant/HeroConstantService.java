@@ -20,6 +20,6 @@ public class HeroConstantService extends BaseApiConstantService<HeroConstant> {
 
   @Override
   protected int schemaVersion() {
-    return 1;
+    return 2;
   }
 }

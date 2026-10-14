@@ -154,3 +154,19 @@ Off by default everywhere. It sends a few thousand tokens of match facts to Open
 2. On demand, in a `Match <id>` thread of a match with a DONE or PARTIAL run, send `~ai` (or `/match ai`). `~ai gpt-4o` or `/match ai model:gpt-4o` uses that model for the one call (it must be in the allowed list, otherwise one refusal line; a stored answer of another model is not reused; the card footnote names the model). Without the second switch it still works, it only does not post by itself. Refusals are one line each: switched off, no API key, no stored replay analysis.
 3. What to look at: the card `Top 5 reasons` with `Dire won; your team won/lost`, numbered reasons that end with `(based on: ...)`, and the line saying how many reasons had enough data when fewer than five. Send `~ai` again: no second paid call (log has no new `AI reasons of match ... reasons` line, and the card is the same).
 4. A failure (bad key, timeout, unusable answer) posts nothing in the thread and logs a WARN `AI reasons of match <id> failed`.
+
+## 12. Sync hero, ability and item icons (optional)
+
+Off by default, and nothing in the reports uses the icons yet (the core is here, the sections come in a later change), so this step only prepares the emoji and shows their state. The test bot has its own quota of 2000 application emoji, separate from the production bot: syncing here never touches production emoji.
+
+1. Add to the start-up lines of step 3, with the test bot's token, and start the app:
+   ```
+   export DISCORD_ICONS_ENABLED=true
+   export DISCORD_ICONS_DIRECTORY=$HOME/dbuff-icons
+   ```
+   Optional: `DISCORD_ICONS_MAX_EMOJI` (default 1900, no new emoji after that many).
+2. Sync (this needs the bot to be online; it runs in the background and the call returns at once): `curl -X POST 'http://localhost:8080/api/v1/discord/icons/sync?kind=HERO'`, then `kind=ITEM`, then `kind=ABILITY` (only abilities seen in stored matches) or `kind=ABILITY&all=true` (all 1056, which with heroes and items uses about 1590 of the 2000). `kind=ALL` does heroes, items and the seen abilities. One emoji is created about every half second, so a full sync takes several minutes. A second sync while one runs answers 409.
+3. What to look at: the log line `Icon sync [...] finished: Report[created=..., replaced=..., unchanged=..., failed=..., overLimit=...]`; the emoji in the Discord developer portal (Application, Emojis); the table `discord_icon` (`status` SYNCED, FAILED with the reason in `error`, or MISSING). A second sync of the same kind should show `created=0` and everything `unchanged`. The 128 px PNG files are kept in `DISCORD_ICONS_DIRECTORY`.
+4. Delete an emoji by hand in the portal and restart the app: the start-up check logs a WARN with the count and marks it MISSING; run the sync again to create it.
+
+Not tested against real Discord or the real CDN yet: the emoji name rules, the image size limit and the quota behaviour are confirmed by this step.

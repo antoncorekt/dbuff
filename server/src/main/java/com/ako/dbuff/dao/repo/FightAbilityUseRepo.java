@@ -12,6 +12,10 @@ public interface FightAbilityUseRepo extends JpaRepository<FightAbilityUseDomain
 
   List<FightAbilityUseDomain> findByMatchId(Long matchId);
 
+  @Query(
+      "select distinct d.abilityName from FightAbilityUseDomain d where d.abilityName is not null")
+  List<String> findDistinctAbilityNames();
+
   @Transactional
   @Modifying
   @Query("delete from FightAbilityUseDomain d where d.matchId = :matchId")
