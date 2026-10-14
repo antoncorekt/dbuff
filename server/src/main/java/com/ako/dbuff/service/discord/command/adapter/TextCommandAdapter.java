@@ -3,6 +3,7 @@ package com.ako.dbuff.service.discord.command.adapter;
 import com.ako.dbuff.service.discord.command.CommandContext;
 import com.ako.dbuff.service.discord.command.CommandRegistry;
 import com.ako.dbuff.service.discord.command.DbuffCommand;
+import com.ako.dbuff.service.discord.command.TextCommandProperties;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -13,12 +14,12 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.springframework.stereotype.Component;
 
 /**
- * Routes legacy {@code !} text commands to the same {@link DbuffCommand} handlers as the slash
+ * Routes legacy prefixed text commands to the same {@link DbuffCommand} handlers as the slash
  * surface.
  *
- * <p>Kept so existing muscle memory ({@code !vs}, {@code !dbuf status}, {@code !rerun}) keeps
- * working. Each command translates its own argument string into option values, so handlers see no
- * difference between the two surfaces.
+ * <p>Kept so existing muscle memory (for example {@code !vs}, {@code !dbuf status}, {@code !rerun}
+ * with the default prefix) keeps working. Each command translates its own argument string into
+ * option values, so handlers see no difference between the two surfaces.
  */
 @Slf4j
 @Component
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Component;
 public class TextCommandAdapter extends ListenerAdapter {
 
   private final CommandRegistry registry;
+  private final TextCommandProperties properties;
 
   @Override
   public void onMessageReceived(MessageReceivedEvent event) {
@@ -34,7 +36,7 @@ public class TextCommandAdapter extends ListenerAdapter {
     }
 
     Optional<TextCommandParser.ParsedCommand> parsed =
-        TextCommandParser.parse(event.getMessage().getContentRaw());
+        TextCommandParser.parse(properties.getTextPrefix(), event.getMessage().getContentRaw());
     if (parsed.isEmpty()) {
       return;
     }
@@ -42,7 +44,7 @@ public class TextCommandAdapter extends ListenerAdapter {
 
     Optional<DbuffCommand> resolved = registry.findByTextAlias(parsedCommand.alias());
     if (resolved.isEmpty()) {
-      // Silently ignored: the channel may carry unrelated `!` messages from other bots,
+      // Silently ignored: the channel may carry messages with another prefix from other bots,
       // and complaining about each one would be noise.
       return;
     }
@@ -67,7 +69,8 @@ public class TextCommandAdapter extends ListenerAdapter {
             command.execute(subcommand, context);
           } catch (Exception e) {
             log.error(
-                "Text command !{} {} failed: {}",
+                "Text command {}{} {} failed: {}",
+                properties.getTextPrefix(),
                 parsedCommand.alias(),
                 subcommand,
                 e.getMessage(),

@@ -27,7 +27,7 @@ class CommandRegistryTest {
             List.of());
     scout = new StubCommand("scout", Commands.slash("scout", "Scout an opponent"), List.of("vs"));
 
-    registry = new CommandRegistry(List.of(stats, scout));
+    registry = new CommandRegistry(List.of(stats, scout), new TextCommandProperties());
   }
 
   @Test
@@ -107,6 +107,17 @@ class CommandRegistryTest {
         .contains("/stats items")
         .contains("/scout")
         .contains("!vs");
+  }
+
+  @Test
+  void buildHelpEmbed_showsTheConfiguredTextPrefix() {
+    TextCommandProperties properties = new TextCommandProperties();
+    properties.setTextPrefix("~");
+
+    String rendered =
+        new CommandRegistry(List.of(stats, scout), properties).buildHelpEmbed().getDescription();
+
+    assertThat(rendered).contains("~vs").doesNotContain("!vs");
   }
 
   /** Minimal DbuffCommand for registry tests — does nothing when executed. */
