@@ -62,6 +62,9 @@ public class ReplayReportProperties {
   /** The most lines the items section lists. */
   private int maxItemLines = 4;
 
+  /** The most lines the outliers section lists. */
+  private int maxOutlierLines = 4;
+
   /** The most lines the objectives section lists for missed objectives. */
   private int maxObjectiveLines = 3;
 
@@ -102,6 +105,7 @@ public class ReplayReportProperties {
     requireRange("max-smoke-lines", maxSmokeLines, 1, MAX_BEHAVIOUR_LINES);
     requireRange("max-objective-lines", maxObjectiveLines, 1, MAX_BEHAVIOUR_LINES);
     requireRange("max-item-lines", maxItemLines, 1, MAX_BEHAVIOUR_LINES);
+    requireRange("max-outlier-lines", maxOutlierLines, 1, MAX_BEHAVIOUR_LINES);
     requireRange("max-vision-lines", maxVisionLines, 1, MAX_BEHAVIOUR_LINES);
     if (!(objectiveCloseDistance > 0
         && objectiveCloseDistance < objectiveFarDistance

@@ -11,6 +11,7 @@ import com.ako.dbuff.dao.model.LaneReasonDomain;
 import com.ako.dbuff.dao.model.LaneResultDomain;
 import com.ako.dbuff.dao.model.ObjectiveConversionDomain;
 import com.ako.dbuff.dao.model.OpeningSummaryDomain;
+import com.ako.dbuff.dao.model.PlayerOutlierDomain;
 import com.ako.dbuff.dao.model.PlayerRoleDomain;
 import com.ako.dbuff.dao.model.RunePickupDomain;
 import com.ako.dbuff.dao.model.SmokeUseDomain;
@@ -29,6 +30,7 @@ import com.ako.dbuff.dao.repo.LaneReasonRepo;
 import com.ako.dbuff.dao.repo.LaneResultRepo;
 import com.ako.dbuff.dao.repo.ObjectiveConversionRepo;
 import com.ako.dbuff.dao.repo.OpeningSummaryRepo;
+import com.ako.dbuff.dao.repo.PlayerOutlierRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleRepo;
 import com.ako.dbuff.dao.repo.RunePickupRepo;
 import com.ako.dbuff.dao.repo.SmokeUseRepo;
@@ -62,6 +64,7 @@ import static org.assertj.core.api.Assertions.tuple;
   RunesSectionReader.class,
   LanesSectionReader.class,
   ItemsSectionReader.class,
+  OutliersSectionReader.class,
   BehaviourSectionReader.class,
   FightExplanationReader.class,
   FightLossProperties.class
@@ -76,6 +79,8 @@ class SectionReadersTest {
   @Autowired private RunesSectionReader runes;
   @Autowired private LanesSectionReader lanes;
   @Autowired private ItemsSectionReader items;
+  @Autowired private OutliersSectionReader outliers;
+  @Autowired private PlayerOutlierRepo outlierRepo;
   @Autowired private BehaviourSectionReader behaviour;
 
   @Autowired private PlayerRoleRepo roleRepo;
@@ -107,12 +112,50 @@ class SectionReadersTest {
     assertThat(runes.read(OTHER, null).openings()).isEmpty();
     assertThat(lanes.read(OTHER, null).results()).isEmpty();
     assertThat(items.read(OTHER, null)).isEmpty();
+    assertThat(outliers.read(OTHER, null)).isEmpty();
     Behaviour none = behaviour.read(OTHER, null);
     assertThat(none.rotations()).isEmpty();
     assertThat(none.splitStretches()).isEmpty();
     assertThat(none.laneSwaps()).isEmpty();
     assertThat(none.smokes()).isEmpty();
     assertThat(none.objectiveConversions()).isEmpty();
+  }
+
+  @Test
+  void outliers_listRowsBySlotAndStartWithNullsKept() {
+    outlierRepo.save(
+        PlayerOutlierDomain.builder()
+            .matchId(MATCH)
+            .playerSlot(129L)
+            .kind("FEEDER")
+            .startSeconds(600)
+            .endSeconds(900)
+            .sharePercent(7.5)
+            .explanation("he died 9 times in that stretch")
+            .incomeBreakSeconds(480)
+            .mainIncomeSource("LANE_CREEPS")
+            .build());
+    outlierRepo.save(
+        PlayerOutlierDomain.builder()
+            .matchId(MATCH)
+            .playerSlot(1L)
+            .kind("NW_OUTLIER")
+            .startSeconds(1200)
+            .endSeconds(1500)
+            .sharePercent(41.0)
+            .build());
+    outlierRepo.save(PlayerOutlierDomain.builder().matchId(OTHER).playerSlot(3L).build());
+
+    assertThat(outliers.read(MATCH, null))
+        .extracting(
+            o -> o.slot(),
+            o -> o.kind(),
+            o -> o.incomeBreakSeconds(),
+            o -> o.mainIncomeSource(),
+            o -> o.explanation())
+        .containsExactly(
+            tuple(1L, "NW_OUTLIER", null, null, null),
+            tuple(129L, "FEEDER", 480, "LANE_CREEPS", "he died 9 times in that stretch"));
   }
 
   @Test

@@ -4,19 +4,23 @@ import com.ako.dbuff.dao.model.DeathAnalysisDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.PlayerOutlierDomain;
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
+import com.ako.dbuff.dao.model.ReplayPlayerMinuteDomain;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.PlayerOutlierRepo;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
+import com.ako.dbuff.dao.repo.ReplayPlayerMinuteRepo;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -25,7 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Finds the players whose share of the team's net worth does not fit how much they took part: a big
- * share with few fights joined, and a small share with many deaths.
+ * share with few fights joined, and a small share with many deaths. Each outlier also gets why: the
+ * minute his income broke from his team's, the gold source behind it, and one plain sentence. The
+ * team rotations run later and are left to the readers.
  */
 @Slf4j
 @Order(65)
@@ -41,6 +47,7 @@ public class OutlierAnalyzer implements ReplayAnalyzer {
   private final PlayerTimelineRepo timelineRepo;
   private final FightPlayerRepo fightPlayerRepo;
   private final DeathAnalysisRepo deathRepo;
+  private final ReplayPlayerMinuteRepo minuteRepo;
   private final PlayerOutlierRepo outlierRepo;
   private final ReplayAnalysisProperties properties;
 
@@ -51,7 +58,12 @@ public class OutlierAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 1;
+    return 2;
+  }
+
+  @Override
+  public Set<String> requires() {
+    return Set.of("fights", "deaths", "minutes");
   }
 
   @Override
@@ -64,20 +76,32 @@ public class OutlierAnalyzer implements ReplayAnalyzer {
       return;
     }
     Map<Long, Integer> joined = new HashMap<>();
+    Set<Integer> fightIndexes = new HashSet<>();
     for (FightPlayerDomain p : fightPlayerRepo.findByMatchId(matchId)) {
+      if (p.getFightIndex() != null) {
+        fightIndexes.add(p.getFightIndex());
+      }
       if (JOINED.contains(p.getPresence())) {
         joined.merge(p.getPlayerSlot(), 1, Integer::sum);
       }
     }
     Map<Long, Integer> deaths = new HashMap<>();
+    Map<Long, List<DeathAnalysisDomain>> deathRows = new HashMap<>();
     for (DeathAnalysisDomain d : deathRepo.findByMatchId(matchId)) {
       if (!"REINCARNATED".equals(d.getReason())) {
         deaths.merge(d.getPlayerSlot(), 1, Integer::sum);
+        deathRows.computeIfAbsent(d.getPlayerSlot(), s -> new ArrayList<>()).add(d);
       }
     }
+    Map<Long, List<ReplayPlayerMinuteDomain>> minutes =
+        minuteRepo.findByMatchId(matchId).stream()
+            .filter(m -> m.getPlayerSlot() != null)
+            .collect(Collectors.groupingBy(ReplayPlayerMinuteDomain::getPlayerSlot));
+    OutlierExplainer explainer =
+        new OutlierExplainer(minutes, deathRows, fightIndexes.size(), properties);
     List<PlayerOutlierDomain> rows = new ArrayList<>();
     for (boolean dire : new boolean[] {false, true}) {
-      rows.addAll(team(matchId, worth, joined, deaths, dire));
+      rows.addAll(team(matchId, worth, joined, deaths, explainer, dire));
     }
     outlierRepo.saveAll(rows);
   }
@@ -93,6 +117,7 @@ public class OutlierAnalyzer implements ReplayAnalyzer {
       Map<Long, double[]> worth,
       Map<Long, Integer> joined,
       Map<Long, Integer> deaths,
+      OutlierExplainer explainer,
       boolean dire) {
     List<Long> slots = worth.keySet().stream().filter(s -> (s >= FIRST_DIRE_SLOT) == dire).toList();
     if (slots.size() != TEAM_SIZE) {
@@ -115,7 +140,26 @@ public class OutlierAnalyzer implements ReplayAnalyzer {
                 s -> s > properties.getOutlierSharePercent() / 100.0,
                 Math.max(1, properties.getOutlierMinutes()),
                 true)
-            .forEach(r -> rows.add(row(matchId, slot, "NW_OUTLIER", r, rank, fights, died)));
+            .forEach(
+                r ->
+                    rows.add(
+                        row(
+                            matchId,
+                            slot,
+                            "NW_OUTLIER",
+                            r,
+                            rank,
+                            fights,
+                            died,
+                            explainer.explain(
+                                false,
+                                slot,
+                                worth.get(slot),
+                                mates(worth, slots, slot),
+                                r.startMinute(),
+                                r.endMinute(),
+                                fights,
+                                medianJoined))));
       }
       if (died >= MIN_FEEDER_DEATHS && died > FEEDER_DEATH_FACTOR * medianDeaths) {
         ShareRuns.of(
@@ -123,14 +167,44 @@ public class OutlierAnalyzer implements ReplayAnalyzer {
                 s -> s < properties.getFeederSharePercent() / 100.0,
                 Math.max(1, properties.getFeederMinutes()),
                 false)
-            .forEach(r -> rows.add(row(matchId, slot, "FEEDER", r, rank, fights, died)));
+            .forEach(
+                r ->
+                    rows.add(
+                        row(
+                            matchId,
+                            slot,
+                            "FEEDER",
+                            r,
+                            rank,
+                            fights,
+                            died,
+                            explainer.explain(
+                                true,
+                                slot,
+                                worth.get(slot),
+                                mates(worth, slots, slot),
+                                r.startMinute(),
+                                r.endMinute(),
+                                fights,
+                                medianJoined))));
       }
     }
     return rows;
   }
 
+  private static List<double[]> mates(Map<Long, double[]> worth, List<Long> slots, long slot) {
+    return slots.stream().filter(s -> s != slot).map(worth::get).toList();
+  }
+
   private PlayerOutlierDomain row(
-      long matchId, long slot, String kind, ShareRuns.Run run, int rank, int fights, int deaths) {
+      long matchId,
+      long slot,
+      String kind,
+      ShareRuns.Run run,
+      int rank,
+      int fights,
+      int deaths,
+      OutlierExplainer.Explanation why) {
     return PlayerOutlierDomain.builder()
         .matchId(matchId)
         .playerSlot(slot)
@@ -141,6 +215,9 @@ public class OutlierAnalyzer implements ReplayAnalyzer {
         .participationRank(rank)
         .fightsJoined(fights)
         .deaths(deaths)
+        .incomeBreakSeconds(why.incomeBreakSeconds())
+        .mainIncomeSource(why.mainIncomeSource())
+        .explanation(why.text())
         .analysisVersion(version())
         .build();
   }
