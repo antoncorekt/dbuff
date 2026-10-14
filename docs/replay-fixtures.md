@@ -22,7 +22,7 @@ For each match id, with `curl` and `jq`, and a pause of about two seconds betwee
 3. Decompress to `<id>.dem` (`zstd -d` or `bzip2 -dc`).
 4. Skip every file that already exists, so the steps can be repeated safely.
 
-A replay is available for about eight days after the match for most matches, and Valve deletes it for good after that, so download early and keep the files.
+Valve deletes replays after a while (a five-day-old match still downloaded in October 2026), so download early and keep the files.
 
 ## Choosing matches
 
