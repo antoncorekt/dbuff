@@ -184,10 +184,7 @@ public class LanesSection implements ReplayReportSection {
                       winner.row().getMargin(),
                       properties.getLaneClearMargin(),
                       properties.getLaneBigMargin());
-      return Prettify.team(winner.side().name())
-          + (winner.side() == yours ? " (your team)" : "")
-          + " won"
-          + how;
+      return Prettify.teamOf(winner.side().name(), yours) + " won" + how;
     }
     Map.Entry<TeamSide, LaneResultDomain> only = sides.entrySet().iterator().next();
     if (sides.size() == 1

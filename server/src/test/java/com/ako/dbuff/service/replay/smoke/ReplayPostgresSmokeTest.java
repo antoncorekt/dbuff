@@ -72,6 +72,7 @@ import com.ako.dbuff.service.replay.report.ItemsSection;
 import com.ako.dbuff.service.replay.report.LanesSection;
 import com.ako.dbuff.service.replay.report.MovementSection;
 import com.ako.dbuff.service.replay.report.ObjectivesSection;
+import com.ako.dbuff.service.replay.report.OpeningSection;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.RotationsSection;
 import com.ako.dbuff.service.replay.report.SmokeSection;
@@ -160,6 +161,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private SmokeSection smokeSection;
   @Autowired private ObjectivesSection objectivesSection;
   @Autowired private ItemsSection itemsSection;
+  @Autowired private OpeningSection openingSection;
   @Autowired private DeathSection deathSection;
   @Autowired private FightSection fightSection;
   @Autowired private MovementSection movementSection;
@@ -679,6 +681,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     saveSection("smoke", smokeSection.lines(input), id, 4);
     saveSection("objectives", objectivesSection.lines(input), id, 7);
     saveSection("items", itemsSection.lines(input), id, 5);
+    saveSection("opening", openingSection.lines(input), id, 4);
   }
 
   private void saveSection(String name, List<String> lines, String id, int maxLines) {
