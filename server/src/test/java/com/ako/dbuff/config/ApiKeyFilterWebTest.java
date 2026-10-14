@@ -9,13 +9,19 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
+import java.util.Properties;
 import net.dv8tion.jda.api.JDA;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.support.PropertiesLoaderUtils;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,6 +41,18 @@ class ApiKeyFilterWebTest {
   @Autowired private ReplayParseRunRepo runRepo;
 
   private static final long MATCH = 9_000_000_001L;
+
+  /**
+   * The management settings of the real prod profile, so the exposure tested is the shipped one.
+   */
+  @DynamicPropertySource
+  static void prodManagementProperties(DynamicPropertyRegistry registry) throws IOException {
+    Properties prod =
+        PropertiesLoaderUtils.loadProperties(new ClassPathResource("application-prod.properties"));
+    prod.stringPropertyNames().stream()
+        .filter(name -> name.startsWith("management."))
+        .forEach(name -> registry.add(name, () -> prod.getProperty(name)));
+  }
 
   @LocalServerPort private int port;
 
@@ -100,6 +118,46 @@ class ApiKeyFilterWebTest {
   @Test
   void theHealthCheckNeedsNoKey() throws Exception {
     assertThat(status("/actuator/health", null)).isNotEqualTo(401);
+  }
+
+  @Test
+  void theMetricsEndpointNeedsTheKey() throws Exception {
+    assertThat(status("/actuator/metrics", null)).isEqualTo(401);
+    assertThat(status("/actuator/metrics/dbuff.replay.runs", null)).isEqualTo(401);
+    assertThat(status("/actuator/metrics", "wrong")).isEqualTo(401);
+    assertThat(status("/actuator/metrics", "test-key")).isEqualTo(200);
+    assertThat(status("/actuator/metrics/dbuff.replay.runs?tag=status:DONE", "test-key"))
+        .isEqualTo(200);
+  }
+
+  @Test
+  void theOtherActuatorEndpointsStayClosedEvenWithTheKey() throws Exception {
+    for (String endpoint : List.of("env", "beans", "heapdump", "threaddump", "loggers")) {
+      assertThat(status("/actuator/" + endpoint, "test-key")).as(endpoint).isEqualTo(404);
+    }
+  }
+
+  @Test
+  void metricsVariantsWithoutAKeyAreRefused() throws Exception {
+    for (String path :
+        List.of(
+            "/actuator/metrics/",
+            "/actuator/metrics/..;/env",
+            "/actuator/metrics/%2e%2e/env",
+            "/actuator/%6detrics",
+            "/actuator/health/../metrics",
+            "/actuator/health/%2e%2e/metrics",
+            "/actuator/health/..;/metrics",
+            "/actuator/health/..;/env",
+            "/actuator/health/..;/beans",
+            "/actuator/health/..;/heapdump")) {
+      assertThat(rawStatus(path)).as(path).isEqualTo(401);
+    }
+  }
+
+  @Test
+  void anEncodedSlashIsRefusedAndNeverServed() throws Exception {
+    assertThat(rawStatus("/actuator/metrics/..%2fenv")).isIn(400, 401);
   }
 
   @Test

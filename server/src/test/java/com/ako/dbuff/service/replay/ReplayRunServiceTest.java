@@ -10,8 +10,12 @@ import com.ako.dbuff.service.replay.analysis.ReplayAnalysisService;
 import com.ako.dbuff.service.replay.file.ReplayFile;
 import com.ako.dbuff.service.replay.file.ReplayFileProvider;
 import com.ako.dbuff.service.replay.map.MapLayouts;
+import com.ako.dbuff.service.replay.metrics.ReplayMetrics;
+import com.ako.dbuff.service.replay.metrics.ReplayRunCounts;
 import com.ako.dbuff.service.replay.mode.GameModeRegistry;
 import com.ako.dbuff.service.replay.mode.TestModes;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -21,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -90,6 +95,49 @@ class ReplayRunServiceTest {
     assertThat(run.getClarityVersion()).isEqualTo("5.0.1");
     assertThat(run.getLeaseUntil()).isNull();
     verify(goodExtractor).extract(any(), any());
+  }
+
+  @Test
+  void process_timesTheRunUnderItsFinalStatus() {
+    service.process(match());
+
+    assertThat(registry.get("dbuff.replay.run.duration").tag("status", "DONE").timer().count())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void process_doesNotCountTimeSpentWaitingForTheParsePermit() throws Exception {
+    semaphore.acquire();
+    Thread worker = new Thread(() -> service.process(match()));
+    worker.start();
+    Thread.sleep(500);
+    semaphore.release();
+    worker.join();
+
+    var timer = registry.get("dbuff.replay.run.duration").tag("status", "DONE").timer();
+    assertThat(timer.count()).isEqualTo(1);
+    assertThat(timer.totalTime(TimeUnit.MILLISECONDS)).isLessThan(400);
+  }
+
+  @Test
+  void process_doesNotTimeARunThatNeverParses() {
+    MatchDomain other = match();
+    other.setGameModeId(3L);
+
+    service.process(other);
+
+    assertThat(registry.find("dbuff.replay.run.duration").timers()).isEmpty();
+  }
+
+  @Test
+  void process_isNotFailedByABrokenMetricsRegistry() {
+    MeterRegistry broken = mock(MeterRegistry.class);
+    when(broken.timer(any(String.class), any(String[].class)))
+        .thenThrow(new IllegalStateException("registry closed"));
+    service =
+        serviceWith(List.of(goodExtractor), new ReplayMetrics(broken, mock(ReplayRunCounts.class)));
+
+    assertThat(service.process(match())).isEqualTo(ReplayStatus.DONE);
   }
 
   @Test
@@ -290,7 +338,14 @@ class ReplayRunServiceTest {
     verify(fileProvider, never()).open(any());
   }
 
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+  private final ReplayMetrics metrics = new ReplayMetrics(registry, mock(ReplayRunCounts.class));
+
   private ReplayRunService serviceWith(List<ReplayExtractor> extractors) {
+    return serviceWith(extractors, metrics);
+  }
+
+  private ReplayRunService serviceWith(List<ReplayExtractor> extractors, ReplayMetrics metrics) {
     return new ReplayRunService(
         runRepo,
         statRepo,
@@ -303,7 +358,8 @@ class ReplayRunServiceTest {
         semaphore,
         mapLayouts,
         analysis,
-        modes);
+        modes,
+        metrics);
   }
 
   private static MatchDomain match() {

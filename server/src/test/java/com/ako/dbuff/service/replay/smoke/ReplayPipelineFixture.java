@@ -33,6 +33,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
@@ -96,6 +97,11 @@ public abstract class ReplayPipelineFixture {
 
   @TestConfiguration
   static class Config {
+    @Bean
+    SimpleMeterRegistry meterRegistry() {
+      return new SimpleMeterRegistry();
+    }
+
     @Bean
     ObjectMapper objectMapper() {
       return new ObjectMapper();
