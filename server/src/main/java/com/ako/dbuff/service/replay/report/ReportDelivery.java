@@ -14,6 +14,9 @@ public enum ReportDelivery {
   QUIET_HOURS("it is quiet hours"),
   NO_THREAD("this match has no thread on record"),
   NO_SECTIONS("no report section applies to this match with the current settings"),
+  SECTION_EMPTY(
+      "the section had nothing to post (not enough data, the daily call limit was reached or the"
+          + " model failed, see the log)"),
   THREAD_NOT_FOUND("Discord could not find the thread"),
   FAILED("something went wrong, see the log");
 
