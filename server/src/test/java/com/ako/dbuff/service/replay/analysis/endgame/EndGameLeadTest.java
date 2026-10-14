@@ -10,7 +10,7 @@ class EndGameLeadTest {
     for (int i = 0; i < gold.length; i++) {
       share[i] = gold[i] / 100000.0;
     }
-    return EndGameLead.of(gold, share, 0.10);
+    return EndGameLead.of(gold, share, new EndGameLead.Rules(2000, 0.03, 0.10, 3000, 3));
   }
 
   @Test
@@ -39,13 +39,40 @@ class EndGameLeadTest {
 
   @Test
   void heldSecondsCountsTheLongestRunAtOrAboveTheShare() {
-    EndGameLead lead = of(new double[] {0, 12000, 15000, 11000, 2000, 10000, -3000});
+    EndGameLead lead = of(new double[] {0, 0, 0, 0, 12000, 15000, 11000, 2000, 10000, -3000});
 
     assertThat(lead.heldSeconds()).isEqualTo(180);
   }
 
   @Test
   void aSingleSampleCountsAsAMinute() {
-    assertThat(of(new double[] {0, 20000, 0}).heldSeconds()).isEqualTo(60);
+    assertThat(of(new double[] {0, 0, 0, 20000, 0}).heldSeconds()).isEqualTo(60);
+  }
+
+  @Test
+  void aLeadBelowTheMinimumGoldOrShareIsNotALead() {
+    assertThat(of(new double[] {0, 656, 1500, -1000}).everLed()).isFalse();
+    EndGameLead lowShare =
+        EndGameLead.of(
+            new double[] {0, 5000},
+            new double[] {0, 0.02},
+            new EndGameLead.Rules(2000, 0.03, 0.1, 3000, 0));
+    assertThat(lowShare.everLed()).isFalse();
+  }
+
+  @Test
+  void samplesBeforeTheThrowMinuteOrBelowTheThrowGoldDoNotHold() {
+    assertThat(of(new double[] {20000, 20000, 20000, 0, 0}).heldSeconds()).isZero();
+    EndGameLead small =
+        EndGameLead.of(
+            new double[] {0, 0, 0, 0, 2500, 2500},
+            new double[] {0, 0, 0, 0, 0.2, 0.2},
+            new EndGameLead.Rules(2000, 0.03, 0.1, 3000, 3));
+    assertThat(small.heldSeconds()).isZero();
+  }
+
+  @Test
+  void theLastSampleIsKept() {
+    assertThat(of(new double[] {0, 4000, 6000}).lastGold()).isEqualTo(6000);
   }
 }

@@ -21,6 +21,24 @@ class EndGamePropertiesTest {
   }
 
   @Test
+  void theLeadAndThrowMinimumsMustBeFiniteAndNotNegative() {
+    for (double bad : new double[] {-1, Double.NaN, Double.POSITIVE_INFINITY}) {
+      EndGameProperties gold = new EndGameProperties();
+      gold.setMinLeadGold(bad);
+      assertThatThrownBy(gold::validate).hasMessageContaining("min-lead-gold");
+      EndGameProperties throwGold = new EndGameProperties();
+      throwGold.setThrowMinGold(bad);
+      assertThatThrownBy(throwGold::validate).hasMessageContaining("throw-min-gold");
+    }
+    EndGameProperties share = new EndGameProperties();
+    share.setMinLeadShare(Double.NaN);
+    assertThatThrownBy(share::validate).hasMessageContaining("min-lead-share");
+    EndGameProperties minute = new EndGameProperties();
+    minute.setThrowMinMinute(-1);
+    assertThatThrownBy(minute::validate).hasMessageContaining("throw-min-minute");
+  }
+
+  @Test
   void aSecondsSettingOutOfRangeFailsStartUp() {
     EndGameProperties minimum = new EndGameProperties();
     minimum.setThrowMinSeconds(0);

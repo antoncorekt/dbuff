@@ -95,6 +95,7 @@ class EndGameAnalyzerTest {
 
     EndGameSummaryDomain row = summary();
     assertThat(row.getWinnerTeam()).isEqualTo("RADIANT");
+    assertThat(row.getLeadKnown()).isTrue();
     assertThat(row.getThrown()).isTrue();
     assertThat(row.getLeadLost()).isTrue();
     assertThat(row.getPeakLeadSeconds()).isEqualTo(15 * 60);
@@ -102,6 +103,90 @@ class EndGameAnalyzerTest {
     assertThat(row.getPeakLeadPercent()).isEqualTo(15.0);
     assertThat(row.getHeldSeconds()).isEqualTo(10 * 60);
     assertThat(row.getDurationSeconds()).isEqualTo(2460);
+  }
+
+  @Test
+  void anEarlyLeadIsNotAThrowAndATinyOneIsNoLead() {
+    match(true, m -> m < 6 ? -0.15 : m < 30 ? 0.0 : 0.2);
+
+    analyzer.analyze(MATCH);
+
+    assertThat(summary().getThrown()).isFalse();
+    assertThat(summary().getPeakLeadGold()).isEqualTo(30000);
+    assertThat(summary().getHeldSeconds()).isZero();
+  }
+
+  @Test
+  void aTinyLeadIsSaidToBeNoLeadAtAll() {
+    match(true, m -> m == 2 ? -0.003 : 0.1 + m * 0.005);
+
+    analyzer.analyze(MATCH);
+
+    EndGameSummaryDomain row = summary();
+    assertThat(row.getLeadKnown()).isTrue();
+    assertThat(row.getPeakLeadSeconds()).isNull();
+    assertThat(row.getThrown()).isFalse();
+  }
+
+  @Test
+  void aLoserStillLeadingAtTheLastMinuteHasNoThrowAndNoTurningPoint() {
+    match(true, m -> m < 15 ? 0.0 : -0.15);
+    fight(0, 1000, "RADIANT", 5000, true);
+
+    analyzer.analyze(MATCH);
+
+    EndGameSummaryDomain row = summary();
+    assertThat(row.getLeadLost()).isFalse();
+    assertThat(row.getThrown()).isFalse();
+    assertThat(row.getLastLeadGold()).isEqualTo(30000);
+    assertThat(row.getTurningSeconds()).isNull();
+  }
+
+  @Test
+  void onlyTheFightsAreRequiredAndMissingTablesDegrade() {
+    assertThat(analyzer.requires()).containsExactly("fights");
+    match(true, EndGameAnalyzerTest::dire15ThenRadiant);
+    fightRepo.save(
+        FightDomain.builder()
+            .matchId(MATCH)
+            .fightIndex(0)
+            .startSeconds(2000.0)
+            .winner("DRAW")
+            .build());
+
+    analyzer.analyze(MATCH);
+
+    EndGameSummaryDomain row = summary();
+    assertThat(row.getThrown()).isTrue();
+    assertThat(row.getTurningSeconds()).isNull();
+    assertThat(row.getRadiantBuybacks()).isZero();
+    assertThat(row.getDireBuybacks()).isZero();
+    assertThat(row.getFinalFightWinner()).isEqualTo("DRAW");
+  }
+
+  @Test
+  void aFightSpanningThePeakCanBeTheTurningPoint() {
+    match(true, EndGameAnalyzerTest::dire15ThenRadiant);
+    fightRepo.save(
+        FightDomain.builder()
+            .matchId(MATCH)
+            .fightIndex(0)
+            .startSeconds(880.0)
+            .endSeconds(940.0)
+            .winner("RADIANT")
+            .build());
+    importanceRepo.save(
+        FightImportanceDomain.builder()
+            .matchId(MATCH)
+            .fightIndex(0)
+            .winningTeam("RADIANT")
+            .goldChange(800L)
+            .important(true)
+            .build());
+
+    analyzer.analyze(MATCH);
+
+    assertThat(summary().getTurningFightIndex()).isZero();
   }
 
   @Test
@@ -227,6 +312,7 @@ class EndGameAnalyzerTest {
     EndGameSummaryDomain row = summary();
     assertThat(row.getWinnerTeam()).isEqualTo("DIRE");
     assertThat(row.getThrown()).isFalse();
+    assertThat(row.getLeadKnown()).isFalse();
     assertThat(row.getPeakLeadSeconds()).isNull();
     assertThat(row.getFinalFightWinner()).isEqualTo("DIRE");
   }

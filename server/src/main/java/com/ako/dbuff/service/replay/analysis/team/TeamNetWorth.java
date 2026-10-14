@@ -1,12 +1,16 @@
 package com.ako.dbuff.service.replay.analysis.team;
 
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
+import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
 /** Each team's net worth at every minute of a game, from the per-player timelines. */
 public record TeamNetWorth(double[] radiant, double[] dire) {
+  /** The time between two samples: the timelines hold one per minute. */
+  public static final int STEP_SECONDS = 60;
+
   private static final int PLAYERS = 10;
   private static final long FIRST_DIRE_SLOT = 128;
 
@@ -37,6 +41,11 @@ public record TeamNetWorth(double[] radiant, double[] dire) {
       expected++;
     }
     return expected == 0 ? null : new TeamNetWorth(radiant, dire);
+  }
+
+  /** The net worth by minute of one team. */
+  public double[] of(TeamSide side) {
+    return side == TeamSide.RADIANT ? radiant : dire;
   }
 
   /** Radiant's lead as a share of both teams' net worth together. */

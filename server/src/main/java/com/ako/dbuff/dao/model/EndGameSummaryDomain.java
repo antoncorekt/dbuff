@@ -37,7 +37,16 @@ public class EndGameSummaryDomain {
 
   private Integer durationSeconds;
 
-  /** When the losing team's net worth lead was largest; null when it never led. */
+  /**
+   * Whether the net worth timeline was read; false (or null on rows from version 1) means the lead
+   * fields below are unknown, which is not the same as the loser never having led.
+   */
+  private Boolean leadKnown;
+
+  /**
+   * When the losing team's net worth lead was largest; null when it never led meaningfully (the
+   * peak must reach the minimum gold and share) or the lead is not known.
+   */
   private Integer peakLeadSeconds;
 
   /** The losing team's net worth lead at that time, in gold; null when it never led. */
@@ -46,13 +55,22 @@ public class EndGameSummaryDomain {
   /** That lead as a percentage of both teams' net worth together. */
   private Double peakLeadPercent;
 
-  /** The loser no longer led at the last minute; null when it never led. */
+  /**
+   * The loser did not lead at the last whole minute sample of the net worth timeline, which can be
+   * before the game ended; null when it never led or the lead is not known.
+   */
   private Boolean leadLost;
+
+  /** The loser's lead in gold at that last sample, negative when it trailed; null when unknown. */
+  private Long lastLeadGold;
 
   /** The longest stretch the loser led by at least the throw share, in seconds. */
   private Integer heldSeconds;
 
-  /** The loser held at least the throw share for at least the throw minimum, and then lost. */
+  /**
+   * The loser held at least the throw share and gold, from the throw minute on, for at least the
+   * throw minimum, and was not leading at the last sample.
+   */
   private Boolean thrown;
 
   private Integer turningFightIndex;

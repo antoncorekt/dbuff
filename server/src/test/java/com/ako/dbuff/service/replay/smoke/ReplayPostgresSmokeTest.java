@@ -75,6 +75,7 @@ import com.ako.dbuff.service.replay.report.LanesSection;
 import com.ako.dbuff.service.replay.report.MovementSection;
 import com.ako.dbuff.service.replay.report.ObjectivesSection;
 import com.ako.dbuff.service.replay.report.OpeningSection;
+import com.ako.dbuff.service.replay.report.OutliersSection;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.RotationsSection;
 import com.ako.dbuff.service.replay.report.SmokeSection;
@@ -169,6 +170,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private EndGameSection endGameSection;
   @Autowired private EndGameSummaryRepo endGameRepo;
   @Autowired private ItemsSection itemsSection;
+  @Autowired private OutliersSection outliersSection;
   @Autowired private OpeningSection openingSection;
   @Autowired private VisionSection visionSection;
   @Autowired private DeathSection deathSection;
@@ -402,7 +404,16 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(document.keySet())
         .as("%s: every section", id)
         .containsExactly(
-            "run", "roles", "fights", "vision", "runes", "lanes", "items", "behaviour", "endgame");
+            "run",
+            "roles",
+            "fights",
+            "vision",
+            "runes",
+            "lanes",
+            "items",
+            "outliers",
+            "behaviour",
+            "endgame");
     JsonNode json = new ObjectMapper().valueToTree(document);
     assertThat(json.at("/run/status").asText()).isEqualTo("DONE");
     assertThat(json.at("/roles/players")).as("%s roles", id).hasSize(10);
@@ -764,6 +775,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     System.out.println("END GAME " + id + " " + endGameRepo.findByMatchId(matchId).getFirst());
     saveSection("endgame", endGameSection.lines(input), id, 2);
     saveSection("items", itemsSection.lines(input), id, 5);
+    saveSection("outliers", outliersSection.lines(input), id, 5);
     saveSection("opening", openingSection.lines(input), id, 4);
     saveSection("vision", visionSection.lines(input), id, 7);
   }

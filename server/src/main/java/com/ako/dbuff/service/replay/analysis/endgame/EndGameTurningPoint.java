@@ -12,8 +12,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * The fight the game turned on: the winner's first won fight after the loser's peak lead that was
- * followed by an objective, or else the winner's won fight after it that moved the gold most.
+ * The fight the game turned on: the winner's first won fight at or after the loser's peak lead (it
+ * ends no earlier than the peak) that was followed by an objective, or else the winner's important
+ * fight at or after it that moved the gold most.
  */
 public final class EndGameTurningPoint {
   public static final String CONVERTED = "CONVERTED";
@@ -42,12 +43,16 @@ public final class EndGameTurningPoint {
     Map<Integer, FightDomain> after =
         fights.stream()
             .filter(f -> f.getFightIndex() != null && f.getStartSeconds() != null)
-            .filter(f -> f.getStartSeconds() >= peakSeconds)
+            .filter(f -> end(f) >= peakSeconds)
             .collect(
                 Collectors.toMap(FightDomain::getFightIndex, Function.identity(), (a, b) -> a));
     Map<Integer, FightImportanceDomain> gold =
         importance.stream()
-            .filter(i -> i.getFightIndex() != null && winner.equals(i.getWinningTeam()))
+            .filter(
+                i ->
+                    i.getFightIndex() != null
+                        && i.isImportant()
+                        && winner.equals(i.getWinningTeam()))
             .collect(Collectors.toMap(FightImportanceDomain::getFightIndex, i -> i, (a, b) -> a));
     Optional<Pick> converted =
         conversions.stream()
@@ -71,6 +76,10 @@ public final class EndGameTurningPoint {
             Comparator.comparing(FightImportanceDomain::getGoldChange)
                 .thenComparing(i -> -after.get(i.getFightIndex()).getStartSeconds()))
         .map(i -> new Pick(SWING, after.get(i.getFightIndex()), null, i.getGoldChange()));
+  }
+
+  private static double end(FightDomain fight) {
+    return fight.getEndSeconds() == null ? fight.getStartSeconds() : fight.getEndSeconds();
   }
 
   private static Long goldChange(FightImportanceDomain importance) {

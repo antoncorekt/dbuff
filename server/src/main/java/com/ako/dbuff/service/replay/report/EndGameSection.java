@@ -8,6 +8,7 @@ import com.ako.dbuff.service.replay.analysis.building.BuildingName;
 import com.ako.dbuff.service.replay.analysis.endgame.EndGameTurningPoint;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.analysis.team.TeamNetWorth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -24,8 +25,6 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class EndGameSection implements ReplayReportSection {
-  private static final int MINUTE_SECONDS = 60;
-
   private final EndGameSummaryRepo summaryRepo;
   private final ReplayReportProperties properties;
 
@@ -74,22 +73,31 @@ public class EndGameSection implements ReplayReportSection {
     String loser = Prettify.teamOf(winner.opponent().name(), yours);
     String end =
         r.getDurationSeconds() == null ? "" : " at " + GameTime.clock(r.getDurationSeconds());
+    if (!Boolean.TRUE.equals(r.getLeadKnown())) {
+      return won + " won" + end + ".";
+    }
     if (r.getPeakLeadSeconds() == null || r.getPeakLeadGold() == null) {
-      // a stored heldSeconds means the net worth was read, so no peak means the loser never led
-      return won + " won" + end + (r.getHeldSeconds() == null ? "." : "; " + loser + " never led.");
+      return won + " won" + end + "; " + loser + " never led.";
+    }
+    if (Boolean.FALSE.equals(r.getLeadLost())) {
+      return "%s won%s although %s still led%s at the last minute."
+          .formatted(
+              won,
+              end,
+              loser,
+              r.getLastLeadGold() == null
+                  ? ""
+                  : " by " + BehaviourWording.gold(r.getLastLeadGold()));
     }
     String lead =
-        "%s %s at %s"
+        "%s at %s"
             .formatted(
-                Boolean.TRUE.equals(r.getThrown()) ? "a lead of" : "led by",
-                BehaviourWording.gold(r.getPeakLeadGold()),
-                GameTime.clock(r.getPeakLeadSeconds()));
+                BehaviourWording.gold(r.getPeakLeadGold()), GameTime.clock(r.getPeakLeadSeconds()));
     String head =
         Boolean.TRUE.equals(r.getThrown())
-            ? "%s threw %s and lost%s".formatted(loser, lead, end)
-            : "%s won%s after %s %s".formatted(won, end, loser, lead);
-    String still = Boolean.FALSE.equals(r.getLeadLost()) ? " and still led at the end" : "";
-    return head + still + turningPoint(r, winner, yours);
+            ? "%s threw a lead of %s and lost%s".formatted(loser, lead, end)
+            : "%s won%s after %s led by %s".formatted(won, end, loser, lead);
+    return head + turningPoint(r, winner, yours);
   }
 
   private static String turningPoint(EndGameSummaryDomain r, TeamSide winner, TeamSide yours) {
@@ -149,8 +157,9 @@ public class EndGameSection implements ReplayReportSection {
   }
 
   private static String window(int seconds) {
-    return seconds % MINUTE_SECONDS == 0
-        ? seconds / MINUTE_SECONDS + (seconds == MINUTE_SECONDS ? " minute" : " minutes")
+    return seconds % TeamNetWorth.STEP_SECONDS == 0
+        ? seconds / TeamNetWorth.STEP_SECONDS
+            + (seconds == TeamNetWorth.STEP_SECONDS ? " minute" : " minutes")
         : seconds + " seconds";
   }
 }

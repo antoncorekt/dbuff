@@ -18,6 +18,7 @@ class EndGameTurningPointTest {
         .fightIndex(index)
         .winningTeam(winner)
         .goldChange(gold)
+        .important(true)
         .build();
   }
 
@@ -81,6 +82,28 @@ class EndGameTurningPointTest {
     assertThat(pick.get().fight().getFightIndex()).isEqualTo(1);
     assertThat(pick.get().conversion()).isNull();
     assertThat(pick.get().goldChange()).isEqualTo(2500);
+  }
+
+  @Test
+  void aFightThatSpansThePeakCounts() {
+    var pick =
+        EndGameTurningPoint.pick(
+            "RADIANT",
+            1010,
+            List.of(
+                FightDomain.builder().fightIndex(5).startSeconds(990.0).endSeconds(1030.0).build()),
+            List.of(swing(5, "RADIANT", 700)),
+            List.of());
+
+    assertThat(pick.get().fight().getFightIndex()).isEqualTo(5);
+  }
+
+  @Test
+  void aSwingFromAFightThatIsNotImportantIsNotTaken() {
+    FightImportanceDomain minor = swing(1, "RADIANT", 5000);
+    minor.setImportant(false);
+
+    assertThat(EndGameTurningPoint.pick("RADIANT", 0, fights, List.of(minor), List.of())).isEmpty();
   }
 
   @Test

@@ -38,7 +38,8 @@ class SectionSwitchContextTest {
           EndGameSection.class,
           OpeningSection.class,
           VisionSection.class,
-          ItemsSection.class);
+          ItemsSection.class,
+          OutliersSection.class);
 
   private static final Set<String> OFF_BY_DEFAULT =
       Set.of(
@@ -50,7 +51,8 @@ class SectionSwitchContextTest {
           "endgame",
           "opening",
           "vision",
-          "items");
+          "items",
+          "outliers");
 
   @Configuration
   @EnableConfigurationProperties(ReplayReportProperties.class)
@@ -108,7 +110,8 @@ class SectionSwitchContextTest {
                       "endgame",
                       "opening",
                       "vision",
-                      "items");
+                      "items",
+                      "outliers");
               assertThat(byName.values())
                   .filteredOn(s -> !OFF_BY_DEFAULT.contains(s.name()))
                   .allMatch(ReplayReportSection::defaultEnabled);

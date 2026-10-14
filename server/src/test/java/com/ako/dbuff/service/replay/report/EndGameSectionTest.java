@@ -24,6 +24,8 @@ class EndGameSectionTest {
         .matchId(1L)
         .winnerTeam("RADIANT")
         .durationSeconds(2480)
+        .leadKnown(true)
+        .lastLeadGold(-5000L)
         .peakLeadSeconds(1450)
         .peakLeadGold(8300L)
         .leadLost(true)
@@ -91,10 +93,18 @@ class EndGameSectionTest {
   }
 
   @Test
-  void aLeadStillHeldAtTheEndIsMentioned() {
-    assertThat(lines(won().leadLost(false).turningSeconds(null).build()).getFirst())
-        .isEqualTo(
-            "Radiant won at 41:20 after Dire led by 8.3k at 24:10 and still led at the end.");
+  void aLeadStillHeldAtTheLastMinuteHasItsOwnWordingWithoutThrow() {
+    assertThat(lines(won().leadLost(false).thrown(false).lastLeadGold(5000L).build()).getFirst())
+        .isEqualTo("Radiant won at 41:20 although Dire still led by 5k at the last minute.");
+  }
+
+  @Test
+  void anUnknownLeadSaysOnlyWhoWon() {
+    EndGameSummaryDomain row =
+        won().leadKnown(false).peakLeadSeconds(null).peakLeadGold(null).build();
+
+    assertThat(lines(row).getFirst()).isEqualTo("Radiant won at 41:20.");
+    assertThat(lines(won().leadKnown(null).build()).getFirst()).isEqualTo("Radiant won at 41:20.");
   }
 
   @Test

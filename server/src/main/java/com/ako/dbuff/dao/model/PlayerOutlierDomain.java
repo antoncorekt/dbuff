@@ -1,5 +1,6 @@
 package com.ako.dbuff.dao.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -45,5 +46,22 @@ public class PlayerOutlierDomain {
 
   private Integer fightsJoined;
   private Integer deaths;
+
+  /**
+   * Game second of the start of the first minute from which his income broke away from the rest of
+   * his team's; null when none did. Null with the next two on rows from before analysis version 2,
+   * until {@code reanalyze} rewrites them.
+   */
+  private Integer incomeBreakSeconds;
+
+  /**
+   * An IncomeSource name: the biggest gold source of his income from the break; null if unknown.
+   */
+  private String mainIncomeSource;
+
+  /** Why, in one plain sentence that names no hero. */
+  @Column(length = 400)
+  private String explanation;
+
   private Integer analysisVersion;
 }

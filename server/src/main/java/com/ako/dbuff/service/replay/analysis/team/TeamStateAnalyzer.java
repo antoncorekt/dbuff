@@ -22,8 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class TeamStateAnalyzer implements ReplayAnalyzer {
-  private static final int STEP_SECONDS = 60;
-
   private final PlayerTimelineRepo timelineRepo;
   private final GameStateSegmentRepo segmentRepo;
   private final ReplayAnalysisProperties properties;
@@ -54,8 +52,9 @@ public class TeamStateAnalyzer implements ReplayAnalyzer {
     }
     TeamStateSegmenter segmenter = new TeamStateSegmenter(properties.teamStateTuning());
     List<GameStateSegmentDomain> rows = new ArrayList<>();
-    rows.addAll(rows(matchId, "RADIANT", segmenter.segment(radiantLead, STEP_SECONDS)));
-    rows.addAll(rows(matchId, "DIRE", segmenter.segment(direLead, STEP_SECONDS)));
+    rows.addAll(
+        rows(matchId, "RADIANT", segmenter.segment(radiantLead, TeamNetWorth.STEP_SECONDS)));
+    rows.addAll(rows(matchId, "DIRE", segmenter.segment(direLead, TeamNetWorth.STEP_SECONDS)));
     segmentRepo.saveAll(rows);
   }
 

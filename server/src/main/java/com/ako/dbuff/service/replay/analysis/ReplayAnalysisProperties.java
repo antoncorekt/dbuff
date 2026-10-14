@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.analysis.death.DeathAssessor;
 import com.ako.dbuff.service.replay.analysis.fight.FightDetector;
 import com.ako.dbuff.service.replay.analysis.spike.SpikeDetector;
 import com.ako.dbuff.service.replay.analysis.team.TeamStateSegmenter;
+import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +15,11 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "replay.analysis")
 public class ReplayAnalysisProperties {
+  private static final int MAX_INCOME_BREAK_MINUTES = 30;
+  private static final int MAX_PERCENT = 100;
+  private static final int MAX_STRETCH_MINUTES = 240;
+  private static final double MAX_INCOME_BREAK_SHARE = 5;
+
   /** A creep last hit up to this long before a sample, or during it, counts the hero as farming. */
   private int activityFarmLookbackSeconds = 10;
 
@@ -108,6 +114,38 @@ public class ReplayAnalysisProperties {
 
   /** ...for at least this many minutes. */
   private int feederMinutes = 5;
+
+  /**
+   * The income breaks from his team's when his gain per minute differs from theirs for this long.
+   */
+  private int incomeBreakMinutes = 3;
+
+  /** ...by at least this share of the teammates' average gain per minute. */
+  private double incomeBreakShare = 0.25;
+
+  /** Fails at startup on an income break setting that could not tell a break from noise. */
+  @PostConstruct
+  void validate() {
+    requireRange("outlier-share-percent", outlierSharePercent, 1, MAX_PERCENT);
+    requireRange("outlier-minutes", outlierMinutes, 1, MAX_STRETCH_MINUTES);
+    requireRange("feeder-share-percent", feederSharePercent, 1, MAX_PERCENT);
+    requireRange("feeder-minutes", feederMinutes, 1, MAX_STRETCH_MINUTES);
+    requireRange("income-break-minutes", incomeBreakMinutes, 1, MAX_INCOME_BREAK_MINUTES);
+    if (!(incomeBreakShare > 0 && incomeBreakShare <= MAX_INCOME_BREAK_SHARE)) {
+      throw new IllegalStateException(
+          "replay.analysis.income-break-share must be above 0 and at most "
+              + MAX_INCOME_BREAK_SHARE
+              + ", got "
+              + incomeBreakShare);
+    }
+  }
+
+  private static void requireRange(String name, int value, int min, int max) {
+    if (value < min || value > max) {
+      throw new IllegalStateException(
+          "replay.analysis." + name + " must be " + min + " to " + max + ", got " + value);
+    }
+  }
 
   public SpikeDetector.Tuning spikeTuning() {
     return new SpikeDetector.Tuning(
