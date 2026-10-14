@@ -119,6 +119,7 @@ The explanations (income drop reasons, Midas payback, key item behind a swing) a
 
 1. This plan (docs).
 2. Rendering seam (`SectionView`, `DiscordRenderer` for Components V2, plain fallback), `important-fights` moved over. Includes the real-channel test of the V2 limits.
+   Built (branch `feature/report-view-seam`): `SectionView`, `PlainViewRenderer`, `ComponentsViewRenderer`, `replay.report.format` (PLAIN default), `important-fights` on views. Still to verify in a real channel: the V2 per-block text limit, the 4000 total and 40 component limits, and how the accent container and "(2/3)" split look; header and thread behaviour belong to step 3.
 3. Stage model: `MatchReportStage`, `HeaderRenderer` and the stage 1 card on the seam from step 2, `RecentMatch` extended, title changes at stages 2 and 3, replay-off and failure paths (`HeaderStatusUpdater`, timeout check before quiet hours), old OpenDota report as on-demand sections (and automatic while replay is off). Includes the real-channel test of header editing and thread creation.
 4. Settings and commands: global default list, per-channel `sections` and `language`, `/match report`, `!report`, cooldown.
 5. Icons: constants `img` field, download and storage, emoji sync job, `discord_icon` table, `IconService` with the fallback chain, used by the card and the sections; heroes, abilities and items.

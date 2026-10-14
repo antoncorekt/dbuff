@@ -24,6 +24,8 @@ import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.metrics.ReplayMetrics;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.GameModeRegistry;
+import com.ako.dbuff.service.replay.report.view.ComponentsViewRenderer;
+import com.ako.dbuff.service.replay.report.view.ReportMessage;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -49,9 +51,6 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class ReplayReportService {
-  private static final String NOTE = "\n_(%d more left out)_";
-  private static final int MESSAGE_LIMIT = 2000;
-
   private final ReplayReportProperties properties;
   private final ReplayProcessingProperties processing;
   private final ReplayParseRunRepo runRepo;
@@ -67,6 +66,7 @@ public class ReplayReportService {
   private final QuietHoursGuard quietHours;
   private final GameModeRegistry modes;
   private final ReplayMetrics metrics;
+  private final ComponentsViewRenderer componentsRenderer;
 
   /** Delivers what is waiting for the matches whose replay run finished lately. */
   public void deliverPending() {
@@ -148,7 +148,7 @@ public class ReplayReportService {
           instance.getId());
       return;
     }
-    List<String> messages = messages(match, stats, instance, settings);
+    List<ReportMessage> messages = messages(match, stats, instance, settings);
     if (messages.isEmpty()) {
       return;
     }
@@ -167,14 +167,20 @@ public class ReplayReportService {
             .messages(messages.size())
             .postedAt(LocalDateTime.now())
             .build());
-    for (String message : messages) {
-      discord.sendThreadMessageBlocking(channel, message);
-    }
+    messages.forEach(message -> send(channel, message));
     metrics.reportPosted();
     log.info("Replay report of match {} posted in {} messages", match.getId(), messages.size());
   }
 
-  private List<String> messages(
+  private void send(ThreadChannel channel, ReportMessage message) {
+    switch (message) {
+      case ReportMessage.Plain plain -> discord.sendThreadMessageBlocking(channel, plain.text());
+      case ReportMessage.Components cards ->
+          discord.sendThreadComponentsBlocking(channel, cards.components());
+    }
+  }
+
+  private List<ReportMessage> messages(
       MatchDomain match,
       List<PlayerMatchStatisticDomain> stats,
       DbufInstanceConfigDomain instance,
@@ -189,39 +195,48 @@ public class ReplayReportService {
       return List.of();
     }
     ReplayReportInput input = input(match, stats, instance);
-    List<Report> reports = new ArrayList<>();
-    sections.stream()
-        .filter(sectionSwitch::isEnabled)
-        .filter(s -> s.supports(mode))
-        .filter(s -> settings.detail().includes(s.minimumDetail()))
-        .sorted(Comparator.comparingInt(ReplayReportSection::order))
-        .forEach(
-            section -> {
-              List<String> lines = section.lines(input);
-              if (!lines.isEmpty()) {
-                reports.add(new TextReport("replay", String.join("\n", lines)));
-              }
-            });
-    if (reports.isEmpty()) {
-      return List.of();
-    }
-    List<String> formatted = formatter.formatForDiscord(reports, Map.of());
+    List<ReplayReportSection> active =
+        sections.stream()
+            .filter(sectionSwitch::isEnabled)
+            .filter(s -> s.supports(mode))
+            .filter(s -> settings.detail().includes(s.minimumDetail()))
+            .sorted(Comparator.comparingInt(ReplayReportSection::order))
+            .toList();
+    List<ReportMessage> all =
+        properties.getFormat() == ReportFormat.COMPONENTS
+            ? components(active, input)
+            : plain(active, input);
     int cap =
         Math.max(
             1,
             settings.detail() == ReportDetail.FULL
                 ? properties.getMaxMessages()
                 : properties.getStandardMaxMessages());
-    if (formatted.size() <= cap) {
-      return formatted;
+    return MessageCap.apply(all, cap);
+  }
+
+  private List<ReportMessage> plain(List<ReplayReportSection> active, ReplayReportInput input) {
+    List<Report> reports = new ArrayList<>();
+    for (ReplayReportSection section : active) {
+      List<String> lines = section.lines(input);
+      if (!lines.isEmpty()) {
+        reports.add(new TextReport("replay", String.join("\n", lines)));
+      }
     }
-    List<String> kept = new ArrayList<>(formatted.subList(0, cap));
-    String note = NOTE.formatted(formatted.size() - cap);
-    String last = kept.get(cap - 1);
-    if (last.length() + note.length() <= MESSAGE_LIMIT) {
-      kept.set(cap - 1, last + note);
+    if (reports.isEmpty()) {
+      return List.of();
     }
-    return kept;
+    return formatter.formatForDiscord(reports, Map.of()).stream()
+        .<ReportMessage>map(ReportMessage.Plain::new)
+        .toList();
+  }
+
+  private List<ReportMessage> components(
+      List<ReplayReportSection> active, ReplayReportInput input) {
+    return active.stream()
+        .flatMap(section -> section.view(input).stream())
+        .flatMap(view -> componentsRenderer.render(view).stream())
+        .toList();
   }
 
   private ReplayReportInput input(

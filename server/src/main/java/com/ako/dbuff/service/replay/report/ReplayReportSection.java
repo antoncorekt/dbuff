@@ -2,7 +2,10 @@ package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * One part of the replay analysis posted in a match thread. A section reads the tables the replay
@@ -37,4 +40,15 @@ public interface ReplayReportSection {
 
   /** The text of the section, empty when there is nothing worth saying. */
   List<String> lines(ReplayReportInput input);
+
+  /**
+   * The section as a view for the renderers. A section that has not moved to views shows its lines
+   * as bullets of an untitled card.
+   */
+  default Optional<SectionView> view(ReplayReportInput input) {
+    List<String> lines = lines(input);
+    return lines.isEmpty()
+        ? Optional.empty()
+        : Optional.of(new SectionView("", null, Accent.INFO, lines, null));
+  }
 }

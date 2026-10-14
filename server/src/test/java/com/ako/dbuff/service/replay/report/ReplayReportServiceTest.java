@@ -36,12 +36,17 @@ import com.ako.dbuff.service.replay.metrics.ReplayMetrics;
 import com.ako.dbuff.service.replay.metrics.ReplayRunCounts;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.TestModes;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.ComponentsViewRenderer;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import net.dv8tion.jda.api.components.MessageTopLevelComponent;
+import net.dv8tion.jda.api.components.container.Container;
+import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -102,7 +107,8 @@ class ReplayReportServiceTest {
             discord,
             quiet,
             TestModes.registry(),
-            new ReplayMetrics(registry, mock(ReplayRunCounts.class)));
+            new ReplayMetrics(registry, mock(ReplayRunCounts.class)),
+            new ComponentsViewRenderer());
     when(matchRepo.findById(1L))
         .thenReturn(Optional.of(MatchDomain.builder().id(1L).gameModeId(18L).build()));
     when(statRepo.findAllByMatchId(1L))
@@ -184,7 +190,8 @@ class ReplayReportServiceTest {
             discord,
             quiet,
             TestModes.registry(),
-            new ReplayMetrics(registry, mock(ReplayRunCounts.class)));
+            new ReplayMetrics(registry, mock(ReplayRunCounts.class)),
+            new ComponentsViewRenderer());
     when(matchRepo.findById(2L))
         .thenReturn(Optional.of(MatchDomain.builder().id(2L).gameModeId(22L).build()));
     when(statRepo.findAllByMatchId(2L))
@@ -235,7 +242,8 @@ class ReplayReportServiceTest {
         discord,
         quiet,
         TestModes.registry(),
-        new ReplayMetrics(registry, mock(ReplayRunCounts.class)));
+        new ReplayMetrics(registry, mock(ReplayRunCounts.class)),
+        new ComponentsViewRenderer());
   }
 
   private static ReplayReportSection named(String name, boolean defaultEnabled) {
@@ -608,5 +616,116 @@ class ReplayReportServiceTest {
 
     assertThat(registry.get("dbuff.replay.report.posted").counter().count()).isEqualTo(1);
     assertThat(registry.find("dbuff.replay.report.skipped").counters()).isEmpty();
+  }
+
+  @Test
+  void format_isPlainByDefault() {
+    assertThat(new ReplayReportProperties().getFormat()).isEqualTo(ReportFormat.PLAIN);
+    new ReplayReportProperties().validate();
+  }
+
+  @Test
+  void validate_rejectsANullFormat() {
+    ReplayReportProperties bad = new ReplayReportProperties();
+    bad.setFormat(null);
+
+    assertThatThrownBy(bad::validate)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("replay.report.format");
+  }
+
+  @Test
+  void format_bindsFromTheYamlForm() {
+    ReplayReportProperties bound =
+        new org.springframework.boot.context.properties.bind.Binder(
+                new org.springframework.boot.context.properties.source
+                    .MapConfigurationPropertySource(
+                    java.util.Map.of("replay.report.format", "components")))
+            .bindOrCreate("replay.report", ReplayReportProperties.class);
+
+    assertThat(bound.getFormat()).isEqualTo(ReportFormat.COMPONENTS);
+  }
+
+  @Test
+  void deliver_plainFormatPostsExactlyTheFormattedTextOfTheSectionLines() {
+    service = serviceWith(named("alpha", true), named("beta", true));
+
+    service.deliver(1L);
+
+    ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
+    verify(discord, Mockito.times(2)).sendThreadMessageBlocking(Mockito.eq(thread), text.capture());
+    assertThat(text.getAllValues())
+        .containsExactly("**alpha**\n10:00: line of alpha", "**beta**\n10:00: line of beta");
+    verify(discord, never()).sendThreadComponentsBlocking(any(), any());
+  }
+
+  @Test
+  void deliver_plainFormatCapsLongReportsWithTheLeftOutNote() {
+    properties.setMaxMessages(1);
+    service = serviceWith(longSection("alpha"), longSection("beta"), longSection("gamma"));
+
+    service.deliver(1L);
+
+    ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
+    verify(discord, Mockito.times(1)).sendThreadMessageBlocking(Mockito.eq(thread), text.capture());
+    assertThat(text.getValue()).contains("more left out").hasSizeLessThanOrEqualTo(2000);
+  }
+
+  private static ReplayReportSection longSection(String name) {
+    return new ReplaySection() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public int order() {
+        return name.charAt(0);
+      }
+
+      @Override
+      public List<String> lines(ReplayReportInput input) {
+        return java.util.stream.IntStream.range(0, 12)
+            .mapToObj(i -> name + "x".repeat(150))
+            .toList();
+      }
+    };
+  }
+
+  @Test
+  void deliver_componentsFormatPostsOneCardPerSectionInOrder() {
+    properties.setFormat(ReportFormat.COMPONENTS);
+    service = serviceWith(named("alpha", true), named("beta", true));
+
+    service.deliver(1L);
+
+    ArgumentCaptor<List<MessageTopLevelComponent>> cards = ArgumentCaptor.forClass(List.class);
+    verify(discord, Mockito.times(2))
+        .sendThreadComponentsBlocking(Mockito.eq(thread), cards.capture());
+    verify(discord, never()).sendThreadMessageBlocking(any(), any());
+    assertThat(cards.getAllValues()).hasSize(2);
+    assertThat(cards.getAllValues().get(0).get(0)).isInstanceOf(Container.class);
+    assertThat(((Container) cards.getAllValues().get(0).get(0)).getAccentColorRaw())
+        .isEqualTo(Accent.INFO.rgb());
+    ArgumentCaptor<ReplayReportPostedDomain> posted =
+        ArgumentCaptor.forClass(ReplayReportPostedDomain.class);
+    verify(postedRepo).save(posted.capture());
+    assertThat(posted.getValue().getMessages()).isEqualTo(2);
+  }
+
+  @Test
+  void deliver_componentsFormatHonoursTheCapAndAddsTheLeftOutNote() {
+    properties.setFormat(ReportFormat.COMPONENTS);
+    properties.setMaxMessages(2);
+    service = serviceWith(named("a", true), named("b", true), named("c", true), named("d", true));
+
+    service.deliver(1L);
+
+    ArgumentCaptor<List<MessageTopLevelComponent>> cards = ArgumentCaptor.forClass(List.class);
+    verify(discord, Mockito.times(2))
+        .sendThreadComponentsBlocking(Mockito.eq(thread), cards.capture());
+    List<MessageTopLevelComponent> last = cards.getAllValues().get(1);
+    assertThat(((TextDisplay) last.get(last.size() - 1)).getContent())
+        .isEqualTo("_(2 more left out)_");
   }
 }

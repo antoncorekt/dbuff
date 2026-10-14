@@ -7,6 +7,9 @@ import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.LostFight;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.RankedReason;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -143,6 +146,53 @@ class ImportantFightsSectionTest {
         .contains("10:00 Dire (your team) won the fight, 1.2k net worth swing");
     assertThat(section.lines(input(2L, 130L)))
         .contains("10:00 Dire won the fight, 1.2k net worth swing");
+  }
+
+  @Test
+  void viewTellsTheTrackedTeamsScoreAndColoursTheCard() {
+    stored(
+        fight(1, 600, "DIRE", 1200L, false),
+        fight(2, 900, "DIRE", 1200L, false),
+        fight(3, 1200, "RADIANT", 1200L, false));
+
+    SectionView lost = section.view(input(0L)).orElseThrow();
+    assertThat(lost.title()).isEqualTo("Important fights");
+    assertThat(lost.verdict()).isEqualTo("Radiant (your team) won 1 of 3");
+    assertThat(lost.accent()).isEqualTo(Accent.LOSS);
+    assertThat(lost.bullets()).hasSize(3);
+
+    SectionView won = section.view(input(130L)).orElseThrow();
+    assertThat(won.verdict()).isEqualTo("Dire (your team) won 2 of 3");
+    assertThat(won.accent()).isEqualTo(Accent.WIN);
+  }
+
+  @Test
+  void viewIsNeutralWhenTheTrackedTeamSplitsOrBothTeamsAreTracked() {
+    stored(fight(1, 600, "DIRE", 1200L, false), fight(2, 900, "RADIANT", 1200L, false));
+
+    assertThat(section.view(input(0L)).orElseThrow().accent()).isEqualTo(Accent.NEUTRAL);
+    SectionView both = section.view(input(2L, 130L)).orElseThrow();
+    assertThat(both.accent()).isEqualTo(Accent.NEUTRAL);
+    assertThat(both.verdict()).isEqualTo("Radiant won 1 of 2");
+  }
+
+  @Test
+  void linesAreTheViewThroughThePlainRenderer() {
+    stored(fight(1, 600, "RADIANT", 1200L, false));
+
+    SectionView view = section.view(input(0L)).orElseThrow();
+
+    assertThat(section.lines(input(0L)))
+        .isEqualTo(new PlainViewRenderer().lines(view))
+        .startsWith("**Important fights**");
+    assertThat(section.view(input(0L))).isPresent();
+  }
+
+  @Test
+  void viewIsEmptyWithoutImportantFights() {
+    when(reader.importantFights(1L)).thenReturn(List.of());
+
+    assertThat(section.view(input(0L))).isEmpty();
   }
 
   @Test

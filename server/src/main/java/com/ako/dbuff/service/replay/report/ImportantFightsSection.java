@@ -6,11 +6,15 @@ import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.LostFight;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -23,6 +27,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ImportantFightsSection implements ReplayReportSection {
   private static final int MAX_REASONS = 2;
+  private static final PlainViewRenderer PLAIN = new PlainViewRenderer();
 
   private final FightExplanationReader explanationReader;
   private final ReportHeroNames heroNames;
@@ -46,12 +51,17 @@ public class ImportantFightsSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return view(input).map(PLAIN::lines).orElse(List.of());
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
     List<LostFight> important =
         explanationReader.importantFights(input.matchId()).stream()
             .filter(l -> Enums.find(TeamSide.class, l.importance().getWinningTeam()) != null)
             .toList();
     if (important.isEmpty()) {
-      return List.of();
+      return Optional.empty();
     }
     List<LostFight> listed =
         important.stream()
@@ -67,13 +77,45 @@ public class ImportantFightsSection implements ReplayReportSection {
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     List<String> lines = new ArrayList<>();
-    lines.add("**Important fights**");
     for (LostFight fight : listed) {
       int index = fight.fight().getFightIndex();
       LostFight full = withReasons.getOrDefault(index, fight);
       lines.add(line(fight, full, heroes, yours));
     }
-    return lines;
+    return Optional.of(
+        new SectionView(
+            "Important fights", verdict(listed, yours), accent(listed, yours), lines, null));
+  }
+
+  private static long wonBy(List<LostFight> fights, TeamSide side) {
+    return fights.stream()
+        .filter(l -> Enums.find(TeamSide.class, l.importance().getWinningTeam()) == side)
+        .count();
+  }
+
+  private static String verdict(List<LostFight> fights, TeamSide yours) {
+    TeamSide side = yours;
+    if (side == null) {
+      side =
+          wonBy(fights, TeamSide.RADIANT) >= wonBy(fights, TeamSide.DIRE)
+              ? TeamSide.RADIANT
+              : TeamSide.DIRE;
+    }
+    return String.format(
+        Locale.ROOT,
+        "%s won %d of %d",
+        Prettify.teamOf(side.name(), yours),
+        wonBy(fights, side),
+        fights.size());
+  }
+
+  private static Accent accent(List<LostFight> fights, TeamSide yours) {
+    if (yours == null) {
+      return Accent.NEUTRAL;
+    }
+    long won = wonBy(fights, yours);
+    long lost = fights.size() - won;
+    return won > lost ? Accent.WIN : won < lost ? Accent.LOSS : Accent.NEUTRAL;
   }
 
   /** The tenths of a thousand gold the fight moved, 0 when too small to tell, -1 when unknown. */

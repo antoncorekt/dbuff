@@ -1,8 +1,10 @@
 package com.ako.dbuff.service.discord;
 
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.components.MessageTopLevelComponent;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
@@ -61,6 +63,15 @@ public class DiscordMessageService {
    */
   public Message sendThreadMessageBlocking(ThreadChannel thread, String message) {
     return thread.sendMessage(message).complete();
+  }
+
+  /**
+   * Sends Components V2 to a thread and waits for completion; the message then carries only the
+   * components.
+   */
+  public Message sendThreadComponentsBlocking(
+      ThreadChannel thread, List<MessageTopLevelComponent> components) {
+    return thread.sendMessageComponents(components).useComponentsV2(true).complete();
   }
 
   public ThreadChannel getThreadById(long threadId) {
