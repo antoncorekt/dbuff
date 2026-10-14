@@ -84,7 +84,7 @@ public class TextCommandAdapter extends ListenerAdapter {
   }
 
   /**
-   * Replaces the old silent fall-through to help, which made {@code dbuf add-player 123} look like
+   * Replaces the old silent fall-through to help, which made {@code !dbuf add-player 123} look like
    * it had partly worked.
    */
   private void replyUnknownSubcommand(Message message, DbuffCommand command, String subcommand) {

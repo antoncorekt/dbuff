@@ -14,20 +14,29 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "discord.commands")
 public class TextCommandProperties {
 
-  private static final Pattern VALID_PREFIX = Pattern.compile("(?!/)\\S{1,3}");
-
-  /** One to three non-whitespace characters, not starting with {@code /} (slash commands). */
-  private String textPrefix = "!";
+  private static final String DEFAULT_PREFIX = "!";
+  private static final Pattern VALID_PREFIX = Pattern.compile("(?!/)[^\\p{L}\\p{N}\\s]{1,3}");
 
   /**
-   * Rejects an invalid value at binding time, so the application fails to start instead of running
-   * with a prefix that can never match or that collides with slash commands.
+   * One to three characters that are neither letters, digits nor whitespace, not starting with
+   * {@code /} (slash commands). A blank or unset value falls back to the default {@code !}.
+   */
+  private String textPrefix = DEFAULT_PREFIX;
+
+  /**
+   * Rejects an invalid non-blank value at binding time, so the application fails to start instead
+   * of running with a prefix that collides with slash commands or ordinary chat. A blank value (for
+   * example {@code DISCORD_COMMANDS_TEXT_PREFIX=} in a deploy file) keeps the default.
    */
   public void setTextPrefix(String textPrefix) {
-    if (textPrefix == null || !VALID_PREFIX.matcher(textPrefix).matches()) {
+    if (textPrefix == null || textPrefix.isBlank()) {
+      this.textPrefix = DEFAULT_PREFIX;
+      return;
+    }
+    if (!VALID_PREFIX.matcher(textPrefix).matches()) {
       throw new IllegalArgumentException(
-          "discord.commands.text-prefix must be 1-3 non-whitespace characters not starting with"
-              + " '/', was: '"
+          "discord.commands.text-prefix must be 1-3 characters, none a letter, digit or whitespace,"
+              + " not starting with '/', was: '"
               + textPrefix
               + "'");
     }

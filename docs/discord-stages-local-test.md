@@ -39,6 +39,8 @@ mkdir -p $REPLAY_PROCESSING_TEMP_DIR
 java --enable-preview -jar server/build/libs/server-0.0.1-SNAPSHOT.jar
 ```
 
+The `~` export lives only in this terminal. If you start the app from another one and forget it, the prefix is `!` again and both bots answer `!rerun`.
+
 Do not use `./gradlew :server:bootRun` for this: the build passes `--enable-preview` to the compiler and to the test tasks only, `bootRun` has no such argument, and the class files of `MatchProcessorService`, `MatchCompletenessService` and `ProcessContext` are marked as preview classes (checked with their class file version), so the JVM refuses to load them without the flag. Production starts the jar the same way (`java --enable-preview -jar`, see `infrastructure/cloudformation/template.yaml`). The jar name was checked by building it.
 
 Instead of `export`, the same `NAME=value` lines can go into a `.env` file in the repository root (it is git-ignored and the build includes `spring-dotenv`); I did not run that route.
@@ -125,10 +127,10 @@ These are the checks nobody has done in a real channel. Write what you see in th
 | 11 | Whether the note after a card is accepted | no WARN `Components of the replay report ... rejected` | | |
 | 12 | The report posted again by `~rerun` | the same sections as before, no duplicates inside one run, quiet hours ignored | | |
 | 13 | Standard detail posts at most 2 messages, full at most 4 | counts as stated | | |
-| 14 | Switch off (restart without `DISCORD_REPORT_STAGES_ENABLED`) | `~rerun` replies as before, no refresh, no repost | | |
+| 14 | Switch off (restart without `DISCORD_REPORT_STAGES_ENABLED`; unset `DISCORD_COMMANDS_TEXT_PREFIX` too only if you want the `!` form back) | `~rerun` replies as before, no refresh, no repost | | |
 
 Log lines to look at (the terminal that runs the jar): `Stage 1 sent for match`, `Replay run for match`, `Replay report of match <id> posted in <n> messages`, and the WARN lines for failures (`Stage 1 of match`, `Replay title of match`, `Header refresh of match`, `Could not edit header message`, `Header components ... rejected`).
 
 ## 10. Switch it off again
 
-Stop the app, unset the variables (or open a new terminal) and start it as usual: with `DISCORD_REPORT_STAGES_ENABLED` false, new matches get the old plain header and no title edits or reposts run. A thread whose header is staged keeps being editable only through the staged code, which is off then.
+Stop the app, unset the variables (or open a new terminal; the `~` prefix export lives only in the terminal you set it in, and starting the app without it makes both bots answer `!rerun`) and start it as usual: with `DISCORD_REPORT_STAGES_ENABLED` false, new matches get the old plain header and no title edits or reposts run. A thread whose header is staged keeps being editable only through the staged code, which is off then.
