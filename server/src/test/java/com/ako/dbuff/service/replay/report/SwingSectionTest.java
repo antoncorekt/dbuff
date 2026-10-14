@@ -32,7 +32,13 @@ class SwingSectionTest {
   private final ReportHeroNames heroNames = mock(ReportHeroNames.class);
   private final ReplayReportProperties properties = new ReplayReportProperties();
   private final SwingSection section =
-      new SwingSection(spikeRepo, factorRepo, reader, heroNames, properties);
+      new SwingSection(
+          spikeRepo,
+          factorRepo,
+          reader,
+          heroNames,
+          new ReasonWording(Prettify::ability),
+          properties);
 
   SwingSectionTest() {
     when(reader.read(anyLong(), anyInt(), anyInt()))

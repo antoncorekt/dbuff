@@ -13,30 +13,32 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.springframework.stereotype.Component;
 
 /**
  * A stored fight reason as a phrase in a sentence: a player reason starts with the hero, a team
  * reason with "the team". Most evidence is an internal note (a presence name, ability names), so
  * the phrase is chosen by code and the evidence only fills in what the code leaves open.
  */
-public final class ReasonWording {
+@Component
+public class ReasonWording {
   private static final String TEAM = "the team";
   private static final String TEAM_REASON = "TEAM";
   private static final String ENEMY_RUNE = "ENEMY_RUNE_ADVANTAGE";
   private static final Pattern ABOUT_A_TEAM = Pattern.compile("^(Radiant|Dire) ");
   private static final Pattern FARMING = Pattern.compile("was (farming [a-z ]+?) when");
 
-  private static final Map<String, Function<String, String>> PLAYER_PHRASES =
+  private final Map<String, Function<String, String>> playerPhrases =
       Map.ofEntries(
           Map.entry("NO_TP", e -> "had no teleport"),
           Map.entry("TP_ON_COOLDOWN", e -> "had the teleport on cooldown"),
           Map.entry("HAD_TP_NOT_USED", e -> "had a teleport and did not use it"),
-          Map.entry("NO_MANA", ReasonWording::outOfMana),
-          Map.entry("ABILITY_ON_COOLDOWN", ReasonWording::onCooldown),
-          Map.entry("ITEM_ON_COOLDOWN", ReasonWording::onCooldown),
+          Map.entry("NO_MANA", this::outOfMana),
+          Map.entry("ABILITY_ON_COOLDOWN", this::onCooldown),
+          Map.entry("ITEM_ON_COOLDOWN", this::onCooldown),
           Map.entry("CARRY_FARMING_ELSEWHERE", ReasonWording::farming),
           Map.entry("SUPPORT_ABSENT", e -> "was not in the fight"),
-          Map.entry("RUNE_ADVANTAGE", ReasonWording::tookRune),
+          Map.entry("RUNE_ADVANTAGE", this::tookRune),
           Map.entry("DIED_FIRST", e -> "died first"),
           Map.entry("BKB_READY_UNUSED", e -> "died with Black King Bar ready"),
           Map.entry("BKB_ON_COOLDOWN", e -> "died with Black King Bar on cooldown"),
@@ -50,14 +52,18 @@ public final class ReasonWording {
           Map.entry("OUT_OF_POSITION", e -> "stood too far in front"),
           Map.entry("NO_BKB", e -> "had no Black King Bar"));
 
-  private ReasonWording() {}
+  private final AbilityLabels labels;
 
-  public static String phrase(FightReasonDomain reason, String hero) {
+  public ReasonWording(AbilityLabels labels) {
+    this.labels = labels;
+  }
+
+  public String phrase(FightReasonDomain reason, String hero) {
     if (TEAM_REASON.equals(reason.getScope())) {
       return teamPhrase(reason.getCode(), reason.getEvidence());
     }
     String evidence = reason.getEvidence() == null ? "" : reason.getEvidence().trim();
-    Function<String, String> known = PLAYER_PHRASES.get(reason.getCode());
+    Function<String, String> known = playerPhrases.get(reason.getCode());
     if (known != null) {
       return hero + " " + known.apply(evidence);
     }
@@ -72,7 +78,7 @@ public final class ReasonWording {
    * The phrase of a reason with its hero looked up by slot; empty for a player reason whose hero is
    * not known.
    */
-  public static Optional<String> phrase(FightReasonDomain reason, Map<Long, String> heroes) {
+  public Optional<String> phrase(FightReasonDomain reason, Map<Long, String> heroes) {
     String hero = reason.getSubjectSlot() == null ? null : heroes.get(reason.getSubjectSlot());
     if (hero == null && !TEAM_REASON.equals(reason.getScope())) {
       return Optional.empty();
@@ -81,7 +87,7 @@ public final class ReasonWording {
   }
 
   /** The first {@code limit} ranked reasons that can be worded, joined with commas. */
-  public static String ranked(List<RankedReason> reasons, Map<Long, String> heroes, int limit) {
+  public String ranked(List<RankedReason> reasons, Map<Long, String> heroes, int limit) {
     return reasons.stream()
         .filter(RankedReason::ranked)
         .map(r -> phrase(r.reason(), heroes))
@@ -90,7 +96,7 @@ public final class ReasonWording {
         .collect(Collectors.joining(", "));
   }
 
-  private static String teamPhrase(String code, String evidence) {
+  private String teamPhrase(String code, String evidence) {
     if (ENEMY_RUNE.equals(code)) {
       List<RuneEvidence> runes = RuneEvidence.parseAll(evidence);
       return runes.isEmpty()
@@ -115,7 +121,7 @@ public final class ReasonWording {
     return TEAM + (has ? " had " : ": ") + words;
   }
 
-  private static String tookRune(String evidence) {
+  private String tookRune(String evidence) {
     List<RuneEvidence> runes = RuneEvidence.parseAll(evidence);
     if (runes.isEmpty()) {
       return "had a rune effect";
@@ -130,21 +136,21 @@ public final class ReasonWording {
     return "aeiou".indexOf(word.charAt(0)) >= 0 ? "an" : "a";
   }
 
-  private static String outOfMana(String evidence) {
+  private String outOfMana(String evidence) {
     String names = abilities(evidence);
     return names.isEmpty() ? "ran out of mana" : "was out of mana for " + names;
   }
 
-  private static String onCooldown(String evidence) {
+  private String onCooldown(String evidence) {
     String names = abilities(evidence);
     return names.isEmpty() ? "had an ability on cooldown" : "had " + names + " on cooldown";
   }
 
-  private static String abilities(String evidence) {
+  private String abilities(String evidence) {
     return Arrays.stream(evidence.split(","))
         .map(String::trim)
         .filter(name -> !name.isEmpty())
-        .map(Prettify::ability)
+        .map(labels::label)
         .collect(Collectors.joining(" and "));
   }
 

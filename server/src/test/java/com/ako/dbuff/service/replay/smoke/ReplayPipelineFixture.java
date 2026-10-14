@@ -18,6 +18,7 @@ import com.ako.dbuff.dao.repo.TeamfightRepo;
 import com.ako.dbuff.dao.repo.WardEventRepo;
 import com.ako.dbuff.dotapi.invoker.JSON;
 import com.ako.dbuff.dotapi.model.MatchResponse;
+import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.constant.data.ItemConstant;
@@ -26,6 +27,8 @@ import com.ako.dbuff.service.match.data.WardEventMapper;
 import com.ako.dbuff.service.replay.AbilityNames;
 import com.ako.dbuff.service.replay.analysis.item.ItemKits;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
+import com.ako.dbuff.service.replay.report.AbilityLabels;
+import com.ako.dbuff.service.replay.report.ConstantAbilityLabels;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,6 +46,9 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * What a test that runs a fixture replay through the pipeline needs: a local HTTP server standing
@@ -150,6 +156,36 @@ public abstract class ReplayPipelineFixture {
       return key ->
           Optional.ofNullable(items == null ? null : items.get(key))
               .map(n -> lenient.convertValue(n, ItemConstant.class));
+    }
+
+    /** The real label logic over the fixture's hero and ability constants. */
+    @Bean
+    AbilityLabels abilityLabels() throws IOException {
+      ObjectMapper lenient =
+          new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+      Map<String, AbilityConstant> abilities = new HashMap<>();
+      Map<String, HeroConstant> heroes = new HashMap<>();
+      JsonNode abilityJson = constants("constants-abilities.json");
+      if (abilityJson != null) {
+        abilityJson
+            .fields()
+            .forEachRemaining(
+                e ->
+                    abilities.put(
+                        e.getKey(), lenient.convertValue(e.getValue(), AbilityConstant.class)));
+      }
+      JsonNode heroJson = constants("constants-heroes.json");
+      if (heroJson != null) {
+        heroJson
+            .fields()
+            .forEachRemaining(
+                e ->
+                    heroes.put(e.getKey(), lenient.convertValue(e.getValue(), HeroConstant.class)));
+      }
+      ConstantsManagers constants = mock(ConstantsManagers.class);
+      when(constants.getAllAbilityConstants()).thenReturn(abilities);
+      when(constants.getHeroConstantMap()).thenReturn(heroes);
+      return new ConstantAbilityLabels(constants);
     }
 
     private static JsonNode constants(String file) throws IOException {

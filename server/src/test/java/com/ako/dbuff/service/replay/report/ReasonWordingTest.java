@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ReasonWordingTest {
+  private static final ReasonWording WORDING = new ReasonWording(Prettify::ability);
 
   private static FightReasonDomain player(String code, String evidence) {
     return FightReasonDomain.builder().scope("PLAYER").code(code).evidence(evidence).build();
@@ -25,9 +26,9 @@ class ReasonWordingTest {
 
   @Test
   void phrase_startsAPlayerReasonWithTheHero() {
-    assertThat(ReasonWording.phrase(player("NO_TP", "ABSENT_ALIVE"), "Venomancer"))
+    assertThat(WORDING.phrase(player("NO_TP", "ABSENT_ALIVE"), "Venomancer"))
         .isEqualTo("Venomancer had no teleport");
-    assertThat(ReasonWording.phrase(player("DIED_FIRST", "died at 23:10 to x"), "Sven"))
+    assertThat(WORDING.phrase(player("DIED_FIRST", "died at 23:10 to x"), "Sven"))
         .isEqualTo("Sven died first");
   }
 
@@ -35,74 +36,70 @@ class ReasonWordingTest {
   void phrase_takesWhatTheFarmingEvidenceSays() {
     String evidence = "carry was farming a lane when the fight began and stayed out of it";
 
-    assertThat(ReasonWording.phrase(player("CARRY_FARMING_ELSEWHERE", evidence), "Terrorblade"))
+    assertThat(WORDING.phrase(player("CARRY_FARMING_ELSEWHERE", evidence), "Terrorblade"))
         .isEqualTo("Terrorblade was farming a lane");
-    assertThat(ReasonWording.phrase(player("CARRY_FARMING_ELSEWHERE", "odd"), "Terrorblade"))
+    assertThat(WORDING.phrase(player("CARRY_FARMING_ELSEWHERE", "odd"), "Terrorblade"))
         .isEqualTo("Terrorblade was farming elsewhere");
   }
 
   @Test
   void phrase_namesTheAbilitiesFromTheEvidence() {
     assertThat(
-            ReasonWording.phrase(
-                player("ITEM_ON_COOLDOWN", " item_black_king_bar, item_blink "), "Axe"))
+            WORDING.phrase(player("ITEM_ON_COOLDOWN", " item_black_king_bar, item_blink "), "Axe"))
         .isEqualTo("Axe had Black King Bar and Blink on cooldown");
   }
 
   @Test
   void phrase_wordsATeamReasonFromItsToken() {
-    assertThat(ReasonWording.phrase(team("NO_DISABLE"), "ignored"))
-        .isEqualTo("the team had no disable");
-    assertThat(ReasonWording.phrase(team("CARRIES_2"), "ignored"))
-        .isEqualTo("the team had 2 carries");
-    assertThat(ReasonWording.phrase(team("TOP_HEAVY"), "ignored"))
+    assertThat(WORDING.phrase(team("NO_DISABLE"), "ignored")).isEqualTo("the team had no disable");
+    assertThat(WORDING.phrase(team("CARRIES_2"), "ignored")).isEqualTo("the team had 2 carries");
+    assertThat(WORDING.phrase(team("TOP_HEAVY"), "ignored"))
         .isEqualTo("the team: everyone wants the farm");
   }
 
   @Test
   void phrase_wordsATeamReasonThatIsNoCompositionTokenFromItsEvidence() {
     assertThat(
-            ReasonWording.phrase(
+            WORDING.phrase(
                 teamWith(
                     "WEAK_COMBINATION",
                     " Radiant drafted skills whose best player reaches only: x "),
                 "ignored"))
         .isEqualTo("Radiant drafted skills whose best player reaches only: x");
     assertThat(
-            ReasonWording.phrase(
+            WORDING.phrase(
                 teamWith("STRONG_SKILL_LEFT", "strong skills nobody drafted: a (b)"), "ignored"))
         .isEqualTo("the team: strong skills nobody drafted: a (b)");
-    assertThat(ReasonWording.phrase(teamWith("NEW_MODE_CODE", "short note"), "ignored"))
+    assertThat(WORDING.phrase(teamWith("NEW_MODE_CODE", "short note"), "ignored"))
         .isEqualTo("the team: short note");
-    assertThat(ReasonWording.phrase(teamWith("WEAK_COMBINATION", null), "ignored"))
+    assertThat(WORDING.phrase(teamWith("WEAK_COMBINATION", null), "ignored"))
         .isEqualTo("the team had a gap");
   }
 
   @Test
   void phrase_fallsBackToTheTrimmedEvidenceForAnUnknownCode() {
-    assertThat(ReasonWording.phrase(player("NEW_CODE", "  something odd "), "Sven"))
+    assertThat(WORDING.phrase(player("NEW_CODE", "  something odd "), "Sven"))
         .isEqualTo("Sven: something odd");
-    assertThat(ReasonWording.phrase(player("NEW_CODE", null), "Sven")).isEqualTo("Sven new code");
+    assertThat(WORDING.phrase(player("NEW_CODE", null), "Sven")).isEqualTo("Sven new code");
   }
 
   @Test
   void phrase_dropsTheAbilityListWhenTheEvidenceIsBlank() {
-    assertThat(ReasonWording.phrase(player("NO_MANA", " "), "Axe"))
-        .isEqualTo("Axe ran out of mana");
-    assertThat(ReasonWording.phrase(player("ABILITY_ON_COOLDOWN", null), "Axe"))
+    assertThat(WORDING.phrase(player("NO_MANA", " "), "Axe")).isEqualTo("Axe ran out of mana");
+    assertThat(WORDING.phrase(player("ABILITY_ON_COOLDOWN", null), "Axe"))
         .isEqualTo("Axe had an ability on cooldown");
   }
 
   @Test
   void phrase_survivesATeamReasonWithNoCode() {
-    assertThat(ReasonWording.phrase(teamWith(null, null), "x")).isEqualTo("the team had a gap");
-    assertThat(ReasonWording.phrase(teamWith("", " "), "x")).isEqualTo("the team had a gap");
+    assertThat(WORDING.phrase(teamWith(null, null), "x")).isEqualTo("the team had a gap");
+    assertThat(WORDING.phrase(teamWith("", " "), "x")).isEqualTo("the team had a gap");
   }
 
   @Test
   void phrase_doesNotRepeatTheHeroWhenTheEvidenceStartsWithIt() {
     assertThat(
-            ReasonWording.phrase(
+            WORDING.phrase(
                 player("INTENT_NOT_PLAYED", "Sven was drafted as offlane and played hard support"),
                 "Sven"))
         .isEqualTo("Sven was drafted as offlane and played hard support");
@@ -114,16 +111,16 @@ class ReasonWordingTest {
         "double damage rune taken at 5:20 by Windrunner, 40 s from the fight start, active in the"
             + " fight";
 
-    assertThat(ReasonWording.phrase(player("RUNE_ADVANTAGE", evidence), "Windrunner"))
+    assertThat(WORDING.phrase(player("RUNE_ADVANTAGE", evidence), "Windrunner"))
         .isEqualTo("Windrunner took a double damage rune 40 s before the fight");
     assertThat(
-            ReasonWording.phrase(
+            WORDING.phrase(
                 player(
                     "RUNE_ADVANTAGE",
                     evidence.replace("double damage", "arcane").replace("40 s", "-12 s")),
                 "Windrunner"))
         .isEqualTo("Windrunner took an arcane rune 12 s into the fight");
-    assertThat(ReasonWording.phrase(player("RUNE_ADVANTAGE", "odd"), "Windrunner"))
+    assertThat(WORDING.phrase(player("RUNE_ADVANTAGE", "odd"), "Windrunner"))
         .isEqualTo("Windrunner had a rune effect");
   }
 
@@ -132,9 +129,9 @@ class ReasonWordingTest {
     String evidence =
         "haste rune taken at 5:20 by Windrunner, 10 s from the fight start, active in the fight";
 
-    assertThat(ReasonWording.phrase(teamWith("ENEMY_RUNE_ADVANTAGE", evidence), "ignored"))
+    assertThat(WORDING.phrase(teamWith("ENEMY_RUNE_ADVANTAGE", evidence), "ignored"))
         .isEqualTo("the enemy Windrunner took a haste rune 10 s before the fight");
-    assertThat(ReasonWording.phrase(teamWith("ENEMY_RUNE_ADVANTAGE", "odd"), "ignored"))
+    assertThat(WORDING.phrase(teamWith("ENEMY_RUNE_ADVANTAGE", "odd"), "ignored"))
         .isEqualTo("the team: the enemy had a rune effect");
   }
 
@@ -146,15 +143,33 @@ class ReasonWordingTest {
         "arcane rune taken at 5:25 by Axe, 5 s from the fight start, active in the fight";
 
     assertThat(
-            ReasonWording.phrase(
+            WORDING.phrase(
                 player("RUNE_ADVANTAGE", first + "; " + first.replace("haste", "shield")),
                 "Windrunner"))
         .isEqualTo(
             "Windrunner took a haste rune 10 s before the fight and a shield rune 10 s before the"
                 + " fight");
-    assertThat(ReasonWording.phrase(teamWith("ENEMY_RUNE_ADVANTAGE", first + "; " + second), "x"))
+    assertThat(WORDING.phrase(teamWith("ENEMY_RUNE_ADVANTAGE", first + "; " + second), "x"))
         .isEqualTo(
             "the enemy Windrunner took a haste rune 10 s before the fight, Axe took an arcane rune"
                 + " 5 s before the fight");
+  }
+
+  @Test
+  void phrase_namesCooldownAbilitiesThroughTheLabels() {
+    ReasonWording wording =
+        new ReasonWording(
+            name ->
+                switch (name) {
+                  case "terrorblade_metamorphosis" -> "Metamorphosis";
+                  case "death_prophet_exorcism" -> "Exorcism";
+                  default -> Prettify.ability(name);
+                });
+
+    assertThat(
+            wording.phrase(
+                player("ABILITY_ON_COOLDOWN", "terrorblade_metamorphosis, death_prophet_exorcism"),
+                "Nature's Prophet"))
+        .isEqualTo("Nature's Prophet had Metamorphosis and Exorcism on cooldown");
   }
 }

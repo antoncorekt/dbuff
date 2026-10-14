@@ -155,7 +155,7 @@ public final class LoopWording {
 
   /** A reason as a sentence about the hero, for example "Mirana stood too far in front". */
   public static String reason(FightReasonDomain reason, String hero) {
-    return ReasonWording.phrase(reason, hero);
+    return new ReasonWording(Prettify::ability).phrase(reason, hero);
   }
 
   /** What a stored code says about the hero, without the hero: "had no teleport". */

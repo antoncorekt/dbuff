@@ -28,6 +28,7 @@ public class ImportantFightsSection implements ReplayReportSection {
 
   private final FightExplanationReader explanationReader;
   private final ReportHeroNames heroNames;
+  private final ReasonWording wording;
   private final ReplayReportProperties properties;
 
   @Override
@@ -83,11 +84,11 @@ public class ImportantFightsSection implements ReplayReportSection {
     return change == null ? -1 : Math.round(Math.abs(change) / 100.0);
   }
 
-  private static String line(
+  private String line(
       LostFight fight, LostFight withReasons, Map<Long, String> heroes, TeamSide yours) {
     FightImportanceDomain importance = fight.importance();
     TeamSide winner = Enums.find(TeamSide.class, importance.getWinningTeam());
-    String reasons = ReasonWording.ranked(withReasons.reasons(), heroes, MAX_REASONS);
+    String reasons = wording.ranked(withReasons.reasons(), heroes, MAX_REASONS);
     return String.format(
         Locale.ROOT,
         "%s %s%s won the fight%s%s",

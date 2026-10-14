@@ -52,6 +52,7 @@ public class SwingSection implements ReplayReportSection {
   private final GameSpikeFactorRepo factorRepo;
   private final FightExplanationReader explanationReader;
   private final ReportHeroNames heroNames;
+  private final ReasonWording wording;
   private final ReplayReportProperties properties;
 
   @Override
@@ -116,14 +117,14 @@ public class SwingSection implements ReplayReportSection {
         .collect(Collectors.toMap(s -> s.swing().getSpikeIndex(), s -> s, (a, b) -> a));
   }
 
-  private static Optional<String> lostLine(
+  private Optional<String> lostLine(
       LostFight lost, Map<Long, String> heroes, boolean noImportantFight) {
     TeamSide loser = Enums.find(TeamSide.class, lost.explanation().getLosingTeam());
     Double start = lost.fight().getStartSeconds();
     if (loser == null || start == null) {
       return Optional.empty();
     }
-    String reasons = ReasonWording.ranked(lost.reasons(), heroes, Integer.MAX_VALUE);
+    String reasons = wording.ranked(lost.reasons(), heroes, Integer.MAX_VALUE);
     if (reasons.isEmpty()) {
       return Optional.empty();
     }

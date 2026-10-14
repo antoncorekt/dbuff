@@ -29,7 +29,8 @@ class ImportantFightsSectionTest {
   private final ReplayReportProperties properties = new ReplayReportProperties();
   private final SectionSwitch sectionSwitch = new SectionSwitch(properties, List.of());
   private final ImportantFightsSection section =
-      new ImportantFightsSection(reader, heroNames, properties);
+      new ImportantFightsSection(
+          reader, heroNames, new ReasonWording(Prettify::ability), properties);
 
   ImportantFightsSectionTest() {
     when(heroNames.bySlot(1L)).thenReturn(Map.of(2L, "Terrorblade", 130L, "Venomancer"));
