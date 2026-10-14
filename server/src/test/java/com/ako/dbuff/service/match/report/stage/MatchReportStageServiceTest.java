@@ -6,6 +6,7 @@ import com.ako.dbuff.dao.model.MatchReportStage;
 import com.ako.dbuff.dao.model.MatchReportThreadDomain;
 import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
+import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.MatchReportThreadRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.service.constant.ConstantsManagers;
@@ -52,6 +53,8 @@ class MatchReportStageServiceTest {
   private final PlayerGameStatisticRepo statRepo = mock(PlayerGameStatisticRepo.class);
   private final ConstantsManagers constants = mock(ConstantsManagers.class);
   private final ReplayForecast forecast = mock(ReplayForecast.class);
+  private final ReplayStageTargets targets = mock(ReplayStageTargets.class);
+  private final MatchRepo matchRepo = mock(MatchRepo.class);
   private final Message headerMessage = mock(Message.class);
   private final ThreadChannel thread = mock(ThreadChannel.class);
   private MatchReportStageService service;
@@ -70,7 +73,9 @@ class MatchReportStageServiceTest {
             new ComponentsViewRenderer(new PlainViewRenderer()),
             discord,
             new MatchThreadRecorder(threadRepo),
-            forecast);
+            forecast,
+            targets,
+            matchRepo);
     config =
         DbufInstanceConfigDomain.builder()
             .id(INSTANCE)

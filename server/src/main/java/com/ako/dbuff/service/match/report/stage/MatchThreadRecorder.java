@@ -6,7 +6,9 @@ import com.ako.dbuff.dao.model.MatchReportStage;
 import com.ako.dbuff.dao.model.MatchReportThreadDomain;
 import com.ako.dbuff.dao.repo.MatchReportThreadRepo;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
+import java.util.function.IntSupplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.entities.Message;
@@ -53,6 +55,10 @@ public class MatchThreadRecorder {
     }
   }
 
+  public List<MatchReportThreadDomain> findAll(long matchId) {
+    return threadRepo.findAllByMatchId(matchId);
+  }
+
   public Optional<MatchReportThreadDomain> find(long matchId, String instanceId) {
     return threadRepo.findByMatchIdAndInstanceId(matchId, instanceId);
   }
@@ -65,20 +71,58 @@ public class MatchThreadRecorder {
     if (stage.predecessors().isEmpty()) {
       return false;
     }
+    FactValues values = FactValues.of(facts);
+    return store(
+        row,
+        stage,
+        () ->
+            threadRepo.advanceStage(
+                row.getId(),
+                stage,
+                stage.predecessors(),
+                values.mode(),
+                values.wins(),
+                values.losses(),
+                values.durationSeconds()));
+  }
+
+  /**
+   * Like {@link #advance}, for a deliberate retitle: the stage is set even if it goes back. Nothing
+   * guards against a concurrent writer, which is acceptable for the explicit rerun only.
+   */
+  public boolean force(MatchReportThreadDomain row, MatchReportStage stage, MatchFacts facts) {
+    FactValues values = FactValues.of(facts);
+    return store(
+        row,
+        stage,
+        () ->
+            threadRepo.forceStage(
+                row.getId(),
+                stage,
+                values.mode(),
+                values.wins(),
+                values.losses(),
+                values.durationSeconds()));
+  }
+
+  private boolean store(MatchReportThreadDomain row, MatchReportStage stage, IntSupplier update) {
     try {
-      boolean known = facts.result().known();
-      return threadRepo.advanceStage(
-              row.getId(),
-              stage,
-              stage.predecessors(),
-              facts.mode(),
-              known ? facts.result().wins() : null,
-              known ? facts.result().losses() : null,
-              facts.durationSeconds())
-          > 0;
+      return update.getAsInt() > 0;
     } catch (RuntimeException e) {
       log.warn("Could not store stage {} of match {}", stage, row.getMatchId(), e);
       return false;
+    }
+  }
+
+  /** The facts a stage write refreshes; null leaves the stored value, as an unknown result is. */
+  private record FactValues(String mode, Integer wins, Integer losses, Long durationSeconds) {
+    static FactValues of(MatchFacts facts) {
+      boolean known = facts.result().known();
+      return new FactValues(
+          facts.mode(),
+          known ? facts.result().wins() : null,
+          known ? facts.result().losses() : null,
+          facts.durationSeconds());
     }
   }
 }

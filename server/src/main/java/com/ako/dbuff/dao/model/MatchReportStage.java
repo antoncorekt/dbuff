@@ -15,7 +15,8 @@ public enum MatchReportStage {
   /**
    * Whether a header in the {@code current} stage may move to this one. A header only moves on: a
    * parse timeout is possible only before OpenDota parsed, and a replay outcome can still follow
-   * it.
+   * it. A replay that failed for good can still succeed after a manual retry or a parser bump, so
+   * {@code REPLAY_DONE} may follow {@code REPLAY_UNAVAILABLE}, never the other way round.
    */
   public boolean mayFollow(MatchReportStage current) {
     if (current == null) {
@@ -23,6 +24,9 @@ public enum MatchReportStage {
     }
     if (this == PARSE_TIMED_OUT) {
       return current == REQUESTED;
+    }
+    if (this == REPLAY_DONE && current == REPLAY_UNAVAILABLE) {
+      return true;
     }
     return rank() > current.rank();
   }

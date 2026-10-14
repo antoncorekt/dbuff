@@ -27,8 +27,8 @@ public class HeaderRenderer {
   private static final DateTimeFormatter DATE_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-  public ReportMessage.Components render(MatchReportStage stage, MatchFacts facts) {
-    String title = title(stage, facts);
+  public ReportMessage.Components render(StageTarget target, MatchFacts facts) {
+    String title = title(target, facts);
     String link = LINK_PREFIX + facts.link();
     List<ContainerChildComponent> children =
         List.of(TextDisplay.of("**" + title + "**"), TextDisplay.of(link));
@@ -39,28 +39,29 @@ public class HeaderRenderer {
         top, textLength, children.size() + 1, title + "\n" + facts.link());
   }
 
-  public String title(MatchReportStage stage, MatchFacts facts) {
+  public String title(StageTarget target, MatchFacts facts) {
     List<String> parts = new ArrayList<>();
     parts.add("Match " + facts.matchId());
     if (facts.mode() != null) {
       parts.add(facts.mode());
     }
     if (facts.result().known()) {
-      parts.add(facts.result().label() + score(stage, facts));
+      parts.add(facts.result().label() + score(target.stage(), facts));
     }
     if (facts.durationSeconds() != null) {
       parts.add(facts.durationSeconds() / SECONDS_PER_MINUTE + " min");
     }
-    parts.add(status(stage));
+    parts.add(status(target));
     return String.join(SEPARATOR, parts);
   }
 
-  private static String status(MatchReportStage stage) {
-    return switch (stage) {
+  private static String status(StageTarget target) {
+    boolean partial = target.partial();
+    return switch (target.stage()) {
       case REQUESTED -> "OpenDota parse requested";
       case PARSED -> "OpenDota data ready";
       case REPLAY_PENDING -> "replay processing";
-      case REPLAY_DONE -> "replay analysis ready";
+      case REPLAY_DONE -> partial ? "replay analysis ready (partial)" : "replay analysis ready";
       case REPLAY_UNAVAILABLE -> "replay analysis not available";
       case PARSE_TIMED_OUT -> "OpenDota did not parse this match";
     };

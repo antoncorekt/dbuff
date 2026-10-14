@@ -4,6 +4,8 @@ import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.MatchReportStage;
 import com.ako.dbuff.dao.model.MatchReportThreadDomain;
+import com.ako.dbuff.dao.model.ReplayStatus;
+import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.service.discord.DiscordMessageService;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator.PartialReportResult;
 import com.ako.dbuff.service.replay.ReplayForecast;
@@ -12,7 +14,9 @@ import com.ako.dbuff.service.replay.report.view.ComponentsViewRenderer;
 import com.ako.dbuff.service.replay.report.view.MessageLimits;
 import com.ako.dbuff.service.replay.report.view.ReportMessage;
 import com.ako.dbuff.service.replay.report.view.SectionView;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
@@ -36,6 +40,8 @@ public class MatchReportStageService {
   private final DiscordMessageService discord;
   private final MatchThreadRecorder recorder;
   private final ReplayForecast forecast;
+  private final ReplayStageTargets targets;
+  private final MatchRepo matchRepo;
 
   public boolean enabled() {
     return properties.isEnabled();
@@ -90,7 +96,8 @@ public class MatchReportStageService {
       facts = factsFactory.fromSummary(match.getId(), summary);
       header =
           publisher.create(
-              config.getDiscordChannelId(), headers.render(MatchReportStage.REQUESTED, facts));
+              config.getDiscordChannelId(),
+              headers.render(StageTarget.at(MatchReportStage.REQUESTED), facts));
     } catch (RuntimeException e) {
       log.warn("Stage 1 of match {} failed: {}", match.getId(), e.getMessage(), e);
       return null;
@@ -164,7 +171,7 @@ public class MatchReportStageService {
     } else if (properties.isEnabled()
         && row.getHeaderMessageId() != null
         && row.getChannelId() != null) {
-      editPlain(row, headers.title(MatchReportStage.PARSE_TIMED_OUT, facts));
+      editPlain(row, headers.title(StageTarget.at(MatchReportStage.PARSE_TIMED_OUT), facts));
     }
   }
 
@@ -176,19 +183,95 @@ public class MatchReportStageService {
     }
   }
 
-  /** The stored stage moves only forward, and only once Discord shows the new title. */
   private void retitle(MatchReportThreadDomain row, MatchReportStage stage, MatchFacts facts) {
-    if (!stage.mayFollow(row.getStage())) {
+    retitle(row, StageTarget.at(stage), facts, false);
+  }
+
+  /**
+   * The stored stage moves only forward, and only once Discord shows the new title; {@code force}
+   * lifts the first rule for a deliberate refresh.
+   */
+  private boolean retitle(
+      MatchReportThreadDomain row, StageTarget target, MatchFacts facts, boolean force) {
+    MatchReportStage stage = target.stage();
+    if (!force && !stage.mayFollow(row.getStage())) {
       log.debug("Match {} stays at {}, not {}", row.getMatchId(), row.getStage(), stage);
-      return;
+      return false;
     }
     if (row.getHeaderMessageId() == null || row.getChannelId() == null) {
       log.debug("Match {} has no header message to retitle", row.getMatchId());
+      return false;
+    }
+    if (!publisher.edit(
+        row.getChannelId(), row.getHeaderMessageId(), headers.render(target, facts))) {
+      return false;
+    }
+    if (force) {
+      recorder.force(row, stage, facts);
+    } else {
+      recorder.advance(row, stage, facts);
+    }
+    return true;
+  }
+
+  /**
+   * A replay run reached {@code status}: when that is final, every staged thread of the match is
+   * retitled, whatever the report switches say. A legacy plain header is never touched.
+   */
+  public void replayFinished(long matchId, ReplayStatus status, boolean retryLeft) {
+    if (!properties.isEnabled()) {
       return;
     }
-    if (publisher.edit(
-        row.getChannelId(), row.getHeaderMessageId(), headers.render(stage, facts))) {
-      recorder.advance(row, stage, facts);
+    try {
+      StageTarget.of(status, retryLeft).ifPresent(target -> retitleAll(matchId, target));
+    } catch (RuntimeException e) {
+      log.warn("Replay title of match {} failed: {}", matchId, e.getMessage(), e);
+    }
+  }
+
+  private void retitleAll(long matchId, StageTarget target) {
+    List<MatchReportThreadDomain> rows = recorder.findAll(matchId);
+    if (rows.isEmpty()) {
+      return;
+    }
+    MatchDomain match = matchRepo.findById(matchId).orElse(null);
+    for (MatchReportThreadDomain row : rows) {
+      try {
+        if (ownsHeader(row)) {
+          retitle(row, target, MatchFacts.fromRow(row, match), false);
+        }
+      } catch (RuntimeException e) {
+        log.warn(
+            "Replay title of match {} in {} failed: {}",
+            matchId,
+            row.getInstanceId(),
+            e.getMessage());
+      }
+    }
+  }
+
+  /**
+   * Retitles the header from what is stored now, even to a stage the header has passed (a rerun).
+   * Only a staged header is touched.
+   *
+   * @return whether the header was changed
+   */
+  public boolean refresh(MatchDomain match, DbufInstanceConfigDomain instance) {
+    if (!properties.isEnabled()) {
+      return false;
+    }
+    try {
+      Optional<MatchReportThreadDomain> row =
+          recorder.find(match.getId(), instance.getId()).filter(this::ownsHeader);
+      Optional<StageTarget> target = row.isPresent() ? targets.forMatch(match) : Optional.empty();
+      if (target.isEmpty()) {
+        return false;
+      }
+      MatchFacts facts = factsFactory.fromParsed(match, instance).orFrom(row.get());
+      return retitle(row.get(), target.get(), facts, true);
+    } catch (RuntimeException e) {
+      log.warn("Header refresh of match {} failed: {}", match.getId(), e.getMessage(), e);
+      return false;
     }
   }
 

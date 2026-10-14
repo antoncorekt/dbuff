@@ -57,12 +57,23 @@ class HeaderRendererTest {
   @ParameterizedTest
   @MethodSource("titles")
   void titleStatesTheStageAndTheFacts(MatchReportStage stage, Result result, String expected) {
-    assertThat(renderer.title(stage, facts(result, 40L, 25L))).isEqualTo(expected);
+    assertThat(renderer.title(StageTarget.at(stage), facts(result, 40L, 25L))).isEqualTo(expected);
+  }
+
+  @Test
+  void aPartialReplayIsSaidSoInTheTitle() {
+    assertThat(
+            renderer.title(
+                new StageTarget(MatchReportStage.REPLAY_DONE, true),
+                facts(new Result(1, 0), 40L, 25L)))
+        .endsWith("replay analysis ready (partial)");
   }
 
   @Test
   void stageOneLeavesOutTheScoreEvenIfKnown() {
-    assertThat(renderer.title(MatchReportStage.REQUESTED, facts(new Result(1, 0), 40L, 25L)))
+    assertThat(
+            renderer.title(
+                StageTarget.at(MatchReportStage.REQUESTED), facts(new Result(1, 0), 40L, 25L)))
         .doesNotContain("40-25");
   }
 
@@ -70,7 +81,7 @@ class HeaderRendererTest {
   void missingFactsAreLeftOutOfTheTitle() {
     MatchFacts bare = new MatchFacts(5L, null, new Result(0, 0), null, null, null);
 
-    assertThat(renderer.title(MatchReportStage.PARSED, bare))
+    assertThat(renderer.title(StageTarget.at(MatchReportStage.PARSED), bare))
         .isEqualTo("Match 5 · OpenDota data ready");
   }
 
@@ -86,7 +97,8 @@ class HeaderRendererTest {
   @MethodSource("accents")
   void cardAccentFollowsTheTrackedPlayersResult(Result result, Accent accent) {
     for (MatchReportStage stage : MatchReportStage.values()) {
-      ReportMessage.Components header = renderer.render(stage, facts(result, 1L, 2L));
+      ReportMessage.Components header =
+          renderer.render(StageTarget.at(stage), facts(result, 1L, 2L));
 
       Container card = (Container) header.components().get(0);
       assertThat(card.getAccentColorRaw()).isEqualTo(accent.rgb());
@@ -97,18 +109,19 @@ class HeaderRendererTest {
   void cardHoldsTheTitleAndTheLinkAndTheFallbackIsPlainText() {
     MatchFacts facts = facts(new Result(1, 0), 40L, 25L);
 
-    ReportMessage.Components header = renderer.render(MatchReportStage.PARSED, facts);
+    ReportMessage.Components header =
+        renderer.render(StageTarget.at(MatchReportStage.PARSED), facts);
 
     Container card = (Container) header.components().get(0);
     List<String> texts =
         card.getComponents().stream().map(c -> ((TextDisplay) c).getContent()).toList();
     assertThat(texts)
         .containsExactly(
-            "**" + renderer.title(MatchReportStage.PARSED, facts) + "**",
+            "**" + renderer.title(StageTarget.at(MatchReportStage.PARSED), facts) + "**",
             "-# https://www.dotabuff.com/matches/77");
     assertThat(header.fallback())
         .isEqualTo(
-            renderer.title(MatchReportStage.PARSED, facts)
+            renderer.title(StageTarget.at(MatchReportStage.PARSED), facts)
                 + "\nhttps://www.dotabuff.com/matches/77");
     assertThat(header.componentCount()).isEqualTo(3);
   }
@@ -142,6 +155,11 @@ class HeaderRendererTest {
     assertThat(MatchReportStage.REPLAY_PENDING.mayFollow(MatchReportStage.REPLAY_DONE)).isFalse();
     assertThat(MatchReportStage.PARSED.mayFollow(MatchReportStage.PARSED)).isFalse();
     assertThat(MatchReportStage.REPLAY_UNAVAILABLE.mayFollow(MatchReportStage.REPLAY_DONE))
+        .isFalse();
+    assertThat(MatchReportStage.REPLAY_DONE.mayFollow(MatchReportStage.REPLAY_UNAVAILABLE))
+        .isTrue();
+    assertThat(MatchReportStage.REPLAY_DONE.mayFollow(MatchReportStage.REPLAY_DONE)).isFalse();
+    assertThat(MatchReportStage.REPLAY_UNAVAILABLE.mayFollow(MatchReportStage.REPLAY_UNAVAILABLE))
         .isFalse();
     assertThat(MatchReportStage.PARSE_TIMED_OUT.mayFollow(MatchReportStage.REQUESTED)).isTrue();
     assertThat(MatchReportStage.PARSE_TIMED_OUT.mayFollow(MatchReportStage.PARSED)).isFalse();

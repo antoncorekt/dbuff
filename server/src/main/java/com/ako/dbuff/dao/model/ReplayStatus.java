@@ -27,6 +27,11 @@ public enum ReplayStatus {
     return permanent;
   }
 
+  /** Whether a run that ended so holds stored analysis, whole or partial. */
+  public boolean hasAnalysis() {
+    return this == DONE || this == PARTIAL;
+  }
+
   public boolean isRetryable() {
     return !permanent && this != DONE;
   }

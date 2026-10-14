@@ -11,8 +11,12 @@ import com.ako.dbuff.service.match.DotaApiParseRequestService;
 import com.ako.dbuff.service.match.MatchDeletionService;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator.PartialReportResult;
+import com.ako.dbuff.service.match.report.stage.MatchReportStageService;
+import com.ako.dbuff.service.replay.report.ReplayReportService;
+import com.ako.dbuff.service.replay.report.ReportDelivery;
 import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -47,6 +51,8 @@ public class MatchCommand implements DbuffCommand {
   private final MatchDeletionService matchDeletionService;
   private final DotaApiParseRequestService parseRequestService;
   private final MatchParseSchedulerService matchParseSchedulerService;
+  private final MatchReportStageService stageService;
+  private final ReplayReportService replayReportService;
 
   public MatchCommand(
       MatchRepo matchRepo,
@@ -54,7 +60,9 @@ public class MatchCommand implements DbuffCommand {
       @Lazy MatchReportOrchestrator matchReportOrchestrator,
       @Lazy MatchDeletionService matchDeletionService,
       @Lazy DotaApiParseRequestService parseRequestService,
-      @Lazy MatchParseSchedulerService matchParseSchedulerService) {
+      @Lazy MatchParseSchedulerService matchParseSchedulerService,
+      @Lazy MatchReportStageService stageService,
+      @Lazy ReplayReportService replayReportService) {
     // Lazy for the same reason the old listener was: these pull in the whole match pipeline.
     this.matchRepo = matchRepo;
     this.instanceConfigRepo = instanceConfigRepo;
@@ -62,6 +70,8 @@ public class MatchCommand implements DbuffCommand {
     this.matchDeletionService = matchDeletionService;
     this.parseRequestService = parseRequestService;
     this.matchParseSchedulerService = matchParseSchedulerService;
+    this.stageService = stageService;
+    this.replayReportService = replayReportService;
   }
 
   @Override
@@ -140,10 +150,38 @@ public class MatchCommand implements DbuffCommand {
       log.info(
           "Rerunning report for match {} in channel {}", matchId, config.getDiscordChannelId());
       matchReportOrchestrator.processAndReport(List.of(match.get()), config);
+      if (stageService.enabled()) {
+        String note = refreshForTesting(match.get(), config);
+        if (!note.isEmpty()) {
+          reply.post(note);
+        }
+      }
     } catch (Exception e) {
       log.error("Failed to rerun report for match {}", matchId, e);
       reply.fail("❌ Failed to rerun match " + matchId + ": " + e.getMessage());
     }
+  }
+
+  /** Stage test aid: retitles the header and posts the replay report again; never fails. */
+  private String refreshForTesting(MatchDomain match, DbufInstanceConfigDomain config) {
+    List<String> notes = new ArrayList<>();
+    try {
+      if (stageService.refresh(match, config)) {
+        notes.add("Header refreshed.");
+      }
+    } catch (RuntimeException e) {
+      log.warn("Header refresh of match {} failed: {}", match.getId(), e.getMessage(), e);
+    }
+    try {
+      ReportDelivery delivery = replayReportService.redeliver(match.getId(), config.getId());
+      notes.add(
+          delivery == ReportDelivery.POSTED
+              ? "Replay report posted again."
+              : "Replay report not posted: " + delivery.reason() + ".");
+    } catch (RuntimeException e) {
+      log.warn("Replay report repost of match {} failed: {}", match.getId(), e.getMessage(), e);
+    }
+    return String.join(" ", notes);
   }
 
   private void retry(CommandContext context, Long matchId, DbufInstanceConfigDomain config) {
