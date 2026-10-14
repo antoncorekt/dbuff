@@ -8,6 +8,7 @@ import com.ako.dbuff.dao.repo.GameSpikeRepo;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.LostFight;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.SwingExplanation;
+import com.ako.dbuff.service.replay.analysis.item.HeroInputs;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.spike.SpikeCause;
@@ -151,32 +152,38 @@ public class SwingSection implements ReplayReportSection {
         .map(
             f -> {
               Optional<Double> seconds = completedAt(f.getDetail());
-              String item = labels.label("item_" + f.getRef());
-              if (seconds.isEmpty() || item.isBlank()) {
+              if (seconds.isEmpty()) {
                 return "";
               }
-              String hero = heroes.get(f.getPlayerSlot());
+              String hero = f.getPlayerSlot() == null ? null : heroes.get(f.getPlayerSlot());
               return String.format(
                   Locale.ROOT,
                   "; it came after %s finished %s%s at %s",
                   Prettify.team(spike.getBenefitingTeam()),
-                  withArticle(item),
+                  itemName(f.getRef()),
                   hero == null ? "" : " (" + hero + ")",
                   GameTime.clock(seconds.get()));
             })
         .orElse("");
   }
 
+  private String itemName(String key) {
+    String replayName = HeroInputs.replayName(key);
+    String label = labels.label(replayName);
+    return label == null || label.isBlank() || label.equals(replayName) || label.equals(key)
+        ? Prettify.ability(replayName)
+        : label;
+  }
+
   private static Optional<Double> completedAt(String detail) {
     try {
-      return detail == null ? Optional.empty() : Optional.of(Double.parseDouble(detail));
+      Double seconds = detail == null ? null : Double.valueOf(detail);
+      return seconds == null || !(seconds >= 0) || seconds.isInfinite()
+          ? Optional.empty()
+          : Optional.of(seconds);
     } catch (NumberFormatException e) {
       return Optional.empty();
     }
-  }
-
-  private static String withArticle(String name) {
-    return ("aeiouAEIOU".indexOf(name.charAt(0)) >= 0 ? "an " : "a ") + name;
   }
 
   private static String line(GameSpikeDomain spike, List<GameSpikeFactorDomain> factors) {

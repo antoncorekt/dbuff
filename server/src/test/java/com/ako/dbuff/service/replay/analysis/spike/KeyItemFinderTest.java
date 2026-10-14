@@ -13,6 +13,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class KeyItemFinderTest {
 
@@ -138,20 +139,117 @@ class KeyItemFinderTest {
         .containsExactly(done(0, "echo_sabre", 910));
   }
 
+  private static ReplayStateChangeDomain removed(long slot, String name, double seconds) {
+    return ReplayStateChangeDomain.builder()
+        .playerSlot(slot)
+        .name(name)
+        .gameSeconds(seconds)
+        .kind("ITEM_REMOVED")
+        .build();
+  }
+
+  @Test
+  void completions_skipARecipeAndAnExcludedItem() {
+    Map<String, Long> costs = new java.util.HashMap<>(COSTS);
+    costs.put("recipe_blink", 2250L);
+    costs.put("aghanims_shard", 2800L);
+    costs.put("ward_dispenser", 2500L);
+    KeyItemFinder wide =
+        new KeyItemFinder(
+            key ->
+                Optional.ofNullable(costs.get(key))
+                    .map(c -> ItemConstant.builder().cost(c).build()),
+            properties);
+
+    assertThat(
+            wide.completions(
+                List.of(
+                    added(0, "item_recipe_blink", 100),
+                    added(0, "item_aghanims_shard", 110),
+                    added(0, "item_ward_dispenser", 120),
+                    added(0, "item_blink", 130))))
+        .containsExactly(done(0, "blink", 130));
+  }
+
+  @Test
+  void completions_skipAnItemATeammateLostJustBefore() {
+    List<ReplayStateChangeDomain> traded =
+        List.of(
+            added(0, "item_blink", 100),
+            removed(0, "item_blink", 500),
+            added(1, "item_blink", 530),
+            added(128, "item_force_staff", 540));
+    List<ReplayStateChangeDomain> late =
+        List.of(
+            added(0, "item_blink", 100),
+            removed(0, "item_blink", 500),
+            added(1, "item_blink", 561));
+
+    assertThat(finder.completions(traded))
+        .containsExactly(done(0, "blink", 100), done(128, "force_staff", 540));
+    assertThat(finder.completions(late))
+        .containsExactly(done(0, "blink", 100), done(1, "blink", 561));
+  }
+
+  @Test
+  void completions_countARebuyOnlyLongAfterTheSale_notABackpackSwap() {
+    List<ReplayStateChangeDomain> swap =
+        List.of(
+            added(0, "item_blink", 100),
+            removed(0, "item_blink", 300),
+            added(0, "item_blink", 302));
+    List<ReplayStateChangeDomain> rebuy =
+        List.of(
+            added(0, "item_blink", 100),
+            removed(0, "item_blink", 300),
+            added(0, "item_blink", 400));
+
+    assertThat(finder.completions(swap)).containsExactly(done(0, "blink", 100));
+    assertThat(finder.completions(rebuy))
+        .containsExactly(done(0, "blink", 100), done(0, "blink", 400));
+  }
+
+  @Test
+  void completions_countAHigherTierOnlyWithoutAnEarlierOne() {
+    Map<String, Long> costs = Map.of("travel_boots", 2500L, "travel_boots_2", 3000L);
+    KeyItemFinder tiers =
+        new KeyItemFinder(
+            key ->
+                Optional.ofNullable(costs.get(key))
+                    .map(c -> ItemConstant.builder().cost(c).build()),
+            properties);
+
+    assertThat(
+            tiers.completions(
+                List.of(added(0, "item_travel_boots", 100), added(0, "item_travel_boots_2", 900))))
+        .extracting(Completion::item)
+        .containsExactly("travel_boots");
+    assertThat(tiers.completions(List.of(added(1, "item_travel_boots_2", 900))))
+        .extracting(Completion::item)
+        .containsExactly("travel_boots_2");
+  }
+
   @Test
   void properties_failAtStartupOnABadValue() {
-    SpikeProperties bad = new SpikeProperties();
-    bad.setKeyItemMinCost(Double.NaN);
-    org.assertj.core.api.Assertions.assertThatThrownBy(bad::validate)
-        .hasMessageContaining("key-item-min-cost");
-    SpikeProperties negative = new SpikeProperties();
-    negative.setKeyItemMinCost(-1);
-    org.assertj.core.api.Assertions.assertThatThrownBy(negative::validate)
-        .hasMessageContaining("key-item-min-cost");
-    SpikeProperties window = new SpikeProperties();
-    window.setKeyItemWindowSeconds(0);
-    org.assertj.core.api.Assertions.assertThatThrownBy(window::validate)
-        .hasMessageContaining("key-item-window-seconds");
+    for (double bad : new double[] {Double.NaN, Double.POSITIVE_INFINITY, -1, 0}) {
+      SpikeProperties p = new SpikeProperties();
+      p.setKeyItemMinCost(bad);
+      assertThatThrownBy(p::validate).hasMessageContaining("key-item-min-cost");
+    }
+    for (int bad : new int[] {0, -5, 1801}) {
+      SpikeProperties p = new SpikeProperties();
+      p.setKeyItemWindowSeconds(bad);
+      assertThatThrownBy(p::validate).hasMessageContaining("key-item-window-seconds");
+    }
     new SpikeProperties().validate();
+  }
+
+  @Test
+  void properties_excludeByNameOrPrefix() {
+    SpikeProperties p = new SpikeProperties();
+
+    assertThat(p.excludes("item_ward_sentry")).isTrue();
+    assertThat(p.excludes("item_moon_shard")).isTrue();
+    assertThat(p.excludes("item_blink")).isFalse();
   }
 }

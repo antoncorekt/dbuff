@@ -188,16 +188,37 @@ class SwingSectionTest {
         .thenReturn(List.of(itemFactor("black_king_bar", 2L, "1660")));
 
     assertThat(section.lines(input()).get(1))
-        .endsWith("; it came after Dire finished a Black King Bar (Terrorblade) at 27:40");
+        .endsWith("; it came after Dire finished Black King Bar (Terrorblade) at 27:40");
   }
 
   @Test
-  void lines_sayAnBeforeAVowelAndSkipTheHeroWhenUnknown() {
+  void lines_skipTheHeroWhenUnknownOrWithoutASlot() {
     when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spike(0, 1800, 5000, "FIGHT_WIN", false)));
     heroes();
     when(factorRepo.findByMatchId(1L)).thenReturn(List.of(itemFactor("aether_lens", 9L, "600")));
 
-    assertThat(section.lines(input()).get(1)).endsWith("finished an Aether Lens at 10:00");
+    assertThat(section.lines(input()).get(1)).endsWith("finished Aether Lens at 10:00");
+    when(factorRepo.findByMatchId(1L)).thenReturn(List.of(itemFactor("aether_lens", null, "600")));
+    assertThat(section.lines(input()).get(1)).endsWith("finished Aether Lens at 10:00");
+  }
+
+  @Test
+  void lines_dropTheClauseForANegativeTime_andPrettifyAnUnknownItem() {
+    when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spike(0, 1800, 5000, "FIGHT_WIN", false)));
+    when(factorRepo.findByMatchId(1L)).thenReturn(List.of(itemFactor("aether_lens", 2L, "-5")));
+    assertThat(section.lines(input()).get(1)).doesNotContain("finished");
+
+    SwingSection raw =
+        new SwingSection(
+            spikeRepo,
+            factorRepo,
+            reader,
+            heroNames,
+            new ReasonWording(Prettify::ability),
+            n -> n,
+            properties);
+    when(factorRepo.findByMatchId(1L)).thenReturn(List.of(itemFactor("new_thing", 2L, "600")));
+    assertThat(raw.lines(input()).get(1)).endsWith("finished New Thing at 10:00");
   }
 
   @Test
