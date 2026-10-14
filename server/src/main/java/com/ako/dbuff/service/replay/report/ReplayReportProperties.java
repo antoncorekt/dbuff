@@ -61,6 +61,9 @@ public class ReplayReportProperties {
   /** The most lines the objectives section lists for missed objectives. */
   private int maxObjectiveLines = 3;
 
+  /** The most lines the vision section lists for fights with a vision problem. */
+  private int maxVisionLines = 4;
+
   /** A missed objective's closest hero is said to be close to the tower within this many units. */
   private double objectiveCloseDistance = 1500;
 
@@ -86,6 +89,7 @@ public class ReplayReportProperties {
     requireRange("max-rotation-lines", maxRotationLines, 1, MAX_BEHAVIOUR_LINES);
     requireRange("max-smoke-lines", maxSmokeLines, 1, MAX_BEHAVIOUR_LINES);
     requireRange("max-objective-lines", maxObjectiveLines, 1, MAX_BEHAVIOUR_LINES);
+    requireRange("max-vision-lines", maxVisionLines, 1, MAX_BEHAVIOUR_LINES);
     if (!(objectiveCloseDistance > 0
         && objectiveCloseDistance < objectiveFarDistance
         && objectiveFarDistance <= MAX_OBJECTIVE_DISTANCE)) {
