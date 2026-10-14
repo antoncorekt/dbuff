@@ -35,8 +35,10 @@ export REPLAY_PROCESSING_TEMP_DIR=$HOME/dbuff-replay-tmp
 export SCHEDULER_QUIET_HOURS_ENABLED=false
 mkdir -p $REPLAY_PROCESSING_TEMP_DIR
 ./gradlew :server:bootJar
-java --enable-preview -jar server/build/libs/server-0.0.1-SNAPSHOT.jar
+$JAVA_HOME/bin/java --enable-preview -jar server/build/libs/server-0.0.1-SNAPSHOT.jar
 ```
+
+Start it with `$JAVA_HOME/bin/java`, not plain `java`: the `java` on your PATH may be a newer JDK (for example 25), which fails with `UnsupportedClassVersionError ... preview features ... only recognizes preview features for class file version 69` because the jar is compiled with JDK 21. Check with `java -version`.
 
 Do not use `./gradlew :server:bootRun` for this: the build passes `--enable-preview` to the compiler and to the test tasks only, `bootRun` has no such argument, and the class files of `MatchProcessorService`, `MatchCompletenessService` and `ProcessContext` are marked as preview classes (checked with their class file version), so the JVM refuses to load them without the flag. Production starts the jar the same way (`java --enable-preview -jar`, see `infrastructure/cloudformation/template.yaml`). The jar name was checked by building it.
 
