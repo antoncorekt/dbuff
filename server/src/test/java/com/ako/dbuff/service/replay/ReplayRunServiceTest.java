@@ -118,6 +118,14 @@ class ReplayRunServiceTest {
   }
 
   @Test
+  void process_aThrowingPublisherDoesNotChangeTheStatus() {
+    doThrow(new IllegalStateException("listener")).when(events).publishEvent(any(Object.class));
+
+    assertThat(service.process(match())).isEqualTo(ReplayStatus.DONE);
+    assertThat(runs.get(1L).getStatus()).isEqualTo(ReplayStatus.DONE);
+  }
+
+  @Test
   void process_publishesNothingForARunThatCouldNotBeRecorded() {
     when(runRepo.save(any(ReplayParseRunDomain.class))).thenThrow(new IllegalStateException("db"));
 

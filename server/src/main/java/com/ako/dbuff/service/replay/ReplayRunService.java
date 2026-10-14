@@ -275,8 +275,20 @@ public class ReplayRunService {
         run.getAttempts(),
         run.getReplayBytes(),
         run.getParseMillis());
-    events.publishEvent(new ReplayRunFinished(run.getMatchId(), status, run.retryLeft()));
+    publish(run, status);
     return status;
+  }
+
+  /** A listener's trouble must not turn a recorded run into a failure. */
+  private void publish(ReplayParseRunDomain run, ReplayStatus status) {
+    try {
+      events.publishEvent(new ReplayRunFinished(run.getMatchId(), status, run.retryLeft()));
+    } catch (RuntimeException e) {
+      log.warn(
+          "Replay outcome of match {} could not be published: {}",
+          run.getMatchId(),
+          e.getMessage());
+    }
   }
 
   private static String truncate(String message) {

@@ -207,6 +207,20 @@ class MatchCommandTest {
   }
 
   @Test
+  void rerun_aFailingRefreshStillReportsTheRepost() {
+    Mockito.when(stageService.enabled()).thenReturn(true);
+    Mockito.when(stageService.refresh(Mockito.any(), Mockito.any()))
+        .thenThrow(new IllegalStateException("db down"));
+    Mockito.when(replayReportService.redeliver(MATCH_ID, "instance-1"))
+        .thenReturn(ReportDelivery.POSTED);
+
+    FakeCommandContext context = inThread();
+    command.execute("rerun", context);
+
+    assertThat(context.getPosts()).containsExactly("Replay report posted again.");
+  }
+
+  @Test
   void retry_neverRefreshesTheHeader() {
     Mockito.when(stageService.enabled()).thenReturn(true);
     Mockito.when(orchestrator.processAndReportPartial(Mockito.any(), Mockito.any()))

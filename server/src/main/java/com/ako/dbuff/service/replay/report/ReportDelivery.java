@@ -5,6 +5,7 @@ public enum ReportDelivery {
   POSTED("posted"),
   REPORT_SWITCHED_OFF("the replay report is switched off on the server"),
   NOT_STORED("no replay analysis is stored for this match"),
+  NO_INSTANCE("the match or the channel configuration is not in the database"),
   NO_CHANNEL("the channel is not set up"),
   REPORT_OFF_FOR_CHANNEL(
       "the replay report is off for this channel (/dbuff settings replay_report)"),

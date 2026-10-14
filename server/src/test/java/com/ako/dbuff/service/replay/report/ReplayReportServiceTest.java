@@ -638,6 +638,10 @@ class ReplayReportServiceTest {
     assertThat(service.redeliver(1L, "i1")).isEqualTo(ReportDelivery.NOT_STORED);
 
     storedRun(ReplayStatus.DONE);
+    when(instanceRepo.findById("i1")).thenReturn(Optional.empty());
+    assertThat(service.redeliver(1L, "i1")).isEqualTo(ReportDelivery.NO_INSTANCE);
+
+    storedRun(ReplayStatus.DONE);
     when(discord.getThreadById(9L)).thenThrow(new IllegalStateException("discord down"));
 
     assertThat(service.redeliver(1L, "i1")).isEqualTo(ReportDelivery.FAILED);

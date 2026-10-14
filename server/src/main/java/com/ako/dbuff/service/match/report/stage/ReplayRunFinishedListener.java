@@ -6,7 +6,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-/** Retitles the match headers when a replay run ends; never fails the run that published it. */
+/**
+ * Retitles the match headers when a replay run ends. The Discord calls run on their own virtual
+ * thread, so a slow call never holds the parse permit or the batch, and nothing reaches the
+ * publisher.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -18,6 +22,10 @@ public class ReplayRunFinishedListener {
     if (!stages.enabled()) {
       return;
     }
+    Thread.startVirtualThread(() -> retitle(event));
+  }
+
+  private void retitle(ReplayRunFinished event) {
     try {
       stages.replayFinished(event.matchId(), event.status(), event.retryLeft());
     } catch (RuntimeException e) {

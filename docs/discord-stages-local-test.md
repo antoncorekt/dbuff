@@ -6,8 +6,23 @@ Property names, environment variable names, commands and endpoints below were ch
 
 ## 1. What you need
 
-1. Docker running, JDK 21 (`export JAVA_HOME=~/.sdkman/candidates/java/21.0.0.0+35-tem
-export DISCORD_BOT_TOKEN=<bot token>
+1. Docker running, JDK 21 (`export JAVA_HOME=~/.sdkman/candidates/java/21.0.0.0+35-tem`), this branch checked out.
+2. A Discord bot token (`DISCORD_BOT_TOKEN`) for a bot that is a member of a test server. The bot needs: view channel, send messages, create public threads, send messages in threads. Use a test channel that is not the one you use for real matches.
+3. A match that already has a Discord thread named `Match <id>` in that test channel, or step 6 to make one.
+4. For the replay part: the match must be an Ability Draft (mode 18) or All Pick (mode 22) match with OpenDota replay info (`cluster` and `replay_salt`) and a replay Valve still serves (a few days old at most).
+
+## 2. Start the database
+
+1. `docker compose up -d postgres` in the repository root. It listens on `localhost:5432`, user `postgres`, password `password`, database `dbuff`; these are the defaults of `spring.datasource.*`, so no variables are needed. Your data is in the `postgres-data` volume, so existing matches and the channel registration are kept.
+2. Check: `docker compose ps` shows `dbuff-postgres` healthy.
+
+## 3. Start the app
+
+In one terminal, from the repository root, paste your own token into the second line and run the lines one after another:
+
+```
+export JAVA_HOME=~/.sdkman/candidates/java/21.0.0.0+35-tem
+export DISCORD_BOT_TOKEN='paste-the-bot-token-here'
 export DISCORD_REPORT_STAGES_ENABLED=true
 export REPLAY_PROCESSING_ENABLED=true
 export REPLAY_REPORT_ENABLED=true
@@ -42,7 +57,7 @@ What each one does:
 
 Other keys (OpenAI, Google Vision, `DOTA_API_KEY`) are not needed for this test; the app starts without them. The REST API is open locally because `app.api.required` is false and `DBUFF_API_KEY` is empty.
 
-Check: the log shows no stack trace at the end of the start, and the bot is online in the test server.
+The last command keeps this terminal busy; leave it open and use another terminal for the later commands. Check: the log shows no stack trace at the end of the start, and the bot is online in the test server.
 
 ## 4. Register the test channel
 
@@ -72,12 +87,14 @@ The shortest path for an existing match: `/match retry` in its thread (stage 1 a
 
 The replay job takes a match when it has no run yet for the current `replay.processing.parser-version` (1), is mapped, and is an active mode (18 and 22). It runs every 10 minutes (`0 3/10 * * * ?`: minutes 3, 13, 23, ...) and, for a match found fresh, at once.
 
+Wherever a command below says `<matchId>`, type the match number instead (no angle brackets).
+
 1. Check where the match stands: `curl localhost:8080/api/v1/replay/<matchId>` (404 means no run yet).
 2. A match that already has a run is not taken again. To process it again, delete its run in Postgres: `docker exec -i dbuff-postgres psql -U postgres dbuff -c "delete from replay_parse_run_domain where match_id = <matchId>"`. Its stored analysis is replaced by the next run.
-3. A match older than the fresh windows (mapped more than 24 hours ago) is a "backlog" match and is only taken when you also set `REPLAY_PROCESSING_BACKLOG_ENABLED=true` (then restart the app). Valve deletes replays after a while, and a match older than 90 days is skipped (`EXPIRED`).
+3. A match older than the fresh windows (mapped more than 24 hours ago) is a "backlog" match and is only taken when you also run `export REPLAY_PROCESSING_BACKLOG_ENABLED=true` before starting the jar (stop it with Ctrl+C and start it again). Valve deletes replays after a while, and a match older than 90 days is skipped (`EXPIRED`).
 4. Wait for the next cron minute. In the log: `Replay run for match <id>: DONE (attempt 1, ...)` then `Replay batch: 1 of 1 matches stored`. At that moment the header title changes to `replay analysis ready` (stage 3), and, if the channel allows it and it is not quiet hours, the report is posted.
 5. `POST localhost:8080/api/v1/replay/<matchId>/reanalyze` only reruns the analyzers on stored data (it needs a DONE run); it does not fetch the replay and does not touch Discord. Use it after changing analyzer settings, then `!rerun` to see the result.
-6. No replay from Valve (offline test, or the replay is gone): serve a stored one yourself. The download URL is `replay.processing.url-template` (env `REPLAY_PROCESSING_URL_TEMPLATE`), filled by `String.format` with the arguments cluster, match id, salt (`HttpReplayDownloader`). Put `<id>.dem.zst` of a match in a folder `570/` as `<id>_<salt>.dem.bz2`, run `python3 -m http.server 8099` in the parent folder, and start the app with `REPLAY_PROCESSING_URL_TEMPLATE='http://localhost:8099/570/%2$d_%3$d.dem.bz2'` (`%2$d` and `%3$d` skip the cluster). The decompressor is chosen from the file's first bytes, not its name (`docs/replay-fixtures.md`). The match must still have `cluster` and `replay_salt` stored from OpenDota. The format string and the server were not run end to end.
+6. No replay from Valve (offline test, or the replay is gone): serve a stored one yourself. The download URL is `replay.processing.url-template` (env `REPLAY_PROCESSING_URL_TEMPLATE`), filled by `String.format` with the arguments cluster, match id, salt (`HttpReplayDownloader`). Put `<id>.dem.zst` of a match in a folder `570/` as `<id>_<salt>.dem.bz2`, run `python3 -m http.server 8099` in the parent folder, and start the app (in the same terminal as step 3, after `export REPLAY_PROCESSING_URL_TEMPLATE='http://localhost:8099/570/%2$d_%3$d.dem.bz2'`) (`%2$d` and `%3$d` skip the cluster). The decompressor is chosen from the file's first bytes, not its name (`docs/replay-fixtures.md`). The match must still have `cluster` and `replay_salt` stored from OpenDota. The format string and the server were not run end to end.
 
 ## 8. Use `!rerun`
 
@@ -85,7 +102,7 @@ The replay job takes a match when it has no run yet for the current `replay.proc
 2. With the switch on, it then also:
    1. sets the header title again from what is stored now: `replay analysis ready` (or `(partial)`, or `not available`) when the match has a final run; `replay processing` when a replay is still expected; `OpenDota data ready` when the match is stored and no replay is expected. This is the one place where a title may go back to an earlier stage, for example after you deleted the run in step 7.2. It only touches a staged header; a plain header is left alone.
    2. posts the replay report sections again, if the match has a DONE or PARTIAL run, even if the report was already posted for it. It follows the section switches, the channel's `replay_report` setting and detail level; it ignores quiet hours because you asked.
-   3. says what happened in one extra message in the thread: `Header refreshed.` when the title was set, then `Replay report posted again.` or `Replay report not posted: <reason>.` (no stored replay analysis, report off for the channel, minimal detail, no thread on record, no section applies, Discord cannot find the thread). No `Header refreshed.` means the header was not changed (plain header, no thread row, or the Discord edit failed: see the log line `Header refresh of match ... failed` or `Could not edit header message`).
+   3. says what happened in one extra message in the thread: `Header refreshed.` when the title was set, then `Replay report posted again.` or `Replay report not posted: <reason>.` (no stored replay analysis, report off for the channel, minimal detail, no match or channel row, no thread on record, no section applies, Discord cannot find the thread). No `Header refreshed.` means the header was not changed (plain header, no thread row, or the Discord edit failed: see the log line `Header refresh of match ... failed` or `Could not edit header message`).
 3. `/match retry` is unchanged and does not refresh.
 
 ## 9. What to look at in Discord
@@ -101,7 +118,7 @@ These are the checks nobody has done in a real channel. Write what you see in th
 | 5 | The stage titles keep result, score, mode and duration | e.g. `Match 77 · ability draft · Win (40-25) · 35 min · replay analysis ready` | | |
 | 6 | `(partial)` and `not available` titles | wording as above | | |
 | 7 | `!rerun` goes back and forth: delete the run, `!rerun` shows `replay processing` or `OpenDota data ready`; run again, title returns to `ready` | title follows the stored state | | |
-| 8 | A plain (old) header is not edited as V2 and stays plain | no error, no change | | |
+| 8 | A plain (old) header is not edited as V2 and stays plain, also when a replay run ends | no error, no change | | |
 | 9 | V2 limits: the report cards are accepted at full detail | no `rejected, posting plain text` WARN in the log; if there is one, the text fallback is posted | | |
 | 10 | How packed cards look (several sections in one message) | readable, not cut off | | |
 | 11 | Whether the note after a card is accepted | no WARN `Components of the replay report ... rejected` | | |

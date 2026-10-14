@@ -169,13 +169,17 @@ public class MatchCommand implements DbuffCommand {
       if (stageService.refresh(match, config)) {
         notes.add("Header refreshed.");
       }
+    } catch (RuntimeException e) {
+      log.warn("Header refresh of match {} failed: {}", match.getId(), e.getMessage(), e);
+    }
+    try {
       ReportDelivery delivery = replayReportService.redeliver(match.getId(), config.getId());
       notes.add(
           delivery == ReportDelivery.POSTED
               ? "Replay report posted again."
               : "Replay report not posted: " + delivery.reason() + ".");
     } catch (RuntimeException e) {
-      log.warn("Header refresh of match {} failed: {}", match.getId(), e.getMessage(), e);
+      log.warn("Replay report repost of match {} failed: {}", match.getId(), e.getMessage(), e);
     }
     return String.join(" ", notes);
   }

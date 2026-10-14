@@ -127,10 +127,13 @@ public class ReplayReportService {
               .findByMatchIdAndParserVersion(matchId, processing.getParserVersion())
               .filter(run -> run.getStatus().hasAnalysis())
               .isPresent();
-      MatchDomain match = stored ? matchRepo.findById(matchId).orElse(null) : null;
+      if (!stored) {
+        return logSkipped(matchId, ReportDelivery.NOT_STORED);
+      }
+      MatchDomain match = matchRepo.findById(matchId).orElse(null);
       DbufInstanceConfigDomain instance = instanceRepo.findById(instanceId).orElse(null);
       if (match == null || instance == null) {
-        return logSkipped(matchId, ReportDelivery.NOT_STORED);
+        return logSkipped(matchId, ReportDelivery.NO_INSTANCE);
       }
       return logSkipped(
           matchId,
@@ -142,7 +145,9 @@ public class ReplayReportService {
   }
 
   private ReportDelivery logSkipped(long matchId, ReportDelivery result) {
-    if (result != ReportDelivery.POSTED) {
+    if (result == ReportDelivery.THREAD_NOT_FOUND) {
+      log.warn("Replay report of match {} not posted: {}", matchId, result.reason());
+    } else if (result != ReportDelivery.POSTED) {
       log.debug("Replay report of match {} not posted: {}", matchId, result.reason());
     }
     return result;
