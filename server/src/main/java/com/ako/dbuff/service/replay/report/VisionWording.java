@@ -26,47 +26,51 @@ public final class VisionWording {
         .toList();
   }
 
-  /** Whether the row names a problem: a known verdict other than fine. */
-  public static boolean isProblem(FightVisionDomain row) {
-    return verdicts(row).stream().anyMatch(v -> v != VisionVerdict.FINE);
-  }
-
-  /** Whether the row says no ward of the team covered the fight. */
-  public static boolean hadNoVision(FightVisionDomain row) {
-    return verdicts(row).contains(VisionVerdict.NO_VISION);
-  }
-
   /**
-   * One sentence for a problem row: {@code Dire fought without vision: no ward of theirs covered
-   * the fight}, {@code Radiant had no sentry or dust against Riki}, {@code Dire's only ward was
-   * placed 20 seconds before the fight}; several problems join into one sentence.
+   * One sentence for the problems of a row: {@code Dire fought without vision: no ward of theirs
+   * covered the fight}, {@code Radiant had no sentry or dust against Riki}, {@code Dire's only ward
+   * was placed 20 seconds before the fight}; several problems join into one sentence.
    */
-  public static String sentence(FightVisionDomain row, Map<Long, String> heroNames) {
+  public static String sentence(
+      FightVisionDomain row, List<VisionVerdict> problems, Map<Long, String> heroNames) {
     String team = Prettify.team(row.getTeam());
-    List<VisionVerdict> verdicts = verdicts(row);
-    boolean noVision = verdicts.contains(VisionVerdict.NO_VISION);
-    boolean noDetection = verdicts.contains(VisionVerdict.INVISIBLE_HERO_NO_DETECTION);
-    boolean late = verdicts.contains(VisionVerdict.LATE_WARD);
+    boolean noVision = problems.contains(VisionVerdict.NO_VISION);
+    boolean noDetection = problems.contains(VisionVerdict.INVISIBLE_HERO_NO_DETECTION);
+    boolean late = problems.contains(VisionVerdict.LATE_WARD);
     String detection = "had no sentry or dust against " + invisible(row, heroNames);
+    String text;
     if (noVision) {
-      String head = team + " fought without vision: no ward of theirs covered the fight";
-      return noDetection ? head + ", and they " + detection : head;
+      text = team + " fought without vision: no ward of theirs covered the fight";
+      text += noDetection ? ", and they " + detection : "";
+    } else if (noDetection) {
+      text = team + " " + detection;
+    } else {
+      return lateWard(row, team);
     }
-    if (noDetection) {
-      return late ? team + " " + detection + "; " + lateWard(row, team) : team + " " + detection;
-    }
-    return lateWard(row, team);
+    return late ? text + "; " + lateWard(row, team) : text;
   }
 
   private static String lateWard(FightVisionDomain row, String team) {
-    int observers = row.getActiveObservers() == null ? 0 : row.getActiveObservers();
-    String when =
-        row.getLateWardSeconds() == null
-            ? "just before the fight"
-            : "%d seconds before the fight".formatted(row.getLateWardSeconds());
-    return observers > 1
-        ? "%s's wards were all placed shortly before the fight, the latest %s".formatted(team, when)
-        : "%s's only ward was placed %s".formatted(team, when);
+    Integer observers = row.getActiveObservers();
+    Integer sentries = row.getActiveSentries();
+    Integer seconds = row.getLateWardSeconds();
+    String when = seconds == null ? "just before the fight" : before(seconds);
+    boolean countsKnown = observers != null && sentries != null;
+    if (countsKnown && observers + sentries == 1) {
+      return "%s's only ward was placed %s".formatted(team, when);
+    }
+    if (countsKnown && observers == 1) {
+      return "%s's only observer was placed %s".formatted(team, when);
+    }
+    if (observers != null && observers > 1) {
+      return "%s's observers were all placed shortly before the fight%s"
+          .formatted(team, seconds == null ? "" : ", the latest " + before(seconds));
+    }
+    return "%s's latest ward was placed %s".formatted(team, when);
+  }
+
+  private static String before(int seconds) {
+    return "%d %s before the fight".formatted(seconds, seconds == 1 ? "second" : "seconds");
   }
 
   private static String invisible(FightVisionDomain row, Map<Long, String> heroNames) {
