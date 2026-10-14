@@ -92,6 +92,11 @@ public final class ReasonRanking {
     return new Ranking(entries.stream().sorted(order).toList(), notRanked);
   }
 
+  /** How many of the reasons are about the team; the count {@code fight_explanation} stores. */
+  public static int countOfTeam(List<FightReasonDomain> reasons, String team) {
+    return (int) reasons.stream().filter(r -> team.equals(r.getTeam())).count();
+  }
+
   private static List<Entry> collapseAbsence(List<FightReasonDomain> reasons) {
     Map<Long, List<FightReasonDomain>> absences =
         reasons.stream()
