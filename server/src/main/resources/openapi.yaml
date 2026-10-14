@@ -2,9 +2,18 @@ openapi: 3.0.3
 info:
   title: DBuff API
   description: |
-    DBuff is a Dota 2 analytics backend that fetches, analyzes, and stores match data 
-    using the OpenDota API. It provides endpoints for player statistics, item rankings, 
-    ability rankings, and match history. Works as pet project only for limited player ids.
+    DBuff is a Dota 2 analytics backend that fetches, analyzes, and stores match data
+    using the OpenDota API and parsed replays. It provides endpoints for player statistics,
+    item and ability rankings, match history, match reports, replay analysis and the
+    registration of Discord instances. Works as pet project only for limited player ids.
+
+    Authentication: every path except GET /actuator/health requires the X-Api-Key header
+    (see the ApiKeyAuth security scheme). The key is not required locally: with
+    app.api.required=false and no DBUFF_API_KEY set the API runs open. In production a
+    missing key on the server closes the API, so every request answers 401.
+
+    Serialisation: null fields are omitted from every response, so a field listed in a
+    schema may be absent. Dates are ISO-8601 strings.
   version: 1.0.0
   contact:
     name: kozlovsky.anton@gmail.com
@@ -12,6 +21,15 @@ info:
 servers:
   - url: http://localhost:8080
     description: Local development server
+  - url: https://{host}
+    description: Production placeholder, replace the host with the deployed one
+    variables:
+      host:
+        default: dbuff.example.com
+        description: Host name of the production deployment
+
+security:
+  - ApiKeyAuth: []
 
 tags:
   - name: Players
@@ -19,17 +37,43 @@ tags:
   - name: Player Statistics
     description: Aggregated player statistics and rankings
   - name: Matches
-    description: Match parsing and processing
+    description: Match parsing, processing, reports and AI analysis
+  - name: Replay
+    description: Replay run status, the stored replay analysis and re-running the analyzers
+  - name: Register
+    description: Registration and settings of Discord instances (tracked players, game modes)
   - name: History
     description: Match history fetching and processing
   - name: Search
-    description: Player search functionality
+    description: Player search by name, external player statistics
+  - name: Image
+    description: Scoreboard image recognition and statistics from it
+  - name: Health
+    description: Liveness, the only unauthenticated path
 
 paths:
+  /actuator/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: The only path that does not need X-Api-Key. The deploy gate and rollback poll it.
+      operationId: health
+      security: []
+      responses:
+        '200':
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+
   /api/v1/players/:
     get:
-      tags:
-        - Players
+      tags: [Players]
       summary: List all players
       description: Returns a paginated list of all players in the database
       operationId: listPlayers
@@ -44,18 +88,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PagedPlayerResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/player/{playerId}/itemRanking:
     get:
-      tags:
-        - Player Statistics
+      tags: [Player Statistics]
       summary: Get item rankings for a player
       description: |
-        Returns a list of items ordered by pick count, with statistics including:
-        - Pick count - number of matches where the item was purchased
-        - Pick rate - percentage of matches where the item was purchased
-        - Win rate - percentage of wins when the item was purchased
-        - Average purchase time - average time in seconds when the item was purchased
+        Returns items ordered by pick count descending. With no items filter the top items by
+        pick count are returned. A limit below 1 falls back to the default.
       operationId: getItemRanking
       parameters:
         - $ref: '#/components/parameters/PlayerIdParam'
@@ -63,7 +105,7 @@ paths:
         - $ref: '#/components/parameters/EndDateParam'
         - name: items
           in: query
-          description: Set of item dnames to include
+          description: Item dnames to include
           required: false
           schema:
             type: array
@@ -71,12 +113,14 @@ paths:
               type: string
         - name: excludedItems
           in: query
-          description: Set of item dnames to exclude
+          description: Item dnames to exclude
           required: false
           schema:
             type: array
             items:
               type: string
+        - $ref: '#/components/parameters/HeroesParam'
+        - $ref: '#/components/parameters/GameModesParam'
         - $ref: '#/components/parameters/LimitParam'
       responses:
         '200':
@@ -87,17 +131,16 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ItemRankingResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/player/{playerId}/abilityRanking:
     get:
-      tags:
-        - Player Statistics
+      tags: [Player Statistics]
       summary: Get ability rankings for a player
       description: |
-        Returns a list of abilities ordered by pick count, with statistics including:
-        - Pick count - number of matches where the ability was picked
-        - Pick rate - percentage of matches where the ability was picked
-        - Win rate - percentage of wins when the ability was picked
+        Returns abilities ordered by pick count descending. With no abilities filter the top
+        abilities by pick count are returned. A limit below 1 falls back to the default.
       operationId: getAbilityRanking
       parameters:
         - $ref: '#/components/parameters/PlayerIdParam'
@@ -105,7 +148,7 @@ paths:
         - $ref: '#/components/parameters/EndDateParam'
         - name: abilities
           in: query
-          description: Set of ability names to include
+          description: Ability names to include
           required: false
           schema:
             type: array
@@ -113,12 +156,14 @@ paths:
               type: string
         - name: excludedAbilities
           in: query
-          description: Set of ability names to exclude
+          description: Ability names to exclude
           required: false
           schema:
             type: array
             items:
               type: string
+        - $ref: '#/components/parameters/HeroesParam'
+        - $ref: '#/components/parameters/GameModesParam'
         - $ref: '#/components/parameters/LimitParam'
       responses:
         '200':
@@ -129,19 +174,17 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/AbilityRankingResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/player/{playerId}/statistic:
     get:
-      tags:
-        - Player Statistics
+      tags: [Player Statistics]
       summary: Get aggregated player statistics
       description: |
-        Returns aggregated statistics including:
-        - N most popular heroes (default 3)
-        - Average/max/min for various metrics (last hits, KDA, gold per min, etc.)
-        - Win/loss statistics
-        - Ward placement statistics
-        - Objective statistics (tower kills, roshan kills)
+        Popular heroes, average/max/min of the main metrics, wins and losses, ward and
+        objective statistics for the date range. Without startDate the whole history is
+        included; without endDate the current date is used.
       operationId: getPlayerStatistics
       parameters:
         - $ref: '#/components/parameters/PlayerIdParam'
@@ -149,11 +192,13 @@ paths:
         - $ref: '#/components/parameters/EndDateParam'
         - name: heroLimit
           in: query
-          description: Number of popular heroes to return
+          description: Number of popular heroes to return; below 1 falls back to the default
           required: false
           schema:
             type: integer
             default: 3
+        - $ref: '#/components/parameters/HeroesParam'
+        - $ref: '#/components/parameters/GameModesParam'
       responses:
         '200':
           description: Successful response
@@ -161,13 +206,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlayerStatisticResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/player/{playerId}/statistic/persist:
     post:
-      tags:
-        - Player Statistics
+      tags: [Player Statistics]
       summary: Persist player statistics
-      description: Persists player statistics for a specific date range for weekly/monthly comparisons
+      description: Persists player statistics for a date range for weekly/monthly comparisons
       operationId: persistPlayerStatistics
       parameters:
         - $ref: '#/components/parameters/PlayerIdParam'
@@ -194,16 +240,17 @@ paths:
             default: 3
       responses:
         '201':
-          description: Statistics persisted successfully
+          description: Statistics persisted
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlayerStatisticSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/player/{playerId}/statistic/persist/weekly:
     post:
-      tags:
-        - Player Statistics
+      tags: [Player Statistics]
       summary: Persist weekly statistics
       description: Calculates and persists statistics for the last 7 days
       operationId: persistWeeklyStatistics
@@ -211,18 +258,19 @@ paths:
         - $ref: '#/components/parameters/PlayerIdParam'
       responses:
         '201':
-          description: Weekly statistics persisted successfully
+          description: Weekly statistics persisted
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlayerStatisticSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/player/{playerId}/statistic/history:
     get:
-      tags:
-        - Player Statistics
+      tags: [Player Statistics]
       summary: Get persisted statistics history
-      description: Returns all persisted statistics summaries for a player
+      description: Returns all persisted statistics summaries for a player, newest start date first
       operationId: getPersistedStatistics
       parameters:
         - $ref: '#/components/parameters/PlayerIdParam'
@@ -235,11 +283,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/PlayerStatisticSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/player/{playerId}/statistic/history/range:
     get:
-      tags:
-        - Player Statistics
+      tags: [Player Statistics]
       summary: Get persisted statistics in date range
       description: Returns persisted statistics summaries within a date range
       operationId: getPersistedStatisticsInRange
@@ -268,39 +317,111 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/PlayerStatisticSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/matches/{id}:
+    get:
+      tags: [Matches]
+      summary: Get a stored match
+      description: The match with its player statistics, items, abilities, kill log and AI analysis
+      operationId: getMatch
+      parameters:
+        - $ref: '#/components/parameters/MatchIdParam'
+      responses:
+        '200':
+          description: The match
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchDetailResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: The match is not stored
+    delete:
+      tags: [Matches]
+      summary: Delete a match
+      description: |
+        Deletes the match and its player statistics, items, abilities and analysis (unless the
+        analysis is shared with other matches). An unknown match raises EntityNotFoundException,
+        which no handler maps, so it surfaces as a 500 error.
+      operationId: deleteMatch
+      parameters:
+        - $ref: '#/components/parameters/MatchIdParam'
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: The match does not exist (unmapped EntityNotFoundException) or deletion failed
 
   /api/v1/matches/{id}/parse:
     post:
-      tags:
-        - Matches
+      tags: [Matches]
       summary: Parse a match
-      description: Fetches and parses match details from OpenDota API
+      description: Fetches and parses match details from the OpenDota API and returns what was stored
       operationId: parseMatch
       parameters:
         - name: id
           in: path
-          description: Match ID
+          description: Match ID, parsed as a long
           required: true
           schema:
             type: string
       responses:
         '200':
-          description: Match parsed successfully
+          description: Match parsed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MatchDomain'
+                $ref: '#/components/schemas/MatchDetailResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/matches/{id}/report:
+    get:
+      tags: [Matches]
+      summary: Get the match report of an instance
+      description: Runs the report analyzers of the instance over a stored match
+      operationId: getMatchReport
+      parameters:
+        - $ref: '#/components/parameters/MatchIdParam'
+        - $ref: '#/components/parameters/InstanceIdQuery'
+        - name: playerIds
+          in: query
+          description: Keep per-player reports of these players only; reports that are not per-player are always kept
+          required: false
+          schema:
+            type: array
+            items:
+              type: integer
+              format: int64
+      responses:
+        '200':
+          description: The reports
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchReportResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: The instance or the match is unknown
 
   /api/v1/matches/processLast:
     post:
-      tags:
-        - Matches
-      summary: Process last matches
-      description: Fetches and processes recent matches for configured players
+      tags: [Matches]
+      summary: Process last matches of an instance
+      description: Fetches and processes the recent matches of the instance players
       operationId: processLastMatches
+      parameters:
+        - $ref: '#/components/parameters/InstanceIdQuery'
+        - $ref: '#/components/parameters/EnableAiParam'
       responses:
         '200':
-          description: Successful response
+          description: IDs of the matches that were fetched
           content:
             application/json:
               schema:
@@ -308,27 +429,405 @@ paths:
                 items:
                   type: integer
                   format: int64
-                description: Set of processed match IDs
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: The instance is unknown
+
+  /api/v1/matches/processAll:
+    post:
+      tags: [Matches]
+      summary: Process last matches of all active instances
+      description: Starts processing for every active instance and returns at once
+      operationId: processAllInstances
+      parameters:
+        - $ref: '#/components/parameters/EnableAiParam'
+      responses:
+        '202':
+          description: Processing started
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/matches/analyze:
+    post:
+      tags: [Matches]
+      summary: Analyze matches with AI
+      description: |
+        Runs the AI analysis for an instance over processed matches (those with player
+        statistics). Unknown or unprocessed match IDs, and entries that are not numbers, are
+        skipped; with nothing left the response is an empty list. If both fieldConfig and
+        preset are sent, fieldConfig wins.
+      operationId: analyzeMatches
+      parameters:
+        - $ref: '#/components/parameters/InstanceIdQuery'
+        - name: matches
+          in: query
+          description: Comma-separated match IDs
+          required: true
+          schema:
+            type: string
+            example: 9038725154,9037038717
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeMatchesRequest'
+      responses:
+        '200':
+          description: The analysis results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MatchAnalysisDomain'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: The instance is unknown
+
+  /api/v1/matches/findIncompleted:
+    get:
+      tags: [Matches]
+      summary: Find incomplete matches
+      description: Checks every stored match and lists those with missing data. Walks all matches, so it can be slow.
+      operationId: findIncompletedMatches
+      responses:
+        '200':
+          description: One single-key object per incomplete match, match ID mapped to what is missing
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IncompleteMatchEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/matches/findIncompletedAndFix:
+    post:
+      tags: [Matches]
+      summary: Find incomplete matches and process them again
+      description: Same check as findIncompleted, then processes every incomplete match. Returns the list found before fixing.
+      operationId: findIncompletedMatchesAndFix
+      responses:
+        '200':
+          description: The incomplete matches that were reprocessed
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IncompleteMatchEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/replay/{matchId}:
+    get:
+      tags: [Replay]
+      summary: Replay run status
+      description: How the replay run of the match ended, for the current parser version
+      operationId: getReplayRun
+      parameters:
+        - $ref: '#/components/parameters/ReplayMatchIdParam'
+      responses:
+        '200':
+          description: The run status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No run is stored for the match
+
+  /api/v1/replay/{matchId}/analysis:
+    get:
+      tags: [Replay]
+      summary: Stored replay analysis
+      description: |
+        The stored analysis of a match as one JSON document, read from the tables only, in one
+        snapshot. The sections are run, roles, fights, vision, runes, lanes, items, outliers,
+        behaviour and endgame; all are returned when sections is absent. Roles, runes, lanes
+        and behaviour are objects of lists, the others are lists; the fields are those of the
+        reader records in service/replay/read.
+      operationId: getReplayAnalysis
+      parameters:
+        - $ref: '#/components/parameters/ReplayMatchIdParam'
+        - name: sections
+          in: query
+          description: Comma-separated section names; an empty entry or an unknown name gives 400
+          required: false
+          schema:
+            type: string
+            example: roles,fights
+      responses:
+        '200':
+          description: The requested sections, keyed by name
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReplayAnalysis'
+        '400':
+          description: Empty entry or unknown section; the message lists the valid sections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No replay run of the match is stored (empty body)
+
+  /api/v1/replay/{matchId}/reanalyze:
+    post:
+      tags: [Replay]
+      summary: Re-run the analyzers for one match
+      description: |
+        Runs every analyzer again from the stored data, no replay needed. Only runs with status
+        DONE qualify. One re-analysis runs at a time across this and the bulk endpoint.
+      operationId: reanalyzeMatch
+      parameters:
+        - $ref: '#/components/parameters/ReplayMatchIdParam'
+      responses:
+        '200':
+          description: Analyzed; failedAnalyzers lists the analyzers that failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  matchId:
+                    type: integer
+                    format: int64
+                  failedAnalyzers:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No run stored for the match, or its status is not DONE (empty body)
+        '409':
+          description: The match is not stored or its game mode is not active for replay processing, or a re-analysis is already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+
+  /api/v1/replay/reanalyze:
+    post:
+      tags: [Replay]
+      summary: Re-run the analyzers in bulk
+      description: |
+        Runs every analyzer again for finished (DONE) runs of matches with an ID above after,
+        oldest first, up to limit. Call again with after set to lastMatchId to continue. Runs
+        whose game mode is not active are skipped.
+      operationId: reanalyzeMatches
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum runs to process
+          required: false
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 500
+        - name: after
+          in: query
+          description: Process only matches with an ID greater than this
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+      responses:
+        '200':
+          description: Counts of the batch
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  analysed:
+                    type: integer
+                    description: Runs analysed
+                  available:
+                    type: integer
+                    description: DONE runs of the parser version, before the after and limit cut
+                  withFailures:
+                    type: integer
+                    description: Analysed runs where an analyzer failed or threw
+                  skipped:
+                    type: integer
+                    description: Runs skipped because the game mode is not active
+                  lastMatchId:
+                    type: integer
+                    format: int64
+                    description: Last match ID reached, to pass as after; equals after when nothing was left
+        '400':
+          description: limit outside 1 to 500
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: A re-analysis is already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+
+  /api/v1/register:
+    post:
+      tags: [Register]
+      summary: Register an instance
+      description: |
+        Creates an instance configuration. A deactivated instance on the same Discord channel is
+        brought back instead of rejected. Game modes are names, numeric IDs or "all".
+      operationId: registerInstance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInstanceRequest'
+      responses:
+        '201':
+          description: The created instance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbufInstanceConfigResponse'
+        '400':
+          description: No player IDs, or an unknown game mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: The Discord channel already has an active instance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Registration failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags: [Register]
+      summary: List active instances
+      operationId: listInstances
+      responses:
+        '200':
+          description: Active instance configurations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DbufInstanceConfigResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/register/{id}:
+    get:
+      tags: [Register]
+      summary: Get an instance
+      operationId: getInstance
+      parameters:
+        - $ref: '#/components/parameters/InstanceIdPath'
+      responses:
+        '200':
+          description: The instance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbufInstanceConfigResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: The instance is unknown
+    patch:
+      tags: [Register]
+      summary: Update an instance
+      description: Adds or removes players and game modes, renames, activates or deactivates, and changes the per-channel settings
+      operationId: updateInstance
+      parameters:
+        - $ref: '#/components/parameters/InstanceIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInstanceRequest'
+      responses:
+        '200':
+          description: The updated instance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DbufInstanceConfigResponse'
+        '400':
+          description: Unknown instance or invalid value, such as an unknown game mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: Update failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Register]
+      summary: Delete an instance
+      operationId: deleteInstance
+      parameters:
+        - $ref: '#/components/parameters/InstanceIdPath'
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/register/{id}/deactivate:
+    post:
+      tags: [Register]
+      summary: Deactivate an instance
+      description: Marks the instance inactive and unschedules its jobs; an unknown ID is ignored
+      operationId: deactivateInstance
+      parameters:
+        - $ref: '#/components/parameters/InstanceIdPath'
+      responses:
+        '204':
+          description: Deactivated
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/history/processAll:
     post:
-      tags:
-        - History
-      summary: Process all match history
+      tags: [History]
+      summary: Process the match history of an instance
       description: |
-        Fetches and processes complete match history for specified players.
-        If no players specified, uses default configured players.
+        Loads the complete history of every player of the instance in the background, for the
+        game modes of the instance, and returns at once.
       operationId: processAllHistory
       parameters:
-        - name: players
-          in: query
-          description: List of player IDs to process
-          required: false
-          schema:
-            type: array
-            items:
-              type: integer
-              format: int64
+        - $ref: '#/components/parameters/InstanceIdQuery'
         - name: startPage
           in: query
           description: Starting page number
@@ -344,17 +843,22 @@ paths:
             type: integer
             default: -1
       responses:
-        '200':
-          description: History processing started
+        '202':
+          description: Processing started
+        '400':
+          description: The instance is not active
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: The instance is unknown
 
   /api/v1/findPlayer/{playerName}:
     get:
-      tags:
-        - Search
+      tags: [Search]
       summary: Find player matches by name
       description: |
-        Returns a list of matches where the player participated, ordered by match date descending.
-        Each match includes statistics for the searched player and default players.
+        Matches where the player took part, newest first, each with statistics of the searched
+        player and the instance players. An unknown player or instance gives an empty list.
       operationId: findPlayerMatches
       parameters:
         - name: playerName
@@ -363,7 +867,14 @@ paths:
           required: true
           schema:
             type: string
-        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/InstanceIdQuery'
+        - name: limit
+          in: query
+          description: Maximum matches; below 1 falls back to the default
+          required: false
+          schema:
+            type: integer
+            default: 20
       responses:
         '200':
           description: Successful response
@@ -373,8 +884,139 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/FindPlayerMatchesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/externalPlayerStatistic:
+    get:
+      tags: [Search]
+      summary: Statistics against or with an external player
+      description: |
+        Games where the focus group played with or against the named player. The focus group
+        comes from instance_id when given, otherwise from focus_player_ids (empty when neither
+        is sent).
+      operationId: getExternalPlayerStatistic
+      parameters:
+        - name: instance_id
+          in: query
+          description: Instance whose players are the focus group
+          required: false
+          schema:
+            type: string
+        - name: focus_player_ids
+          in: query
+          description: Focus group player IDs, used only when instance_id is absent
+          required: false
+          schema:
+            type: array
+            items:
+              type: integer
+              format: int64
+        - name: player_name
+          in: query
+          description: The external player's name
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The statistics; empty when the player is not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalPlayerStatisticResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/image/players:
+    post:
+      tags: [Image]
+      summary: Extract player names from a scoreboard image
+      description: OCR over the uploaded image (Google Cloud Vision); uploads up to 20MB
+      operationId: extractPlayerNames
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: The image file (PNG, JPEG, etc.)
+      responses:
+        '200':
+          description: The detected names
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractedPlayerNamesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/scoreboardStatistics:
+    post:
+      tags: [Image]
+      summary: Statistics of the opponents on a scoreboard image
+      description: |
+        Detects the player names on the image, drops the focus group itself and returns the
+        statistics against each remaining player. The focus group comes from instance_id when
+        given, otherwise from focus_player_ids. The two text fields are read as request
+        parameters, so they may be sent as form fields or in the query string.
+      operationId: getScoreboardStatistics
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: The scoreboard image
+                instance_id:
+                  type: string
+                  description: Instance whose players are the focus group
+                focus_player_ids:
+                  type: array
+                  items:
+                    type: integer
+                    format: int64
+                  description: Focus group player IDs, used only when instance_id is absent
+      responses:
+        '200':
+          description: One entry per detected opponent
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExternalPlayerStatisticResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: |
+        Required on every path except /actuator/health. Not required locally
+        (app.api.required=false with an empty DBUFF_API_KEY runs open).
+
+  responses:
+    Unauthorized:
+      description: Missing or wrong X-Api-Key, or the server has no key configured in production
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorMessage'
+
   parameters:
     PlayerIdParam:
       name: playerId
@@ -384,34 +1026,86 @@ components:
       schema:
         type: integer
         format: int64
-
+    MatchIdParam:
+      name: id
+      in: path
+      description: Match ID
+      required: true
+      schema:
+        type: integer
+        format: int64
+    ReplayMatchIdParam:
+      name: matchId
+      in: path
+      description: Match ID
+      required: true
+      schema:
+        type: integer
+        format: int64
+    InstanceIdPath:
+      name: id
+      in: path
+      description: Instance ID
+      required: true
+      schema:
+        type: string
+    InstanceIdQuery:
+      name: instanceId
+      in: query
+      description: Instance configuration ID
+      required: true
+      schema:
+        type: string
+    EnableAiParam:
+      name: enableAi
+      in: query
+      description: Run the AI analysis after processing
+      required: false
+      schema:
+        type: boolean
+        default: true
     StartDateParam:
       name: startDate
       in: query
-      description: Start date filter (inclusive)
+      description: Start date filter (inclusive); absent includes all history
       required: false
       schema:
         type: string
         format: date
-
     EndDateParam:
       name: endDate
       in: query
-      description: End date filter (inclusive)
+      description: End date filter (inclusive); absent uses the current date
       required: false
       schema:
         type: string
         format: date
-
+    HeroesParam:
+      name: heroes
+      in: query
+      description: Hero names to restrict the statistics to
+      required: false
+      schema:
+        type: array
+        items:
+          type: string
+    GameModesParam:
+      name: gameModes
+      in: query
+      description: Game mode names to restrict the statistics to; absent includes every mode
+      required: false
+      schema:
+        type: array
+        items:
+          type: string
     LimitParam:
       name: limit
       in: query
-      description: Maximum number of results to return
+      description: Maximum number of results; below 1 falls back to the default
       required: false
       schema:
         type: integer
         default: 10
-
     PageParam:
       name: page
       in: query
@@ -420,7 +1114,6 @@ components:
       schema:
         type: integer
         default: 0
-
     SizeParam:
       name: size
       in: query
@@ -429,7 +1122,6 @@ components:
       schema:
         type: integer
         default: 20
-
     SortParam:
       name: sort
       in: query
@@ -439,370 +1131,2468 @@ components:
         type: string
 
   schemas:
-    ItemRankingResponse:
+    ErrorResponse:
       type: object
-      description: Item ranking statistics for a player
+      description: "Error body of the register endpoints."
       properties:
-        itemId:
-          type: integer
-          format: int64
-          description: Item ID
-        itemName:
+        code:
           type: string
-          description: Item internal name
-        itemPrettyName:
+          description: "INVALID_REQUEST, CONFLICT or INTERNAL_ERROR"
+        message:
           type: string
-          description: Item display name
-        playerId:
-          type: integer
-          format: int64
-          description: Player account ID
-        playerName:
+          description: "Human-readable message"
+        details:
           type: string
-          description: Player name
-        pickCount:
-          type: integer
-          format: int64
-          description: Number of matches where this item was picked
-        pickRate:
-          type: number
-          description: Percentage of matches where this item was picked (0-100)
-        winRate:
-          type: number
-          description: Win rate when this item was picked (0-100)
-        avgPurchaseTime:
-          type: number
-          description: Average purchase time in seconds
-
-    AbilityRankingResponse:
+          description: "Extra detail, present on INTERNAL_ERROR"
+    ErrorMessage:
       type: object
-      description: Ability ranking statistics for a player
+      description: "Error body of the replay endpoints and of the API key filter (unauthorized responses carry the text Unauthorized)."
       properties:
-        abilityId:
-          type: integer
-          format: int64
-          description: Ability ID
-        abilityName:
+        error:
           type: string
-          description: Ability internal name
-        abilityPrettyName:
-          type: string
-          description: Ability display name
-        playerId:
-          type: integer
-          format: int64
-          description: Player account ID
-        playerName:
-          type: string
-          description: Player name
-        pickCount:
-          type: integer
-          format: int64
-          description: Number of matches where this ability was picked
-        pickRate:
-          type: number
-          description: Percentage of matches where this ability was picked (0-100)
-        winRate:
-          type: number
-          description: Win rate when this ability was picked (0-100)
-
-    PlayerStatisticResponse:
+          description: "What went wrong"
+    PlayerDomain:
       type: object
-      description: Aggregated player statistics
-      properties:
-        playerId:
-          type: integer
-          format: int64
-          description: Player account ID
-        playerName:
-          type: string
-          description: Player name
-        startDate:
-          type: string
-          format: date
-          description: Start date of the statistics period
-        endDate:
-          type: string
-          format: date
-          description: End date of the statistics period
-        totalMatches:
-          type: integer
-          format: int64
-          description: Total number of matches in the period
-        popularHeroes:
-          type: array
-          description: Most popular heroes
-          items:
-            $ref: '#/components/schemas/HeroStatistic'
-        avgObsPlaced:
-          type: number
-          description: Average observer wards placed
-        avgSenPlaced:
-          type: number
-          description: Average sentry wards placed
-        avgCreepsStacked:
-          type: number
-          description: Average creeps stacked
-        avgLastHits:
-          type: number
-          description: Average last hits
-        maxLastHits:
-          type: integer
-          format: int64
-          description: Maximum last hits
-        minLastHits:
-          type: integer
-          format: int64
-          description: Minimum last hits
-        avgDenies:
-          type: number
-          description: Average denies
-        avgCampsStacked:
-          type: number
-          description: Average camps stacked
-        avgRunePickups:
-          type: number
-          description: Average rune pickups
-        avgTowerKills:
-          type: number
-          description: Average tower kills
-        avgRoshanKills:
-          type: number
-          description: Average roshan kills
-        avgWinRate:
-          type: number
-          description: Average win rate (0-100)
-        wins:
-          type: integer
-          format: int64
-          description: Total wins
-        losses:
-          type: integer
-          format: int64
-          description: Total losses
-        avgKda:
-          type: number
-          description: Average KDA ratio
-        maxKda:
-          type: number
-          description: Maximum KDA ratio
-        minKda:
-          type: number
-          description: Minimum KDA ratio
-        avgNeutralKills:
-          type: number
-          description: Average neutral kills
-        avgCourierKills:
-          type: number
-          description: Average courier kills
-        avgLaneEfficiency:
-          type: number
-          description: Average lane efficiency
-        avgGoldPerMin:
-          type: number
-          description: Average gold per minute
-        maxGoldPerMin:
-          type: integer
-          format: int64
-          description: Maximum gold per minute
-        minGoldPerMin:
-          type: integer
-          format: int64
-          description: Minimum gold per minute
-        avgXpPerMin:
-          type: number
-          description: Average XP per minute
-
-    HeroStatistic:
-      type: object
-      description: Hero statistics
-      properties:
-        heroId:
-          type: integer
-          format: int64
-          description: Hero ID
-        heroName:
-          type: string
-          description: Hero internal name
-        heroPrettyName:
-          type: string
-          description: Hero display name
-        pickCount:
-          type: integer
-          format: int64
-          description: Number of times picked
-        winRate:
-          type: number
-          description: Win rate (0-100)
-
-    FindPlayerMatchesResponse:
-      type: object
-      description: Player match search result
-      properties:
-        matchId:
-          type: integer
-          format: int64
-          description: Match ID
-        matchDate:
-          type: string
-          format: date
-          description: Match date
-        dotabuffUrl:
-          type: string
-          description: Dotabuff URL for the match builds
-        playerId:
-          type: integer
-          format: int64
-          description: Searched player ID
-        playerName:
-          type: string
-          description: Searched player name
-        statistics:
-          type: array
-          description: Statistics for players in this match
-          items:
-            $ref: '#/components/schemas/PlayerMatchStatistic'
-
-    PlayerMatchStatistic:
-      type: object
-      description: Player statistics in a match
-      properties:
-        playerId:
-          type: integer
-          format: int64
-          description: Player ID
-        playerName:
-          type: string
-          description: Player name
-        playerSlot:
-          type: integer
-          format: int64
-          description: Player slot (0-4 Radiant, 128-132 Dire)
-        heroPrettyName:
-          type: string
-          description: Hero display name
-        kda:
-          type: number
-          description: KDA ratio
-        win:
-          type: integer
-          format: int64
-          description: Win (1) or Loss (0)
-        goldPerMin:
-          type: integer
-          format: int64
-          description: Gold per minute
-
-    PlayerStatisticSummary:
-      type: object
-      description: Persisted player statistics summary
+      description: "A tracked player."
       properties:
         id:
           type: integer
           format: int64
-          description: Summary ID
-        playerId:
-          type: integer
-          format: int64
-          description: Player account ID
-        startDate:
+          description: "Player account ID"
+        name:
           type: string
-          format: date
-          description: Start date of the period
-        endDate:
+          description: "Player name (the entity key)"
+        discordUserId:
           type: string
-          format: date
-          description: End date of the period
-        totalMatches:
-          type: integer
-          format: int64
-          description: Total matches in period
-        wins:
-          type: integer
-          format: int64
-          description: Total wins
-        losses:
-          type: integer
-          format: int64
-          description: Total losses
-        avgKda:
-          type: number
-          description: Average KDA
-        avgGoldPerMin:
-          type: number
-          description: Average gold per minute
-        createdAt:
-          type: string
-          format: date-time
-          description: When the summary was created
-
-    MatchDomain:
-      type: object
-      description: Match domain object
-      properties:
-        matchId:
-          type: integer
-          format: int64
-          description: Match ID
-        startTime:
-          type: string
-          format: date-time
-          description: Match start time
-        duration:
-          type: integer
-          description: Match duration in seconds
-        radiantWin:
-          type: boolean
-          description: Whether Radiant won
-        gameMode:
-          type: integer
-          description: Game mode ID
-        lobbyType:
-          type: integer
-          description: Lobby type ID
-
-    PlayerDomain:
-      type: object
-      description: Player domain object
-      properties:
-        accountId:
-          type: integer
-          format: int64
-          description: Player account ID
-        personaName:
-          type: string
-          description: Player persona name
-        avatarUrl:
-          type: string
-          description: Avatar URL
-
+          description: "Linked Discord user ID (snowflake as a string), absent when unlinked"
     PagedPlayerResponse:
       type: object
-      description: Paginated player response
+      description: "Spring Data Page of players. Only the main fields are listed; the page also carries pageable and sort objects."
       properties:
         content:
           type: array
           items:
             $ref: '#/components/schemas/PlayerDomain'
+          description: "Players on this page"
         totalElements:
           type: integer
           format: int64
-          description: Total number of elements
+          description: "Total number of players"
         totalPages:
           type: integer
-          description: Total number of pages
+          format: int32
+          description: "Total number of pages"
         size:
           type: integer
-          description: Page size
+          format: int32
+          description: "Page size"
         number:
           type: integer
-          description: Current page number
+          format: int32
+          description: "Current page number, 0-indexed"
+        numberOfElements:
+          type: integer
+          format: int32
+          description: "Elements on this page"
         first:
           type: boolean
-          description: Is first page
+          description: "Is first page"
         last:
           type: boolean
-          description: Is last page
+          description: "Is last page"
         empty:
           type: boolean
-          description: Is page empty
+          description: "Is page empty"
+        pageable:
+          type: object
+          additionalProperties: true
+          description: "Spring Data pageable echo (pageNumber, pageSize, offset, sort, paged, unpaged)"
+        sort:
+          type: object
+          additionalProperties: true
+          description: "Spring Data sort echo (sorted, unsorted, empty)"
+    ItemRankingResponse:
+      type: object
+      description: "Item usage of a player across matches."
+      properties:
+        itemId:
+          type: integer
+          format: int64
+          description: "Item ID"
+        itemName:
+          type: string
+          description: "Item internal name"
+        itemPrettyName:
+          type: string
+          description: "Item display name"
+        playerId:
+          type: integer
+          format: int64
+          description: "Player account ID"
+        playerName:
+          type: string
+          description: "Player name"
+        pickCount:
+          type: integer
+          format: int64
+          description: "Number of matches where the item was picked"
+        pickRate:
+          type: number
+          description: "Percentage of matches where the item was picked (0-100)"
+        winRate:
+          type: number
+          description: "Win rate when the item was picked (0-100)"
+        avgPurchaseTime:
+          type: number
+          description: "Average purchase time in seconds"
+        avgUseCount:
+          type: number
+          description: "Average uses per game; absent means no use data was recorded, not never used"
+    AbilityRankingResponse:
+      type: object
+      description: "Ability usage of a player across matches."
+      properties:
+        abilityId:
+          type: integer
+          format: int64
+          description: "Ability ID"
+        abilityName:
+          type: string
+          description: "Ability internal name"
+        abilityPrettyName:
+          type: string
+          description: "Ability display name"
+        playerId:
+          type: integer
+          format: int64
+          description: "Player account ID"
+        playerName:
+          type: string
+          description: "Player name"
+        pickCount:
+          type: integer
+          format: int64
+          description: "Number of matches where the ability was picked"
+        pickRate:
+          type: number
+          description: "Percentage of matches where the ability was picked (0-100)"
+        winRate:
+          type: number
+          description: "Win rate when the ability was picked (0-100)"
+        avgUseCount:
+          type: number
+          description: "Average uses per game; absent means no use data was recorded, not never used"
+    HeroStatistic:
+      type: object
+      description: "Hero statistics for the popular heroes."
+      properties:
+        heroId:
+          type: integer
+          format: int64
+          description: "Hero ID"
+        heroName:
+          type: string
+          description: "Hero internal name"
+        heroPrettyName:
+          type: string
+          description: "Hero display name"
+        pickCount:
+          type: integer
+          format: int64
+          description: "Number of times picked"
+        winRate:
+          type: number
+          description: "Win rate (0-100)"
+    PlayerStatisticResponse:
+      type: object
+      description: "Aggregated player statistics for a date range."
+      properties:
+        playerId:
+          type: integer
+          format: int64
+          description: "Player account ID"
+        playerName:
+          type: string
+          description: "Player name"
+        startDate:
+          type: string
+          format: date
+          description: "Start of the period"
+        endDate:
+          type: string
+          format: date
+          description: "End of the period"
+        totalMatches:
+          type: integer
+          format: int64
+          description: "Matches in the period"
+        popularHeroes:
+          type: array
+          items:
+            $ref: '#/components/schemas/HeroStatistic'
+          description: "Most popular heroes"
+        heroFiltered:
+          type: boolean
+          description: "True when the statistics were restricted to a single hero; omit popularHeroes then"
+        avgObsPlaced:
+          type: number
+          description: "Average observer wards placed"
+        avgSenPlaced:
+          type: number
+          description: "Average sentry wards placed"
+        avgCreepsStacked:
+          type: number
+          description: "Average creeps stacked"
+        avgLastHits:
+          type: number
+          description: "Average last hits"
+        maxLastHits:
+          type: integer
+          format: int64
+          description: "Maximum last hits"
+        minLastHits:
+          type: integer
+          format: int64
+          description: "Minimum last hits"
+        avgDenies:
+          type: number
+          description: "Average denies"
+        avgCampsStacked:
+          type: number
+          description: "Average camps stacked"
+        avgRunePickups:
+          type: number
+          description: "Average rune pickups"
+        avgTowerKills:
+          type: number
+          description: "Average tower kills"
+        avgRoshanKills:
+          type: number
+          description: "Average roshan kills"
+        avgWinRate:
+          type: number
+          description: "Average win rate (0-100)"
+        wins:
+          type: integer
+          format: int64
+          description: "Total wins"
+        losses:
+          type: integer
+          format: int64
+          description: "Total losses"
+        avgKda:
+          type: number
+          description: "Average KDA"
+        maxKda:
+          type: number
+          description: "Maximum KDA"
+        minKda:
+          type: number
+          description: "Minimum KDA"
+        avgNeutralKills:
+          type: number
+          description: "Average neutral kills"
+        avgCourierKills:
+          type: number
+          description: "Average courier kills"
+        avgLaneEfficiency:
+          type: number
+          description: "Average lane efficiency"
+        avgGoldPerMin:
+          type: number
+          description: "Average gold per minute"
+        maxGoldPerMin:
+          type: integer
+          format: int64
+          description: "Maximum gold per minute"
+        minGoldPerMin:
+          type: integer
+          format: int64
+          description: "Minimum gold per minute"
+        avgXpPerMin:
+          type: number
+          description: "Average XP per minute"
+    PlayerStatisticSummary:
+      type: object
+      description: "Persisted player statistics summary (PlayerStatisticSummaryDomain)."
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: "Summary ID"
+        playerId:
+          type: integer
+          format: int64
+          description: "Player account ID"
+        startDate:
+          type: string
+          format: date
+          description: "Start of the period (inclusive)"
+        endDate:
+          type: string
+          format: date
+          description: "End of the period (inclusive)"
+        createdAt:
+          type: string
+          format: date-time
+          description: "When the summary was calculated"
+        totalMatches:
+          type: integer
+          format: int64
+          description: "Matches in the period"
+        popularHeroIds:
+          type: string
+          description: "Top 3 hero IDs, comma-separated"
+        popularHeroNames:
+          type: string
+          description: "Top 3 hero names, comma-separated"
+        avgObsPlaced:
+          type: number
+          description: "Average observer wards placed"
+        avgSenPlaced:
+          type: number
+          description: "Average sentry wards placed"
+        avgCreepsStacked:
+          type: number
+          description: "Average creeps stacked"
+        avgLastHits:
+          type: number
+          description: "Average last hits"
+        maxLastHits:
+          type: integer
+          format: int64
+          description: "Maximum last hits"
+        minLastHits:
+          type: integer
+          format: int64
+          description: "Minimum last hits"
+        avgDenies:
+          type: number
+          description: "Average denies"
+        avgCampsStacked:
+          type: number
+          description: "Average camps stacked"
+        avgRunePickups:
+          type: number
+          description: "Average rune pickups"
+        avgTowerKills:
+          type: number
+          description: "Average tower kills"
+        avgRoshanKills:
+          type: number
+          description: "Average roshan kills"
+        avgWinRate:
+          type: number
+          description: "Average win rate"
+        wins:
+          type: integer
+          format: int64
+          description: "Total wins"
+        losses:
+          type: integer
+          format: int64
+          description: "Total losses"
+        avgKda:
+          type: number
+          description: "Average KDA"
+        maxKda:
+          type: number
+          description: "Maximum KDA"
+        minKda:
+          type: number
+          description: "Minimum KDA"
+        avgNeutralKills:
+          type: number
+          description: "Average neutral kills"
+        avgCourierKills:
+          type: number
+          description: "Average courier kills"
+        avgLaneEfficiency:
+          type: number
+          description: "Average lane efficiency"
+        avgGoldPerMin:
+          type: number
+          description: "Average gold per minute"
+        maxGoldPerMin:
+          type: integer
+          format: int64
+          description: "Maximum gold per minute"
+        minGoldPerMin:
+          type: integer
+          format: int64
+          description: "Minimum gold per minute"
+        avgXpPerMin:
+          type: number
+          description: "Average XP per minute"
+    PlayerMatchStatistic:
+      type: object
+      description: "Statistics of one player in a match."
+      properties:
+        playerId:
+          type: integer
+          format: int64
+          description: "Player ID"
+        playerName:
+          type: string
+          description: "Player name"
+        playerSlot:
+          type: integer
+          format: int64
+          description: "Player slot (0-4 Radiant, 128-132 Dire)"
+        heroPrettyName:
+          type: string
+          description: "Hero display name"
+        kda:
+          type: number
+          description: "KDA ratio"
+        win:
+          type: integer
+          format: int64
+          description: "Win (1) or loss (0)"
+        goldPerMin:
+          type: integer
+          format: int64
+          description: "Gold per minute"
+    FindPlayerMatchesResponse:
+      type: object
+      description: "A match the searched player took part in."
+      properties:
+        matchId:
+          type: integer
+          format: int64
+          description: "Match ID"
+        matchDate:
+          type: string
+          format: date
+          description: "Match date"
+        dotabuffUrl:
+          type: string
+          description: "Dotabuff URL for the match builds"
+        playerId:
+          type: integer
+          format: int64
+          description: "ID of the searched player"
+        playerName:
+          type: string
+          description: "Name of the searched player"
+        statistics:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerMatchStatistic'
+          description: "Searched player plus the instance players in this match"
+    WinLoseStat:
+      type: object
+      description: "Win/lose counters from the focus group perspective."
+      properties:
+        win:
+          type: integer
+          format: int64
+          description: "Matches won"
+        lose:
+          type: integer
+          format: int64
+          description: "Matches lost"
+    ExternalMatchStats:
+      type: object
+      description: "The external player within one match."
+      properties:
+        playerHero:
+          type: string
+          description: "Hero (pretty name) played by the external player"
+        playerSkills:
+          type: array
+          items:
+            type: string
+          description: "Abilities (pretty names) chosen by the external player"
+    ExternalHistoryEntry:
+      type: object
+      description: "One match in which a focus player met the external player."
+      properties:
+        matchId:
+          type: integer
+          format: int64
+          description: "Match ID"
+        matchDate:
+          type: string
+          format: date
+          description: "Date the match was played, may be absent"
+        dotabuffLink:
+          type: string
+          description: "Dotabuff URL for the match builds"
+        against:
+          type: boolean
+          description: "External player was on the opposing team"
+        teammate:
+          type: boolean
+          description: "External player was on the same team"
+        playerWon:
+          type: boolean
+          description: "The focus player won the match"
+        matchStats:
+          description: "The external player in this match"
+          allOf:
+            - $ref: '#/components/schemas/ExternalMatchStats'
+    ExternalPlayerStatisticResponse:
+      type: object
+      description: "History of games where the focus group played with or against an external player; an empty body when the player is not found."
+      properties:
+        playerName:
+          type: string
+          description: "Name searched for"
+        playerId:
+          type: integer
+          format: int64
+          description: "Account ID of the external player, absent when not found"
+        againstStat:
+          description: "Matches against the external player"
+          allOf:
+            - $ref: '#/components/schemas/WinLoseStat'
+        teammateStat:
+          description: "Matches with the external player"
+          allOf:
+            - $ref: '#/components/schemas/WinLoseStat'
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExternalHistoryEntry'
+          description: "One entry per qualifying match"
+    ExtractedPlayerNamesResponse:
+      type: object
+      description: "Player names detected in an image by OCR."
+      properties:
+        playerNames:
+          type: array
+          items:
+            type: string
+          description: "Detected names (expected up to 10)"
+    PlayerInfo:
+      type: object
+      description: "A tracked player with name."
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: "Player account ID"
+        name:
+          type: string
+          description: "Player name"
+    InstanceSettingsResponse:
+      type: object
+      description: "Per-channel settings with unset values resolved to what applies."
+      properties:
+        aiSummaryEnabled:
+          type: boolean
+          description: "OpenAI match summary on"
+        replayReportEnabled:
+          type: boolean
+          description: "Replay analysis in the match thread on"
+        quietHours:
+          type: string
+          description: "\"server default\", \"off\" or HH:mm-HH:mm"
+        timezone:
+          type: string
+          description: "IANA zone id or \"server default\""
+        defaultGameModes:
+          type: array
+          items:
+            type: string
+          description: "Mode tokens as stored; empty means /stats uses Ability Draft"
+        reportDetail:
+          type: string
+          description: "MINIMAL, STANDARD or FULL"
+    DbufInstanceConfigResponse:
+      type: object
+      description: "A registered instance configuration."
+      properties:
+        id:
+          type: string
+          description: "Instance ID"
+        discordChannelId:
+          type: string
+          description: "Discord channel ID"
+        discordGuildId:
+          type: string
+          description: "Discord guild ID"
+        name:
+          type: string
+          description: "Instance name"
+        players:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerInfo'
+          description: "Tracked players (a set, unordered)"
+        gameModes:
+          type: array
+          items:
+            type: string
+          description: "Tracked game modes"
+        settings:
+          description: "Per-channel settings"
+          allOf:
+            - $ref: '#/components/schemas/InstanceSettingsResponse'
+        extraConfig:
+          type: object
+          additionalProperties: true
+          description: "Additional configuration"
+        createdAt:
+          type: string
+          format: date-time
+          description: "Creation time"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "Last update time"
+        active:
+          type: boolean
+          description: "Whether the instance is active"
+    RegisterInstanceRequest:
+      type: object
+      description: "Registers an instance."
+      required: [playerIds]
+      properties:
+        playerIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: "Player IDs to track; required, at least one"
+        gameModes:
+          type: array
+          items:
+            type: string
+          description: "Game mode names or numeric IDs, or \"all\"; absent or empty means all modes"
+        discordChannelId:
+          type: string
+          description: "Discord channel ID; an active instance on the same channel gives 409"
+        discordGuildId:
+          type: string
+          description: "Discord guild ID"
+        name:
+          type: string
+          description: "Instance name"
+        extraConfig:
+          type: object
+          additionalProperties: true
+          description: "Additional configuration"
+    UpdateInstanceRequest:
+      type: object
+      description: "Partial update of an instance; every field is optional."
+      properties:
+        addPlayerIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: "Player IDs to add"
+        removePlayerIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: "Player IDs to remove"
+        addGameModes:
+          type: array
+          items:
+            type: string
+          description: "Game modes to add"
+        removeGameModes:
+          type: array
+          items:
+            type: string
+          description: "Game modes to remove"
+        name:
+          type: string
+          description: "New name"
+        discordChannelId:
+          type: string
+          description: "New Discord channel ID"
+        discordGuildId:
+          type: string
+          description: "New Discord guild ID"
+        active:
+          type: boolean
+          description: "Activate or deactivate"
+        aiSummaryEnabled:
+          type: boolean
+          description: "Turn the OpenAI match summary on or off"
+        replayReportEnabled:
+          type: boolean
+          description: "Turn the replay analysis in the match thread on or off"
+        quietHours:
+          type: string
+          description: "HH:mm-HH:mm, \"off\" or \"default\""
+        timezone:
+          type: string
+          description: "IANA zone id or \"default\""
+        defaultGameModes:
+          type: array
+          items:
+            type: string
+          description: "Modes /stats defaults to, or just \"default\" to clear"
+        reportDetail:
+          type: string
+          description: "MINIMAL, STANDARD or FULL"
+    MatchDomain:
+      type: object
+      description: "A stored match."
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: "Match ID"
+        startProcess:
+          type: string
+          format: date-time
+          description: "When processing started"
+        endProcess:
+          type: string
+          format: date-time
+          description: "When processing ended"
+        startTime:
+          type: integer
+          format: int64
+          description: "Start time, epoch seconds"
+        startTimeMillis:
+          type: integer
+          format: int64
+          description: "Start time, epoch milliseconds"
+        startLocalDate:
+          type: string
+          format: date
+          description: "Start date"
+        startMonth:
+          type: integer
+          format: int32
+          description: "Start month"
+        startYear:
+          type: integer
+          format: int32
+          description: "Start year"
+        duration:
+          type: integer
+          format: int64
+          description: "Duration in seconds"
+        firstBloodTime:
+          type: integer
+          format: int64
+          description: "First blood time in seconds"
+        radiantScore:
+          type: integer
+          format: int64
+          description: "Radiant score"
+        direScore:
+          type: integer
+          format: int64
+          description: "Dire score"
+        radiantWin:
+          type: boolean
+          description: "Whether Radiant won"
+        patch:
+          type: integer
+          format: int64
+          description: "Patch ID"
+        patchStr:
+          type: string
+          description: "Patch name"
+        error:
+          type: string
+          description: "Processing error, if any"
+        gameModeId:
+          type: integer
+          format: int64
+          description: "Game mode ID"
+        gameModeName:
+          type: string
+          description: "Game mode name"
+        dotaApiFailed:
+          type: boolean
+          description: "OpenDota call failed"
+        abadon:
+          type: boolean
+          description: "Match had an abandon"
+        hasParsed:
+          type: boolean
+          description: "OpenDota has parsed the replay; false means replay-derived fields are missing"
+        replayCluster:
+          type: integer
+          format: int64
+          description: "Valve replay cluster"
+        replaySalt:
+          type: integer
+          format: int64
+          description: "Valve replay salt"
+        detailsMappedAt:
+          type: string
+          format: date-time
+          description: "When complete OpenDota detail rows were stored"
+        detailsAttemptedAt:
+          type: string
+          format: date-time
+          description: "Last time the detail rows were tried"
+        parseRequested:
+          type: boolean
+          description: "A parse was requested on OpenDota"
+        parseRequestedAt:
+          type: string
+          format: date-time
+          description: "When the parse was requested"
+        analysis:
+          description: "The AI analysis of the match, if any"
+          allOf:
+            - $ref: '#/components/schemas/MatchAnalysisDomain'
+    MatchAnalysisDomain:
+      type: object
+      description: "An AI-generated analysis; one analysis may cover several matches."
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: "Analysis ID"
+        analysisText:
+          type: string
+          description: "The analysis text"
+        aiProvider:
+          type: string
+          description: "AI provider"
+        aiModel:
+          type: string
+          description: "Model used"
+        createdAt:
+          type: string
+          format: date-time
+          description: "Creation time"
+        contextPrompt:
+          type: string
+          description: "The prompt sent to the AI"
+        matchIds:
+          type: string
+          description: "Comma-separated IDs of the matches analysed together"
+        matchCount:
+          type: integer
+          format: int32
+          description: "Number of matches"
+        tokensUsed:
+          type: integer
+          format: int32
+          description: "Tokens used, when reported"
+        success:
+          type: boolean
+          description: "Whether the analysis succeeded"
+        errorMessage:
+          type: string
+          description: "Error message on failure"
+    PlayerMatchStatisticDomain:
+      type: object
+      description: "Per-player statistics of a match (key: matchId, playerSlot)."
+      properties:
+        matchId:
+          type: integer
+          format: int64
+          description: "Match ID"
+        playerSlot:
+          type: integer
+          format: int64
+          description: "Player slot (0-4 Radiant, 128-132 Dire)"
+        playerId:
+          type: integer
+          format: int64
+          description: "Player account ID"
+        obsPlaced:
+          type: integer
+          format: int64
+          description: "Observers placed"
+        senPlaced:
+          type: integer
+          format: int64
+          description: "Sentries placed"
+        creepsStacked:
+          type: integer
+          format: int64
+          description: "Creeps stacked"
+        lastHits:
+          type: integer
+          format: int64
+          description: "Last hits"
+        denies:
+          type: integer
+          format: int64
+          description: "Denies"
+        campsStacked:
+          type: integer
+          format: int64
+          description: "Camps stacked"
+        runePickups:
+          type: integer
+          format: int64
+          description: "Rune pickups"
+        towerKills:
+          type: integer
+          format: int64
+          description: "Tower kills"
+        roshanKills:
+          type: integer
+          format: int64
+          description: "Roshan kills"
+        partySize:
+          type: integer
+          format: int64
+          description: "Party size"
+        heroId:
+          type: integer
+          format: int64
+          description: "Hero ID"
+        heroName:
+          type: string
+          description: "Hero internal name"
+        heroPrettyName:
+          type: string
+          description: "Hero display name"
+        win:
+          type: integer
+          format: int64
+          description: "1 win, 0 loss"
+        totalGold:
+          type: integer
+          format: int64
+          description: "Total gold"
+        totalXp:
+          type: integer
+          format: int64
+          description: "Total XP"
+        kda:
+          type: number
+          description: "KDA"
+        computedMmmr:
+          type: number
+          description: "Computed MMR"
+        heroHealing:
+          type: integer
+          format: int64
+          description: "Hero healing"
+        heroDamage:
+          type: integer
+          format: int64
+          description: "Hero damage"
+        towerDamage:
+          type: integer
+          format: int64
+          description: "Tower damage"
+        damageTaken:
+          type: integer
+          format: int64
+          description: "Damage taken"
+        abandons:
+          type: integer
+          format: int64
+          description: "Abandons"
+        neutralKills:
+          type: integer
+          format: int64
+          description: "Neutral kills"
+        courierKills:
+          type: integer
+          format: int64
+          description: "Courier kills"
+        aganim:
+          type: integer
+          format: int64
+          description: "Aghanim scepter flag"
+        aganimShard:
+          type: integer
+          format: int64
+          description: "Aghanim shard flag"
+        moonshard:
+          type: integer
+          format: int64
+          description: "Moon shard flag"
+        lane:
+          type: integer
+          format: int64
+          description: "Lane"
+        laneEfficiency:
+          type: number
+          description: "Lane efficiency"
+        laneEfficiencyPct:
+          type: number
+          description: "Lane efficiency percent"
+        goldPerMin:
+          type: integer
+          format: int64
+          description: "Gold per minute"
+        xpPerMin:
+          type: integer
+          format: int64
+          description: "XP per minute"
+        hasNeutralItems:
+          type: boolean
+          description: "Neutral items stored"
+        dotaApiItems:
+          type: boolean
+          description: "Items came from the OpenDota API"
+        hasItems:
+          type: boolean
+          description: "Items stored"
+        dotaApiAbilities:
+          type: boolean
+          description: "Abilities came from the OpenDota API"
+        hasAbilities:
+          type: boolean
+          description: "Abilities stored"
+        kills:
+          type: integer
+          format: int64
+          description: "Kills"
+        deaths:
+          type: integer
+          format: int64
+          description: "Deaths"
+        assists:
+          type: integer
+          format: int64
+          description: "Assists"
+        level:
+          type: integer
+          format: int64
+          description: "Level"
+        netWorth:
+          type: integer
+          format: int64
+          description: "Net worth"
+        isRadiant:
+          type: boolean
+          description: "On the Radiant team"
+        stuns:
+          type: number
+          description: "Stun seconds"
+        teamfightParticipation:
+          type: number
+          description: "Teamfight participation"
+        actionsPerMin:
+          type: integer
+          format: int64
+          description: "Actions per minute"
+        laneRole:
+          type: integer
+          format: int64
+          description: "Lane role"
+        positionEst:
+          type: integer
+          format: int64
+          description: "Estimated position"
+        rankTier:
+          type: integer
+          format: int64
+          description: "Rank tier"
+        heroVariant:
+          type: integer
+          format: int64
+          description: "Hero variant"
+        buybackCount:
+          type: integer
+          format: int64
+          description: "Buybacks"
+        goldSpent:
+          type: integer
+          format: int64
+          description: "Gold spent"
+        goldAt5Min:
+          type: integer
+          format: int64
+          description: "Gold at 5 min"
+        goldAt10Min:
+          type: integer
+          format: int64
+          description: "Gold at 10 min"
+        goldAt15Min:
+          type: integer
+          format: int64
+          description: "Gold at 15 min"
+        goldAt20Min:
+          type: integer
+          format: int64
+          description: "Gold at 20 min"
+        lastHitsAt5Min:
+          type: integer
+          format: int64
+          description: "Last hits at 5 min"
+        lastHitsAt10Min:
+          type: integer
+          format: int64
+          description: "Last hits at 10 min"
+        lastHitsAt15Min:
+          type: integer
+          format: int64
+          description: "Last hits at 15 min"
+        lastHitsAt20Min:
+          type: integer
+          format: int64
+          description: "Last hits at 20 min"
+        xpAt5Min:
+          type: integer
+          format: int64
+          description: "XP at 5 min"
+        xpAt10Min:
+          type: integer
+          format: int64
+          description: "XP at 10 min"
+        xpAt15Min:
+          type: integer
+          format: int64
+          description: "XP at 15 min"
+        xpAt20Min:
+          type: integer
+          format: int64
+          description: "XP at 20 min"
+        handDamageDealt:
+          type: integer
+          format: int64
+          description: "Hand damage dealt"
+        handDamageReceived:
+          type: integer
+          format: int64
+          description: "Hand damage received"
+    ItemDomain:
+      type: object
+      description: "An item a player held in a match (key: itemId, matchId, playerSlot)."
+      properties:
+        itemId:
+          type: integer
+          format: int64
+          description: "Item ID"
+        matchId:
+          type: integer
+          format: int64
+          description: "Match ID"
+        playerSlot:
+          type: integer
+          format: int64
+          description: "Player slot"
+        playerId:
+          type: integer
+          format: int64
+          description: "Player account ID"
+        itemName:
+          type: string
+          description: "Item internal name"
+        itemPrettyName:
+          type: string
+          description: "Item display name"
+        itemPurchaseTime:
+          type: integer
+          format: int64
+          description: "Purchase time in seconds"
+        neutral:
+          type: boolean
+          description: "Neutral item (serialised from the Lombok getter isNeutral)"
+        neutralEnhancement:
+          type: string
+          description: "Neutral enhancement"
+        damageDealt:
+          type: integer
+          format: int64
+          description: "Damage dealt"
+        damageReceived:
+          type: integer
+          format: int64
+          description: "Damage received"
+        useCount:
+          type: integer
+          format: int64
+          description: "Use count"
+    AbilityDomain:
+      type: object
+      description: "An ability a player had in a match (key: matchId, playerSlot, abilityId)."
+      properties:
+        matchId:
+          type: integer
+          format: int64
+          description: "Match ID"
+        playerSlot:
+          type: integer
+          format: int64
+          description: "Player slot"
+        abilityId:
+          type: integer
+          format: int64
+          description: "Ability ID"
+        playerId:
+          type: integer
+          format: int64
+          description: "Player account ID"
+        name:
+          type: string
+          description: "Ability internal name"
+        prettyName:
+          type: string
+          description: "Ability display name"
+        damageDealt:
+          type: integer
+          format: int64
+          description: "Damage dealt"
+        damageReceived:
+          type: integer
+          format: int64
+          description: "Damage received"
+        useCount:
+          type: integer
+          format: int64
+          description: "Use count"
+    KillLogDomain:
+      type: object
+      description: "One kill (key: matchId, playerSlot, time, killedHeroName)."
+      properties:
+        matchId:
+          type: integer
+          format: int64
+          description: "Match ID"
+        playerSlot:
+          type: integer
+          format: int64
+          description: "Killer slot"
+        time:
+          type: integer
+          format: int64
+          description: "Time in seconds"
+        killedHeroName:
+          type: string
+          description: "Killed hero internal name"
+        playerId:
+          type: integer
+          format: int64
+          description: "Killer account ID"
+        killedPlayerSlot:
+          type: integer
+          format: int64
+          description: "Victim slot"
+        killedPlayerId:
+          type: integer
+          format: int64
+          description: "Victim account ID"
+        killedHeroPrettyName:
+          type: string
+          description: "Killed hero display name"
+    MatchDetailResponse:
+      type: object
+      description: "A match with everything stored for it."
+      properties:
+        match:
+          description: "The match"
+          allOf:
+            - $ref: '#/components/schemas/MatchDomain'
+        players:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerMatchStatisticDomain'
+          description: "Per-player statistics"
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemDomain'
+          description: "Items"
+        abilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/AbilityDomain'
+          description: "Abilities"
+        killLogs:
+          type: array
+          items:
+            $ref: '#/components/schemas/KillLogDomain'
+          description: "Kills"
+        analysis:
+          description: "AI analysis, if any"
+          allOf:
+            - $ref: '#/components/schemas/MatchAnalysisDomain'
+    Report:
+      type: object
+      description: "One report of a match report. type selects the subtype; the fields of subtypes not listed below (chosenAbility, abilityHistoryStats, chosenItem, itemHistoryStats, damageHistory) are not described here."
+      additionalProperties: true
+      properties:
+        type:
+          type: string
+          description: "text, link, laneMatchup, chosenAbility, abilityHistoryStats, chosenItem, itemHistoryStats, itemEfficiency, damageHistory or otherPlayer"
+        name:
+          type: string
+          description: "Report name"
+        playerId:
+          type: integer
+          format: int64
+          description: "Present on per-player reports"
+    MatchReportResponse:
+      type: object
+      description: "The reports an instance gets for a match."
+      properties:
+        matchId:
+          type: integer
+          format: int64
+          description: "Match ID"
+        reports:
+          type: array
+          items:
+            $ref: '#/components/schemas/Report'
+          description: "Reports; subtype fields are listed by type in the Report description"
+    AnalyzeMatchesRequest:
+      type: object
+      description: "Optional tuning of the AI analysis."
+      properties:
+        customPrompt:
+          type: string
+          description: "Appended to the AI context, e.g. a specific question"
+        fieldConfig:
+          description: "Which fields go into the prompt; wins over preset"
+          allOf:
+            - $ref: '#/components/schemas/AiPromptFieldConfig'
+        preset:
+          type: string
+          description: "default, minimal or full (case-insensitive); unknown values fall back to default"
+    AiPromptFieldConfig:
+      type: object
+      description: "Which fields go into the AI prompt. matchFields, playerStatisticFields, itemFields and abilityFields are objects of include* booleans (for example includeKda, includeGoldPerMin, includeItemName, includeUseCount); the full list is in AiPromptFieldConfig.java."
+      properties:
+        matchFields:
+          type: object
+          additionalProperties: true
+          description: "include* booleans for the match: Duration, RadiantScore, DireScore, RadiantWin, Patch, GameMode, FirstBloodTime, StartTime"
+        playerStatisticFields:
+          type: object
+          additionalProperties: true
+          description: "include* booleans for player statistics, for example includeKda, includeGoldPerMin, includeHeroDamage"
+        itemFields:
+          type: object
+          additionalProperties: true
+          description: "include* booleans for items: ItemName, PurchaseTime, IsNeutral, NeutralEnhancement, DamageDealt, DamageReceived, UseCount"
+        abilityFields:
+          type: object
+          additionalProperties: true
+          description: "include* booleans for abilities: AbilityName, DamageDealt, DamageReceived, UseCount"
+        customSystemPrompt:
+          type: string
+          description: "Replacement system prompt"
+        customAnalysisInstructions:
+          type: string
+          description: "Extra analysis instructions"
+        responseLanguage:
+          type: string
+          description: "Response language, default Russian"
+        includeSarcasm:
+          type: boolean
+          description: "Default true"
+        includeAbilities:
+          type: boolean
+          description: "Default true"
+        includeItems:
+          type: boolean
+          description: "Default true"
+        filterItemsToFocusPlayers:
+          type: boolean
+          description: "Default true"
+        includeNeutralItems:
+          type: boolean
+          description: "Default false"
+    IncompleteMatchEntry:
+      type: object
+      description: "A single-key object: the key is the match ID, the value lists what is missing (a Map.Entry serialised by Jackson)."
+      additionalProperties:
+        type: object
+        additionalProperties: true
+    RunStatus:
+      type: object
+      description: "How the replay run of a match ended (current parser version)."
+      properties:
+        matchId:
+          type: integer
+          format: int64
+          description: "Match ID"
+        status:
+          type: string
+          description: "RUNNING, DONE, PARTIAL, SKIPPED_NO_REPLAY_INFO, SKIPPED_NOT_SUPPORTED, SKIPPED_NOT_PLAYED, EXPIRED, TOO_LARGE, FAILED_IDENTITY, FAILED_PARSER, FAILED_DOWNLOAD, FAILED_RESOURCE or FAILED_TIMEOUT"
+        attempts:
+          type: integer
+          format: int32
+          description: "Attempts made"
+        error:
+          type: string
+          description: "Error of the last attempt, if any"
+        mapVersion:
+          type: string
+          description: "Map version of the replay"
+    RolePlayer:
+      type: object
+      description: "A role assigned to a player slot."
+      properties:
+        slot:
+          type: integer
+          format: int64
+          description: "Player slot"
+        role:
+          type: integer
+          format: int32
+          description: "Role number"
+        source:
+          type: string
+          description: "How the role was decided"
+        confidence:
+          type: number
+          format: double
+          description: "Confidence"
+    RoleComposition:
+      type: object
+      description: "A team composition token string at a stage."
+      properties:
+        team:
+          type: string
+          description: "Team"
+        stage:
+          type: string
+          description: "Stage"
+        tokens:
+          type: string
+          description: "Composition tokens"
+    RolesSection:
+      type: object
+      description: "Section roles."
+      properties:
+        players:
+          type: array
+          items:
+            $ref: '#/components/schemas/RolePlayer'
+          description: "Roles per slot"
+        compositions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleComposition'
+          description: "Team compositions"
+    FightImportance:
+      type: object
+      description: "Why a fight is important."
+      properties:
+        winningTeam:
+          type: string
+          description: "Winning team"
+        goldChange:
+          type: integer
+          format: int64
+          description: "Gold swing"
+        xpChange:
+          type: integer
+          format: int64
+          description: "XP swing"
+        netWorth:
+          type: integer
+          format: int64
+          description: "Net worth"
+        sharePercent:
+          type: number
+          format: double
+          description: "Share percent"
+        leadFlip:
+          type: boolean
+          description: "Lead flipped"
+        flipToWinner:
+          type: boolean
+          description: "Flipped toward the match winner"
+        slopeBreak:
+          type: boolean
+          description: "Slope break"
+    FightReason:
+      type: object
+      description: "A ranked reason the losing team lost the fight."
+      properties:
+        rank:
+          type: integer
+          format: int32
+          description: "Rank"
+        subjectSlot:
+          type: integer
+          format: int64
+          description: "Slot the reason is about"
+        team:
+          type: string
+          description: "Team"
+        scope:
+          type: string
+          description: "Scope"
+        code:
+          type: string
+          description: "Reason code"
+        severity:
+          type: number
+          format: double
+          description: "Severity"
+        evidence:
+          type: string
+          description: "Evidence text"
+        also:
+          type: array
+          items:
+            type: string
+          description: "Other codes folded into this reason"
+    ImportantFight:
+      type: object
+      description: "An important fight with the explanation of its loss; the explanation fields are absent when none is stored."
+      properties:
+        fightIndex:
+          type: integer
+          format: int32
+          description: "Fight index"
+        type:
+          type: string
+          description: "Fight type"
+        startSeconds:
+          type: number
+          format: double
+          description: "Start"
+        endSeconds:
+          type: number
+          format: double
+          description: "End"
+        zone:
+          type: string
+          description: "Zone"
+        lane:
+          type: string
+          description: "Lane"
+        winner:
+          type: string
+          description: "Winner"
+        radiantDeaths:
+          type: integer
+          format: int32
+          description: "Radiant deaths"
+        direDeaths:
+          type: integer
+          format: int32
+          description: "Dire deaths"
+        spikeIndex:
+          type: integer
+          format: int32
+          description: "Spike index"
+        losingTeam:
+          type: string
+          description: "Losing team"
+        goldLost:
+          type: integer
+          format: int64
+          description: "Gold lost"
+        unmatchedDeaths:
+          type: integer
+          format: int32
+          description: "Unmatched deaths"
+        importance:
+          description: "Importance"
+          allOf:
+            - $ref: '#/components/schemas/FightImportance'
+        totalReasons:
+          type: integer
+          format: int32
+          description: "Reasons stored for the losing team"
+        reasonsShown:
+          type: integer
+          format: int32
+          description: "Reasons in reasons (at most 5)"
+        reasons:
+          type: array
+          items:
+            $ref: '#/components/schemas/FightReason'
+          description: "Top ranked reasons"
+    FightVision:
+      type: object
+      description: "Vision before one team of one fight."
+      properties:
+        fightIndex:
+          type: integer
+          format: int32
+          description: "Fight index"
+        team:
+          type: string
+          description: "Team"
+        lost:
+          type: boolean
+          description: "The team lost the fight"
+        windowStart:
+          type: number
+          format: double
+          description: "Window start"
+        windowEnd:
+          type: number
+          format: double
+          description: "Window end"
+        activeObservers:
+          type: integer
+          format: int32
+          description: "Active observers"
+        activeSentries:
+          type: integer
+          format: int32
+          description: "Active sentries"
+        youngestObserverAge:
+          type: integer
+          format: int32
+          description: "Youngest observer age"
+        oldestObserverAge:
+          type: integer
+          format: int32
+          description: "Oldest observer age"
+        nearestWardDistance:
+          type: integer
+          format: int32
+          description: "Nearest ward distance"
+        visionWeight:
+          type: number
+          format: double
+          description: "Vision weight"
+        lateWard:
+          type: boolean
+          description: "Ward placed late"
+        lateWardSeconds:
+          type: integer
+          format: int32
+          description: "Seconds late"
+        wardsDestroyed:
+          type: integer
+          format: int32
+          description: "Wards destroyed"
+        destroyedBy:
+          type: string
+          description: "Destroyed by"
+        invisibleHero:
+          type: boolean
+          description: "An invisible hero was present"
+        invisibleHeroes:
+          type: string
+          description: "Invisible heroes"
+        detection:
+          type: boolean
+          description: "Detection available"
+        detectionUsed:
+          type: boolean
+          description: "Detection used"
+        verdict:
+          type: string
+          description: "Verdict"
+    RunePickup:
+      type: object
+      description: "A rune pickup."
+      properties:
+        slot:
+          type: integer
+          format: int64
+          description: "Player slot"
+        team:
+          type: string
+          description: "Team"
+        runeIndex:
+          type: integer
+          format: int32
+          description: "Rune index"
+        runeType:
+          type: string
+          description: "Rune type"
+        seconds:
+          type: integer
+          format: int32
+          description: "Time"
+        zone:
+          type: string
+          description: "Zone"
+        lane:
+          type: string
+          description: "Lane"
+        gold:
+          type: integer
+          format: int32
+          description: "Bounty gold"
+        effectEndSeconds:
+          type: number
+          format: double
+          description: "When the effect ended"
+        midLane:
+          type: boolean
+          description: "Taken in the mid lane"
+    RuneOpening:
+      type: object
+      description: "Opening rune window of a team."
+      properties:
+        team:
+          type: string
+          description: "Team"
+        windowStart:
+          type: integer
+          format: int32
+          description: "Window start"
+        windowEnd:
+          type: integer
+          format: int32
+          description: "Window end"
+        runesTaken:
+          type: integer
+          format: int32
+          description: "Runes taken"
+        bountyGold:
+          type: integer
+          format: int32
+          description: "Bounty gold in the window"
+        bountyGoldGame:
+          type: integer
+          format: int32
+          description: "Bounty gold in the game"
+        firstTakerSlot:
+          type: integer
+          format: int64
+          description: "First taker slot"
+        firstTakerSeconds:
+          type: integer
+          format: int32
+          description: "First taker time"
+        kills:
+          type: integer
+          format: int32
+          description: "Kills"
+        gold:
+          type: integer
+          format: int64
+          description: "Gold"
+        xp:
+          type: integer
+          format: int64
+          description: "XP"
+        balance:
+          type: integer
+          format: int64
+          description: "Balance"
+        result:
+          type: string
+          description: "Result"
+    RunesSection:
+      type: object
+      description: "Section runes."
+      properties:
+        pickups:
+          type: array
+          items:
+            $ref: '#/components/schemas/RunePickup'
+          description: "Rune pickups"
+        openings:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuneOpening'
+          description: "Opening windows"
+    LaneAssignment:
+      type: object
+      description: "A player in a lane for a time span."
+      properties:
+        slot:
+          type: integer
+          format: int64
+          description: "Player slot"
+        team:
+          type: string
+          description: "Team"
+        lane:
+          type: string
+          description: "Lane"
+        pairId:
+          type: integer
+          format: int32
+          description: "Lane pair ID"
+        position:
+          type: string
+          description: "Position"
+        startSeconds:
+          type: integer
+          format: int32
+          description: "Start"
+        endSeconds:
+          type: integer
+          format: int32
+          description: "End"
+        endReason:
+          type: string
+          description: "Why the assignment ended"
+    LaneReason:
+      type: object
+      description: "A ranked reason for a lane result."
+      properties:
+        rank:
+          type: integer
+          format: int32
+          description: "Rank"
+        code:
+          type: string
+          description: "Code"
+        direction:
+          type: string
+          description: "Direction"
+        subjectSlot:
+          type: integer
+          format: int64
+          description: "Slot"
+        severity:
+          type: number
+          format: double
+          description: "Severity"
+        evidence:
+          type: string
+          description: "Evidence"
+        source:
+          type: string
+          description: "Source"
+    LaneResult:
+      type: object
+      description: "Result of one side of a lane."
+      properties:
+        pairId:
+          type: integer
+          format: int32
+          description: "Lane pair ID"
+        lane:
+          type: string
+          description: "Lane"
+        team:
+          type: string
+          description: "Team"
+        position:
+          type: string
+          description: "Position"
+        slots:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: "Slots of this side"
+        heroes:
+          type: integer
+          format: int32
+          description: "Heroes on this side"
+        enemyHeroes:
+          type: integer
+          format: int32
+          description: "Enemy heroes"
+        startSeconds:
+          type: integer
+          format: int32
+          description: "Start"
+        endSeconds:
+          type: integer
+          format: int32
+          description: "End"
+        endReason:
+          type: string
+          description: "End reason"
+        sideEndSeconds:
+          type: integer
+          format: int32
+          description: "Side end"
+        sideEndReason:
+          type: string
+          description: "Side end reason"
+        creepScore:
+          type: number
+          format: double
+          description: "Creep score"
+        lastHits:
+          type: integer
+          format: int32
+          description: "Last hits"
+        siegeLastHits:
+          type: integer
+          format: int32
+          description: "Siege last hits"
+        denies:
+          type: integer
+          format: int32
+          description: "Denies"
+        xp:
+          type: number
+          format: double
+          description: "XP"
+        gold:
+          type: number
+          format: double
+          description: "Gold"
+        level:
+          type: number
+          format: double
+          description: "Level"
+        kills:
+          type: integer
+          format: int32
+          description: "Kills"
+        deaths:
+          type: integer
+          format: int32
+          description: "Deaths"
+        heroDamageDealt:
+          type: integer
+          format: int64
+          description: "Hero damage dealt"
+        heroDamageTaken:
+          type: integer
+          format: int64
+          description: "Hero damage taken"
+        towerDamage:
+          type: integer
+          format: int64
+          description: "Tower damage"
+        ownTowerFell:
+          type: boolean
+          description: "Own tower fell"
+        enemyTowerFell:
+          type: boolean
+          description: "Enemy tower fell"
+        result:
+          type: string
+          description: "Result"
+        margin:
+          type: number
+          format: double
+          description: "Margin"
+        reasons:
+          type: array
+          items:
+            $ref: '#/components/schemas/LaneReason'
+          description: "Ranked reasons"
+    LanesSection:
+      type: object
+      description: "Section lanes."
+      properties:
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/LaneAssignment'
+          description: "Lane assignments"
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LaneResult'
+          description: "Lane results"
+    ItemEfficiency:
+      type: object
+      description: "Efficiency of one purchase."
+      properties:
+        slot:
+          type: integer
+          format: int64
+          description: "Player slot"
+        entryKey:
+          type: string
+          description: "Entry key"
+        itemKey:
+          type: string
+          description: "Item key"
+        kind:
+          type: string
+          description: "Kind"
+        purchaseSeconds:
+          type: number
+          format: double
+          description: "Purchase time"
+        useCount:
+          type: integer
+          format: int32
+          description: "Use count"
+        gain:
+          type: number
+          format: double
+          description: "Gain"
+        cost:
+          type: integer
+          format: int64
+          description: "Cost"
+        ratio:
+          type: number
+          format: double
+          description: "Ratio"
+        paybackSeconds:
+          type: number
+          format: double
+          description: "Payback time"
+        figures:
+          type: string
+          description: "Figures behind the numbers"
+    Outlier:
+      type: object
+      description: "A player outlier; the explanation columns are absent on rows written before analysis version 2 until the match is analysed again."
+      properties:
+        slot:
+          type: integer
+          format: int64
+          description: "Player slot"
+        kind:
+          type: string
+          description: "Kind"
+        startSeconds:
+          type: integer
+          format: int32
+          description: "Start"
+        endSeconds:
+          type: integer
+          format: int32
+          description: "End"
+        sharePercent:
+          type: number
+          format: double
+          description: "Share percent"
+        participationRank:
+          type: integer
+          format: int32
+          description: "Participation rank"
+        fightsJoined:
+          type: integer
+          format: int32
+          description: "Fights joined"
+        deaths:
+          type: integer
+          format: int32
+          description: "Deaths"
+        incomeBreakSeconds:
+          type: integer
+          format: int32
+          description: "Income break"
+        mainIncomeSource:
+          type: string
+          description: "Main income source"
+        explanation:
+          type: string
+          description: "Explanation"
+    Rotation:
+      type: object
+      description: "A rotation of a player."
+      properties:
+        team:
+          type: string
+          description: "Team"
+        slot:
+          type: integer
+          format: int64
+          description: "Player slot"
+        startSeconds:
+          type: integer
+          format: int32
+          description: "Start"
+        endSeconds:
+          type: integer
+          format: int32
+          description: "End"
+        endReason:
+          type: string
+          description: "End reason"
+        fromZone:
+          type: string
+          description: "From zone"
+        fromLane:
+          type: string
+          description: "From lane"
+        toZone:
+          type: string
+          description: "To zone"
+        toLane:
+          type: string
+          description: "To lane"
+        toSide:
+          type: string
+          description: "To side"
+        groupZone:
+          type: string
+          description: "Group zone"
+        groupLane:
+          type: string
+          description: "Group lane"
+        teleported:
+          type: boolean
+          description: "Used a teleport"
+        laneLeft:
+          type: string
+          description: "Lane left"
+        kills:
+          type: integer
+          format: int32
+          description: "Kills"
+        creepKills:
+          type: integer
+          format: int32
+          description: "Creep kills"
+        fights:
+          type: integer
+          format: int32
+          description: "Fights"
+        fightsWon:
+          type: integer
+          format: int32
+          description: "Fights won"
+        fightIndex:
+          type: integer
+          format: int32
+          description: "Fight index"
+        proxyOwnKills:
+          type: integer
+          format: int32
+          description: "Proxy own kills"
+        proxyEnemyKills:
+          type: integer
+          format: int32
+          description: "Proxy enemy kills"
+        reasons:
+          type: string
+          description: "Reasons"
+        incomeBefore:
+          type: integer
+          format: int32
+          description: "Income before"
+        incomeDuring:
+          type: integer
+          format: int32
+          description: "Income during"
+        xpBefore:
+          type: integer
+          format: int32
+          description: "XP before"
+        xpDuring:
+          type: integer
+          format: int32
+          description: "XP during"
+        verdict:
+          type: string
+          description: "Verdict"
+    SplitStretch:
+      type: object
+      description: "A split-push stretch of a team."
+      properties:
+        team:
+          type: string
+          description: "Team"
+        startSeconds:
+          type: integer
+          format: int32
+          description: "Start"
+        endSeconds:
+          type: integer
+          format: int32
+          description: "End"
+        label:
+          type: string
+          description: "Label"
+        towersLost:
+          type: integer
+          format: int32
+          description: "Towers lost"
+        towersTaken:
+          type: integer
+          format: int32
+          description: "Towers taken"
+        ownHeroesDied:
+          type: integer
+          format: int32
+          description: "Own heroes died"
+        enemyHeroesDied:
+          type: integer
+          format: int32
+          description: "Enemy heroes died"
+    LaneSwap:
+      type: object
+      description: "A lane swap of a player."
+      properties:
+        team:
+          type: string
+          description: "Team"
+        slot:
+          type: integer
+          format: int64
+          description: "Player slot"
+        laneBefore:
+          type: string
+          description: "Lane before"
+        laneAfter:
+          type: string
+          description: "Lane after"
+        fromSeconds:
+          type: integer
+          format: int32
+          description: "From"
+        toSeconds:
+          type: integer
+          format: int32
+          description: "To"
+    Smoke:
+      type: object
+      description: "A smoke use."
+      properties:
+        team:
+          type: string
+          description: "Team"
+        userSlot:
+          type: integer
+          format: int64
+          description: "Slot that used the smoke"
+        groupSlots:
+          type: string
+          description: "Slots in the group"
+        startSeconds:
+          type: integer
+          format: int32
+          description: "Start"
+        endSeconds:
+          type: integer
+          format: int32
+          description: "End"
+        endReason:
+          type: string
+          description: "End reason"
+        startZone:
+          type: string
+          description: "Start zone"
+        startLane:
+          type: string
+          description: "Start lane"
+        endZone:
+          type: string
+          description: "End zone"
+        endLane:
+          type: string
+          description: "End lane"
+        outcome:
+          type: string
+          description: "Outcome"
+        kills:
+          type: integer
+          format: int32
+          description: "Kills"
+        buildings:
+          type: integer
+          format: int32
+          description: "Buildings"
+        roshanKills:
+          type: integer
+          format: int32
+          description: "Roshan kills"
+        groupDeaths:
+          type: integer
+          format: int32
+          description: "Group deaths"
+        enemyDeaths:
+          type: integer
+          format: int32
+          description: "Enemy deaths"
+    ObjectiveConversion:
+      type: object
+      description: "What a fight winner did with the win."
+      properties:
+        fightIndex:
+          type: integer
+          format: int32
+          description: "Fight index"
+        winnerTeam:
+          type: string
+          description: "Winner"
+        result:
+          type: string
+          description: "Result"
+        objectiveKind:
+          type: string
+          description: "Objective kind"
+        objectiveKey:
+          type: string
+          description: "Objective key"
+        secondsAfter:
+          type: integer
+          format: int32
+          description: "Seconds after the fight"
+        stateBefore:
+          type: string
+          description: "State before"
+        winnersAlive:
+          type: integer
+          format: int32
+          description: "Winners alive"
+        nearestTower:
+          type: string
+          description: "Nearest tower"
+        towerLane:
+          type: string
+          description: "Tower lane"
+        towerDistance:
+          type: integer
+          format: int32
+          description: "Tower distance"
+        nearestHeroSlot:
+          type: integer
+          format: int64
+          description: "Nearest hero slot"
+        heroZone:
+          type: string
+          description: "Hero zone"
+        heroLane:
+          type: string
+          description: "Hero lane"
+        roshanNearSlots:
+          type: string
+          description: "Slots near Roshan"
+        roshanCall:
+          type: string
+          description: "Roshan call"
+    BehaviourSection:
+      type: object
+      description: "Section behaviour."
+      properties:
+        rotations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Rotation'
+          description: "Rotations"
+        splitStretches:
+          type: array
+          items:
+            $ref: '#/components/schemas/SplitStretch'
+          description: "Split stretches"
+        laneSwaps:
+          type: array
+          items:
+            $ref: '#/components/schemas/LaneSwap'
+          description: "Lane swaps"
+        smokes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Smoke'
+          description: "Smokes"
+        objectiveConversions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObjectiveConversion'
+          description: "Objective conversions"
+    EndGame:
+      type: object
+      description: "How the game ended."
+      properties:
+        winnerTeam:
+          type: string
+          description: "Winner"
+        durationSeconds:
+          type: integer
+          format: int32
+          description: "Duration"
+        leadKnown:
+          type: boolean
+          description: "Lead is known"
+        peakLeadSeconds:
+          type: integer
+          format: int32
+          description: "Peak lead time"
+        peakLeadGold:
+          type: integer
+          format: int64
+          description: "Peak lead gold"
+        peakLeadPercent:
+          type: number
+          format: double
+          description: "Peak lead percent"
+        leadLost:
+          type: boolean
+          description: "Lead was lost"
+        lastLeadGold:
+          type: integer
+          format: int64
+          description: "Last lead gold"
+        heldSeconds:
+          type: integer
+          format: int32
+          description: "Seconds the lead was held"
+        thrown:
+          type: boolean
+          description: "Thrown game"
+        turningFightIndex:
+          type: integer
+          format: int32
+          description: "Turning fight"
+        turningSeconds:
+          type: number
+          format: double
+          description: "Turning time"
+        turningKind:
+          type: string
+          description: "Turning kind"
+        objectiveKind:
+          type: string
+          description: "Objective kind"
+        objectiveKey:
+          type: string
+          description: "Objective key"
+        objectiveSecondsAfter:
+          type: integer
+          format: int32
+          description: "Seconds after"
+        turningGoldChange:
+          type: integer
+          format: int64
+          description: "Turning gold change"
+        radiantBuybacks:
+          type: integer
+          format: int32
+          description: "Radiant buybacks"
+        direBuybacks:
+          type: integer
+          format: int32
+          description: "Dire buybacks"
+        buybackWindowSeconds:
+          type: integer
+          format: int32
+          description: "Buyback window"
+        finalFightIndex:
+          type: integer
+          format: int32
+          description: "Final fight"
+        finalFightSeconds:
+          type: number
+          format: double
+          description: "Final fight time"
+        finalFightWinner:
+          type: string
+          description: "Final fight winner"
+    ReplayAnalysis:
+      type: object
+      description: "The stored analysis as one JSON document, keyed by section name in the order run, roles, fights, vision, runes, lanes, items, outliers, behaviour, endgame. Only the requested sections are present. Empty sections are empty lists, never absent. Nested field lists follow the reader record classes in service/replay/read; null columns are omitted from the JSON."
+      properties:
+        run:
+          description: "Section run"
+          allOf:
+            - $ref: '#/components/schemas/RunStatus'
+        roles:
+          description: "Section roles"
+          allOf:
+            - $ref: '#/components/schemas/RolesSection'
+        fights:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportantFight'
+          description: "Section fights: important fights only"
+        vision:
+          type: array
+          items:
+            $ref: '#/components/schemas/FightVision'
+          description: "Section vision"
+        runes:
+          description: "Section runes"
+          allOf:
+            - $ref: '#/components/schemas/RunesSection'
+        lanes:
+          description: "Section lanes"
+          allOf:
+            - $ref: '#/components/schemas/LanesSection'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemEfficiency'
+          description: "Section items"
+        outliers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Outlier'
+          description: "Section outliers"
+        behaviour:
+          description: "Section behaviour"
+          allOf:
+            - $ref: '#/components/schemas/BehaviourSection'
+        endgame:
+          type: array
+          items:
+            $ref: '#/components/schemas/EndGame'
+          description: "Section endgame: one entry per stored end-game summary"
