@@ -91,7 +91,12 @@ public class MatchReportOrchestrator {
             + " past matches for `/stats`. Live reports start with your next game.");
   }
 
-  public record PartialReportResult(long threadId, long headerMessageId) {}
+  /** {@code threadId} is 0 when the header was posted but its thread could not be made. */
+  public record PartialReportResult(long threadId, long headerMessageId) {
+    public boolean hasThread() {
+      return threadId > 0;
+    }
+  }
 
   /**
    * Phase 1: Send partial report with header + thread + partial-data analyzers. Returns the Discord

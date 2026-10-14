@@ -15,7 +15,6 @@ import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import org.springframework.stereotype.Service;
 
@@ -43,12 +42,13 @@ public class MatchReportStageService {
   }
 
   /**
-   * Whether the staged header of the match is a Components V2 message this service retitles. False
-   * with the switch off and for a thread whose header was posted as plain text before the switch
-   * was turned on (a row without a stage): that one is only ever edited as text.
+   * Whether the header of the match is a staged Components V2 message this service retitles. That
+   * depends on the row alone, not on the switch: the switch only decides how new headers are made.
+   * A row without a stage, including a header that fell back to plain text, is only ever edited as
+   * text.
    */
   public boolean ownsHeader(long matchId, String instanceId) {
-    if (!properties.isEnabled() || instanceId == null) {
+    if (instanceId == null) {
       return false;
     }
     try {
@@ -72,7 +72,7 @@ public class MatchReportStageService {
       DbufInstanceConfigDomain config,
       NewMatchSummary summary,
       Map<Long, String> playerNames) {
-    Message header;
+    ReportHeaderPublisher.Posted header;
     MatchFacts facts;
     try {
       facts = factsFactory.fromSummary(match.getId(), summary);
@@ -87,37 +87,44 @@ public class MatchReportStageService {
       log.warn("Failed to send header for match {}", match.getId());
       return null;
     }
+    long headerId = header.message().getIdLong();
+    // A header that fell back to plain text has no stage: it is edited as text, never as V2.
+    MatchReportStage stage = header.components() ? MatchReportStage.REQUESTED : null;
+    ThreadChannel thread = null;
     try {
-      ThreadChannel thread = discord.createThread(header, "Match " + match.getId());
-      recorder.remember(match, config, thread, header, MatchReportStage.REQUESTED, facts);
-      postCard(thread, cardBuilder.build(facts, summary.lines(), playerNames));
-      log.info("Stage 1 sent for match {} in thread {}", match.getId(), thread.getIdLong());
-      return new PartialReportResult(thread.getIdLong(), header.getIdLong());
+      thread = discord.createThread(header.message(), "Match " + match.getId());
     } catch (RuntimeException e) {
       log.warn(
-          "Stage 1 of match {} went on without its thread: {}", match.getId(), e.getMessage(), e);
-      return new PartialReportResult(0L, header.getIdLong());
+          "Stage 1 of match {} went on without a thread: {}", match.getId(), e.getMessage(), e);
     }
+    recorder.remember(match, config, thread, header.message(), stage, facts);
+    if (thread == null) {
+      return new PartialReportResult(0L, headerId);
+    }
+    try {
+      postCard(thread, cardBuilder.build(facts, summary.lines(), playerNames));
+    } catch (RuntimeException e) {
+      log.warn("No player card in thread {}: {}", thread.getIdLong(), e.getMessage(), e);
+    }
+    log.info("Stage 1 sent for match {} in thread {}", match.getId(), thread.getIdLong());
+    return new PartialReportResult(thread.getIdLong(), headerId);
   }
 
   /** Stage 2: OpenDota parsed the match; the header says whether a replay analysis follows. */
   public void parsed(MatchDomain match, DbufInstanceConfigDomain config) {
-    if (!properties.isEnabled()) {
-      return;
-    }
     try {
       MatchReportStage stage =
           forecast.isExpected(match) ? MatchReportStage.REPLAY_PENDING : MatchReportStage.PARSED;
       recorder
           .find(match.getId(), config.getId())
+          .filter(this::ownsHeader)
           .ifPresentOrElse(
-              row -> {
-                if (ownsHeader(row)) {
-                  retitle(row, stage, factsFactory.fromParsed(match, config));
-                }
-              },
+              row -> retitle(row, stage, factsFactory.fromParsed(match, config)),
               () ->
-                  log.debug("No thread of match {} in instance {}", match.getId(), config.getId()));
+                  log.debug(
+                      "No staged thread of match {} in instance {}",
+                      match.getId(),
+                      config.getId()));
     } catch (RuntimeException e) {
       log.warn("Stage 2 of match {} failed: {}", match.getId(), e.getMessage(), e);
     }
@@ -125,7 +132,7 @@ public class MatchReportStageService {
 
   /** OpenDota never parsed the match; the header keeps what stage 1 said and states that. */
   public void parseTimedOut(MatchDomain match, String instanceId) {
-    if (!properties.isEnabled() || instanceId == null) {
+    if (instanceId == null) {
       return;
     }
     try {
@@ -168,7 +175,7 @@ public class MatchReportStageService {
     }
     if (publisher.edit(
         row.getChannelId(), row.getHeaderMessageId(), headers.render(stage, facts))) {
-      recorder.setStage(row, stage);
+      recorder.advance(row, stage, facts);
     }
   }
 

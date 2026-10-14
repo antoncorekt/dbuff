@@ -268,4 +268,27 @@ class LastMatchesProcessorServiceTest {
                         && summary.gameMode() == ABILITY_DRAFT
                         && summary.lines().equals(List.of(line))));
   }
+
+  @Test
+  void theSummaryTakesTheFirstDurationAndModeAnyTrackedPlayersRecordKnows() {
+    instanceWithNewcomer(TRACKING_SINCE);
+    long start = epoch(TRACKING_SINCE.plusMinutes(10));
+    Mockito.when(lastMatches.fetchLastMatches(PLAYER))
+        .thenReturn(List.of(new RecentMatch(4, start, null, null)));
+    Mockito.when(lastMatches.fetchLastMatches(NEWCOMER))
+        .thenReturn(List.of(new RecentMatch(4, start, 1700L, ABILITY_DRAFT)));
+
+    service.processLastMatchesForInstance("instance-1");
+
+    Mockito.verify(orchestrator)
+        .processAndReportPartial(
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.argThat(
+                summary ->
+                    summary.duration() != null
+                        && summary.duration() == 1700L
+                        && summary.gameMode() != null
+                        && summary.gameMode() == ABILITY_DRAFT));
+  }
 }

@@ -51,15 +51,11 @@ public class MatchParseCheckJob implements Job {
                 .getDomainById(instanceId)
                 .map(DbufInstanceConfigDomain::effectiveSettings)
                 .orElseGet(InstanceSettings::new);
-    MatchDomain match = matchRepo.findById(matchId).orElse(null);
-    if (match != null && match.getEndProcess() == null && isTimedOut(match)) {
-      log.warn(
-          "Match {} parse wait timed out after {} hours", matchId, config.getParseMaxWaitHours());
-      match.setError("Parse timeout exceeded");
-      match.setEndProcess(LocalDateTime.now());
-      matchRepo.save(match);
-      stageService.parseTimedOut(match, instanceId);
-      matchParseSchedulerService.unscheduleParseWait(matchId);
+    // With stages a timed-out match gets its title even in quiet hours; without them the order is
+    // the one the job always had.
+    boolean timeoutFirst = stageService.enabled();
+    MatchDomain match = timeoutFirst ? matchRepo.findById(matchId).orElse(null) : null;
+    if (timeoutFirst && expireIfTimedOut(match, matchId, instanceId)) {
       return;
     }
 
@@ -70,9 +66,16 @@ public class MatchParseCheckJob implements Job {
 
     log.debug("Checking parse status for match {}", matchId);
 
+    if (!timeoutFirst) {
+      match = matchRepo.findById(matchId).orElse(null);
+    }
     if (match == null || match.getEndProcess() != null) {
       log.debug("Match {} already processed or not found, unscheduling", matchId);
       matchParseSchedulerService.unscheduleParseWait(matchId);
+      return;
+    }
+
+    if (!timeoutFirst && expireIfTimedOut(match, matchId, instanceId)) {
       return;
     }
 
@@ -102,6 +105,21 @@ public class MatchParseCheckJob implements Job {
     } catch (RuntimeException e) {
       log.warn("Could not retitle match {}: {}", match.getId(), e.getMessage(), e);
     }
+  }
+
+  /** Closes the match when OpenDota never parsed it; true when it did. */
+  private boolean expireIfTimedOut(MatchDomain match, long matchId, String instanceId) {
+    if (match == null || match.getEndProcess() != null || !isTimedOut(match)) {
+      return false;
+    }
+    log.warn(
+        "Match {} parse wait timed out after {} hours", matchId, config.getParseMaxWaitHours());
+    match.setError("Parse timeout exceeded");
+    match.setEndProcess(LocalDateTime.now());
+    matchRepo.save(match);
+    stageService.parseTimedOut(match, instanceId);
+    matchParseSchedulerService.unscheduleParseWait(matchId);
+    return true;
   }
 
   private boolean isTimedOut(MatchDomain match) {

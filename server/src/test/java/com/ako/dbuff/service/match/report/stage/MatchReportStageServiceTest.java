@@ -81,6 +81,23 @@ class MatchReportStageServiceTest {
     when(discord.createThread(any(), anyString())).thenReturn(thread);
     when(constants.getHeroConstantMap()).thenReturn(Map.of());
     when(constants.getMatchTypeConstantMap()).thenReturn(Map.of());
+    when(threadRepo.advanceStage(any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
+  }
+
+  private void verifyAdvanced(MatchReportStage stage) {
+    verify(threadRepo)
+        .advanceStage(
+            eq(9L),
+            eq(stage),
+            org.mockito.ArgumentMatchers.anyCollection(),
+            any(),
+            any(),
+            any(),
+            any());
+  }
+
+  private void verifyNotAdvanced() {
+    verify(threadRepo, never()).advanceStage(any(), any(), any(), any(), any(), any(), any());
   }
 
   private static NewMatchSummary summary() {
@@ -90,6 +107,7 @@ class MatchReportStageServiceTest {
 
   private static MatchReportThreadDomain row(MatchReportStage stage) {
     return MatchReportThreadDomain.builder()
+        .id(9L)
         .matchId(MATCH)
         .instanceId(INSTANCE)
         .channelId(CHANNEL)
@@ -157,6 +175,10 @@ class MatchReportStageServiceTest {
     verify(discord)
         .sendChannelMessage(
             eq(CHANNEL), org.mockito.ArgumentMatchers.contains("OpenDota parse requested"));
+    ArgumentCaptor<MatchReportThreadDomain> saved =
+        ArgumentCaptor.forClass(MatchReportThreadDomain.class);
+    verify(threadRepo).save(saved.capture());
+    assertThat(saved.getValue().getStage()).isNull();
   }
 
   @Test
@@ -215,8 +237,7 @@ class MatchReportStageServiceTest {
 
     assertThat(editedTitle())
         .isEqualTo("**Match 77 · ability draft · Win (40-25) · 35 min · replay processing**");
-    assertThat(row.getStage()).isEqualTo(MatchReportStage.REPLAY_PENDING);
-    verify(threadRepo).save(row);
+    verifyAdvanced(MatchReportStage.REPLAY_PENDING);
     verify(discord, never()).sendThreadComponentsBlocking(any(), anyList());
   }
 
@@ -229,7 +250,7 @@ class MatchReportStageServiceTest {
     service.parsed(parsedMatch(), config);
 
     assertThat(editedTitle()).contains("OpenDota data ready");
-    assertThat(row.getStage()).isEqualTo(MatchReportStage.PARSED);
+    verifyAdvanced(MatchReportStage.PARSED);
   }
 
   @Test
@@ -282,7 +303,7 @@ class MatchReportStageServiceTest {
     assertThat(editedTitle())
         .isEqualTo(
             "**Match 77 · ability draft · Win · 35 min · OpenDota did not parse this match**");
-    assertThat(row.getStage()).isEqualTo(MatchReportStage.PARSE_TIMED_OUT);
+    verifyAdvanced(MatchReportStage.PARSE_TIMED_OUT);
   }
 
   @Test
@@ -297,18 +318,21 @@ class MatchReportStageServiceTest {
     verify(discord, never()).editComponentsMessage(anyString(), anyLong(), anyList());
     verify(discord)
         .editMessage(eq(CHANNEL), eq(500L), org.mockito.ArgumentMatchers.contains("did not parse"));
-    assertThat(legacy.getStage()).isNull();
+    verifyNotAdvanced();
     assertThat(service.ownsHeader(MATCH, INSTANCE)).isFalse();
   }
 
   @Test
-  void aStagedRowOwnsItsHeaderOnlyWhileTheSwitchIsOn() {
+  void aStagedRowKeepsItsStagedEditsEvenAfterTheSwitchIsTurnedOff() {
+    properties.setEnabled(false);
+    statsOfTrackedPlayer();
     when(threadRepo.findByMatchIdAndInstanceId(MATCH, INSTANCE))
         .thenReturn(Optional.of(row(MatchReportStage.REQUESTED)));
 
     assertThat(service.ownsHeader(MATCH, INSTANCE)).isTrue();
-    properties.setEnabled(false);
-    assertThat(service.ownsHeader(MATCH, INSTANCE)).isFalse();
+    service.parsed(parsedMatch(), config);
+
+    verifyAdvanced(MatchReportStage.PARSED);
   }
 
   @Test
@@ -322,8 +346,7 @@ class MatchReportStageServiceTest {
     service.parseTimedOut(timedOutMatch(), INSTANCE);
 
     verify(discord, never()).editComponentsMessage(anyString(), anyLong(), anyList());
-    verify(threadRepo, never()).save(any());
-    assertThat(done.getStage()).isEqualTo(MatchReportStage.REPLAY_DONE);
+    verifyNotAdvanced();
   }
 
   @Test
@@ -337,8 +360,7 @@ class MatchReportStageServiceTest {
 
     service.parsed(parsedMatch(), config);
 
-    assertThat(row.getStage()).isEqualTo(MatchReportStage.REQUESTED);
-    verify(threadRepo, never()).save(any());
+    verifyNotAdvanced();
   }
 
   @Test
@@ -359,16 +381,34 @@ class MatchReportStageServiceTest {
         service.start(MatchDomain.builder().id(MATCH).build(), config, summary(), Map.of());
 
     assertThat(result).isEqualTo(new PartialReportResult(0L, 500L));
+    ArgumentCaptor<MatchReportThreadDomain> saved =
+        ArgumentCaptor.forClass(MatchReportThreadDomain.class);
+    verify(threadRepo).save(saved.capture());
+    assertThat(saved.getValue().getThreadId()).isNull();
+    assertThat(saved.getValue().getHeaderMessageId()).isEqualTo(500L);
+    assertThat(saved.getValue().getStage()).isEqualTo(MatchReportStage.REQUESTED);
   }
 
   @Test
-  void switchedOff_nothingIsEditedOrLookedUp() {
+  void stageOne_aFailingCardStillReturnsTheRealThread() {
+    when(discord.sendThreadComponentsBlocking(any(), anyList()))
+        .thenThrow(new RuntimeException("boom"));
+    when(constants.getHeroConstantMap()).thenThrow(new IllegalStateException("down"));
+
+    PartialReportResult result =
+        service.start(MatchDomain.builder().id(MATCH).build(), config, summary(), Map.of());
+
+    assertThat(result).isEqualTo(new PartialReportResult(600L, 500L));
+  }
+
+  @Test
+  void switchedOff_aLegacyThreadIsNotRetitledAsV2() {
     properties.setEnabled(false);
+    when(threadRepo.findByMatchIdAndInstanceId(MATCH, INSTANCE)).thenReturn(Optional.of(row(null)));
 
     service.parsed(parsedMatch(), config);
-    service.parseTimedOut(timedOutMatch(), INSTANCE);
 
-    org.mockito.Mockito.verifyNoInteractions(discord, threadRepo);
+    verify(discord, never()).editComponentsMessage(anyString(), anyLong(), anyList());
     assertThat(service.enabled()).isFalse();
   }
 }

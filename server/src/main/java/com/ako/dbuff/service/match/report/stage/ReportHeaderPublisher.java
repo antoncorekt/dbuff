@@ -18,16 +18,26 @@ import org.springframework.stereotype.Component;
 public class ReportHeaderPublisher {
   private final DiscordMessageService discord;
 
+  /**
+   * The header as posted.
+   *
+   * @param message the header message
+   * @param components false when Discord rejected the components and the header is plain text
+   */
+  public record Posted(Message message, boolean components) {}
+
   /** The header message; null when the channel is unknown. */
-  public Message create(String channelId, ReportMessage.Components header) {
+  public Posted create(String channelId, ReportMessage.Components header) {
     try {
-      return discord.sendChannelComponents(channelId, header.components());
+      Message message = discord.sendChannelComponents(channelId, header.components());
+      return message == null ? null : new Posted(message, true);
     } catch (RuntimeException e) {
       if (!ComponentsFallback.payloadRejected(e)) {
         throw e;
       }
       log.warn("Header components rejected, posting plain text: {}", e.getMessage());
-      return discord.sendChannelMessage(channelId, header.fallback());
+      Message message = discord.sendChannelMessage(channelId, header.fallback());
+      return message == null ? null : new Posted(message, false);
     }
   }
 

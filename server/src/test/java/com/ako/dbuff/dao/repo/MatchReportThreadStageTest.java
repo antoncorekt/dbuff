@@ -35,4 +35,54 @@ class MatchReportThreadStageTest {
     assertThat(staged.getDurationSeconds()).isEqualTo(2100L);
     assertThat(repo.findByMatchIdAndInstanceId(2L, "i").orElseThrow().getStage()).isNull();
   }
+
+  @Test
+  void advanceStage_movesOnlyForwardAndTouchesOnlyStageAndFacts() {
+    MatchReportThreadDomain saved =
+        repo.saveAndFlush(
+            MatchReportThreadDomain.builder()
+                .matchId(5L)
+                .instanceId("i")
+                .threadId(77L)
+                .stage(MatchReportStage.REQUESTED)
+                .build());
+    MatchReportStage parsed = MatchReportStage.PARSED;
+
+    int moved =
+        repo.advanceStage(saved.getId(), parsed, parsed.predecessors(), "all draft", 1, 0, 2100L);
+    int back =
+        repo.advanceStage(
+            saved.getId(),
+            MatchReportStage.REQUESTED,
+            MatchReportStage.REQUESTED.predecessors(),
+            null,
+            null,
+            null,
+            null);
+
+    MatchReportThreadDomain now = repo.findByMatchIdAndInstanceId(5L, "i").orElseThrow();
+    assertThat(moved).isEqualTo(1);
+    assertThat(back).isZero();
+    assertThat(now.getStage()).isEqualTo(parsed);
+    assertThat(now.getModeName()).isEqualTo("all draft");
+    assertThat(now.getThreadId()).isEqualTo(77L);
+  }
+
+  @Test
+  void advanceStage_leavesALegacyRowAlone() {
+    MatchReportThreadDomain legacy =
+        repo.saveAndFlush(MatchReportThreadDomain.builder().matchId(6L).instanceId("i").build());
+
+    int moved =
+        repo.advanceStage(
+            legacy.getId(),
+            MatchReportStage.PARSED,
+            MatchReportStage.PARSED.predecessors(),
+            null,
+            null,
+            null,
+            null);
+
+    assertThat(moved).isZero();
+  }
 }

@@ -72,6 +72,7 @@ class MatchParseCheckJobTest {
     when(instances.getDomainById(INSTANCE)).thenReturn(Optional.of(instance));
     when(matchRepo.findById(MATCH)).thenReturn(Optional.of(match));
     when(quietHours.isQuietTime(any(InstanceSettings.class))).thenReturn(false);
+    when(stages.enabled()).thenReturn(true);
   }
 
   private void waitedTooLong() {
@@ -154,5 +155,30 @@ class MatchParseCheckJobTest {
     job.execute(context);
 
     verify(orchestrator).processAndReportFull(eq(processed), eq(instance), eq(600L), eq(500L));
+  }
+
+  @Test
+  void switchedOff_quietHoursComeFirstAsTheyAlwaysDid() throws Exception {
+    when(stages.enabled()).thenReturn(false);
+    waitedTooLong();
+    when(quietHours.isQuietTime(any(InstanceSettings.class))).thenReturn(true);
+
+    job.execute(context);
+
+    verify(matchRepo, never()).findById(Mockito.anyLong());
+    verify(stages, never()).parseTimedOut(any(), any());
+    verify(scheduler, never()).unscheduleParseWait(Mockito.anyLong());
+  }
+
+  @Test
+  void switchedOff_aTimedOutMatchOutsideQuietHoursStillTimesOut() throws Exception {
+    when(stages.enabled()).thenReturn(false);
+    waitedTooLong();
+
+    job.execute(context);
+
+    assertThat(match.getError()).isEqualTo("Parse timeout exceeded");
+    verify(stages).parseTimedOut(match, INSTANCE);
+    verify(scheduler).unscheduleParseWait(MATCH);
   }
 }

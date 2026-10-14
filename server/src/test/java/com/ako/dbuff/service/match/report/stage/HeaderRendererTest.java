@@ -146,6 +146,9 @@ class HeaderRendererTest {
     assertThat(MatchReportStage.PARSE_TIMED_OUT.mayFollow(MatchReportStage.REQUESTED)).isTrue();
     assertThat(MatchReportStage.PARSE_TIMED_OUT.mayFollow(MatchReportStage.PARSED)).isFalse();
     assertThat(MatchReportStage.PARSED.mayFollow(MatchReportStage.PARSE_TIMED_OUT)).isFalse();
+    assertThat(MatchReportStage.REPLAY_DONE.mayFollow(MatchReportStage.PARSE_TIMED_OUT)).isTrue();
+    assertThat(MatchReportStage.REPLAY_PENDING.mayFollow(MatchReportStage.PARSE_TIMED_OUT))
+        .isTrue();
     assertThat(MatchReportStage.PARSED.mayFollow(null)).isFalse();
   }
 }
