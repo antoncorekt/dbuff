@@ -6,7 +6,6 @@ import com.ako.dbuff.dao.model.ObjectiveConversionDomain;
 import com.ako.dbuff.dao.repo.FightImportanceRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.ObjectiveConversionRepo;
-import com.ako.dbuff.service.replay.analysis.behaviour.BehaviourProperties;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,8 +24,7 @@ class ObjectivesSectionTest {
   private final ReportHeroNames heroNames = mock(ReportHeroNames.class);
   private final ReplayReportProperties properties = new ReplayReportProperties();
   private final ObjectivesSection section =
-      new ObjectivesSection(
-          repo, fightRepo, importanceRepo, heroNames, properties, new BehaviourProperties());
+      new ObjectivesSection(repo, fightRepo, importanceRepo, heroNames, properties);
   private final List<ObjectiveConversionDomain> rows = new ArrayList<>();
   private final List<FightDomain> fights = new ArrayList<>();
   private final List<FightImportanceDomain> importance = new ArrayList<>();
@@ -40,7 +38,8 @@ class ObjectivesSectionTest {
   }
 
   private ObjectiveConversionDomain fight(int index, int start, String winner, String result) {
-    fights.add(FightDomain.builder().fightIndex(index).startSeconds((double) start).build());
+    fights.add(
+        FightDomain.builder().id(nextId++).fightIndex(index).startSeconds((double) start).build());
     ObjectiveConversionDomain row =
         ObjectiveConversionDomain.builder()
             .id(nextId++)
@@ -48,6 +47,7 @@ class ObjectivesSectionTest {
             .fightIndex(index)
             .winnerTeam(winner)
             .result(result)
+            .windowSeconds(90)
             .build();
     rows.add(row);
     return row;
@@ -123,8 +123,9 @@ class ObjectivesSectionTest {
 
     List<String> lines = section.lines(input());
 
-    assertThat(lines).hasSize(5);
+    assertThat(lines).hasSize(6);
     assertThat(lines.get(1)).endsWith("0 of 5");
+    assertThat(lines.get(5)).isEqualTo("and 2 more missed fights");
     assertThat(lines.get(2)).startsWith("3:20");
     assertThat(lines.get(3)).startsWith("6:40");
     assertThat(lines.get(4)).startsWith("8:20");
@@ -141,18 +142,92 @@ class ObjectivesSectionTest {
     assertThat(lines.subList(2, 5))
         .extracting(l -> l.substring(0, 4))
         .containsExactly("3:20", "5:00", "6:40");
+    assertThat(lines.get(5)).isEqualTo("and 1 more missed fight");
   }
 
   @Test
   void aTieBreaksOnTheRowId() {
     properties.setMaxObjectiveLines(1);
     missed(1, 100, 1000).setHeroZone("RIVER");
-    missed(1, 100, 1000);
+    missed(2, 100, 1000);
     List<ObjectiveConversionDomain> reversed = new ArrayList<>(rows);
     java.util.Collections.reverse(reversed);
     when(repo.findByMatchId(1L)).thenReturn(reversed);
 
     assertThat(section.lines(input()).get(2)).contains("stood in the river");
+  }
+
+  @Test
+  void twoRowsOfTheSameFightIndexKeepTheLargerIdWhateverTheRepositoryOrder() {
+    ObjectiveConversionDomain old = missed(1, 100, 1000);
+    old.setHeroZone("RIVER");
+    ObjectiveConversionDomain latest = missed(1, 100, 1000);
+    latest.setHeroZone("BASE");
+    for (boolean reversed : new boolean[] {false, true}) {
+      List<ObjectiveConversionDomain> order = new ArrayList<>(List.of(old, latest));
+      List<FightDomain> fightOrder = new ArrayList<>(fights);
+      if (reversed) {
+        java.util.Collections.reverse(order);
+        java.util.Collections.reverse(fightOrder);
+      }
+      when(repo.findByMatchId(1L)).thenReturn(order);
+      when(fightRepo.findByMatchId(1L)).thenReturn(fightOrder);
+
+      List<String> lines = section.lines(input());
+
+      assertThat(lines).hasSize(3);
+      assertThat(lines.get(1)).endsWith("0 of 1");
+      assertThat(lines.get(2)).contains("stood in the base");
+    }
+  }
+
+  @Test
+  void aRowWithoutTheStoredWindowSaysSoonAfterAndANewWindowIsNotRestated() {
+    ObjectiveConversionDomain old = missed(1, 100, 1000);
+    old.setWindowSeconds(null);
+    ObjectiveConversionDomain changed = missed(2, 200, 1000);
+    changed.setWindowSeconds(60);
+
+    List<String> lines = section.lines(input());
+
+    assertThat(lines.get(2)).contains("did not take an objective soon after;").doesNotContain("90");
+    assertThat(lines.get(3)).contains("did not take an objective in the next 60 seconds;");
+  }
+
+  @Test
+  void aFightWithoutAClockIsTheOldestForTheCapAndNeverTheRoshanSentence() {
+    properties.setMaxObjectiveLines(1);
+    ObjectiveConversionDomain unknown = missed(1, 100, 1000);
+    fights.removeIf(f -> f.getFightIndex() == 1);
+    unknown.setHeroZone("RIVER");
+    missed(2, 50, 1000).setHeroZone("BASE");
+    ObjectiveConversionDomain roshan = fight(3, 900, "RADIANT", "CONVERTED");
+    roshan.setObjectiveKind("ROSHAN");
+    roshan.setRoshanNearSlots("0");
+    ObjectiveConversionDomain lost = fight(4, 800, "RADIANT", "CONVERTED");
+    lost.setObjectiveKind("ROSHAN");
+    lost.setRoshanNearSlots("1");
+    fights.removeIf(f -> f.getFightIndex() == 4);
+
+    List<String> lines = section.lines(input());
+
+    assertThat(lines.get(2)).startsWith("0:50").contains("stood in the base");
+    assertThat(lines.get(3)).isEqualTo("and 1 more missed fight");
+    assertThat(lines.get(4)).startsWith("After the won fight at 15:00").contains("Axe stood");
+
+    fights.removeIf(f -> f.getFightIndex() == 3);
+    assertThat(section.lines(input())).noneMatch(l -> l.startsWith("After the won fight"));
+  }
+
+  @Test
+  void aNegativeOrMissingDistanceIsNotKnown() {
+    missed(1, 100, -5);
+    missed(2, 200, 1000).setTowerDistance(null);
+
+    List<String> lines = section.lines(input());
+
+    assertThat(lines.get(2)).endsWith("stood in the top lane, how far from it is not known.");
+    assertThat(lines.get(3)).endsWith("stood in the top lane, how far from it is not known.");
   }
 
   @Test

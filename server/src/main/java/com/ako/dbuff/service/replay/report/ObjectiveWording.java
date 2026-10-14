@@ -5,9 +5,9 @@ import com.ako.dbuff.service.replay.analysis.behaviour.RoshanCall;
 import com.ako.dbuff.service.replay.analysis.building.BuildingName;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * The words of the objectives after a won fight that the Discord section and the behaviour loop
@@ -18,19 +18,30 @@ public final class ObjectiveWording {
 
   /** Who stood at Roshan's pit and whether taking him was expected or a gamble. */
   public static String roshanNote(ObjectiveConversionDomain r, Map<Long, String> heroNames) {
-    String near =
-        r.getRoshanNearSlots() == null
-            ? "where the killer stood is not known"
-            : r.getRoshanNearSlots().isBlank()
-                ? "no winner hero was found at the pit"
-                : Arrays.stream(r.getRoshanNearSlots().split(","))
-                        .map(ObjectiveWording::slot)
-                        .filter(Objects::nonNull)
-                        .map(slot -> BehaviourWording.hero(heroNames, slot))
-                        .collect(Collectors.joining(", "))
-                    + " stood at the pit";
+    String near;
+    if (r.getRoshanNearSlots() == null) {
+      near = "where the killer stood is not known";
+    } else if (r.getRoshanNearSlots().isBlank()) {
+      near = "no winner hero was found at the pit";
+    } else {
+      List<String> names =
+          Arrays.stream(r.getRoshanNearSlots().split(","))
+              .map(ObjectiveWording::slot)
+              .filter(Objects::nonNull)
+              .map(slot -> BehaviourWording.hero(heroNames, slot))
+              .toList();
+      near =
+          names.isEmpty()
+              ? "a hero who is not known stood at the pit"
+              : LaneWording.joinNames(names) + " stood at the pit";
+    }
     RoshanCall call = Enums.find(RoshanCall.class, r.getRoshanCall());
     return near + "; " + (call == null ? "the state before the fight is not known" : call.words());
+  }
+
+  /** The window a row was judged with; null on a row stored without it. */
+  public static Integer window(ObjectiveConversionDomain r) {
+    return r.getWindowSeconds() == null || r.getWindowSeconds() < 1 ? null : r.getWindowSeconds();
   }
 
   /** Why a missed fight has no tower to measure from. */

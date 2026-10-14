@@ -309,6 +309,7 @@ class BehaviourLoopReportTest {
                         .fightIndex(3)
                         .winnerTeam("RADIANT")
                         .result("MISSED")
+                        .windowSeconds(90)
                         .winnersAlive(3)
                         .nearestTower("dota_badguys_tower2_mid")
                         .towerLane("MID")
@@ -328,6 +329,51 @@ class BehaviourLoopReportTest {
             "Objectives: 1 won important fight: 0 converted (0 a tower, 0 barracks, 0 the ancient,"
                 + " 0 Roshan), 1 missed.")
         .doesNotContain("MISSED");
+  }
+
+  @Test
+  void render_aMissedRowWithoutAStoredWindowNamesNoNumber() {
+    String report =
+        BehaviourLoopReport.render(
+            withObjectives(
+                List.of(
+                    ObjectiveConversionDomain.builder()
+                        .fightIndex(3)
+                        .winnerTeam("RADIANT")
+                        .result("MISSED")
+                        .windowSeconds(60)
+                        .winnersAlive(0)
+                        .build(),
+                    ObjectiveConversionDomain.builder()
+                        .fightIndex(4)
+                        .winnerTeam("DIRE")
+                        .result("MISSED")
+                        .winnersAlive(2)
+                        .build())));
+
+    assertThat(report)
+        .contains(
+            "Radiant took nothing in 60 s; no hero of the winner was alive when the fight ended")
+        .contains("Dire took nothing soon after; no enemy lane tower was left to measure from");
+  }
+
+  @Test
+  void render_tellsARoshanKillWithTheHeroesAtThePitJoinedWithAnd() {
+    String report =
+        BehaviourLoopReport.render(
+            withObjectives(
+                List.of(
+                    ObjectiveConversionDomain.builder()
+                        .fightIndex(4)
+                        .winnerTeam("RADIANT")
+                        .result("CONVERTED")
+                        .objectiveKind("ROSHAN")
+                        .secondsAfter(0)
+                        .roshanNearSlots("0,128")
+                        .roshanCall("EXPECTED")
+                        .build())));
+
+    assertThat(report).contains("Axe and Mirana stood at the pit; expected, the winner was ahead");
   }
 
   @Test

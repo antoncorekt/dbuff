@@ -675,7 +675,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     ReplayReportInput input = new ReplayReportInput(matchId, null, Set.of(), Map.of(), 3);
     saveSection("rotations", rotationsSection.lines(input), id, 5);
     saveSection("smoke", smokeSection.lines(input), id, 4);
-    saveSection("objectives", objectivesSection.lines(input), id, 6);
+    saveSection("objectives", objectivesSection.lines(input), id, 7);
   }
 
   private void saveSection(String name, List<String> lines, String id, int maxLines) {

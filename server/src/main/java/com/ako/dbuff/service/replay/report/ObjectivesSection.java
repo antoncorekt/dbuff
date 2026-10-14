@@ -7,7 +7,6 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.FightImportanceRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.ObjectiveConversionRepo;
-import com.ako.dbuff.service.replay.analysis.behaviour.BehaviourProperties;
 import com.ako.dbuff.service.replay.analysis.behaviour.ObjectiveKind;
 import com.ako.dbuff.service.replay.analysis.behaviour.ObjectiveResult;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
@@ -19,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +40,6 @@ public class ObjectivesSection implements ReplayReportSection {
   private final FightImportanceRepo importanceRepo;
   private final ReportHeroNames heroNames;
   private final ReplayReportProperties properties;
-  private final BehaviourProperties behaviour;
 
   /** The rows with what the section needs to know about their fight. */
   private record Entry(
@@ -93,14 +92,21 @@ public class ObjectivesSection implements ReplayReportSection {
     lines.add("**Objectives**");
     lines.add(summary(entries));
     int max = Math.max(LineText.ELLIPSIS.length() + 1, properties.getMaxBehaviourLineLength());
-    BehaviourLines.pick(
+    BehaviourLines.Picked<Entry> picked =
+        BehaviourLines.pick(
             entries.stream().filter(e -> result(e) == ObjectiveResult.MISSED).toList(),
             BY_WORTH,
             CHRONOLOGICAL,
-            properties.getMaxObjectiveLines())
-        .forEach(e -> lines.add(LineText.cut(missed(e, heroes, yours), max)));
+            properties.getMaxObjectiveLines());
+    picked.listed().forEach(e -> lines.add(LineText.cut(missed(e, heroes, yours), max)));
+    if (picked.leftOut() > 0) {
+      lines.add(
+          "and %d more missed %s"
+              .formatted(picked.leftOut(), picked.leftOut() == 1 ? "fight" : "fights"));
+    }
     entries.stream()
         .filter(ObjectivesSection::tookRoshan)
+        .filter(e -> e.start() != null)
         .max(CHRONOLOGICAL)
         .ifPresent(e -> lines.add(LineText.cut(roshan(e, heroes, yours), max)));
     return lines;
@@ -111,11 +117,20 @@ public class ObjectivesSection implements ReplayReportSection {
       return List.of();
     }
     Map<Integer, FightDomain> fights =
-        byFightIndex(fightRepo.findByMatchId(matchId), f -> f.getFightIndex());
+        byFightIndex(
+            fightRepo.findByMatchId(matchId), FightDomain::getFightIndex, FightDomain::getId);
     Map<Integer, FightImportanceDomain> importance =
-        byFightIndex(importanceRepo.findByMatchId(matchId), f -> f.getFightIndex());
-    return stored.stream()
-        .filter(Objects::nonNull)
+        byFightIndex(
+            importanceRepo.findByMatchId(matchId),
+            FightImportanceDomain::getFightIndex,
+            FightImportanceDomain::getId);
+    List<ObjectiveConversionDomain> rows = new ArrayList<>();
+    stored.stream().filter(r -> r != null && r.getFightIndex() == null).forEach(rows::add);
+    rows.addAll(
+        byFightIndex(
+                stored, ObjectiveConversionDomain::getFightIndex, ObjectiveConversionDomain::getId)
+            .values());
+    return rows.stream()
         .map(
             row ->
                 new Entry(
@@ -124,14 +139,21 @@ public class ObjectivesSection implements ReplayReportSection {
         .toList();
   }
 
-  private static <T> Map<Integer, T> byFightIndex(Collection<T> rows, Function<T, Integer> index) {
+  /** One row per fight index: the one with the largest id, so the repository order never counts. */
+  private static <T> Map<Integer, T> byFightIndex(
+      Collection<T> rows, Function<T, Integer> index, Function<T, Long> id) {
     if (rows == null) {
       return new HashMap<>();
     }
     return rows.stream()
         .filter(Objects::nonNull)
         .filter(r -> index.apply(r) != null)
-        .collect(Collectors.toMap(index, Function.identity(), (a, b) -> a));
+        .collect(
+            Collectors.toMap(
+                index,
+                Function.identity(),
+                BinaryOperator.maxBy(
+                    Comparator.comparing(id, Comparator.nullsFirst(Comparator.naturalOrder())))));
   }
 
   private static ObjectiveResult result(Entry e) {
@@ -150,9 +172,13 @@ public class ObjectivesSection implements ReplayReportSection {
 
   private String missed(Entry e, Map<Long, String> heroes, TeamSide yours) {
     ObjectiveConversionDomain r = e.row();
+    Integer window = ObjectiveWording.window(r);
     String head =
-        "%s %s won the fight but did not take an objective in the next %d seconds"
-            .formatted(time(e.start()), winner(r, yours), behaviour.getObjectiveWindowSeconds());
+        "%s %s won the fight but did not take an objective %s"
+            .formatted(
+                time(e.start()),
+                winner(r, yours),
+                window == null ? "soon after" : "in the next %d seconds".formatted(window));
     if (r.getNearestTower() == null) {
       return head + "; " + ObjectiveWording.noTowerReason(r) + ".";
     }
@@ -167,7 +193,7 @@ public class ObjectivesSection implements ReplayReportSection {
 
   private String standing(ObjectiveConversionDomain r) {
     String where = BehaviourWording.place(r.getHeroZone(), r.getHeroLane());
-    if (r.getTowerDistance() == null) {
+    if (r.getTowerDistance() == null || r.getTowerDistance() < 0) {
       return "stood in the %s, how far from it is not known".formatted(where);
     }
     double distance = r.getTowerDistance();

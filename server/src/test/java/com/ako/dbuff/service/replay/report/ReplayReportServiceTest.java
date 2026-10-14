@@ -31,7 +31,6 @@ import com.ako.dbuff.dao.repo.TeamRotationRepo;
 import com.ako.dbuff.service.discord.DiscordMessageService;
 import com.ako.dbuff.service.match.report.formatter.DiscordReportFormatter;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
-import com.ako.dbuff.service.replay.analysis.behaviour.BehaviourProperties;
 import com.ako.dbuff.service.replay.analysis.lane.LaneProperties;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.TestModes;
@@ -392,8 +391,7 @@ class ReplayReportServiceTest {
             Mockito.mock(FightRepo.class),
             Mockito.mock(FightImportanceRepo.class),
             Mockito.mock(ReportHeroNames.class),
-            properties,
-            new BehaviourProperties());
+            properties);
     service = serviceWith(named("alpha", true), section);
     enable("smoke", true);
     service.deliver(1L);

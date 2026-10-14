@@ -100,8 +100,7 @@ final class BehaviourLoopReport {
     out.add("");
     out.add(BehaviourObjectiveSection.howToRead(d.properties()));
     out.add("");
-    out.addAll(
-        BehaviourObjectiveSection.table(d.objectives(), d.fights(), d.heroNames(), d.properties()));
+    out.addAll(BehaviourObjectiveSection.table(d.objectives(), d.fights(), d.heroNames()));
     return String.join("\n", out) + "\n";
   }
 
