@@ -115,6 +115,11 @@ class ReplayReportServiceTest {
     }
 
     @Override
+    public boolean defaultEnabled() {
+      return true;
+    }
+
+    @Override
     public int order() {
       return 1;
     }
@@ -275,6 +280,50 @@ class ReplayReportServiceTest {
     service.deliver(1L);
 
     assertThat(posted()).doesNotContain("line of alpha").contains("line of beta");
+  }
+
+  @Test
+  void deliver_neverReadsADisabledSectionAndSavesNothingWhenEverySectionIsOff() {
+    ReplayReportSection off = Mockito.spy(named("alpha", true));
+    enable("alpha", false);
+    service = serviceWith(off);
+
+    service.deliver(1L);
+
+    verify(off, never()).lines(any());
+    verify(postedRepo, never()).save(any());
+    verify(discord, never()).sendThreadMessageBlocking(any(), any());
+  }
+
+  @Test
+  void validate_ignoresLeftoverPropertiesWhileTheReportIsOff() {
+    properties.setEnabled(false);
+    enable("nope", true);
+
+    new SectionSwitch(properties, List.of(named("alpha", true), named("alpha", true))).validate();
+  }
+
+  @Test
+  void validate_failsOnABlankNameNamingTheBeanClass() {
+    SectionSwitch sw = new SectionSwitch(properties, List.of(named(" ", true)));
+
+    assertThatThrownBy(sw::validate)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("ReplayReportServiceTest");
+  }
+
+  @Test
+  void isEnabled_treatsANullSectionsMapAsEmptyAndMatchesNamesIgnoringCaseDashAndUnderscore() {
+    ReplayReportSection splits = named("team-splits", false);
+    properties.setSections(null);
+    assertThat(new SectionSwitch(properties, List.of(splits)).isEnabled(splits)).isFalse();
+
+    properties.setSections(new java.util.HashMap<>());
+    enable("TEAM_SPLITS", true);
+    assertThat(new SectionSwitch(properties, List.of(splits)).isEnabled(splits)).isTrue();
+    properties.getSections().clear();
+    enable("teamsplits", true);
+    assertThat(new SectionSwitch(properties, List.of(splits)).isEnabled(splits)).isTrue();
   }
 
   @Test

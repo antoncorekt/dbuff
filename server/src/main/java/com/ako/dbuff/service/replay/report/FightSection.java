@@ -37,6 +37,11 @@ public class FightSection implements ReplayReportSection {
   }
 
   @Override
+  public boolean defaultEnabled() {
+    return true;
+  }
+
+  @Override
   public int order() {
     return 40;
   }

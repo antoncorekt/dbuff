@@ -16,9 +16,12 @@ public interface ReplayReportSection {
    */
   String name();
 
-  /** Whether the section posts while its property is not set; a new section ships off. */
+  /**
+   * Whether the section posts while its property is not set. Off unless a section says otherwise,
+   * so a new section ships off until the config turns it on.
+   */
   default boolean defaultEnabled() {
-    return true;
+    return false;
   }
 
   /** Whether the section applies to the mode; a common one keeps the default. */

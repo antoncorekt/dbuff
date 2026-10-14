@@ -46,6 +46,11 @@ public class CompositionSection implements ReplayReportSection {
   }
 
   @Override
+  public boolean defaultEnabled() {
+    return true;
+  }
+
+  @Override
   public int order() {
     return 12;
   }
