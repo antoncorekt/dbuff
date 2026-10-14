@@ -6,7 +6,9 @@ import com.ako.dbuff.dao.model.MatchReportStage;
 import com.ako.dbuff.dao.model.MatchReportThreadDomain;
 import com.ako.dbuff.dao.repo.MatchReportThreadRepo;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
+import java.util.function.ToIntFunction;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.entities.Message;
@@ -53,6 +55,10 @@ public class MatchThreadRecorder {
     }
   }
 
+  public List<MatchReportThreadDomain> findAll(long matchId) {
+    return threadRepo.findAllByMatchId(matchId);
+  }
+
   public Optional<MatchReportThreadDomain> find(long matchId, String instanceId) {
     return threadRepo.findByMatchIdAndInstanceId(matchId, instanceId);
   }
@@ -65,17 +71,44 @@ public class MatchThreadRecorder {
     if (stage.predecessors().isEmpty()) {
       return false;
     }
+    return store(
+        row,
+        stage,
+        facts,
+        known ->
+            threadRepo.advanceStage(
+                row.getId(),
+                stage,
+                stage.predecessors(),
+                facts.mode(),
+                known ? facts.result().wins() : null,
+                known ? facts.result().losses() : null,
+                facts.durationSeconds()));
+  }
+
+  /** Like {@link #advance}, for a deliberate retitle: the stage is set even if it goes back. */
+  public boolean force(MatchReportThreadDomain row, MatchReportStage stage, MatchFacts facts) {
+    return store(
+        row,
+        stage,
+        facts,
+        known ->
+            threadRepo.forceStage(
+                row.getId(),
+                stage,
+                facts.mode(),
+                known ? facts.result().wins() : null,
+                known ? facts.result().losses() : null,
+                facts.durationSeconds()));
+  }
+
+  private boolean store(
+      MatchReportThreadDomain row,
+      MatchReportStage stage,
+      MatchFacts facts,
+      ToIntFunction<Boolean> update) {
     try {
-      boolean known = facts.result().known();
-      return threadRepo.advanceStage(
-              row.getId(),
-              stage,
-              stage.predecessors(),
-              facts.mode(),
-              known ? facts.result().wins() : null,
-              known ? facts.result().losses() : null,
-              facts.durationSeconds())
-          > 0;
+      return update.applyAsInt(facts.result().known()) > 0;
     } catch (RuntimeException e) {
       log.warn("Could not store stage {} of match {}", stage, row.getMatchId(), e);
       return false;

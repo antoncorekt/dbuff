@@ -565,6 +565,64 @@ class ReplayReportServiceTest {
     verify(discord, never()).sendThreadMessageBlocking(any(), any());
   }
 
+  private void storedRun(ReplayStatus status) {
+    when(runRepo.findByMatchIdAndParserVersion(any(), any()))
+        .thenReturn(Optional.of(ReplayParseRunDomain.builder().matchId(1L).status(status).build()));
+    when(instanceRepo.findById("i1")).thenReturn(Optional.of(instance(null)));
+  }
+
+  @Test
+  void redeliver_postsAgainWhereDeliverAlreadyPostedOnce() {
+    storedRun(ReplayStatus.DONE);
+
+    service.deliver(1L);
+    when(postedRepo.findByMatchIdAndInstanceId(1L, "i1"))
+        .thenReturn(Optional.of(ReplayReportPostedDomain.builder().id(3L).messages(1).build()));
+    service.deliver(1L);
+    verify(discord, Mockito.times(1)).sendThreadMessageBlocking(any(), any());
+
+    service.redeliver(1L, "i1");
+
+    verify(discord, Mockito.times(2)).sendThreadMessageBlocking(any(), any());
+    ArgumentCaptor<ReplayReportPostedDomain> saved =
+        ArgumentCaptor.forClass(ReplayReportPostedDomain.class);
+    verify(postedRepo, Mockito.times(2)).save(saved.capture());
+    assertThat(saved.getAllValues().get(1).getId()).isEqualTo(3L);
+  }
+
+  @Test
+  void redeliver_ignoresQuietHoursButHonoursTheOtherGates() {
+    storedRun(ReplayStatus.PARTIAL);
+    when(quiet.isQuietTime(any())).thenReturn(true);
+
+    service.redeliver(1L, "i1");
+    verify(discord, Mockito.times(1)).sendThreadMessageBlocking(any(), any());
+
+    when(instanceRepo.findById("i1"))
+        .thenReturn(
+            Optional.of(
+                instance(InstanceSettings.builder().reportDetail(ReportDetail.MINIMAL).build())));
+    service.redeliver(1L, "i1");
+    properties.setEnabled(false);
+    when(instanceRepo.findById("i1")).thenReturn(Optional.of(instance(null)));
+    service.redeliver(1L, "i1");
+
+    verify(discord, Mockito.times(1)).sendThreadMessageBlocking(any(), any());
+  }
+
+  @Test
+  void redeliver_postsNothingWithoutAStoredReplayAndNeverThrows() {
+    storedRun(ReplayStatus.FAILED_DOWNLOAD);
+    service.redeliver(1L, "i1");
+
+    storedRun(ReplayStatus.DONE);
+    when(discord.getThreadById(9L)).thenThrow(new IllegalStateException("discord down"));
+
+    org.assertj.core.api.Assertions.assertThatCode(() -> service.redeliver(1L, "i1"))
+        .doesNotThrowAnyException();
+    verify(discord, never()).sendThreadMessageBlocking(any(), any());
+  }
+
   @Test
   void deliver_triesAgainLaterWhenTheThreadCannotBeFoundNow() {
     when(discord.getThreadById(9L)).thenReturn(null);

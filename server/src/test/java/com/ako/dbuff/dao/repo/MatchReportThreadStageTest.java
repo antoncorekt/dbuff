@@ -116,4 +116,42 @@ class MatchReportThreadStageTest {
     assertThat(now.getLosses()).isZero();
     assertThat(now.getDurationSeconds()).isEqualTo(2100L);
   }
+
+  @Test
+  void forceStage_setsTheStageBackwardsAndLeavesALegacyRowAndOtherColumnsAlone() {
+    MatchReportThreadDomain staged =
+        repo.saveAndFlush(
+            MatchReportThreadDomain.builder()
+                .matchId(9L)
+                .instanceId("i")
+                .threadId(77L)
+                .stage(MatchReportStage.REPLAY_UNAVAILABLE)
+                .modeName("all draft")
+                .build());
+    MatchReportThreadDomain legacy =
+        repo.saveAndFlush(MatchReportThreadDomain.builder().matchId(10L).instanceId("i").build());
+
+    int forced =
+        repo.forceStage(staged.getId(), MatchReportStage.REPLAY_PENDING, null, 1, 0, 2100L);
+    int untouched =
+        repo.forceStage(legacy.getId(), MatchReportStage.PARSED, null, null, null, null);
+
+    MatchReportThreadDomain now = repo.findByMatchIdAndInstanceId(9L, "i").orElseThrow();
+    assertThat(forced).isEqualTo(1);
+    assertThat(now.getStage()).isEqualTo(MatchReportStage.REPLAY_PENDING);
+    assertThat(now.getModeName()).isEqualTo("all draft");
+    assertThat(now.getWins()).isEqualTo(1);
+    assertThat(now.getThreadId()).isEqualTo(77L);
+    assertThat(untouched).isZero();
+    assertThat(repo.findByMatchIdAndInstanceId(10L, "i").orElseThrow().getStage()).isNull();
+  }
+
+  @Test
+  void findAllByMatchId_returnsTheRowsOfEveryInstance() {
+    repo.saveAndFlush(MatchReportThreadDomain.builder().matchId(11L).instanceId("a").build());
+    repo.saveAndFlush(MatchReportThreadDomain.builder().matchId(11L).instanceId("b").build());
+    repo.saveAndFlush(MatchReportThreadDomain.builder().matchId(12L).instanceId("a").build());
+
+    assertThat(repo.findAllByMatchId(11L)).hasSize(2);
+  }
 }

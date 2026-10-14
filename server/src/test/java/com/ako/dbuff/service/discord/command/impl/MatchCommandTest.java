@@ -9,6 +9,8 @@ import com.ako.dbuff.service.match.DotaApiParseRequestService;
 import com.ako.dbuff.service.match.MatchDeletionService;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator.PartialReportResult;
+import com.ako.dbuff.service.match.report.stage.MatchReportStageService;
+import com.ako.dbuff.service.replay.report.ReplayReportService;
 import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
 import java.util.List;
 import java.util.Optional;
@@ -29,6 +31,8 @@ class MatchCommandTest {
   private MatchDeletionService matchDeletionService;
   private DotaApiParseRequestService parseRequestService;
   private MatchParseSchedulerService schedulerService;
+  private MatchReportStageService stageService;
+  private ReplayReportService replayReportService;
   private MatchCommand command;
 
   @BeforeEach
@@ -39,6 +43,8 @@ class MatchCommandTest {
     matchDeletionService = Mockito.mock(MatchDeletionService.class);
     parseRequestService = Mockito.mock(DotaApiParseRequestService.class);
     schedulerService = Mockito.mock(MatchParseSchedulerService.class);
+    stageService = Mockito.mock(MatchReportStageService.class);
+    replayReportService = Mockito.mock(ReplayReportService.class);
 
     command =
         new MatchCommand(
@@ -47,7 +53,9 @@ class MatchCommandTest {
             orchestrator,
             matchDeletionService,
             parseRequestService,
-            schedulerService);
+            schedulerService,
+            stageService,
+            replayReportService);
 
     Mockito.when(instanceConfigRepo.findByDiscordChannelId(Mockito.anyString()))
         .thenReturn(Optional.of(config()));
@@ -141,6 +149,67 @@ class MatchCommandTest {
             Mockito.argThat(
                 matches -> matches.size() == 1 && matches.get(0).getId().equals(MATCH_ID)),
             Mockito.any());
+  }
+
+  @Test
+  void rerun_withTheStagesOffNeverRefreshesOrRedelivers() {
+    FakeCommandContext context = inThread();
+
+    command.execute("rerun", context);
+
+    Mockito.verify(stageService, Mockito.never()).refresh(Mockito.any(), Mockito.any());
+    Mockito.verifyNoInteractions(replayReportService);
+    assertThat(context.getPosts()).isEmpty();
+  }
+
+  @Test
+  void rerun_withTheStagesOn_refreshesTheHeaderRedeliversAndSaysSo() {
+    Mockito.when(stageService.enabled()).thenReturn(true);
+    Mockito.when(stageService.refresh(Mockito.any(), Mockito.any())).thenReturn(true);
+
+    FakeCommandContext context = inThread();
+    command.execute("rerun", context);
+
+    Mockito.verify(stageService)
+        .refresh(Mockito.argThat(m -> m.getId().equals(MATCH_ID)), Mockito.any());
+    Mockito.verify(replayReportService).redeliver(MATCH_ID, "instance-1");
+    assertThat(context.getPosts()).containsExactly("Header refreshed.");
+  }
+
+  @Test
+  void rerun_withTheStagesOn_staysSilentWhenNothingWasRefreshed() {
+    Mockito.when(stageService.enabled()).thenReturn(true);
+
+    FakeCommandContext context = inThread();
+    command.execute("rerun", context);
+
+    assertThat(context.getPosts()).isEmpty();
+    assertThat(context.getFailures()).isEmpty();
+  }
+
+  @Test
+  void rerun_aFailingRefreshNeverFailsTheCommand() {
+    Mockito.when(stageService.enabled()).thenReturn(true);
+    Mockito.when(stageService.refresh(Mockito.any(), Mockito.any()))
+        .thenThrow(new IllegalStateException("db down"));
+
+    FakeCommandContext context = inThread();
+    command.execute("rerun", context);
+
+    assertThat(context.getFailures()).isEmpty();
+    assertThat(context.getPosts()).isEmpty();
+  }
+
+  @Test
+  void retry_neverRefreshesTheHeader() {
+    Mockito.when(stageService.enabled()).thenReturn(true);
+    Mockito.when(orchestrator.processAndReportPartial(Mockito.any(), Mockito.any()))
+        .thenReturn(new PartialReportResult(555L, 666L));
+
+    command.execute("retry", inThread());
+
+    Mockito.verify(stageService, Mockito.never()).refresh(Mockito.any(), Mockito.any());
+    Mockito.verifyNoInteractions(replayReportService);
   }
 
   @Test

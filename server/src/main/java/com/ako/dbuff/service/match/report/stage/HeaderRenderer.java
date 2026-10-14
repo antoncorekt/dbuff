@@ -28,7 +28,13 @@ public class HeaderRenderer {
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
   public ReportMessage.Components render(MatchReportStage stage, MatchFacts facts) {
-    String title = title(stage, facts);
+    return render(stage, facts, false);
+  }
+
+  /** {@code partial}: the replay analysis is stored but some of it failed for good. */
+  public ReportMessage.Components render(
+      MatchReportStage stage, MatchFacts facts, boolean partial) {
+    String title = title(stage, facts, partial);
     String link = LINK_PREFIX + facts.link();
     List<ContainerChildComponent> children =
         List.of(TextDisplay.of("**" + title + "**"), TextDisplay.of(link));
@@ -40,6 +46,10 @@ public class HeaderRenderer {
   }
 
   public String title(MatchReportStage stage, MatchFacts facts) {
+    return title(stage, facts, false);
+  }
+
+  public String title(MatchReportStage stage, MatchFacts facts, boolean partial) {
     List<String> parts = new ArrayList<>();
     parts.add("Match " + facts.matchId());
     if (facts.mode() != null) {
@@ -51,16 +61,16 @@ public class HeaderRenderer {
     if (facts.durationSeconds() != null) {
       parts.add(facts.durationSeconds() / SECONDS_PER_MINUTE + " min");
     }
-    parts.add(status(stage));
+    parts.add(status(stage, partial));
     return String.join(SEPARATOR, parts);
   }
 
-  private static String status(MatchReportStage stage) {
+  private static String status(MatchReportStage stage, boolean partial) {
     return switch (stage) {
       case REQUESTED -> "OpenDota parse requested";
       case PARSED -> "OpenDota data ready";
       case REPLAY_PENDING -> "replay processing";
-      case REPLAY_DONE -> "replay analysis ready";
+      case REPLAY_DONE -> partial ? "replay analysis ready (partial)" : "replay analysis ready";
       case REPLAY_UNAVAILABLE -> "replay analysis not available";
       case PARSE_TIMED_OUT -> "OpenDota did not parse this match";
     };

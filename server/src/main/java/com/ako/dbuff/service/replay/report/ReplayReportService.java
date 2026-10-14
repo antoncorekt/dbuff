@@ -46,8 +46,9 @@ import org.springframework.stereotype.Service;
 /**
  * Follows a match's report into its Discord thread with what the replay showed. It runs after the
  * replay pipeline and knows nothing of how that works: it looks for finished runs, and for each
- * channel that tracks a player of the match posts once, honouring the server switch, the channel's
- * own switch, its detail level and its quiet hours.
+ * channel that tracks a player of the match posts once (unless asked again, see {@link
+ * #redeliver}), honouring the server switch, the channel's own switch, its detail level and its
+ * quiet hours.
  */
 @Slf4j
 @Service
@@ -109,10 +110,38 @@ public class ReplayReportService {
     List<PlayerMatchStatisticDomain> stats = statRepo.findAllByMatchId(matchId);
     for (DbufInstanceConfigDomain instance : instancesTracking(stats)) {
       try {
-        deliverTo(match, stats, instance);
+        deliverTo(match, stats, instance, false);
       } catch (RuntimeException e) {
         log.warn("Replay report of match {} for instance {} failed", matchId, instance.getId(), e);
       }
+    }
+  }
+
+  /**
+   * Posts the report of a match with a stored replay (DONE or PARTIAL) into one channel's thread
+   * again, for a person who asked for it. Skips the already-posted check and the quiet hours; the
+   * server switch, the channel's own switch, its detail level and the section switches still apply.
+   */
+  public void redeliver(long matchId, String instanceId) {
+    if (!properties.isEnabled()) {
+      return;
+    }
+    try {
+      boolean stored =
+          runRepo
+              .findByMatchIdAndParserVersion(matchId, processing.getParserVersion())
+              .filter(
+                  run ->
+                      run.getStatus() == ReplayStatus.DONE
+                          || run.getStatus() == ReplayStatus.PARTIAL)
+              .isPresent();
+      MatchDomain match = stored ? matchRepo.findById(matchId).orElse(null) : null;
+      DbufInstanceConfigDomain instance = instanceRepo.findById(instanceId).orElse(null);
+      if (match != null && instance != null) {
+        deliverTo(match, statRepo.findAllByMatchId(matchId), instance, true);
+      }
+    } catch (RuntimeException e) {
+      log.warn("Replay report of match {} for instance {} failed", matchId, instanceId, e);
     }
   }
 
@@ -132,13 +161,17 @@ public class ReplayReportService {
   private void deliverTo(
       MatchDomain match,
       List<PlayerMatchStatisticDomain> stats,
-      DbufInstanceConfigDomain instance) {
+      DbufInstanceConfigDomain instance,
+      boolean requested) {
     InstanceSettings settings = instance.effectiveSettings();
     if (instance.getDiscordChannelId() == null
         || !settings.isReplayReportOn()
-        || settings.detail() == ReportDetail.MINIMAL
-        || postedRepo.findByMatchIdAndInstanceId(match.getId(), instance.getId()).isPresent()
-        || quietHours.isQuietTime(settings)) {
+        || settings.detail() == ReportDetail.MINIMAL) {
+      return;
+    }
+    if (!requested
+        && (postedRepo.findByMatchIdAndInstanceId(match.getId(), instance.getId()).isPresent()
+            || quietHours.isQuietTime(settings))) {
       return;
     }
     MatchReportThreadDomain thread =
@@ -162,16 +195,25 @@ public class ReplayReportService {
           match.getId());
       return;
     }
-    postedRepo.save(
-        ReplayReportPostedDomain.builder()
-            .matchId(match.getId())
-            .instanceId(instance.getId())
-            .messages(messages.size())
-            .postedAt(LocalDateTime.now())
-            .build());
+    recordPosted(match.getId(), instance.getId(), messages.size());
     messages.forEach(message -> send(match.getId(), channel, message));
     metrics.reportPosted();
     log.info("Replay report of match {} posted in {} messages", match.getId(), messages.size());
+  }
+
+  private void recordPosted(long matchId, String instanceId, int messageCount) {
+    ReplayReportPostedDomain posted =
+        postedRepo
+            .findByMatchIdAndInstanceId(matchId, instanceId)
+            .orElseGet(
+                () ->
+                    ReplayReportPostedDomain.builder()
+                        .matchId(matchId)
+                        .instanceId(instanceId)
+                        .build());
+    posted.setMessages(messageCount);
+    posted.setPostedAt(LocalDateTime.now());
+    postedRepo.save(posted);
   }
 
   private void send(long matchId, ThreadChannel channel, ReportMessage message) {

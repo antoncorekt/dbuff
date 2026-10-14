@@ -11,6 +11,8 @@ import com.ako.dbuff.service.match.DotaApiParseRequestService;
 import com.ako.dbuff.service.match.MatchDeletionService;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator.PartialReportResult;
+import com.ako.dbuff.service.match.report.stage.MatchReportStageService;
+import com.ako.dbuff.service.replay.report.ReplayReportService;
 import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -47,6 +49,8 @@ public class MatchCommand implements DbuffCommand {
   private final MatchDeletionService matchDeletionService;
   private final DotaApiParseRequestService parseRequestService;
   private final MatchParseSchedulerService matchParseSchedulerService;
+  private final MatchReportStageService stageService;
+  private final ReplayReportService replayReportService;
 
   public MatchCommand(
       MatchRepo matchRepo,
@@ -54,7 +58,9 @@ public class MatchCommand implements DbuffCommand {
       @Lazy MatchReportOrchestrator matchReportOrchestrator,
       @Lazy MatchDeletionService matchDeletionService,
       @Lazy DotaApiParseRequestService parseRequestService,
-      @Lazy MatchParseSchedulerService matchParseSchedulerService) {
+      @Lazy MatchParseSchedulerService matchParseSchedulerService,
+      @Lazy MatchReportStageService stageService,
+      @Lazy ReplayReportService replayReportService) {
     // Lazy for the same reason the old listener was: these pull in the whole match pipeline.
     this.matchRepo = matchRepo;
     this.instanceConfigRepo = instanceConfigRepo;
@@ -62,6 +68,8 @@ public class MatchCommand implements DbuffCommand {
     this.matchDeletionService = matchDeletionService;
     this.parseRequestService = parseRequestService;
     this.matchParseSchedulerService = matchParseSchedulerService;
+    this.stageService = stageService;
+    this.replayReportService = replayReportService;
   }
 
   @Override
@@ -140,9 +148,24 @@ public class MatchCommand implements DbuffCommand {
       log.info(
           "Rerunning report for match {} in channel {}", matchId, config.getDiscordChannelId());
       matchReportOrchestrator.processAndReport(List.of(match.get()), config);
+      if (stageService.enabled() && refreshForTesting(match.get(), config)) {
+        reply.post("Header refreshed.");
+      }
     } catch (Exception e) {
       log.error("Failed to rerun report for match {}", matchId, e);
       reply.fail("❌ Failed to rerun match " + matchId + ": " + e.getMessage());
+    }
+  }
+
+  /** Stage test aid: retitles the header and posts the replay report again; never fails. */
+  private boolean refreshForTesting(MatchDomain match, DbufInstanceConfigDomain config) {
+    try {
+      boolean refreshed = stageService.refresh(match, config);
+      replayReportService.redeliver(match.getId(), config.getId());
+      return refreshed;
+    } catch (RuntimeException e) {
+      log.warn("Header refresh of match {} failed: {}", match.getId(), e.getMessage(), e);
+      return false;
     }
   }
 

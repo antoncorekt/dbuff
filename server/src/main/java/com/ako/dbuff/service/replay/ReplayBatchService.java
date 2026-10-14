@@ -2,6 +2,8 @@ package com.ako.dbuff.service.replay;
 
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
+import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
+import com.ako.dbuff.service.match.report.stage.MatchReportStageService;
 import com.ako.dbuff.service.replay.QueuedMatch.Lane;
 import com.ako.dbuff.service.replay.file.ReplayTempCleaner;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
@@ -25,6 +27,8 @@ public class ReplayBatchService {
   private final ReplayRunJanitor janitor;
   private final ReplayReportService reportService;
   private final ReplayProcessingProperties properties;
+  private final MatchReportStageService stageService;
+  private final ReplayParseRunRepo runRepo;
 
   /**
    * Takes one match at a time from the queue, so a match that turns fresh meanwhile goes next, and
@@ -54,6 +58,7 @@ public class ReplayBatchService {
         backlogRoom--;
       }
       ReplayStatus status = runService.process(match);
+      retitleHeaders(match.getId(), status);
       if (status == ReplayStatus.DONE || status == ReplayStatus.PARTIAL) {
         stored++;
         deliverReport(match.getId());
@@ -69,6 +74,22 @@ public class ReplayBatchService {
       log.info("Replay batch: {} of {} matches stored", stored, taken);
     }
     return stored;
+  }
+
+  private void retitleHeaders(long matchId, ReplayStatus status) {
+    if (!stageService.enabled()) {
+      return;
+    }
+    try {
+      boolean retryLeft =
+          runRepo
+              .findByMatchIdAndParserVersion(matchId, properties.getParserVersion())
+              .map(run -> run.getNextAttemptAt() != null)
+              .orElse(false);
+      stageService.replayFinished(matchId, status, retryLeft);
+    } catch (RuntimeException e) {
+      log.warn("Replay title of match {} failed: {}", matchId, e.getMessage(), e);
+    }
   }
 
   private void deliverReport(long matchId) {
