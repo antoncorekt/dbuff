@@ -100,7 +100,7 @@ hostget() { scripts/replay-host.sh "$INSTANCE" get "$1"; }  # an authenticated G
 | `smoke` | off | not yet accepted by the owner (B2 to B4 reports) |
 | `objectives` | off | not yet accepted by the owner |
 | `opening` | off | runes and opening: no acceptance recorded in the plan |
-| `outliers` | off | no acceptance recorded; explanations (C5) are still to come |
+| `outliers` | off | no acceptance recorded; explanations are built (PR #99), neither fixture match has an outlier at the default thresholds |
 | `endgame` | off | new (C6); the throw flag is a guess, no loop round accepted it |
 
 ## 5. Open decisions for the owner

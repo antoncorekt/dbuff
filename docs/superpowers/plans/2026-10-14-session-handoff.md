@@ -1,10 +1,10 @@
 # Replay: session handoff, 2026-10-14
 
-For a fresh agent. Read this, then `2026-10-14-replay-switch-on-checklist.md`, then `2026-10-13-session-handoff.md` (environment, rules and rhythm; its PR list stops at #77 and is superseded by the table below) and `2026-10-12-session-handoff.md` (the owner's rules, shared agent rules block in section 8 of the 10-13 file).
+For a fresh agent. Read this, then `2026-10-14-replay-switch-on-checklist.md`, then `2026-10-13-session-handoff.md` (environment and build quirks; its PR list stops at #77 and is superseded by the table below; its section 8 holds the shared agent rules block, whose plan and worktree paths are stale: the plans are now on `main`) and `2026-10-12-session-handoff.md` (the owner's rules).
 
 ## State
 
-Everything planned is built, reviewed, merged to `main` and deployed (last PR #102). Nothing is open. Replay processing (`REPLAY_PROCESSING_ENABLED`) and the report (`REPLAY_REPORT_ENABLED`) are still OFF in production. Do not turn them on without the owner's word, in the order of `CLAUDE.md` and the checklist. Do not check AWS while replay is off.
+Everything planned is built, reviewed and merged to `main` (last code PR #102; confirm with `gh run list --branch main` that its deploy run is green). This handoff is PR #103 and may itself still be open when you read it. Replay processing (`REPLAY_PROCESSING_ENABLED`) and the report (`REPLAY_REPORT_ENABLED`) are still OFF in production. Do not turn them on without the owner's word, in the order of `CLAUDE.md` and the checklist. Do not check AWS while replay is off.
 
 The owner's standing instruction (2026-10-14): merge each PR once it is reviewed (`code-review`, valid findings fixed) and CI is green on its head; continue until all PRs of the plan are done. That instruction covered the A6/A7 plan PRs (#78 to #102); a new body of work needs a new word.
 
@@ -18,13 +18,13 @@ The owner's standing instruction (2026-10-14): merge each PR once it is reviewed
 | #84 | lane for supports who shadow a carry (A4 fix) |
 | #87 | `GET /api/v1/replay/{matchId}/analysis` (sections: run, roles, fights, vision, runes, lanes, items, outliers, behaviour, endgame) |
 | #88 | per-section switch for the Discord report (`replay.report.sections.<name>.enabled`, `defaultEnabled()` false for new sections) |
-| #89, #91, #92, #93, #94, #95, #96 | Discord sections, all default off: important-fights, lanes, rotations, smoke, objectives, vision, opening, items |
+| #89 important-fights, #91 lanes, #92 rotations and smoke, #93 objectives, #94 vision, #95 opening (the runes and opening section, branch `replay-runes-section`), #96 items | Discord sections, all default off |
 | #90 | one ability wording across the report (display names) |
 | #97 | vision and rotation fight reasons (second pass `late-fight-reasons`, order 95) |
 | #98 | key item behind a swing (factor type `ITEM`) |
-| #99 | outlier explanations and the `outliers` section |
+| #99 | outlier explanations and the `outliers` section (Discord, default off, order 78) |
 | #100 | metrics (`dbuff.replay.*`, `/actuator/metrics` exposed in prod behind the API key) |
-| #101 | end game and throw detection (`end_game_summary`, `endgame` section) |
+| #101 | end game and throw detection (`end_game_summary`, `endgame` section, Discord default off, order 79) |
 | #102 | 20-replay load test, arm64 zstd check, switch-on checklist, `scripts/replay-host.sh` |
 
 ## Findings worth keeping
@@ -38,7 +38,7 @@ The owner's standing instruction (2026-10-14): merge each PR once it is reviewed
 
 ## Open for the owner
 
-1. Which Discord sections to enable first (all new ones are default off), after reading the rendered texts in `~/dbuff-fixtures/send/section-*.txt`.
+1. Which Discord sections to enable first (all new ones are default off: important-fights, lanes, rotations, smoke, objectives, vision, opening, items, outliers, endgame), after reading the rendered texts (files `section-<name>-<matchid>.txt` in `~/dbuff-fixtures/send/`, which exists only on the owner's machine and is not in the repo; the smoke test writes them).
 2. The production switch-on (checklist) and when.
 3. Whether to extend the review rounds to All Pick and more matches (the rules are tuned on two Ability Draft matches).
 4. Cleanup (below).
