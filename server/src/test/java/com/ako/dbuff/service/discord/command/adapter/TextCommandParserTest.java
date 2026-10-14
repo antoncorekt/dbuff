@@ -3,6 +3,8 @@ package com.ako.dbuff.service.discord.command.adapter;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -10,7 +12,7 @@ class TextCommandParserTest {
 
   @Test
   void parsesDbuffSubcommandWithNoArguments() {
-    Optional<TextCommandParser.ParsedCommand> parsed = TextCommandParser.parse("!dbuf status");
+    Optional<TextCommandParser.ParsedCommand> parsed = TextCommandParser.parse("!", "!dbuf status");
 
     assertThat(parsed).isPresent();
     assertThat(parsed.get().alias()).isEqualTo("dbuf");
@@ -21,7 +23,7 @@ class TextCommandParserTest {
   @Test
   void parsesArgumentsAfterTheSubcommand() {
     Optional<TextCommandParser.ParsedCommand> parsed =
-        TextCommandParser.parse("!dbuf add-players 111 222");
+        TextCommandParser.parse("!", "!dbuf add-players 111 222");
 
     assertThat(parsed.get().subcommand()).isEqualTo("add-players");
     assertThat(parsed.get().arguments()).isEqualTo("111 222");
@@ -29,7 +31,7 @@ class TextCommandParserTest {
 
   @Test
   void parsesAliasWithNoSubcommand() {
-    Optional<TextCommandParser.ParsedCommand> parsed = TextCommandParser.parse("!vs Termit");
+    Optional<TextCommandParser.ParsedCommand> parsed = TextCommandParser.parse("!", "!vs Termit");
 
     assertThat(parsed.get().alias()).isEqualTo("vs");
     assertThat(parsed.get().subcommand()).isEqualTo("Termit");
@@ -38,7 +40,7 @@ class TextCommandParserTest {
 
   @Test
   void parsesBareAlias() {
-    Optional<TextCommandParser.ParsedCommand> parsed = TextCommandParser.parse("!rerun");
+    Optional<TextCommandParser.ParsedCommand> parsed = TextCommandParser.parse("!", "!rerun");
 
     assertThat(parsed.get().alias()).isEqualTo("rerun");
     assertThat(parsed.get().subcommand()).isNull();
@@ -47,7 +49,7 @@ class TextCommandParserTest {
 
   @Test
   void isCaseInsensitiveOnTheAliasOnly() {
-    Optional<TextCommandParser.ParsedCommand> parsed = TextCommandParser.parse("!VS Termit");
+    Optional<TextCommandParser.ParsedCommand> parsed = TextCommandParser.parse("!", "!VS Termit");
 
     assertThat(parsed.get().alias()).isEqualTo("vs");
     // Argument casing is preserved — player names are case-sensitive to the user.
@@ -57,7 +59,7 @@ class TextCommandParserTest {
   @Test
   void toleratesSurroundingAndInternalWhitespace() {
     Optional<TextCommandParser.ParsedCommand> parsed =
-        TextCommandParser.parse("   !dbuf   add-players    111   ");
+        TextCommandParser.parse("!", "   !dbuf   add-players    111   ");
 
     assertThat(parsed.get().alias()).isEqualTo("dbuf");
     assertThat(parsed.get().subcommand()).isEqualTo("add-players");
@@ -67,7 +69,7 @@ class TextCommandParserTest {
   @Test
   void keepsFlagsIntactInTheArguments() {
     Optional<TextCommandParser.ParsedCommand> parsed =
-        TextCommandParser.parse("!dbuf register 111 --modes 22 --name Squad");
+        TextCommandParser.parse("!", "!dbuf register 111 --modes 22 --name Squad");
 
     assertThat(parsed.get().subcommand()).isEqualTo("register");
     assertThat(parsed.get().arguments()).isEqualTo("111 --modes 22 --name Squad");
@@ -75,20 +77,20 @@ class TextCommandParserTest {
 
   @Test
   void ignoresMessagesWithoutThePrefix() {
-    assertThat(TextCommandParser.parse("dbuf status")).isEmpty();
-    assertThat(TextCommandParser.parse("hello world")).isEmpty();
+    assertThat(TextCommandParser.parse("!", "dbuf status")).isEmpty();
+    assertThat(TextCommandParser.parse("!", "hello world")).isEmpty();
   }
 
   @Test
   void ignoresBarePrefix() {
-    assertThat(TextCommandParser.parse("!")).isEmpty();
-    assertThat(TextCommandParser.parse("!   ")).isEmpty();
+    assertThat(TextCommandParser.parse("!", "!")).isEmpty();
+    assertThat(TextCommandParser.parse("!", "!   ")).isEmpty();
   }
 
   @Test
   void ignoresNullAndBlank() {
-    assertThat(TextCommandParser.parse(null)).isEmpty();
-    assertThat(TextCommandParser.parse("")).isEmpty();
+    assertThat(TextCommandParser.parse("!", null)).isEmpty();
+    assertThat(TextCommandParser.parse("!", "")).isEmpty();
   }
 
   @Test
@@ -112,5 +114,28 @@ class TextCommandParserTest {
     assertThat(chunks).hasSize(3);
     assertThat(chunks).allSatisfy(c -> assertThat(c.length()).isLessThanOrEqualTo(2000));
     assertThat(String.join("", chunks)).hasSize(4500);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"!", "~", "~~"})
+  void parsesWithTheConfiguredPrefix(String prefix) {
+    Optional<TextCommandParser.ParsedCommand> parsed =
+        TextCommandParser.parse(prefix, prefix + "dbuf status");
+
+    assertThat(parsed).isPresent();
+    assertThat(parsed.get().alias()).isEqualTo("dbuf");
+    assertThat(parsed.get().subcommand()).isEqualTo("status");
+  }
+
+  @Test
+  void ignoresAMessageWithAnotherPrefix() {
+    assertThat(TextCommandParser.parse("~", "!rerun")).isEmpty();
+    assertThat(TextCommandParser.parse("~~", "~rerun")).isEmpty();
+    assertThat(TextCommandParser.parse("!", "~rerun")).isEmpty();
+  }
+
+  @Test
+  void aMultiCharacterPrefixIsStrippedWhole() {
+    assertThat(TextCommandParser.parse("~~", "~~rerun").orElseThrow().alias()).isEqualTo("rerun");
   }
 }

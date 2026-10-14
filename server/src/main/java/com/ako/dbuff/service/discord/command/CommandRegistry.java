@@ -26,11 +26,13 @@ public class CommandRegistry {
   private static final int EMBED_COLOR = 0x00AE86;
 
   private final List<DbuffCommand> commands;
+  private final String textPrefix;
   private final Map<String, DbuffCommand> byName = new LinkedHashMap<>();
   private final Map<String, DbuffCommand> byTextAlias = new LinkedHashMap<>();
 
-  public CommandRegistry(List<DbuffCommand> commands) {
+  public CommandRegistry(List<DbuffCommand> commands, TextCommandProperties textCommandProperties) {
     this.commands = List.copyOf(commands);
+    this.textPrefix = textCommandProperties.getTextPrefix();
     for (DbuffCommand command : commands) {
       byName.put(command.getName().toLowerCase(), command);
       byTextAlias.put(command.getName().toLowerCase(), command);
@@ -143,7 +145,9 @@ public class CommandRegistry {
       if (!command.getTextAliases().isEmpty()) {
         description
             .append("*also: ")
-            .append(String.join(", ", command.getTextAliases().stream().map(a -> "!" + a).toList()))
+            .append(
+                String.join(
+                    ", ", command.getTextAliases().stream().map(a -> textPrefix + a).toList()))
             .append("*\n");
       }
       description.append('\n');
