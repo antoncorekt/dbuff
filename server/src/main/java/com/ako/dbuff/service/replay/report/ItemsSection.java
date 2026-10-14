@@ -50,7 +50,7 @@ public class ItemsSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 76;
+    return 77;
   }
 
   @Override
