@@ -36,12 +36,14 @@ export REPLAY_PROCESSING_TEMP_DIR=$HOME/dbuff-replay-tmp
 export SCHEDULER_QUIET_HOURS_ENABLED=false
 mkdir -p $REPLAY_PROCESSING_TEMP_DIR
 ./gradlew :server:bootJar
-java --enable-preview -jar server/build/libs/server-0.0.1-SNAPSHOT.jar
+$JAVA_HOME/bin/java --enable-preview -jar server/build/libs/server-0.0.1-SNAPSHOT.jar
 ```
+
+Start it with `$JAVA_HOME/bin/java`, not plain `java`. The jar contains classes compiled with JDK 21 preview features (class file version `65.65535`), and a JVM loads preview classes only from its own exact version. If the `java` on your PATH is a newer JDK, the start fails with `UnsupportedClassVersionError ... was compiled with preview features that are unsupported ... only recognizes preview features for class file version NN.0` (`NN` is the running JDK's own number, 69 for JDK 25). Check the JDK that will run with `$JAVA_HOME/bin/java -version` (it must say 21), after the `export JAVA_HOME` line above. Production's PATH `java` is JDK 21, so there it is the same command.
 
 The `~` export lives only in this terminal. If you start the app from another one and forget it, the prefix is `!` again and both bots answer `!rerun`.
 
-Do not use `./gradlew :server:bootRun` for this: the build passes `--enable-preview` to the compiler and to the test tasks only, `bootRun` has no such argument, and the class files of `MatchProcessorService`, `MatchCompletenessService` and `ProcessContext` are marked as preview classes (checked with their class file version), so the JVM refuses to load them without the flag. Production starts the jar the same way (`java --enable-preview -jar`, see `infrastructure/cloudformation/template.yaml`). The jar name was checked by building it.
+Do not use `./gradlew :server:bootRun` for this: the build passes `--enable-preview` to the compiler and to the test tasks only, `bootRun` has no such argument, and the class files of `MatchProcessorService`, `MatchCompletenessService` and `ProcessContext` are marked as preview classes (checked with their class file version), so the JVM refuses to load them without the flag. Production starts the jar the same way, with its own JDK 21 (`java --enable-preview -jar`, see `infrastructure/cloudformation/template.yaml`). The jar name was checked by building it.
 
 Instead of `export`, the same `NAME=value` lines can go into a `.env` file in the repository root (it is git-ignored and the build includes `spring-dotenv`); I did not run that route.
 
