@@ -85,4 +85,35 @@ class MatchReportThreadStageTest {
 
     assertThat(moved).isZero();
   }
+
+  @Test
+  void advanceStage_neverErasesStoredFactsWithNulls() {
+    MatchReportThreadDomain saved =
+        repo.saveAndFlush(
+            MatchReportThreadDomain.builder()
+                .matchId(8L)
+                .instanceId("i")
+                .stage(MatchReportStage.REQUESTED)
+                .modeName("all draft")
+                .wins(1)
+                .losses(0)
+                .durationSeconds(2100L)
+                .build());
+
+    repo.advanceStage(
+        saved.getId(),
+        MatchReportStage.PARSED,
+        MatchReportStage.PARSED.predecessors(),
+        null,
+        null,
+        null,
+        null);
+
+    MatchReportThreadDomain now = repo.findByMatchIdAndInstanceId(8L, "i").orElseThrow();
+    assertThat(now.getStage()).isEqualTo(MatchReportStage.PARSED);
+    assertThat(now.getModeName()).isEqualTo("all draft");
+    assertThat(now.getWins()).isEqualTo(1);
+    assertThat(now.getLosses()).isZero();
+    assertThat(now.getDurationSeconds()).isEqualTo(2100L);
+  }
 }

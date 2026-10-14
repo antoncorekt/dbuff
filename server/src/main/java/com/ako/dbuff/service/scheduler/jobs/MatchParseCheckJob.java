@@ -85,7 +85,7 @@ public class MatchParseCheckJob implements Job {
     try {
       MatchDomain processed = matchParserHandler.handle(matchId);
       if (processed != null && instanceId != null) {
-        announceParsed(processed, instance);
+        announceParsed(processed, instanceId);
         triggerFullReport(processed, instanceId, discordThreadId, headerMessageId);
       }
     } catch (Exception e) {
@@ -94,12 +94,11 @@ public class MatchParseCheckJob implements Job {
     matchParseSchedulerService.unscheduleParseWait(matchId);
   }
 
-  private void announceParsed(MatchDomain match, DbufInstanceConfigDomain instance) {
-    if (instance == null) {
-      return;
-    }
+  private void announceParsed(MatchDomain match, String instanceId) {
     try {
-      stageService.parsed(match, instance);
+      instanceConfigService
+          .getDomainById(instanceId)
+          .ifPresent(current -> stageService.parsed(match, current));
     } catch (RuntimeException e) {
       log.warn("Could not retitle match {}: {}", match.getId(), e.getMessage(), e);
     }

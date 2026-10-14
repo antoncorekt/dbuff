@@ -62,6 +62,9 @@ public class MatchThreadRecorder {
    * those columns only; false when the row was no longer in a stage this one may follow.
    */
   public boolean advance(MatchReportThreadDomain row, MatchReportStage stage, MatchFacts facts) {
+    if (stage.predecessors().isEmpty()) {
+      return false;
+    }
     try {
       boolean known = facts.result().known();
       return threadRepo.advanceStage(

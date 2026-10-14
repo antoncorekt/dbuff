@@ -48,4 +48,19 @@ class MatchThreadRecorderTest {
     assertThat(existing.getDurationSeconds()).isNull();
     Mockito.verify(repo).save(existing);
   }
+
+  @Test
+  void advancingToTheFirstStageRunsNoQuery() {
+    MatchReportThreadRepo repo = Mockito.mock(MatchReportThreadRepo.class);
+
+    boolean moved =
+        new MatchThreadRecorder(repo)
+            .advance(
+                MatchReportThreadDomain.builder().id(1L).build(),
+                MatchReportStage.REQUESTED,
+                new MatchFacts(1L, null, new MatchFacts.Result(0, 0), null, null, null));
+
+    assertThat(moved).isFalse();
+    Mockito.verifyNoInteractions(repo);
+  }
 }

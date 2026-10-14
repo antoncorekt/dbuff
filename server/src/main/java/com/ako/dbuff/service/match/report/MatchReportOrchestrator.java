@@ -169,8 +169,7 @@ public class MatchReportOrchestrator {
     MatchReportContext context = buildContext(match, config, focusPlayerIds);
 
     // Update header with full match info
-    if (headerMessageId > 0
-        && stageService.headerKind(match.getId(), config.getId()) == HeaderKind.PLAIN) {
+    if (headerMessageId > 0 && mayEditHeaderAsText(match.getId(), config.getId())) {
       String winLoss = determineWinLoss(context);
       String fullHeader = headerRenderer.legacyParsed(match, winLoss);
       discordMessageService.editMessage(config.getDiscordChannelId(), headerMessageId, fullHeader);
@@ -204,6 +203,15 @@ public class MatchReportOrchestrator {
     }
 
     log.info("Full report sent for match {} in thread {}", match.getId(), threadId);
+  }
+
+  /**
+   * A plain header is edited as text. When the lookup failed the header is left alone, except with
+   * stages off, where the old code always edited it.
+   */
+  private boolean mayEditHeaderAsText(long matchId, String instanceId) {
+    HeaderKind kind = stageService.headerKind(matchId, instanceId);
+    return kind == HeaderKind.PLAIN || (kind == HeaderKind.UNKNOWN && !stageService.enabled());
   }
 
   /** The analyzers this channel's settings allow. */

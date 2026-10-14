@@ -113,6 +113,16 @@ class MatchReportOrchestratorStagesTest {
   }
 
   @Test
+  void switchedOff_anUnknownHeaderIsEditedAsBefore() {
+    when(stages.enabled()).thenReturn(false);
+    when(stages.headerKind(9L, "i")).thenReturn(HeaderKind.UNKNOWN);
+
+    orchestrator.processAndReportFull(MatchDomain.builder().id(9L).build(), config, 6L, 5L);
+
+    verify(discord).editMessage(eq("c"), eq(5L), anyString());
+  }
+
+  @Test
   void anUnknownHeader_isNotEditedByTheLegacyFullReport() {
     when(stages.enabled()).thenReturn(true);
     when(stages.headerKind(9L, "i")).thenReturn(HeaderKind.UNKNOWN);
