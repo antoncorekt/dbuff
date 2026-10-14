@@ -3,21 +3,27 @@ package com.ako.dbuff.service.replay.analysis.spike;
 import com.ako.dbuff.dao.model.BuildingKillContextDomain;
 import com.ako.dbuff.dao.model.BuybackEventDomain;
 import com.ako.dbuff.dao.model.FightDomain;
+import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.GameSpikeDomain;
 import com.ako.dbuff.dao.model.GameSpikeFactorDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerMinuteDomain;
 import com.ako.dbuff.dao.repo.BuildingKillContextRepo;
 import com.ako.dbuff.dao.repo.BuybackEventRepo;
+import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.GameSpikeFactorRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerMinuteRepo;
+import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
+import com.ako.dbuff.service.replay.analysis.fight.Presence;
+import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.team.TeamNetWorth;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +38,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Finds the swings of a game, the minutes in which the net worth difference between the teams moved
  * far and fast, and gathers the evidence for each: which sources of gold moved, and the fights,
- * buildings and buybacks inside it. The primary cause is the source that explains most.
+ * buildings and buybacks inside it, and the item completed before it that most plausibly moved the
+ * favoured team's strength (see {@link KeyItemFinder}). The primary cause is the source that
+ * explains most.
  */
 @Slf4j
 @Order(60)
@@ -50,6 +58,9 @@ public class SpikeAnalyzer implements ReplayAnalyzer {
   private final GameSpikeRepo spikeRepo;
   private final GameSpikeFactorRepo factorRepo;
   private final ReplayAnalysisProperties properties;
+  private final ReplayStateChangeRepo stateRepo;
+  private final FightPlayerRepo fightPlayerRepo;
+  private final KeyItemFinder keyItems;
 
   /** The gold sources told apart, each with the counters of a minute row that make it up. */
   private enum Source {
@@ -89,7 +100,7 @@ public class SpikeAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 1;
+    return 2;
   }
 
   @Override
@@ -114,7 +125,9 @@ public class SpikeAnalyzer implements ReplayAnalyzer {
             minuteRepo.findByMatchId(matchId),
             fightRepo.findByMatchId(matchId),
             buildingRepo.findByMatchId(matchId),
-            buybackRepo.findByMatchId(matchId));
+            buybackRepo.findByMatchId(matchId),
+            keyItems.completions(stateRepo.findByMatchIdOrderByGameSeconds(matchId)),
+            activeSlotsByFight(fightPlayerRepo.findByMatchId(matchId)));
     List<GameSpikeDomain> rows = new ArrayList<>();
     List<GameSpikeFactorDomain> factors = new ArrayList<>();
     for (int index = 0; index < spikes.size(); index++) {
@@ -159,6 +172,16 @@ public class SpikeAnalyzer implements ReplayAnalyzer {
     factorRepo.deleteByMatchId(matchId);
   }
 
+  private static Map<Integer, Set<Long>> activeSlotsByFight(List<FightPlayerDomain> players) {
+    Map<Integer, Set<Long>> active = new LinkedHashMap<>();
+    for (FightPlayerDomain p : players) {
+      if (Presence.ACTIVE.name().equals(p.getPresence()) && p.getPlayerSlot() != null) {
+        active.computeIfAbsent(p.getFightIndex(), k -> new HashSet<>()).add(p.getPlayerSlot());
+      }
+    }
+    return active;
+  }
+
   /** The cause named for a swing and how much of the swing its source explains, 0 to 1. */
   private record Primary(SpikeCause cause, double confidence) {}
 
@@ -168,17 +191,23 @@ public class SpikeAnalyzer implements ReplayAnalyzer {
     private final List<FightDomain> fights;
     private final List<BuildingKillContextDomain> buildings;
     private final List<BuybackEventDomain> buybacks;
+    private final List<KeyItemFinder.Completion> completions;
+    private final Map<Integer, Set<Long>> activeSlots;
 
     Evidence(
         List<ReplayPlayerMinuteDomain> minuteRows,
         List<FightDomain> fights,
         List<BuildingKillContextDomain> buildings,
-        List<BuybackEventDomain> buybacks) {
+        List<BuybackEventDomain> buybacks,
+        List<KeyItemFinder.Completion> completions,
+        Map<Integer, Set<Long>> activeSlots) {
       minuteRows.forEach(
           m -> minutes.computeIfAbsent(m.getPlayerSlot(), k -> new ArrayList<>()).add(m));
       this.fights = fights;
       this.buildings = buildings;
       this.buybacks = buybacks;
+      this.completions = completions;
+      this.activeSlots = activeSlots;
     }
 
     List<GameSpikeFactorDomain> factors(
@@ -194,8 +223,13 @@ public class SpikeAnalyzer implements ReplayAnalyzer {
               factor(matchId, index, "SOURCE", source.name(), gain, 100.0 * gain / swing, null));
         }
       }
+      List<KeyItemFinder.FightActivity> swingFights = new ArrayList<>();
       for (FightDomain fight : fights) {
         if (fight.getStartSeconds() >= from - FIGHT_LEAD_SECONDS && fight.getStartSeconds() <= to) {
+          swingFights.add(
+              new KeyItemFinder.FightActivity(
+                  fight.getStartSeconds(),
+                  activeSlots.getOrDefault(fight.getFightIndex(), Set.of())));
           factors.add(
               factor(
                   matchId,
@@ -242,6 +276,9 @@ public class SpikeAnalyzer implements ReplayAnalyzer {
                   null));
         }
       }
+      keyItems
+          .find(completions, new KeyItemFinder.Swing(from, TeamSide.valueOf(team), swingFights))
+          .ifPresent(item -> factors.add(itemFactor(matchId, index, item)));
       return factors;
     }
 
@@ -249,7 +286,11 @@ public class SpikeAnalyzer implements ReplayAnalyzer {
     Primary primary(
         List<GameSpikeFactorDomain> factors, String team, int minSharePercent, int from, int to) {
       return factors.stream()
-          .filter(f -> f.getFactorType().equals("SOURCE") && f.getSharePercent() >= minSharePercent)
+          .filter(
+              f ->
+                  "SOURCE".equals(f.getFactorType())
+                      && f.getSharePercent() != null
+                      && f.getSharePercent() >= minSharePercent)
           .max(Comparator.comparingDouble(GameSpikeFactorDomain::getSharePercent))
           .map(
               f ->
@@ -301,6 +342,20 @@ public class SpikeAnalyzer implements ReplayAnalyzer {
 
   private static String teamOf(long slot) {
     return slot >= FIRST_DIRE_SLOT ? "DIRE" : "RADIANT";
+  }
+
+  private GameSpikeFactorDomain itemFactor(long matchId, int index, KeyItemFinder.Completion item) {
+    GameSpikeFactorDomain row =
+        factor(
+            matchId,
+            index,
+            "ITEM",
+            item.item(),
+            item.cost(),
+            null,
+            String.valueOf(Math.round(item.seconds())));
+    row.setPlayerSlot(item.playerSlot());
+    return row;
   }
 
   private GameSpikeFactorDomain factor(

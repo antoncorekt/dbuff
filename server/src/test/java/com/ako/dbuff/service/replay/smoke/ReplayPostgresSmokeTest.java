@@ -152,6 +152,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private BuybackEventRepo buybackRepo;
   @Autowired private PlayerPhaseSummaryRepo phaseRepo;
   @Autowired private GameSpikeRepo spikeRepo;
+  @Autowired private com.ako.dbuff.dao.repo.GameSpikeFactorRepo spikeFactorRepo;
+  @Autowired private com.ako.dbuff.service.replay.report.ReportHeroNames reportHeroNames;
+  @Autowired private com.ako.dbuff.service.replay.report.AbilityLabels abilityLabels;
   @Autowired private GameStateSegmentRepo stateSegmentRepo;
   @Autowired private PlayerRoleRepo roleRepo;
   @Autowired private PlayerRoleProfileRepo roleProfileRepo;
@@ -295,6 +298,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertLanes(id, match.getId());
       assertAbilityDraftReasons(id, match.getId());
       assertFightExplanations(id, match.getId());
+      saveSwingKeyItems(id, match.getId());
       assertAnalysisDocument(id, match.getId());
       printAbilityDraft(id, match.getId(), profiles);
       System.out.println(
@@ -318,6 +322,76 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                   .filter(d -> Long.valueOf(0).equals(d.getPlayerSlot()))
                   .map(d -> d.getAbilityName())
                   .toList());
+    }
+  }
+
+  private void saveSwingKeyItems(String id, long matchId) {
+    Map<Long, String> heroes = reportHeroNames.bySlot(matchId);
+    var factors = spikeFactorRepo.findByMatchId(matchId);
+    List<String> rows = new java.util.ArrayList<>();
+    for (var spike :
+        spikeRepo.findByMatchId(matchId).stream()
+            .sorted(java.util.Comparator.comparingInt(s -> s.getSpikeIndex()))
+            .toList()) {
+      String when =
+          com.ako.dbuff.service.replay.report.GameTime.clock(spike.getStartSeconds())
+              + " to "
+              + com.ako.dbuff.service.replay.report.GameTime.clock(spike.getEndSeconds());
+      String head =
+          "- "
+              + when
+              + ", "
+              + spike.getBenefitingTeam().toLowerCase()
+              + " gained "
+              + String.format(java.util.Locale.ROOT, "%.1fk", spike.getDeltaGold() / 1000.0)
+              + ": ";
+      var item =
+          factors.stream()
+              .filter(
+                  f ->
+                      "ITEM".equals(f.getFactorType())
+                          && spike.getSpikeIndex().equals(f.getSpikeIndex()))
+              .toList();
+      assertThat(item)
+          .as("%s swing %s: at most one item row", id, spike.getSpikeIndex())
+          .hasSizeLessThanOrEqualTo(1);
+      if (item.isEmpty()) {
+        rows.add(head + "no key item");
+        continue;
+      }
+      var f = item.getFirst();
+      assertThat(f.getGoldValue()).isGreaterThanOrEqualTo(2000);
+      assertThat(f.getSharePercent()).isNull();
+      assertThat(Double.parseDouble(f.getDetail())).isLessThanOrEqualTo(spike.getStartSeconds());
+      rows.add(
+          head
+              + heroes.getOrDefault(f.getPlayerSlot(), "slot " + f.getPlayerSlot())
+              + " finished "
+              + abilityLabels.label("item_" + f.getRef())
+              + " ("
+              + String.format(java.util.Locale.ROOT, "%.1fk", f.getGoldValue() / 1000.0)
+              + ") at "
+              + com.ako.dbuff.service.replay.report.GameTime.clock(
+                  Double.parseDouble(f.getDetail())));
+    }
+    String swing =
+        String.join(
+            "\n", swingSection.lines(new ReplayReportInput(matchId, null, Set.of(), Map.of(), 10)));
+    String text =
+        "# Key item behind each swing, match "
+            + id
+            + "\n\n"
+            + String.join("\n", rows)
+            + "\n\n## Swing section text\n\n"
+            + swing
+            + "\n";
+    System.out.println("SWING KEY ITEMS " + id + "\n" + text);
+    try {
+      Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
+      Files.createDirectories(dir);
+      Files.writeString(dir.resolve("swing-key-items-" + id + ".md"), text);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
     }
   }
 
