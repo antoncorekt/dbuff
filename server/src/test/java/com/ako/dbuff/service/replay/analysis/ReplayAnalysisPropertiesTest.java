@@ -51,7 +51,7 @@ class ReplayAnalysisPropertiesTest {
   }
 
   @Test
-  void theDefaultIgnoredItemsHoldTheNonCombatOnesAndPassValidation() {
+  void theBuiltInIgnoredItemsHoldTheNonCombatOnesAndPassValidation() {
     properties.validate();
 
     assertThat(properties.fightAbilityIgnoredItems())
@@ -60,12 +60,22 @@ class ReplayAnalysisPropertiesTest {
   }
 
   @Test
-  void rejectsAnIgnoredItemThatIsNotAnItemName() {
+  void extraIgnoredItemsAreAddedAndNeverReplaceTheBuiltInOnes() {
+    properties.getFightAbility().setExtraIgnoredItems(List.of("item_blink"));
+
+    properties.validate();
+
+    assertThat(properties.fightAbilityIgnoredItems())
+        .contains("item_blink", "item_tango", "item_ward_observer", "item_tpscroll");
+  }
+
+  @Test
+  void rejectsAnExtraIgnoredItemThatIsNotAnItemName() {
     for (String bad : new String[] {"quelling_blade", "item_Tango", "item_", "", " item_x"}) {
-      properties.getFightAbility().setIgnoredItems(List.of(bad));
-      assertThatThrownBy(properties::validate).hasMessageContaining("ignored-items");
+      properties.getFightAbility().setExtraIgnoredItems(List.of(bad));
+      assertThatThrownBy(properties::validate).hasMessageContaining("extra-ignored-items");
     }
-    properties.getFightAbility().setIgnoredItems(null);
-    assertThatThrownBy(properties::validate).hasMessageContaining("ignored-items");
+    properties.getFightAbility().setExtraIgnoredItems(null);
+    assertThatThrownBy(properties::validate).hasMessageContaining("extra-ignored-items");
   }
 }

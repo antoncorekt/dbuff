@@ -54,8 +54,11 @@ public class DraftSection implements ReplayReportSection {
       String chosen =
           picks.stream()
               .filter(p -> player.getKey().equals(p.getPlayerSlot()) && p.getAbilityName() != null)
-              .sorted(Comparator.comparingInt(AbilityDraftPickDomain::getPickOrder))
-              .map(p -> labels.label(p.getAbilityName()) + " (pick " + p.getPickOrder() + ")")
+              .sorted(
+                  Comparator.comparing(
+                      AbilityDraftPickDomain::getPickOrder,
+                      Comparator.nullsLast(Comparator.naturalOrder())))
+              .map(p -> labels.label(p.getAbilityName()) + position(p))
               .collect(Collectors.joining(", "));
       if (!chosen.isEmpty()) {
         lines.add(player.getValue() + " drafted " + chosen);
@@ -66,5 +69,12 @@ public class DraftSection implements ReplayReportSection {
     }
     lines.addFirst("**Draft**");
     return lines;
+  }
+
+  private static String position(AbilityDraftPickDomain pick) {
+    if (pick.getPickOrder() != null) {
+      return " (pick " + pick.getPickOrder() + ")";
+    }
+    return pick.getTeamPickIndex() == null ? "" : " (team pick " + pick.getTeamPickIndex() + ")";
   }
 }

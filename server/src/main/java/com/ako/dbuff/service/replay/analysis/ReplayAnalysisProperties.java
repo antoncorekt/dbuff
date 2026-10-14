@@ -6,6 +6,7 @@ import com.ako.dbuff.service.replay.analysis.fight.FightDetector;
 import com.ako.dbuff.service.replay.analysis.spike.SpikeDetector;
 import com.ako.dbuff.service.replay.analysis.team.TeamStateSegmenter;
 import jakarta.annotation.PostConstruct;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -132,13 +133,9 @@ public class ReplayAnalysisProperties {
   /** Bound from {@code replay.analysis.fight-ability.*}. */
   @Data
   public static class FightAbility {
-    /**
-     * Items a hero carries for upkeep, trees, vision or travel, never meant to be cast in a fight;
-     * the fight ability rows leave them out. Teleports are told apart by the state timeline, not by
-     * this list.
-     */
-    private List<String> ignoredItems =
-        List.of(
+    /** The built-in items never meant to be cast in a fight; not configurable, only extended. */
+    static final Set<String> DEFAULT_IGNORED_ITEMS =
+        Set.of(
             "item_quelling_blade",
             "item_tango",
             "item_flask",
@@ -157,6 +154,9 @@ public class ReplayAnalysisProperties {
             "item_power_treads",
             "item_tranquil_boots",
             "item_ring_of_basilius");
+
+    /** Items added to the built-in ones, so a setting can never bring a consumable back. */
+    private List<String> extraIgnoredItems = List.of();
   }
 
   /** Fails at startup on an income break setting that could not tell a break from noise. */
@@ -167,7 +167,7 @@ public class ReplayAnalysisProperties {
     requireRange("feeder-share-percent", feederSharePercent, 1, MAX_PERCENT);
     requireRange("feeder-minutes", feederMinutes, 1, MAX_STRETCH_MINUTES);
     requireRange("income-break-minutes", incomeBreakMinutes, 1, MAX_INCOME_BREAK_MINUTES);
-    requireItemNames(fightAbility.getIgnoredItems());
+    requireItemNames(fightAbility.getExtraIgnoredItems());
     if (!(incomeBreakShare > 0 && incomeBreakShare <= MAX_INCOME_BREAK_SHARE)) {
       throw new IllegalStateException(
           "replay.analysis.income-break-share must be above 0 and at most "
@@ -179,13 +179,14 @@ public class ReplayAnalysisProperties {
 
   private static void requireItemNames(List<String> items) {
     if (items == null) {
-      throw new IllegalStateException("replay.analysis.fight-ability.ignored-items must be set");
+      throw new IllegalStateException(
+          "replay.analysis.fight-ability.extra-ignored-items must be set");
     }
     for (String item : items) {
       if (item == null || !ITEM_NAME.matcher(item).matches()) {
         throw new IllegalStateException(
-            "replay.analysis.fight-ability.ignored-items must hold item names in lower snake case"
-                + " starting with item_, got "
+            "replay.analysis.fight-ability.extra-ignored-items must hold item names in lower snake"
+                + " case starting with item_, got "
                 + item);
       }
     }
@@ -199,7 +200,9 @@ public class ReplayAnalysisProperties {
   }
 
   public Set<String> fightAbilityIgnoredItems() {
-    return Set.copyOf(fightAbility.getIgnoredItems());
+    Set<String> items = new HashSet<>(FightAbility.DEFAULT_IGNORED_ITEMS);
+    items.addAll(fightAbility.getExtraIgnoredItems());
+    return Set.copyOf(items);
   }
 
   public SpikeDetector.Tuning spikeTuning() {
