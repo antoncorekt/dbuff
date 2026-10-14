@@ -81,6 +81,8 @@ import com.ako.dbuff.service.replay.report.SwingSection;
 import com.ako.dbuff.service.replay.report.VisionSection;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -128,6 +130,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private AbilityDraftPickRepo draftPickRepo;
   @Autowired private AbilityDraftPoolRepo draftPoolRepo;
   @Autowired private ReplayRunService runService;
+  @Autowired private MeterRegistry meterRegistry;
   @Autowired private ReplayDataService dataService;
   @Autowired private ReplayParseRunRepo runRepo;
   @Autowired private ReplayPlayerRepo playerRepo;
@@ -255,6 +258,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     ReplayStatus again = runService.process(seedMatch(MATCHES[0]));
     assertThat(again).as("a second run replaces the first").isEqualTo(ReplayStatus.DONE);
     assertThat(deathRepo.findByMatchId(Long.parseLong(MATCHES[0]))).hasSizeGreaterThan(40);
+    assertReplayMeters();
     dataService.deleteByMatchId(Long.parseLong(MATCHES[0]));
     assertThat(deathRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
     assertThat(reasonRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
@@ -323,6 +327,13 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                   .map(d -> d.getAbilityName())
                   .toList());
     }
+  }
+
+  private void assertReplayMeters() {
+    Timer timer = meterRegistry.get("dbuff.replay.run.duration").tag("status", "DONE").timer();
+    double done = meterRegistry.get("dbuff.replay.runs").tag("status", "DONE").gauge().value();
+    assertThat(timer.count()).isEqualTo(MATCHES.length + 1);
+    assertThat(done).isEqualTo(MATCHES.length);
   }
 
   private void saveSwingKeyItems(String id, long matchId) {

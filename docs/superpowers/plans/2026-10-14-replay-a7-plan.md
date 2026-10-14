@@ -42,7 +42,7 @@ Fight reasons (`fight_reason`) feed the swing line, and the rune contributor (`R
 ### C6: end game and the rest
 - **End game:** buyback readiness at the last fights (buyback events exist; the gold needed from net worth) and a "throw" flag (guess) when a team lost a lead of at least 10% of net worth after a won fight with no objective taken (uses the B4 conversions). Table `end_game_summary`; loop topic `endgame`.
 - **Courier:** courier gold per minute exists; an analysis only if the owner wants it (question 5), otherwise dropped.
-- **Metrics per status** (counts of runs by `ReplayStatus`, last run duration) as Micrometer gauges that read the counts from `replay_parse_run` when scraped (so a restart loses nothing), memory from the JVM meters Spring already registers. No code uses `MeterRegistry` today, so the PR adds it, exposes `/actuator/metrics` (behind the API key; only `/actuator/health` is exempt) and documents the read command in `CLAUDE.md`. No new tables.
+- **Metrics per status** (counts of runs by `ReplayStatus`, last run duration) as Micrometer gauges that read the counts from `replay_parse_run` when scraped (so a restart loses nothing), memory from the JVM meters Spring already registers. No code uses `MeterRegistry` today, so the PR adds it, exposes `/actuator/metrics` (behind the API key; only `/actuator/health` is exempt) and documents the read command in `CLAUDE.md`. No new tables. Built as C6b: `ReplayMetrics` and `ReplayRunCounts` in `service/replay/metrics`; the run counts are one grouped query cached for 30 s; the queue length is not a meter because `ReplayQueue` has no cheap count query.
 
 ## 6. C7: proving it before it is switched on
 
