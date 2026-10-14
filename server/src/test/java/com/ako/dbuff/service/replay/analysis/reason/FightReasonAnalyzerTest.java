@@ -41,6 +41,7 @@ import static org.assertj.core.api.Assertions.tuple;
 @ActiveProfiles("test")
 @Import({
   FightReasonAnalyzer.class,
+  FightContextLoader.class,
   AbsenceReasonContributor.class,
   CarryFarmingElsewhereContributor.class,
   SupportAbsentContributor.class,
