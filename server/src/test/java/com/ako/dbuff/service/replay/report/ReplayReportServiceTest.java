@@ -581,7 +581,7 @@ class ReplayReportServiceTest {
     service.deliver(1L);
     verify(discord, Mockito.times(1)).sendThreadMessageBlocking(any(), any());
 
-    service.redeliver(1L, "i1");
+    assertThat(service.redeliver(1L, "i1")).isEqualTo(ReportDelivery.POSTED);
 
     verify(discord, Mockito.times(2)).sendThreadMessageBlocking(any(), any());
     ArgumentCaptor<ReplayReportPostedDomain> saved =
@@ -602,24 +602,45 @@ class ReplayReportServiceTest {
         .thenReturn(
             Optional.of(
                 instance(InstanceSettings.builder().reportDetail(ReportDetail.MINIMAL).build())));
-    service.redeliver(1L, "i1");
+    assertThat(service.redeliver(1L, "i1")).isEqualTo(ReportDelivery.MINIMAL_DETAIL);
     properties.setEnabled(false);
     when(instanceRepo.findById("i1")).thenReturn(Optional.of(instance(null)));
-    service.redeliver(1L, "i1");
+    assertThat(service.redeliver(1L, "i1")).isEqualTo(ReportDelivery.REPORT_SWITCHED_OFF);
 
     verify(discord, Mockito.times(1)).sendThreadMessageBlocking(any(), any());
   }
 
   @Test
+  void redeliver_saysWhyNothingWasPosted() {
+    storedRun(ReplayStatus.DONE);
+    when(threadRepo.findByMatchIdAndInstanceId(1L, "i1")).thenReturn(Optional.empty());
+    assertThat(service.redeliver(1L, "i1")).isEqualTo(ReportDelivery.NO_THREAD);
+
+    when(threadRepo.findByMatchIdAndInstanceId(1L, "i1"))
+        .thenReturn(
+            Optional.of(
+                MatchReportThreadDomain.builder()
+                    .matchId(1L)
+                    .instanceId("i1")
+                    .threadId(9L)
+                    .build()));
+    when(discord.getThreadById(9L)).thenReturn(null);
+    assertThat(service.redeliver(1L, "i1")).isEqualTo(ReportDelivery.THREAD_NOT_FOUND);
+
+    when(discord.getThreadById(9L)).thenReturn(thread);
+    service = serviceWith(named("off", false));
+    assertThat(service.redeliver(1L, "i1")).isEqualTo(ReportDelivery.NO_SECTIONS);
+  }
+
+  @Test
   void redeliver_postsNothingWithoutAStoredReplayAndNeverThrows() {
     storedRun(ReplayStatus.FAILED_DOWNLOAD);
-    service.redeliver(1L, "i1");
+    assertThat(service.redeliver(1L, "i1")).isEqualTo(ReportDelivery.NOT_STORED);
 
     storedRun(ReplayStatus.DONE);
     when(discord.getThreadById(9L)).thenThrow(new IllegalStateException("discord down"));
 
-    org.assertj.core.api.Assertions.assertThatCode(() -> service.redeliver(1L, "i1"))
-        .doesNotThrowAnyException();
+    assertThat(service.redeliver(1L, "i1")).isEqualTo(ReportDelivery.FAILED);
     verify(discord, never()).sendThreadMessageBlocking(any(), any());
   }
 

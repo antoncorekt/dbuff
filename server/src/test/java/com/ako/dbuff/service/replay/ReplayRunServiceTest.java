@@ -28,6 +28,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -54,6 +55,7 @@ class ReplayRunServiceTest {
   private final MapLayouts mapLayouts = mock(MapLayouts.class);
   private final ReplayAnalysisService analysis = mock(ReplayAnalysisService.class);
   private final GameModeRegistry modes = TestModes.registry(properties);
+  private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
   private ReplayRunService service;
 
   private final ReplayFacts facts =
@@ -95,6 +97,33 @@ class ReplayRunServiceTest {
     assertThat(run.getClarityVersion()).isEqualTo("5.0.1");
     assertThat(run.getLeaseUntil()).isNull();
     verify(goodExtractor).extract(any(), any());
+  }
+
+  @Test
+  void process_publishesTheFinalStatusWithoutARetryForADoneRun() {
+    service.process(match());
+
+    verify(events).publishEvent(new ReplayRunFinished(1L, ReplayStatus.DONE, false));
+  }
+
+  @Test
+  void process_publishesARetryLeftForAPartialRunThatWillBeTried() {
+    when(brokenExtractor.supports(any())).thenReturn(true);
+    doThrow(new IllegalStateException("x")).when(brokenExtractor).extract(any(), any());
+    service = serviceWith(List.of(brokenExtractor));
+
+    service.process(match());
+
+    verify(events).publishEvent(new ReplayRunFinished(1L, ReplayStatus.PARTIAL, true));
+  }
+
+  @Test
+  void process_publishesNothingForARunThatCouldNotBeRecorded() {
+    when(runRepo.save(any(ReplayParseRunDomain.class))).thenThrow(new IllegalStateException("db"));
+
+    service.process(match());
+
+    verify(events, never()).publishEvent(any(Object.class));
   }
 
   @Test
@@ -359,7 +388,8 @@ class ReplayRunServiceTest {
         mapLayouts,
         analysis,
         modes,
-        metrics);
+        metrics,
+        events);
   }
 
   private static MatchDomain match() {

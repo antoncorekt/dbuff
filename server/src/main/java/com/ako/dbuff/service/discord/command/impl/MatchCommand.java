@@ -13,8 +13,10 @@ import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator.PartialReportResult;
 import com.ako.dbuff.service.match.report.stage.MatchReportStageService;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
+import com.ako.dbuff.service.replay.report.ReportDelivery;
 import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -148,8 +150,11 @@ public class MatchCommand implements DbuffCommand {
       log.info(
           "Rerunning report for match {} in channel {}", matchId, config.getDiscordChannelId());
       matchReportOrchestrator.processAndReport(List.of(match.get()), config);
-      if (stageService.enabled() && refreshForTesting(match.get(), config)) {
-        reply.post("Header refreshed.");
+      if (stageService.enabled()) {
+        String note = refreshForTesting(match.get(), config);
+        if (!note.isEmpty()) {
+          reply.post(note);
+        }
       }
     } catch (Exception e) {
       log.error("Failed to rerun report for match {}", matchId, e);
@@ -158,15 +163,21 @@ public class MatchCommand implements DbuffCommand {
   }
 
   /** Stage test aid: retitles the header and posts the replay report again; never fails. */
-  private boolean refreshForTesting(MatchDomain match, DbufInstanceConfigDomain config) {
+  private String refreshForTesting(MatchDomain match, DbufInstanceConfigDomain config) {
+    List<String> notes = new ArrayList<>();
     try {
-      boolean refreshed = stageService.refresh(match, config);
-      replayReportService.redeliver(match.getId(), config.getId());
-      return refreshed;
+      if (stageService.refresh(match, config)) {
+        notes.add("Header refreshed.");
+      }
+      ReportDelivery delivery = replayReportService.redeliver(match.getId(), config.getId());
+      notes.add(
+          delivery == ReportDelivery.POSTED
+              ? "Replay report posted again."
+              : "Replay report not posted: " + delivery.reason() + ".");
     } catch (RuntimeException e) {
       log.warn("Header refresh of match {} failed: {}", match.getId(), e.getMessage(), e);
-      return false;
     }
+    return String.join(" ", notes);
   }
 
   private void retry(CommandContext context, Long matchId, DbufInstanceConfigDomain config) {

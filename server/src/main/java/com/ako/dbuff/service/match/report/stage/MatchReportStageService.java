@@ -96,7 +96,8 @@ public class MatchReportStageService {
       facts = factsFactory.fromSummary(match.getId(), summary);
       header =
           publisher.create(
-              config.getDiscordChannelId(), headers.render(MatchReportStage.REQUESTED, facts));
+              config.getDiscordChannelId(),
+              headers.render(StageTarget.at(MatchReportStage.REQUESTED), facts));
     } catch (RuntimeException e) {
       log.warn("Stage 1 of match {} failed: {}", match.getId(), e.getMessage(), e);
       return null;
@@ -170,7 +171,7 @@ public class MatchReportStageService {
     } else if (properties.isEnabled()
         && row.getHeaderMessageId() != null
         && row.getChannelId() != null) {
-      editPlain(row, headers.title(MatchReportStage.PARSE_TIMED_OUT, facts));
+      editPlain(row, headers.title(StageTarget.at(MatchReportStage.PARSE_TIMED_OUT), facts));
     }
   }
 
@@ -183,7 +184,7 @@ public class MatchReportStageService {
   }
 
   private void retitle(MatchReportThreadDomain row, MatchReportStage stage, MatchFacts facts) {
-    retitle(row, new StageTarget(stage, false), facts, false);
+    retitle(row, StageTarget.at(stage), facts, false);
   }
 
   /**
@@ -202,9 +203,7 @@ public class MatchReportStageService {
       return false;
     }
     if (!publisher.edit(
-        row.getChannelId(),
-        row.getHeaderMessageId(),
-        headers.render(stage, facts, target.partial()))) {
+        row.getChannelId(), row.getHeaderMessageId(), headers.render(target, facts))) {
       return false;
     }
     if (force) {
@@ -216,8 +215,8 @@ public class MatchReportStageService {
   }
 
   /**
-   * A replay run reached {@code status}: when that is final, every thread of the match is retitled,
-   * whatever the report switches say.
+   * A replay run reached {@code status}: when that is final, every staged thread of the match is
+   * retitled, whatever the report switches say. A legacy plain header is never touched.
    */
   public void replayFinished(long matchId, ReplayStatus status, boolean retryLeft) {
     if (!properties.isEnabled()) {
@@ -238,11 +237,8 @@ public class MatchReportStageService {
     MatchDomain match = matchRepo.findById(matchId).orElse(null);
     for (MatchReportThreadDomain row : rows) {
       try {
-        MatchFacts facts = MatchFacts.fromRow(row, match);
         if (ownsHeader(row)) {
-          retitle(row, target, facts, false);
-        } else if (row.getHeaderMessageId() != null && row.getChannelId() != null) {
-          editPlain(row, headers.title(target.stage(), facts, target.partial()));
+          retitle(row, target, MatchFacts.fromRow(row, match), false);
         }
       } catch (RuntimeException e) {
         log.warn(

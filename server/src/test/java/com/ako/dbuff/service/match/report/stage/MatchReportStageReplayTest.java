@@ -204,16 +204,23 @@ class MatchReportStageReplayTest {
   }
 
   @Test
-  void replayFinished_aPlainRowGetsATextTitleAndNoStage() {
+  void replayFinished_aPlainRowIsNeverEdited() {
     rows(row(1, "i1", null));
 
     service.replayFinished(MATCH, ReplayStatus.DONE, false);
 
-    verify(discord)
-        .editMessage(
-            eq(CHANNEL), eq(501L), org.mockito.ArgumentMatchers.contains("replay analysis ready"));
+    verify(discord, never()).editMessage(anyString(), anyLong(), anyString());
     verify(discord, never()).editComponentsMessage(anyString(), anyLong(), anyList());
     verify(threadRepo, never()).advanceStage(any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void replayFinished_aDoneRunMayFollowAnUnavailableHeader() {
+    rows(row(1, "i1", MatchReportStage.REPLAY_UNAVAILABLE));
+
+    service.replayFinished(MATCH, ReplayStatus.DONE, false);
+
+    verify(discord).editComponentsMessage(eq(CHANNEL), eq(501L), anyList());
   }
 
   @Test
@@ -278,9 +285,9 @@ class MatchReportStageReplayTest {
   }
 
   @Test
-  void refresh_aRunStillToBeRetriedFallsBackToPendingOrParsed() {
+  void refresh_withoutARunTheForecastDecidesBetweenPendingAndParsed() {
     rows(row(1, "i1", MatchReportStage.REPLAY_DONE));
-    run(ReplayStatus.FAILED_DOWNLOAD, LocalDateTime.now().plusHours(1));
+    when(runRepo.findByMatchIdAndParserVersion(anyLong(), any())).thenReturn(Optional.empty());
     when(forecast.isExpected(any())).thenReturn(true);
     service.refresh(match(), instance);
     when(forecast.isExpected(any())).thenReturn(false);
@@ -290,6 +297,18 @@ class MatchReportStageReplayTest {
         .satisfiesExactly(
             first -> assertThat(first).endsWith("replay processing**"),
             second -> assertThat(second).endsWith("OpenDota data ready**"));
+  }
+
+  @Test
+  void refresh_aRunningOrRetryableRunIsPendingWhateverTheForecastSays() {
+    rows(row(1, "i1", MatchReportStage.REPLAY_DONE));
+    when(forecast.isExpected(any())).thenReturn(false);
+    run(ReplayStatus.RUNNING, null);
+    service.refresh(match(), instance);
+    run(ReplayStatus.PARTIAL, LocalDateTime.now().plusHours(1));
+    service.refresh(match(), instance);
+
+    assertThat(titles(501L, 2)).allSatisfy(t -> assertThat(t).endsWith("replay processing**"));
   }
 
   @Test

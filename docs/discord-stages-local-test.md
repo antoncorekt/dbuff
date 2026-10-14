@@ -2,26 +2,11 @@
 
 For the owner. It runs the app locally against a real Discord test channel and your local Postgres, with the staged match header turned on, and lets you walk one match through every title with `!rerun`. Nothing here changes production: the switches are set only in the shell you start the app from.
 
-Property names, commands and endpoints below were read from the code. Nothing was run against a real Discord channel (those are the checks in step 9), and what is marked "Not verified" was not run at all.
+Property names, environment variable names, commands and endpoints below were checked against the code (`application.properties`, the `@ConfigurationProperties` classes, `.env.example`, `build.gradle`, the command classes). Nothing was run against a real Discord channel or a real Valve download: those are the checks in step 9 and what is marked "Not verified".
 
 ## 1. What you need
 
-1. Docker running, JDK 21 (`export JAVA_HOME=~/.sdkman/candidates/java/21.0.0.0+35-tem`), this branch checked out.
-2. A Discord bot token (`DISCORD_BOT_TOKEN`) for a bot that is a member of a test server. The bot needs: view channel, send messages, create public threads, send messages in threads. Use a test channel that is not the one you use for real matches.
-3. A match that already has a Discord thread named `Match <id>` in that test channel, or step 6 to make one.
-4. For the replay part: the match must be an Ability Draft (mode 18) or All Pick (mode 22) match with OpenDota replay info (`cluster` and `replay_salt`) and a replay Valve still serves (a few days old at most).
-
-## 2. Start the database
-
-1. `docker compose up -d postgres` in the repository root. It listens on `localhost:5432`, user `postgres`, password `password`, database `dbuff`; these are the defaults of `spring.datasource.*`, so no variables are needed. Your data is in the `postgres-data` volume, so existing matches and the channel registration are kept.
-2. Check: `docker compose ps` shows `dbuff-postgres` healthy.
-
-## 3. Start the app
-
-In one terminal (use your own values; the line breaks are only for reading):
-
-```
-export JAVA_HOME=~/.sdkman/candidates/java/21.0.0.0+35-tem
+1. Docker running, JDK 21 (`export JAVA_HOME=~/.sdkman/candidates/java/21.0.0.0+35-tem
 export DISCORD_BOT_TOKEN=<bot token>
 export DISCORD_REPORT_STAGES_ENABLED=true
 export REPLAY_PROCESSING_ENABLED=true
@@ -33,8 +18,14 @@ export REPLAY_REPORT_SECTIONS_VISION_ENABLED=true
 export REPLAY_REPORT_SECTIONS_ITEMS_ENABLED=true
 export REPLAY_PROCESSING_TEMP_DIR=$HOME/dbuff-replay-tmp
 export SCHEDULER_QUIET_HOURS_ENABLED=false
-./gradlew :server:bootRun
+mkdir -p $REPLAY_PROCESSING_TEMP_DIR
+./gradlew :server:bootJar
+java --enable-preview -jar server/build/libs/server-0.0.1-SNAPSHOT.jar
 ```
+
+Do not use `./gradlew :server:bootRun` for this: the build passes `--enable-preview` to the compiler and to the test tasks only, `bootRun` has no such argument, and the class files of `MatchProcessorService`, `MatchCompletenessService` and `ProcessContext` are marked as preview classes (checked with their class file version), so the JVM refuses to load them without the flag. Production starts the jar the same way (`java --enable-preview -jar`, see `infrastructure/cloudformation/template.yaml`). The jar name was checked by building it.
+
+Instead of `export`, the same `NAME=value` lines can go into a `.env` file in the repository root (it is git-ignored and the build includes `spring-dotenv`); I did not run that route.
 
 What each one does:
 
@@ -46,10 +37,8 @@ What each one does:
 | `REPLAY_REPORT_ENABLED` | `replay.report.enabled` | post the replay report in the thread. Default false |
 | `REPLAY_REPORT_FORMAT` | `replay.report.format` | `components` posts the report as Components V2 cards, `plain` (default) as text |
 | `REPLAY_REPORT_SECTIONS_<NAME>_ENABLED` | `replay.report.sections.<name>.enabled` | six sections are on by default (swing, deaths, fights, movement, composition, draft); the others are off. The name has no dash or underscore: `IMPORTANTFIGHTS` is the section `important-fights`. Other names: `LANES`, `ROTATIONS`, `SMOKE`, `OBJECTIVES`, `OPENING`, `VISION`, `ITEMS`, `OUTLIERS`, `ENDGAME`. **A name that is not a section stops the app from starting while the report is on** |
-| `REPLAY_PROCESSING_TEMP_DIR` | `replay.processing.temp-dir` | where the replay is downloaded and unpacked (up to about 250 MB per match). Default is `<java.io.tmpdir>/dbuff-replays`, which also works on macOS; create the directory first (`mkdir -p ~/dbuff-replay-tmp`) |
+| `REPLAY_PROCESSING_TEMP_DIR` | `replay.processing.temp-dir` | where the replay is downloaded and unpacked (up to about 250 MB per match). Default is `<java.io.tmpdir>/dbuff-replays`, so setting it is optional on macOS |
 | `SCHEDULER_QUIET_HOURS_ENABLED` | `scheduler.quiet-hours.enabled` | by default the replay job and the match jobs sleep from 01:00 to 09:00 server time. Only needed if you test at night |
-
-The `./gradlew :server:bootRun` task passing `--enable-preview` to the app was not checked: the build sets it for tests and the compiler, and the production unit passes it. If the app dies at start with an `UnsupportedClassVersionError`, start the jar instead: `./gradlew :server:bootJar`, then `java --enable-preview -jar server/build/libs/<the jar>` with the same variables. **Not verified.**
 
 Other keys (OpenAI, Google Vision, `DOTA_API_KEY`) are not needed for this test; the app starts without them. The REST API is open locally because `app.api.required` is false and `DBUFF_API_KEY` is empty.
 
@@ -57,7 +46,7 @@ Check: the log shows no stack trace at the end of the start, and the bot is onli
 
 ## 4. Register the test channel
 
-1. In the test channel run `/dbuff register player:<a player>` (the player option has autocomplete; pick a tracked player whose matches you will use). The text alias is `!dbuf`. **Which players the autocomplete offers was not checked.**
+1. In the test channel run `/dbuff register player:<a player>`. The player may be picked from the autocomplete list, or typed as a 32-bit Dota account ID, a Steam64 ID, or a profile link from OpenDota, Dotabuff, Stratz or Steam (`PlayerIdParser`); vanity Steam URLs and persona names are rejected. Use a player who played the match you will test. The text alias of the command is `!dbuf`. Which players the autocomplete lists was not checked.
 2. Run `/dbuff settings replay_report:true detail:full`. The channel must have the replay report on and a detail level above `minimal`, or the report is not posted. `detail:standard` posts fewer sections (and at most 2 messages instead of 4).
 3. `/dbuff status` shows the result. Use `quiet_hours:off` in `/dbuff settings` if the channel has its own quiet hours; quiet hours never delay a title edit or a `!rerun`, but they do hold back the normal report.
 
@@ -88,15 +77,15 @@ The replay job takes a match when it has no run yet for the current `replay.proc
 3. A match older than the fresh windows (mapped more than 24 hours ago) is a "backlog" match and is only taken when you also set `REPLAY_PROCESSING_BACKLOG_ENABLED=true` (then restart the app). Valve deletes replays after a while, and a match older than 90 days is skipped (`EXPIRED`).
 4. Wait for the next cron minute. In the log: `Replay run for match <id>: DONE (attempt 1, ...)` then `Replay batch: 1 of 1 matches stored`. At that moment the header title changes to `replay analysis ready` (stage 3), and, if the channel allows it and it is not quiet hours, the report is posted.
 5. `POST localhost:8080/api/v1/replay/<matchId>/reanalyze` only reruns the analyzers on stored data (it needs a DONE run); it does not fetch the replay and does not touch Discord. Use it after changing analyzer settings, then `!rerun` to see the result.
-6. No replay from Valve (offline test, or the replay is gone): serve a stored one yourself. Put `<id>.dem.zst` of a match in a folder `570/` as `<id>_<salt>.dem.bz2`, run `python3 -m http.server 8099` in the parent folder, and start the app with `REPLAY_PROCESSING_URL_TEMPLATE='http://localhost:8099/570/%2$d_%3$d.dem.bz2'` (the three arguments are cluster, match id and salt). The fixtures are described in `docs/replay-fixtures.md`. **Not run end to end.**
+6. No replay from Valve (offline test, or the replay is gone): serve a stored one yourself. The download URL is `replay.processing.url-template` (env `REPLAY_PROCESSING_URL_TEMPLATE`), filled by `String.format` with the arguments cluster, match id, salt (`HttpReplayDownloader`). Put `<id>.dem.zst` of a match in a folder `570/` as `<id>_<salt>.dem.bz2`, run `python3 -m http.server 8099` in the parent folder, and start the app with `REPLAY_PROCESSING_URL_TEMPLATE='http://localhost:8099/570/%2$d_%3$d.dem.bz2'` (`%2$d` and `%3$d` skip the cluster). The decompressor is chosen from the file's first bytes, not its name (`docs/replay-fixtures.md`). The match must still have `cluster` and `replay_salt` stored from OpenDota. The format string and the server were not run end to end.
 
 ## 8. Use `!rerun`
 
-1. In the match thread send `!rerun` (or `/match rerun`). The bot answers "Rerunning analysis for match <id>" and rebuilds the OpenDota report from stored data.
+1. In the match thread send `!rerun` (text alias of `/match rerun`; `!retry` is the alias of `/match retry`, which you do not want here). The command reads the match id from the thread name, which must be `Match <id>`: the app names every thread it creates that way (`MatchCommand` reads the prefix `Match `), and the thread's parent channel must be a registered channel. The bot answers "Rerunning analysis for match <id>" and rebuilds the OpenDota report from stored data.
 2. With the switch on, it then also:
    1. sets the header title again from what is stored now: `replay analysis ready` (or `(partial)`, or `not available`) when the match has a final run; `replay processing` when a replay is still expected; `OpenDota data ready` when the match is stored and no replay is expected. This is the one place where a title may go back to an earlier stage, for example after you deleted the run in step 7.2. It only touches a staged header; a plain header is left alone.
    2. posts the replay report sections again, if the match has a DONE or PARTIAL run, even if the report was already posted for it. It follows the section switches, the channel's `replay_report` setting and detail level; it ignores quiet hours because you asked.
-   3. replies `Header refreshed.` in the thread when the title was set. No reply means nothing was changed (plain header, no thread row, or the Discord edit failed: see the log line `Header refresh of match ... failed` or `Could not edit header message`).
+   3. says what happened in one extra message in the thread: `Header refreshed.` when the title was set, then `Replay report posted again.` or `Replay report not posted: <reason>.` (no stored replay analysis, report off for the channel, minimal detail, no thread on record, no section applies, Discord cannot find the thread). No `Header refreshed.` means the header was not changed (plain header, no thread row, or the Discord edit failed: see the log line `Header refresh of match ... failed` or `Could not edit header message`).
 3. `/match retry` is unchanged and does not refresh.
 
 ## 9. What to look at in Discord
@@ -120,7 +109,7 @@ These are the checks nobody has done in a real channel. Write what you see in th
 | 13 | Standard detail posts at most 2 messages, full at most 4 | counts as stated | | |
 | 14 | Switch off (restart without `DISCORD_REPORT_STAGES_ENABLED`) | `!rerun` replies as before, no refresh, no repost | | |
 
-Log lines to look at (`./gradlew :server:bootRun` terminal): `Stage 1 sent for match`, `Replay run for match`, `Replay report of match <id> posted in <n> messages`, and the WARN lines for failures (`Stage 1 of match`, `Replay title of match`, `Header refresh of match`, `Could not edit header message`, `Header components ... rejected`).
+Log lines to look at (the terminal that runs the jar): `Stage 1 sent for match`, `Replay run for match`, `Replay report of match <id> posted in <n> messages`, and the WARN lines for failures (`Stage 1 of match`, `Replay title of match`, `Header refresh of match`, `Could not edit header message`, `Header components ... rejected`).
 
 ## 10. Switch it off again
 

@@ -29,7 +29,7 @@ class StageTargetTest {
   @ParameterizedTest
   @EnumSource(ReplayStatus.class)
   void withARetryLeftOnlyDoneAndPermanentStatusesAreFinal(ReplayStatus status) {
-    boolean isFinal = status == ReplayStatus.DONE || status.isPermanent();
+    boolean isFinal = !status.isRetryable();
 
     assertThat(StageTarget.of(status, true).isPresent()).isEqualTo(isFinal);
   }

@@ -63,4 +63,14 @@ public class ReplayParseRunDomain {
 
   @Column(length = 1000)
   private String error;
+
+  /** Whether a retry is still scheduled; the one rule for it. */
+  public boolean retryLeft() {
+    return nextAttemptAt != null;
+  }
+
+  /** Analysis is stored and no retry can change it, so the report may be posted. */
+  public boolean finalWithAnalysis() {
+    return status == ReplayStatus.DONE || (status == ReplayStatus.PARTIAL && !retryLeft());
+  }
 }

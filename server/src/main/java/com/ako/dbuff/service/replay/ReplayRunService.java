@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.concurrent.Semaphore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 /**
@@ -47,6 +48,7 @@ public class ReplayRunService {
   private final ReplayAnalysisService analysis;
   private final GameModeRegistry modes;
   private final ReplayMetrics metrics;
+  private final ApplicationEventPublisher events;
 
   public ReplayRunService(
       ReplayParseRunRepo runRepo,
@@ -61,7 +63,8 @@ public class ReplayRunService {
       MapLayouts mapLayouts,
       ReplayAnalysisService analysis,
       GameModeRegistry modes,
-      ReplayMetrics metrics) {
+      ReplayMetrics metrics,
+      ApplicationEventPublisher events) {
     this.runRepo = runRepo;
     this.playerStatRepo = playerStatRepo;
     this.eligibility = eligibility;
@@ -75,6 +78,7 @@ public class ReplayRunService {
     this.analysis = analysis;
     this.modes = modes;
     this.metrics = metrics;
+    this.events = events;
   }
 
   /**
@@ -271,6 +275,7 @@ public class ReplayRunService {
         run.getAttempts(),
         run.getReplayBytes(),
         run.getParseMillis());
+    events.publishEvent(new ReplayRunFinished(run.getMatchId(), status, run.retryLeft()));
     return status;
   }
 

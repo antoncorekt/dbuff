@@ -11,6 +11,7 @@ import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator.PartialReportResult;
 import com.ako.dbuff.service.match.report.stage.MatchReportStageService;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
+import com.ako.dbuff.service.replay.report.ReportDelivery;
 import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
 import java.util.List;
 import java.util.Optional;
@@ -166,6 +167,8 @@ class MatchCommandTest {
   void rerun_withTheStagesOn_refreshesTheHeaderRedeliversAndSaysSo() {
     Mockito.when(stageService.enabled()).thenReturn(true);
     Mockito.when(stageService.refresh(Mockito.any(), Mockito.any())).thenReturn(true);
+    Mockito.when(replayReportService.redeliver(MATCH_ID, "instance-1"))
+        .thenReturn(ReportDelivery.POSTED);
 
     FakeCommandContext context = inThread();
     command.execute("rerun", context);
@@ -173,17 +176,20 @@ class MatchCommandTest {
     Mockito.verify(stageService)
         .refresh(Mockito.argThat(m -> m.getId().equals(MATCH_ID)), Mockito.any());
     Mockito.verify(replayReportService).redeliver(MATCH_ID, "instance-1");
-    assertThat(context.getPosts()).containsExactly("Header refreshed.");
+    assertThat(context.getPosts()).containsExactly("Header refreshed. Replay report posted again.");
   }
 
   @Test
-  void rerun_withTheStagesOn_staysSilentWhenNothingWasRefreshed() {
+  void rerun_withTheStagesOn_saysWhyTheReportWasNotPosted() {
     Mockito.when(stageService.enabled()).thenReturn(true);
+    Mockito.when(replayReportService.redeliver(MATCH_ID, "instance-1"))
+        .thenReturn(ReportDelivery.NOT_STORED);
 
     FakeCommandContext context = inThread();
     command.execute("rerun", context);
 
-    assertThat(context.getPosts()).isEmpty();
+    assertThat(context.getPosts())
+        .containsExactly("Replay report not posted: no replay analysis is stored for this match.");
     assertThat(context.getFailures()).isEmpty();
   }
 

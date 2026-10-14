@@ -8,7 +8,6 @@ import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayReportPostedDomain;
-import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.DbufInstanceConfigRepository;
 import com.ako.dbuff.dao.repo.MatchRepo;
@@ -88,11 +87,7 @@ public class ReplayReportService {
     boolean complete =
         runRepo
             .findByMatchIdAndParserVersion(matchId, processing.getParserVersion())
-            .filter(
-                run ->
-                    run.getStatus() == ReplayStatus.DONE
-                        || (run.getStatus() == ReplayStatus.PARTIAL
-                            && run.getNextAttemptAt() == null))
+            .filter(ReplayParseRunDomain::finalWithAnalysis)
             .isPresent();
     if (complete) {
       deliver(matchId);
@@ -110,7 +105,7 @@ public class ReplayReportService {
     List<PlayerMatchStatisticDomain> stats = statRepo.findAllByMatchId(matchId);
     for (DbufInstanceConfigDomain instance : instancesTracking(stats)) {
       try {
-        deliverTo(match, stats, instance, false);
+        deliverTo(match, stats, instance, Trigger.AUTOMATIC);
       } catch (RuntimeException e) {
         log.warn("Replay report of match {} for instance {} failed", matchId, instance.getId(), e);
       }
@@ -122,27 +117,41 @@ public class ReplayReportService {
    * again, for a person who asked for it. Skips the already-posted check and the quiet hours; the
    * server switch, the channel's own switch, its detail level and the section switches still apply.
    */
-  public void redeliver(long matchId, String instanceId) {
+  public ReportDelivery redeliver(long matchId, String instanceId) {
     if (!properties.isEnabled()) {
-      return;
+      return logSkipped(matchId, ReportDelivery.REPORT_SWITCHED_OFF);
     }
     try {
       boolean stored =
           runRepo
               .findByMatchIdAndParserVersion(matchId, processing.getParserVersion())
-              .filter(
-                  run ->
-                      run.getStatus() == ReplayStatus.DONE
-                          || run.getStatus() == ReplayStatus.PARTIAL)
+              .filter(run -> run.getStatus().hasAnalysis())
               .isPresent();
       MatchDomain match = stored ? matchRepo.findById(matchId).orElse(null) : null;
       DbufInstanceConfigDomain instance = instanceRepo.findById(instanceId).orElse(null);
-      if (match != null && instance != null) {
-        deliverTo(match, statRepo.findAllByMatchId(matchId), instance, true);
+      if (match == null || instance == null) {
+        return logSkipped(matchId, ReportDelivery.NOT_STORED);
       }
+      return logSkipped(
+          matchId,
+          deliverTo(match, statRepo.findAllByMatchId(matchId), instance, Trigger.REQUESTED));
     } catch (RuntimeException e) {
       log.warn("Replay report of match {} for instance {} failed", matchId, instanceId, e);
+      return ReportDelivery.FAILED;
     }
+  }
+
+  private ReportDelivery logSkipped(long matchId, ReportDelivery result) {
+    if (result != ReportDelivery.POSTED) {
+      log.debug("Replay report of match {} not posted: {}", matchId, result.reason());
+    }
+    return result;
+  }
+
+  /** Who asked: an automatic delivery posts once and waits out quiet hours; a person does not. */
+  private enum Trigger {
+    AUTOMATIC,
+    REQUESTED
   }
 
   private Iterable<DbufInstanceConfigDomain> instancesTracking(
@@ -158,34 +167,41 @@ public class ReplayReportService {
     return byId.values();
   }
 
-  private void deliverTo(
+  private ReportDelivery deliverTo(
       MatchDomain match,
       List<PlayerMatchStatisticDomain> stats,
       DbufInstanceConfigDomain instance,
-      boolean requested) {
+      Trigger trigger) {
     InstanceSettings settings = instance.effectiveSettings();
-    if (instance.getDiscordChannelId() == null
-        || !settings.isReplayReportOn()
-        || settings.detail() == ReportDetail.MINIMAL) {
-      return;
+    if (instance.getDiscordChannelId() == null) {
+      return ReportDelivery.NO_CHANNEL;
     }
-    if (!requested
-        && (postedRepo.findByMatchIdAndInstanceId(match.getId(), instance.getId()).isPresent()
-            || quietHours.isQuietTime(settings))) {
-      return;
+    if (!settings.isReplayReportOn()) {
+      return ReportDelivery.REPORT_OFF_FOR_CHANNEL;
+    }
+    if (settings.detail() == ReportDetail.MINIMAL) {
+      return ReportDelivery.MINIMAL_DETAIL;
+    }
+    if (trigger == Trigger.AUTOMATIC) {
+      if (postedRepo.findByMatchIdAndInstanceId(match.getId(), instance.getId()).isPresent()) {
+        return ReportDelivery.ALREADY_POSTED;
+      }
+      if (quietHours.isQuietTime(settings)) {
+        return ReportDelivery.QUIET_HOURS;
+      }
     }
     MatchReportThreadDomain thread =
         threadRepo.findByMatchIdAndInstanceId(match.getId(), instance.getId()).orElse(null);
-    if (thread == null) {
+    if (thread == null || thread.getThreadId() == null) {
       log.debug(
           "No thread of match {} in instance {}, nothing to follow up",
           match.getId(),
           instance.getId());
-      return;
+      return ReportDelivery.NO_THREAD;
     }
     List<ReportMessage> messages = messages(match, stats, instance, settings);
     if (messages.isEmpty()) {
-      return;
+      return ReportDelivery.NO_SECTIONS;
     }
     ThreadChannel channel = discord.getThreadById(thread.getThreadId());
     if (channel == null) {
@@ -193,12 +209,13 @@ public class ReplayReportService {
           "Discord thread {} of match {} not found, will try again",
           thread.getThreadId(),
           match.getId());
-      return;
+      return ReportDelivery.THREAD_NOT_FOUND;
     }
     recordPosted(match.getId(), instance.getId(), messages.size());
     messages.forEach(message -> send(match.getId(), channel, message));
     metrics.reportPosted();
     log.info("Replay report of match {} posted in {} messages", match.getId(), messages.size());
+    return ReportDelivery.POSTED;
   }
 
   private void recordPosted(long matchId, String instanceId, int messageCount) {

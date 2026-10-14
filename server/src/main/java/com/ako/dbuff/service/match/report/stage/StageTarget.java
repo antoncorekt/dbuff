@@ -12,23 +12,23 @@ import java.util.Optional;
  */
 public record StageTarget(MatchReportStage stage, boolean partial) {
 
+  public static StageTarget at(MatchReportStage stage) {
+    return new StageTarget(stage, false);
+  }
+
   /**
    * The outcome of a run, empty while the run may still change the answer: it is running, or a
    * transient failure or partial result has a retry left. A transient failure with no retry left is
    * final and counts as unavailable.
    */
   public static Optional<StageTarget> of(ReplayStatus status, boolean retryLeft) {
-    if (status == ReplayStatus.RUNNING || (retryLeft && !status.isPermanent() && !isDone(status))) {
+    if (status == ReplayStatus.RUNNING || (status.isRetryable() && retryLeft)) {
       return Optional.empty();
     }
     return switch (status) {
-      case DONE -> Optional.of(new StageTarget(MatchReportStage.REPLAY_DONE, false));
+      case DONE -> Optional.of(at(MatchReportStage.REPLAY_DONE));
       case PARTIAL -> Optional.of(new StageTarget(MatchReportStage.REPLAY_DONE, true));
-      default -> Optional.of(new StageTarget(MatchReportStage.REPLAY_UNAVAILABLE, false));
+      default -> Optional.of(at(MatchReportStage.REPLAY_UNAVAILABLE));
     };
-  }
-
-  private static boolean isDone(ReplayStatus status) {
-    return status == ReplayStatus.DONE;
   }
 }
