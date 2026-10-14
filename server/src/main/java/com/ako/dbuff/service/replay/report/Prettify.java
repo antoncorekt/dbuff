@@ -1,5 +1,7 @@
 package com.ako.dbuff.service.replay.report;
 
+import com.ako.dbuff.service.replay.analysis.reason.Enums;
+import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -28,6 +30,12 @@ public final class Prettify {
       case "DIRE" -> "Dire";
       default -> "An unknown team";
     };
+  }
+
+  /** {@code Radiant}, or {@code Radiant (your team)} for the team being reported to. */
+  static String teamOf(String stored, TeamSide yours) {
+    TeamSide side = Enums.find(TeamSide.class, stored);
+    return team(stored) + (side != null && side == yours ? " (your team)" : "");
   }
 
   /** A replay entity name: {@code PhantomAssassin} to {@code Phantom Assassin}. */
