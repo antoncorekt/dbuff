@@ -21,9 +21,13 @@ public final class Prettify {
     return words(name);
   }
 
-  /** {@code RADIANT} to {@code Radiant}; any other value is the Dire side. */
+  /** {@code RADIANT} to {@code Radiant}, {@code DIRE} to {@code Dire}; anything else is unknown. */
   static String team(String stored) {
-    return "RADIANT".equals(stored) ? "Radiant" : "Dire";
+    return switch (stored == null ? "" : stored) {
+      case "RADIANT" -> "Radiant";
+      case "DIRE" -> "Dire";
+      default -> "An unknown team";
+    };
   }
 
   /** A replay entity name: {@code PhantomAssassin} to {@code Phantom Assassin}. */

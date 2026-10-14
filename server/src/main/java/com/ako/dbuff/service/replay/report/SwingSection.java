@@ -16,9 +16,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -108,21 +106,6 @@ public class SwingSection implements ReplayReportSection {
         .limit(input.maxFindings())
         .sorted(Comparator.comparingInt(GameSpikeDomain::getStartSeconds))
         .toList();
-  }
-
-  /** The fights of the match whose lost-fight line {@link #lines} prints under a swing. */
-  Set<Integer> shownFightIndexes(ReplayReportInput input) {
-    Map<Integer, SwingExplanation> lostBySwing = lostFights(input.matchId());
-    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
-    return selectedSwings(input).stream()
-        .map(spike -> lostBySwing.get(spike.getSpikeIndex()))
-        .filter(Objects::nonNull)
-        .flatMap(
-            told ->
-                told.fights().stream()
-                    .filter(lost -> lostLine(lost, heroes, told.noImportantFight()).isPresent()))
-        .map(lost -> lost.fight().getFightIndex())
-        .collect(Collectors.toSet());
   }
 
   private Map<Integer, SwingExplanation> lostFights(long matchId) {

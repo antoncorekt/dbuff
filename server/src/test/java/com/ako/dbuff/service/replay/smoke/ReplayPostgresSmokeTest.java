@@ -606,6 +606,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     String text = String.join("\n", lines);
     System.out.println("IMPORTANT FIGHTS " + id + "\n" + text);
     assertThat(text).as("%s: important fights fit a message", id).hasSizeLessThan(2000);
+    List<String> tracked =
+        importantFightsSection.lines(new ReplayReportInput(matchId, null, Set.of(0L), Map.of(), 3));
+    assertThat(String.join("\n", tracked)).as("%s: your team marker", id).contains("(your team)");
     try {
       Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
       Files.createDirectories(dir);

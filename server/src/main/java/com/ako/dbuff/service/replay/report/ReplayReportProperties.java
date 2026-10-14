@@ -12,6 +12,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "replay.report")
 public class ReplayReportProperties {
+  private static final int MAX_IMPORTANT_FIGHT_LINES = 15;
+
   /** The server-wide switch; nothing is posted until it is turned on. */
   private boolean enabled = false;
 
@@ -42,12 +44,17 @@ public class ReplayReportProperties {
   /** The per-section switches by section name; a section without one follows its own default. */
   private Map<String, SectionToggle> sections = new HashMap<>();
 
-  /** Fails at startup on a cap that would leave the important fights section empty. */
+  /**
+   * Fails at startup on an important fights cap that leaves the section empty or too long for a
+   * message.
+   */
   @PostConstruct
   public void validate() {
-    if (maxImportantFightLines < 1) {
+    if (maxImportantFightLines < 1 || maxImportantFightLines > MAX_IMPORTANT_FIGHT_LINES) {
       throw new IllegalStateException(
-          "replay.report.max-important-fight-lines must be at least 1, got "
+          "replay.report.max-important-fight-lines must be 1 to "
+              + MAX_IMPORTANT_FIGHT_LINES
+              + ", got "
               + maxImportantFightLines);
     }
   }

@@ -13,9 +13,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -26,24 +26,13 @@ class ImportantFightsSectionTest {
 
   private final FightExplanationReader reader = mock(FightExplanationReader.class);
   private final ReportHeroNames heroNames = mock(ReportHeroNames.class);
-  private final SwingSection swing = mock(SwingSection.class);
   private final ReplayReportProperties properties = new ReplayReportProperties();
   private final SectionSwitch sectionSwitch = new SectionSwitch(properties, List.of());
   private final ImportantFightsSection section =
-      new ImportantFightsSection(reader, heroNames, swing, provider(sectionSwitch), properties);
+      new ImportantFightsSection(reader, heroNames, properties);
 
   ImportantFightsSectionTest() {
     when(heroNames.bySlot(1L)).thenReturn(Map.of(2L, "Terrorblade", 130L, "Venomancer"));
-    when(swing.defaultEnabled()).thenReturn(true);
-    when(swing.name()).thenReturn("swing");
-    when(swing.shownFightIndexes(any())).thenReturn(Set.of());
-  }
-
-  @SuppressWarnings("unchecked")
-  private static ObjectProvider<SectionSwitch> provider(SectionSwitch value) {
-    ObjectProvider<SectionSwitch> provider = mock(ObjectProvider.class);
-    when(provider.getObject()).thenReturn(value);
-    return provider;
   }
 
   private static RankedReason reason(String code, long slot) {
@@ -61,7 +50,7 @@ class ImportantFightsSectionTest {
   }
 
   private static LostFight fight(
-      int index, double start, String winner, long gold, boolean flip, RankedReason... reasons) {
+      int index, double start, String winner, Long gold, boolean flip, RankedReason... reasons) {
     return new LostFight(
         FightDomain.builder().fightIndex(index).startSeconds(start).build(),
         FightExplanationDomain.builder()
@@ -106,9 +95,9 @@ class ImportantFightsSectionTest {
   @Test
   void tellsWinnerWorthLeadFlipAndReasonsInTimeOrder() {
     stored(
-        fight(3, 1500, "DIRE", 4200, true, reason("DIED_FIRST", 2)),
-        fight(1, 600, "RADIANT", 1200, false, reason("NO_TP", 130), reason("BURST", 130)),
-        fight(2, 1020, "DIRE", 2500, false));
+        fight(3, 1500, "DIRE", 4200L, true, reason("DIED_FIRST", 2)),
+        fight(1, 600, "RADIANT", 1200L, false, reason("NO_TP", 130), reason("BURST", 130)),
+        fight(2, 1020, "DIRE", 2500L, false));
 
     List<String> lines = section.lines(input(2L, 130L));
 
@@ -124,7 +113,7 @@ class ImportantFightsSectionTest {
 
   @Test
   void marksTheTrackedSideWhenAllTrackedPlayersShareIt() {
-    stored(fight(1, 600, "DIRE", 1200, false));
+    stored(fight(1, 600, "DIRE", 1200L, false));
 
     assertThat(section.lines(input(130L)))
         .contains("10:00 Dire (your team) won the fight, 1.2k net worth swing");
@@ -133,32 +122,37 @@ class ImportantFightsSectionTest {
   }
 
   @Test
-  void pointsToTheSwingInsteadOfRepeatingTheReasonsWhenItAlreadyTellsTheFight() {
-    stored(
-        fight(1, 600, "RADIANT", 1200, false, reason("NO_TP", 130)),
-        fight(2, 1020, "DIRE", 2500, false, reason("DIED_FIRST", 2)));
-    when(swing.shownFightIndexes(any())).thenReturn(Set.of(1));
+  void repeatsTheReasonsOfAFightTheSwingSectionAlsoTells() {
+    stored(fight(1, 600, "RADIANT", 1200L, false, reason("NO_TP", 130)));
 
-    assertThat(section.lines(input(2L)))
-        .containsExactly(
-            "**Important fights**",
-            "10:00 Radiant (your team) won the fight, 1.2k net worth swing (reasons in the swing"
-                + " above)",
-            "17:00 Dire won the fight, 2.5k net worth swing: Terrorblade died first");
+    assertThat(section.lines(input(2L)).get(1)).endsWith("Venomancer had no teleport");
   }
 
   @Test
-  void repeatsTheReasonsWhenTheSwingSectionIsSwitchedOff() {
-    stored(fight(1, 600, "RADIANT", 1200, false, reason("NO_TP", 130)));
-    when(swing.shownFightIndexes(any())).thenReturn(Set.of(1));
-    properties.setSections(Map.of("swing", toggle(false)));
-    SectionSwitch off = new SectionSwitch(properties, List.of(swing));
-    ImportantFightsSection withSwingOff =
-        new ImportantFightsSection(reader, heroNames, swing, provider(off), properties);
+  void skipsAFightWithoutAKnownWinner() {
+    stored(fight(1, 600, null, 1200L, false), fight(2, 700, "DIRE", 1200L, false));
 
-    assertThat(withSwingOff.lines(input(2L)).get(1))
-        .doesNotContain("swing above")
-        .endsWith("Venomancer had no teleport");
+    List<String> lines = section.lines(input(2L));
+
+    assertThat(lines).hasSize(2);
+    assertThat(lines.get(1)).startsWith("11:40 Dire");
+  }
+
+  @Test
+  void ranksByTheAbsoluteChangeAndPrintsNoSwingForAnUnknownOrTinyOne() {
+    properties.setMaxImportantFightLines(3);
+    stored(
+        fight(1, 100, "DIRE", -3000L, false),
+        fight(2, 200, "DIRE", 40L, false),
+        fight(3, 300, "DIRE", 1000L, false),
+        fight(4, 400, "DIRE", null, false));
+
+    List<String> lines = section.lines(input(2L));
+
+    assertThat(lines).hasSize(4);
+    assertThat(lines.get(1)).contains("3.0k net worth swing");
+    assertThat(lines.get(2)).isEqualTo("3:20 Dire won the fight");
+    assertThat(lines.get(3)).contains("1.0k net worth swing");
   }
 
   @Test
@@ -166,7 +160,7 @@ class ImportantFightsSectionTest {
     properties.setMaxImportantFightLines(2);
     stored(
         IntStream.range(0, 5)
-            .mapToObj(i -> fight(i, 600 + i * 100, "RADIANT", 1000 + i * 1000L, false))
+            .mapToObj(i -> fight(i, 600 + i * 100, "RADIANT", 1000L + i * 1000L, false))
             .toArray(LostFight[]::new));
 
     List<String> lines = section.lines(input(2L));
@@ -185,11 +179,15 @@ class ImportantFightsSectionTest {
 
   @Test
   void rejectsACapBelowOne() {
-    properties.setMaxImportantFightLines(0);
+    for (int bad : new int[] {0, 16}) {
+      properties.setMaxImportantFightLines(bad);
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(properties::validate)
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("max-important-fight-lines");
+      assertThatThrownBy(properties::validate)
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("max-important-fight-lines");
+    }
+    properties.setMaxImportantFightLines(15);
+    properties.validate();
   }
 
   private static ReplayReportProperties.SectionToggle toggle(boolean on) {
