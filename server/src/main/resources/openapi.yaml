@@ -7,7 +7,8 @@ info:
     item and ability rankings, match history, match reports, replay analysis and the
     registration of Discord instances. Works as pet project only for limited player ids.
 
-    Authentication: every path except GET /actuator/health requires the X-Api-Key header
+    Authentication: every path except /actuator/health and everything under /actuator/health/
+    (for example liveness and readiness, any method) requires the X-Api-Key header
     (see the ApiKeyAuth security scheme). The key is not required locally: with
     app.api.required=false and no DBUFF_API_KEY set the API runs open. In production a
     missing key on the server closes the API, so every request answers 401.
@@ -56,7 +57,7 @@ paths:
     get:
       tags: [Health]
       summary: Health check
-      description: The only path that does not need X-Api-Key. The deploy gate and rollback poll it.
+      description: Does not need X-Api-Key, nor does anything under /actuator/health/ (for example liveness and readiness, any method). The deploy gate and rollback poll it.
       operationId: health
       security: []
       responses:
@@ -379,6 +380,8 @@ paths:
                 $ref: '#/components/schemas/MatchDetailResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: A non-numeric id (unmapped NumberFormatException) or an upstream OpenDota failure
 
   /api/v1/matches/{id}/report:
     get:
@@ -550,8 +553,9 @@ paths:
       description: |
         The stored analysis of a match as one JSON document, read from the tables only, in one
         snapshot. The sections are run, roles, fights, vision, runes, lanes, items, outliers,
-        behaviour and endgame; all are returned when sections is absent. Roles, runes, lanes
-        and behaviour are objects of lists, the others are lists; the fields are those of the
+        behaviour and endgame; all are returned when sections is absent. Run, roles, runes,
+        lanes and behaviour are objects (run is the RunStatus record, the others hold lists), the
+        others are lists; the fields are those of the
         reader records in service/replay/read.
       operationId: getReplayAnalysis
       parameters:
@@ -610,6 +614,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: No run stored for the match, or its status is not DONE (empty body)
+        '500':
+          description: An analyzer threw. The single-match path has no try/catch around the analysis, so the exception is unmapped; analyzer failures that are caught come back inside the 200 as failedAnalyzers
         '409':
           description: The match is not stored or its game mode is not active for replay processing, or a re-analysis is already running
           content:
@@ -920,7 +926,7 @@ paths:
             type: string
       responses:
         '200':
-          description: The statistics; empty when the player is not found
+          description: "The statistics. When the player or instance is unknown, or there are no rows, the body is a zeroed response: playerName, againstStat and teammateStat with win 0 and lose 0, and an empty history; playerId is omitted when the player is unknown and set to the external player's ID when the player is known but has no rows."
           content:
             application/json:
               schema:
@@ -989,7 +995,7 @@ paths:
                   description: Focus group player IDs, used only when instance_id is absent
       responses:
         '200':
-          description: One entry per detected opponent
+          description: "One entry per detected opponent. An opponent that is unknown, or has no rows, gets a zeroed response: playerName, againstStat and teammateStat with win 0 and lose 0, and an empty history; playerId is omitted when the player is unknown and set to the external player's ID when the player is known but has no rows."
           content:
             application/json:
               schema:
@@ -1006,7 +1012,7 @@ components:
       in: header
       name: X-Api-Key
       description: |
-        Required on every path except /actuator/health. Not required locally
+        Required on every path except /actuator/health and everything under /actuator/health/ (any method). Not required locally
         (app.api.required=false with an empty DBUFF_API_KEY runs open).
 
   responses:
@@ -1634,7 +1640,7 @@ components:
             - $ref: '#/components/schemas/ExternalMatchStats'
     ExternalPlayerStatisticResponse:
       type: object
-      description: "History of games where the focus group played with or against an external player; an empty body when the player is not found."
+      description: "History of games where the focus group played with or against an external player; when the player or instance is unknown or has no rows it is a zeroed response (win 0 and lose 0 in both stats, empty history; playerId omitted when the player is unknown, set to the external player's ID when known without rows)."
       properties:
         playerName:
           type: string
