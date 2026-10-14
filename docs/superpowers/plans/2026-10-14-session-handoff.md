@@ -41,11 +41,21 @@ The owner's standing instruction (2026-10-14): merge each PR once it is reviewed
 1. Which Discord sections to enable first (all new ones are default off: important-fights, lanes, rotations, smoke, objectives, vision, opening, items, outliers, endgame), after reading the rendered texts (files `section-<name>-<matchid>.txt` in `~/dbuff-fixtures/send/`, which exists only on the owner's machine and is not in the repo; the smoke test writes them).
 2. The production switch-on (checklist) and when.
 3. Whether to extend the review rounds to All Pick and more matches (the rules are tuned on two Ability Draft matches).
-4. Cleanup (below).
+4. Whether to start the plan below (review rounds on the 20 fixtures first).
 
-## Cleanup not done (owner said later)
+## Cleanup (2026-10-14, done at the owner's request)
 
-About 60 merged worktrees `../dbuff-*` and their branches, the docker containers of the loops (`fightloop-pg` if it still exists), `TeamSide` helper duplication in older analyzers (SpikeAnalyzer, TeamNetWorth, OutlierAnalyzer, BuildingKillAnalyzer), remaining `/private/tmp` paths in older plan docs, the `MinuteSeries`/`RowOrder` helper style choices.
+Removed: the 66 merged worktrees `../dbuff-*` (each checked clean and an ancestor of `main`; one had only `.DS_Store` changes), their local branches, the 102 merged remote branches on GitHub (each checked with the compare API as behind or identical to `main`; every PR stays readable, only `main` is left), the stale remote-tracking refs, and the stopped docker container `fightloop-pg`. Not touched: dangling anonymous docker volumes (possibly from other projects), `smoke.log` in the container directory, the fixtures in `~/dbuff-fixtures`.
+
+Still to do (code and docs hygiene, none urgent): `TeamSide` helper duplication in older analyzers (SpikeAnalyzer, TeamNetWorth, OutlierAnalyzer, BuildingKillAnalyzer; `TeamSide.opponent()`, `commonSide` and `Prettify.teamOf` exist now), remaining `/private/tmp` paths in older plan docs, three copies of the load-test figures (CLAUDE.md, checklist, this file), the `RowOrder`/`BehaviourLines` helper style, a timing-based test in `ReplayRunServiceTest` (permit wait: sleeps 500 ms, asserts under 400 ms; make it deterministic if it ever flakes).
+
+## Plan for next (proposal, in order; each needs the owner's word to start)
+
+1. **Owner reads the rendered sections** (`~/dbuff-fixtures/send/section-*.txt`) and says which to enable first and which wording to change. Recommended first set: `important-fights`, `lanes`, `endgame`; hold `vision` (lopsided) and `outliers` (no real data) until more matches are reviewed.
+2. **Review rounds on more matches.** 20 fixtures exist (`server/src/test/resources/replay/load-test/matches.txt`; 9 Ability Draft, 7 All Pick among the new 16): run the loops (`:server:reviewLoop -Ploop.topic=<fights|lanes|vision|runes|items|behaviour|roles>`, `docs/replay-review-loop.md`) over them, send the readable reports to the owner, tune the properties (first candidates: vision contrast rule, `rotation-window-seconds` 60 (the rotation reason never fired), the group or split 4-of-5 cluster rule (most time is MIXED), throw thresholds) with a new round per change. All Pick has had no review round at all.
+3. **Production switch-on** only on the owner's word, following `2026-10-14-replay-switch-on-checklist.md` (step 1: backup, `df -h /tmp`, temp dir `/var/tmp/dbuff-replays`; step 2: processing on with batch size 1; step 3: batch up; step 4: report on, then sections one by one). Items still unverified there: OpenDota data present when a replay is analysed (PARTIAL path), the report text in a real Discord channel, a metrics read on the host, Valve reachable from AWS, a game longer than 76 minutes.
+4. **Code hygiene** from the list above, as small PRs.
+5. **Possible new analyses** (nothing planned): feeding explanations, buyback readiness from gold (needs unspent gold, not stored), courier, a stricter vision rule (observer-count difference), per-section Discord wording polish after the owner's feedback.
 
 ## How the work was done (rhythm, unchanged)
 
