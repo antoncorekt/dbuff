@@ -1,10 +1,12 @@
 package com.ako.dbuff.service.replay.smoke;
 
+import com.ako.dbuff.dao.model.AbilityDraftPickDomain;
 import com.ako.dbuff.dao.model.CreepKillDomain;
 import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightExplanationDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.FightReasonDomain;
+import com.ako.dbuff.dao.model.HeroDraftPickDomain;
 import com.ako.dbuff.dao.model.LaneAssignmentDomain;
 import com.ako.dbuff.dao.model.LaneResultDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
@@ -27,6 +29,7 @@ import com.ako.dbuff.dao.repo.FightReasonRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
 import com.ako.dbuff.dao.repo.GameStateSegmentRepo;
+import com.ako.dbuff.dao.repo.HeroDraftPickRepo;
 import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
 import com.ako.dbuff.dao.repo.LaneAssignmentRepo;
 import com.ako.dbuff.dao.repo.LaneReasonRepo;
@@ -66,6 +69,7 @@ import com.ako.dbuff.service.replay.analysis.rune.RuneType;
 import com.ako.dbuff.service.replay.read.AnalysisAssembler;
 import com.ako.dbuff.service.replay.report.CompositionSection;
 import com.ako.dbuff.service.replay.report.DeathSection;
+import com.ako.dbuff.service.replay.report.DraftBoardSection;
 import com.ako.dbuff.service.replay.report.DraftSection;
 import com.ako.dbuff.service.replay.report.EndGameSection;
 import com.ako.dbuff.service.replay.report.FightSection;
@@ -99,6 +103,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Tag;
@@ -131,6 +136,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
 
   @Autowired private AbilityDraftPickRepo draftPickRepo;
   @Autowired private AbilityDraftPoolRepo draftPoolRepo;
+  @Autowired private HeroDraftPickRepo heroDraftRepo;
   @Autowired private ReplayRunService runService;
   @Autowired private MeterRegistry meterRegistry;
   @Autowired private ReplayDataService dataService;
@@ -180,6 +186,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private FightSection fightSection;
   @Autowired private MovementSection movementSection;
   @Autowired private DraftSection draftSection;
+  @Autowired private DraftBoardSection draftBoardSection;
   @Autowired private CompositionSection compositionSection;
   @Autowired private PlayerGameStatisticRepo playerStatRepo;
   @Autowired private HeroKits heroKits;
@@ -201,6 +208,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertThat(playerRepo.findByMatchId(match.getId())).hasSize(10);
       assertThat(draftPickRepo.findByMatchId(match.getId())).as("%s has no draft", id).isEmpty();
       assertThat(draftPoolRepo.findAll().stream().filter(d -> d.getMatchId().equals(match.getId())))
+          .isEmpty();
+      assertThat(heroDraftRepo.findByMatchId(match.getId()))
+          .as("%s has no hero draft", id)
           .isEmpty();
       assertThat(trackRepo.findByMatchId(match.getId())).hasSize(10);
       assertThat(trackRepo.findByMatchId(match.getId()).getFirst().getMana()).isNotEmpty();
@@ -287,6 +297,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           runRepo.findByMatchIdAndParserVersion(match.getId(), 1).orElseThrow();
       assertThat(status).as("%s: %s", id, run.getError()).isEqualTo(ReplayStatus.DONE);
       assertThat(draftPickRepo.findByMatchId(match.getId())).as("%s draft", id).hasSize(40);
+      assertHeroDraft(id, match.getId());
       assertThat(roleRepo.findByMatchId(match.getId()))
           .as("%s: each team has each role once", id)
           .hasSize(10)
@@ -890,6 +901,36 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   private static boolean inFight(FightPlayerDomain p) {
     Presence presence = Enums.find(Presence.class, p.getPresence());
     return presence == Presence.ACTIVE || presence == Presence.PRESENT_PASSIVE;
+  }
+
+  private void assertHeroDraft(String id, long matchId) {
+    List<HeroDraftPickDomain> heroes = heroDraftRepo.findByMatchId(matchId);
+    assertThat(heroes).as("%s: 12 pool heroes", id).hasSize(12);
+    List<HeroDraftPickDomain> picked =
+        heroes.stream().filter(h -> h.getPlayerSlot() != null).toList();
+    assertThat(picked).as("%s: 10 hero picks", id).hasSize(10);
+    assertThat(picked.stream().map(HeroDraftPickDomain::getPlayerSlot).distinct()).hasSize(10);
+    assertThat(picked)
+        .allMatch(h -> h.getTurnNumber() != null && h.getClockSeconds() < 0 && h.getTeam() != null);
+    List<AbilityDraftPickDomain> skills = draftPickRepo.findByMatchId(matchId);
+    assertThat(skills).allMatch(s -> s.getTurnNumber() != null && s.getClockSeconds() < 0);
+    assertThat(
+            Stream.concat(
+                    picked.stream().map(HeroDraftPickDomain::getTurnNumber),
+                    skills.stream().map(AbilityDraftPickDomain::getTurnNumber))
+                .sorted()
+                .toList())
+        .as("%s: skill and hero turns are 1 to 50", id)
+        .isEqualTo(IntStream.rangeClosed(1, 50).boxed().toList());
+    assertThat(
+            draftBoardSection
+                .view(
+                    new ReplayReportInput(
+                        matchId, null, java.util.Set.of(0L), java.util.Map.of(0L, "P0"), 3))
+                .orElseThrow()
+                .bullets())
+        .as("%s: draft board cards", id)
+        .hasSizeGreaterThanOrEqualTo(2);
   }
 
   /** Derives the expected Ability Draft rows from the stored profiles, compositions and pool. */

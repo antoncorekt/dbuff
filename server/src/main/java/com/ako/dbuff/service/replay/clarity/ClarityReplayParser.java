@@ -1,6 +1,8 @@
 package com.ako.dbuff.service.replay.clarity;
 
 import com.ako.dbuff.dao.model.ReplayStatus;
+import com.ako.dbuff.service.replay.AbilityDraftFacts;
+import com.ako.dbuff.service.replay.HeroDraftFacts;
 import com.ako.dbuff.service.replay.MapFacts;
 import com.ako.dbuff.service.replay.ReplayException;
 import com.ako.dbuff.service.replay.ReplayFacts;
@@ -14,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import java.util.function.IntSupplier;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -41,16 +44,30 @@ import skadistats.clarity.source.MappedFileSource;
 public class ClarityReplayParser implements ReplayParser {
   static final String CLARITY_VERSION = "5.0.1";
 
-  private final Map<Long, DraftReaderFactory> draftReaders;
+  private final Map<Long, DraftReaderFactory<AbilityDraftFacts>> draftReaders;
+  private final Map<Long, DraftReaderFactory<HeroDraftFacts>> heroDraftReaders;
 
   private final Set<String> chargeItems;
 
   public ClarityReplayParser(
-      List<DraftReaderFactory> draftReaders, ReplayProcessingProperties properties) {
+      List<DraftReaderFactory<AbilityDraftFacts>> draftReaders,
+      List<DraftReaderFactory<HeroDraftFacts>> heroDraftReaders,
+      ReplayProcessingProperties properties) {
     this.chargeItems = Set.copyOf(properties.getChargeItems());
-    this.draftReaders =
-        draftReaders.stream()
-            .collect(Collectors.toMap(DraftReaderFactory::gameModeId, Function.identity()));
+    this.draftReaders = byMode(draftReaders);
+    this.heroDraftReaders = byMode(heroDraftReaders);
+  }
+
+  private static <T> Map<Long, DraftReaderFactory<T>> byMode(
+      List<DraftReaderFactory<T>> factories) {
+    return factories.stream()
+        .collect(Collectors.toMap(DraftReaderFactory::gameModeId, Function.identity()));
+  }
+
+  private static <T> DraftReader<T> readerFor(
+      Map<Long, DraftReaderFactory<T>> factories, GameModeProfile mode) {
+    DraftReaderFactory<T> factory = factories.get(mode.gameModeId());
+    return factory == null ? new NoDraftReader<>() : factory.create();
   }
 
   @Override
@@ -60,9 +77,12 @@ public class ClarityReplayParser implements ReplayParser {
 
   @Override
   public ReplayFacts parse(Path demoFile, GameModeProfile mode, BooleanSupplier cancelled) {
-    DraftReaderFactory factory = draftReaders.get(mode.gameModeId());
-    DraftReader draftReader = factory == null ? new NoDraftReader() : factory.create();
-    Collector collector = new Collector(cancelled, draftReader, chargeItems);
+    Collector collector =
+        new Collector(
+            cancelled,
+            readerFor(draftReaders, mode),
+            readerFor(heroDraftReaders, mode),
+            chargeItems);
     try {
       new SimpleRunner(new MappedFileSource(demoFile.toString())).runWith(collector);
     } catch (Exception e) {
@@ -136,16 +156,25 @@ public class ClarityReplayParser implements ReplayParser {
     private final CombatLogRecorder combatLog = new CombatLogRecorder();
     private MapFacts map;
     private StateRecorder stateRecorder;
-    private final DraftReader draftReader;
+    private final DraftReader<AbilityDraftFacts> draftReader;
+    private final DraftReader<HeroDraftFacts> heroDraftReader;
     private final Set<String> chargeItems;
     private long ticksSeen;
     private long gameOverTick = -1;
     private final GameClock clock = new GameClock();
+    private int tickNow;
+    private final IntSupplier draftTick = () -> (int) clock.gameTick(tickNow);
+    private boolean draftOpen = true;
 
-    Collector(BooleanSupplier cancelled, DraftReader draftReader, Set<String> chargeItems) {
+    Collector(
+        BooleanSupplier cancelled,
+        DraftReader<AbilityDraftFacts> draftReader,
+        DraftReader<HeroDraftFacts> heroDraftReader,
+        Set<String> chargeItems) {
       this.cancelled = cancelled;
       this.chargeItems = chargeItems;
       this.draftReader = draftReader;
+      this.heroDraftReader = heroDraftReader;
     }
 
     @OnTickStart
@@ -166,7 +195,9 @@ public class ClarityReplayParser implements ReplayParser {
 
     @OnEntityUpdated(classPattern = "CDOTAGamerulesProxy")
     public void rulesUpdated(Context ctx, Entity rules, FieldPath[] paths, int count) {
-      draftReader.observe(rules, paths, count, () -> (int) clock.gameTick(ctx.getTick()));
+      if (draftOpen && !(draftReader.done() && heroDraftReader.done())) {
+        observeDraft(ctx, rules, paths, count);
+      }
       if (rules.hasProperty(PAUSED) && rules.getProperty(PAUSED) instanceof Boolean paused) {
         clock.paused(paused, ctx.getTick());
       }
@@ -174,6 +205,9 @@ public class ClarityReplayParser implements ReplayParser {
         return;
       }
       int state = rules.getProperty(STATE);
+      if (state >= PRE_GAME) {
+        draftOpen = false;
+      }
       if (state == PRE_GAME) {
         recorder().preGameStarted(clock.gameTick(ctx.getTick()));
       } else if (state == POST_GAME || state == POST_GAME_SCORES) {
@@ -192,9 +226,20 @@ public class ClarityReplayParser implements ReplayParser {
                 .gameStartTime(startTime.doubleValue())
                 .players(readPlayers())
                 .draft(draftReader.read(rules))
+                .heroDraft(heroDraftReader.read(rules))
                 .build();
         recorder().gameStarted(clock.gameTick(ctx.getTick()));
         map = MapReader.read(entities, stringTables.forName("EntityNames"), rules);
+      }
+    }
+
+    /** The name of a path is built once for both readers, and only while a pick can still come. */
+    private void observeDraft(Context ctx, Entity rules, FieldPath[] paths, int count) {
+      tickNow = ctx.getTick();
+      for (int i = 0; i < count; i++) {
+        String name = rules.getNameForFieldPath(paths[i]);
+        draftReader.observe(rules, paths[i], name, draftTick);
+        heroDraftReader.observe(rules, paths[i], name, draftTick);
       }
     }
 
@@ -219,6 +264,7 @@ public class ClarityReplayParser implements ReplayParser {
           .gameStartTime(facts.gameStartTime())
           .players(facts.players())
           .draft(facts.draft())
+          .heroDraft(facts.heroDraft())
           .samples(recorder().result(facts.clockStartTick()))
           .combatLog(combatLog.result(facts.gameStartTime()))
           .map(map)

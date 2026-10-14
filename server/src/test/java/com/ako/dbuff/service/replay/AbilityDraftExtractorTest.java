@@ -72,6 +72,63 @@ class AbilityDraftExtractorTest {
   }
 
   @Test
+  void extract_leavesTurnAndClockOutWithoutAHeroDraftButStillStoresThePicks() {
+    extractor.extract(facts(fullDraft()), MATCH);
+
+    List<AbilityDraftPickDomain> picks = pickRepo.findAll();
+    assertThat(picks).hasSize(40);
+    assertThat(picks).allMatch(p -> p.getTurnNumber() == null && p.getClockSeconds() == null);
+  }
+
+  @Test
+  void extract_leavesTurnAndClockOutWhenTheHeroDraftHasTheWrongShape() {
+    HeroDraftFacts shortHeroes =
+        new HeroDraftFacts(List.of(), List.of(new DraftPick(1, 0, 0, 2105)));
+
+    extractor.extract(withHeroes(shortHeroes), MATCH);
+
+    assertThat(pickRepo.findAll()).hasSize(40);
+    assertThat(pickRepo.findAll())
+        .allMatch(p -> p.getTurnNumber() == null && p.getClockSeconds() == null);
+  }
+
+  @Test
+  void extract_numbersEverySkillTurnAmongTheHeroTurnsAndStampsTheClock() {
+    extractor.extract(withHeroes(heroesAfterTheFirstSkill()), MATCH);
+
+    List<AbilityDraftPickDomain> picks =
+        pickRepo.findAll().stream()
+            .sorted(Comparator.comparing(AbilityDraftPickDomain::getPickOrder))
+            .toList();
+    assertThat(picks.get(0).getTurnNumber()).isEqualTo(1);
+    assertThat(picks.get(1).getTurnNumber()).isEqualTo(3);
+    assertThat(picks.getLast().getTurnNumber()).isEqualTo(41);
+    assertThat(picks.getFirst().getClockSeconds()).isEqualTo((2000 - 17136) / 30.0);
+  }
+
+  private ReplayFacts withHeroes(HeroDraftFacts heroes) {
+    return ReplayFacts.builder()
+        .clockStartTick(17136)
+        .players(players)
+        .draft(fullDraft())
+        .heroDraft(heroes)
+        .build();
+  }
+
+  /** Ten heroes, the first just after the first skill pick and the rest long after the skills. */
+  private static HeroDraftFacts heroesAfterTheFirstSkill() {
+    List<HeroDraftEntry> pool = new ArrayList<>();
+    List<DraftPick> picks = new ArrayList<>();
+    for (int i = 0; i < 12; i++) {
+      pool.add(new HeroDraftEntry(i, 1 + i, -1));
+    }
+    for (int i = 0; i < 10; i++) {
+      picks.add(new DraftPick(i + 1, i, 0, i == 0 ? 2105 : 2000 + 40 * 210 + i));
+    }
+    return new HeroDraftFacts(pool, picks);
+  }
+
+  @Test
   void extract_storesThePoolWithSkippedSkillsHavingNoPicker() {
     extractor.extract(facts(fullDraft()), MATCH);
 

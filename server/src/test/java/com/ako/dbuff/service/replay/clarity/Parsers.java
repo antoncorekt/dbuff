@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.clarity;
 
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
+import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import java.util.List;
 
 /** The parser wired as the application wires it. */
@@ -9,6 +10,8 @@ final class Parsers {
 
   static ClarityReplayParser standard() {
     return new ClarityReplayParser(
-        List.of(new AbilityDraftReaderFactory()), new ReplayProcessingProperties());
+        List.of(new AbilityDraftReaderFactory(new AbilityDraftProfile())),
+        List.of(new HeroDraftReaderFactory(new AbilityDraftProfile())),
+        new ReplayProcessingProperties());
   }
 }

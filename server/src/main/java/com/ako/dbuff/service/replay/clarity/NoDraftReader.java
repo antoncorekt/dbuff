@@ -1,17 +1,21 @@
 package com.ako.dbuff.service.replay.clarity;
 
-import com.ako.dbuff.service.replay.AbilityDraftFacts;
 import java.util.function.IntSupplier;
 import skadistats.clarity.model.Entity;
 import skadistats.clarity.model.FieldPath;
 
-/** For a mode without a draft pool to read. */
-final class NoDraftReader implements DraftReader {
+/** For a mode without a draft part to read. */
+final class NoDraftReader<T> implements DraftReader<T> {
   @Override
-  public void observe(Entity rules, FieldPath[] paths, int count, IntSupplier gameTick) {}
+  public boolean done() {
+    return true;
+  }
 
   @Override
-  public AbilityDraftFacts read(Entity rules) {
+  public void observe(Entity rules, FieldPath path, String name, IntSupplier gameTick) {}
+
+  @Override
+  public T read(Entity rules) {
     return null;
   }
 }
