@@ -11,6 +11,8 @@ import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayReportPostedDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.model.ReportDetail;
+import com.ako.dbuff.dao.model.SmokeUseDomain;
+import com.ako.dbuff.dao.model.TeamRotationDomain;
 import com.ako.dbuff.dao.repo.DbufInstanceConfigRepository;
 import com.ako.dbuff.dao.repo.LaneAssignmentRepo;
 import com.ako.dbuff.dao.repo.LaneReasonRepo;
@@ -20,6 +22,8 @@ import com.ako.dbuff.dao.repo.MatchReportThreadRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayReportPostedRepo;
+import com.ako.dbuff.dao.repo.SmokeUseRepo;
+import com.ako.dbuff.dao.repo.TeamRotationRepo;
 import com.ako.dbuff.service.discord.DiscordMessageService;
 import com.ako.dbuff.service.match.report.formatter.DiscordReportFormatter;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
@@ -306,6 +310,63 @@ class ReplayReportServiceTest {
     enable("lanes", true);
     service.deliver(1L);
     assertThat(posted()).contains("Top lane").contains("Radiant (your team) won clearly");
+  }
+
+  @Test
+  void deliver_theRotationsSectionPostsNothingUntilItsPropertyIsTrue() {
+    TeamRotationRepo rotations = Mockito.mock(TeamRotationRepo.class);
+    when(rotations.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                TeamRotationDomain.builder()
+                    .id(1L)
+                    .team("RADIANT")
+                    .playerSlot(0L)
+                    .startSeconds(600)
+                    .toZone("LANE")
+                    .toLane("TOP")
+                    .verdict("DIED")
+                    .reasons("DIED")
+                    .build()));
+    RotationsSection section =
+        new RotationsSection(rotations, Mockito.mock(ReportHeroNames.class), properties);
+    service = serviceWith(named("alpha", true), section);
+    service.deliver(1L);
+    assertThat(posted()).contains("line of alpha").doesNotContain("Team rotations");
+
+    Mockito.clearInvocations(discord, postedRepo);
+    enable("rotations", true);
+    service.deliver(1L);
+    assertThat(posted()).contains("Team rotations").contains("died on the trip");
+  }
+
+  @Test
+  void deliver_theSmokeSectionPostsNothingUntilItsPropertyIsTrueAndIsIndependentOfRotations() {
+    SmokeUseRepo smokes = Mockito.mock(SmokeUseRepo.class);
+    when(smokes.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                SmokeUseDomain.builder()
+                    .id(1L)
+                    .team("RADIANT")
+                    .userSlot(0L)
+                    .groupSlots("0")
+                    .startSeconds(600)
+                    .endSeconds(640)
+                    .outcome("PAID_OFF")
+                    .endReason("EXPIRED")
+                    .build()));
+    SmokeSection section =
+        new SmokeSection(smokes, Mockito.mock(ReportHeroNames.class), properties);
+    service = serviceWith(named("alpha", true), section);
+    enable("rotations", true);
+    service.deliver(1L);
+    assertThat(posted()).doesNotContain("Smoke of Deceit");
+
+    Mockito.clearInvocations(discord, postedRepo);
+    enable("smoke", true);
+    service.deliver(1L);
+    assertThat(posted()).contains("Smoke of Deceit").contains("paid off");
   }
 
   @Test

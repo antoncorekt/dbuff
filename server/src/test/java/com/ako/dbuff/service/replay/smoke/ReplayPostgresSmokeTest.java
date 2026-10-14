@@ -71,6 +71,8 @@ import com.ako.dbuff.service.replay.report.ImportantFightsSection;
 import com.ako.dbuff.service.replay.report.LanesSection;
 import com.ako.dbuff.service.replay.report.MovementSection;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
+import com.ako.dbuff.service.replay.report.RotationsSection;
+import com.ako.dbuff.service.replay.report.SmokeSection;
 import com.ako.dbuff.service.replay.report.SwingSection;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -152,6 +154,8 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private SwingSection swingSection;
   @Autowired private ImportantFightsSection importantFightsSection;
   @Autowired private LanesSection lanesSection;
+  @Autowired private RotationsSection rotationsSection;
+  @Autowired private SmokeSection smokeSection;
   @Autowired private DeathSection deathSection;
   @Autowired private FightSection fightSection;
   @Autowired private MovementSection movementSection;
@@ -614,6 +618,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
         .hasSizeLessThan(2000);
     saveImportantFights(id, matchId);
     saveLanes(id, matchId);
+    saveBehaviourSections(id, matchId);
     System.out.println(
         "FIGHT LOSS "
             + id
@@ -659,6 +664,26 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       Files.createDirectories(dir);
       Files.writeString(dir.resolve("section-lanes-" + id + ".txt"), text + "\n");
       Files.writeString(dir.resolve("section-lanes-" + id + "-your-team.txt"), trackedText + "\n");
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  private void saveBehaviourSections(String id, long matchId) {
+    ReplayReportInput input = new ReplayReportInput(matchId, null, Set.of(), Map.of(), 3);
+    saveSection("rotations", rotationsSection.lines(input), id, 5);
+    saveSection("smoke", smokeSection.lines(input), id, 4);
+  }
+
+  private void saveSection(String name, List<String> lines, String id, int maxLines) {
+    String text = String.join("\n", lines);
+    System.out.println(name.toUpperCase() + " " + id + "\n" + text);
+    assertThat(lines).as("%s: %s", id, name).hasSizeLessThanOrEqualTo(maxLines);
+    assertThat(text).as("%s: %s fit a message", id, name).hasSizeLessThan(2000);
+    try {
+      Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
+      Files.createDirectories(dir);
+      Files.writeString(dir.resolve("section-" + name + "-" + id + ".txt"), text + "\n");
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }

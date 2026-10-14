@@ -6,6 +6,7 @@ import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.rune.RuneType;
 import com.ako.dbuff.service.replay.report.AbilityLabels;
+import com.ako.dbuff.service.replay.report.BehaviourWording;
 import com.ako.dbuff.service.replay.report.Prettify;
 import com.ako.dbuff.service.replay.report.ReasonWording;
 import java.util.Arrays;
@@ -25,7 +26,6 @@ public final class LoopWording {
   private static volatile AbilityLabels labels = Prettify::ability;
   private static volatile ReasonWording wording = new ReasonWording(labels);
   private static final String UNKNOWN = "?";
-  private static final long THOUSAND = 1000;
   private static final List<String> ROLES =
       List.of("carry", "mid", "offlane", "soft support", "hard support");
   private static final int BEST_FITS = 3;
@@ -44,16 +44,7 @@ public final class LoopWording {
 
   /** Gold as {@code 850} or {@code 1.2k}, {@code ?} when not known. */
   public static String gold(Number gold) {
-    if (gold == null) {
-      return UNKNOWN;
-    }
-    long whole = Math.round(gold.doubleValue());
-    if (Math.abs(whole) < THOUSAND) {
-      return String.valueOf(whole);
-    }
-    String thousands = String.format(Locale.ROOT, "%.1f", whole / (double) THOUSAND);
-    return (thousands.endsWith(".0") ? thousands.substring(0, thousands.length() - 2) : thousands)
-        + "k";
+    return BehaviourWording.gold(gold);
   }
 
   /** A Radiant lead as {@code Radiant +2.3k}; a negative one as {@code Dire +1.1k}. */
@@ -99,20 +90,12 @@ public final class LoopWording {
 
   /** The hero of a slot; without a known hero, "Dire player 2", never an id. */
   public static String hero(Map<Long, String> heroBySlot, Long slot) {
-    if (slot == null) {
-      return UNKNOWN;
-    }
-    String name = heroBySlot.get(slot);
-    if (name != null && !name.isBlank()) {
-      return name;
-    }
-    long number = slot >= TeamSide.FIRST_DIRE_SLOT ? slot - TeamSide.FIRST_DIRE_SLOT : slot;
-    return "%s player %d".formatted(teamOfSlot(slot), number + 1);
+    return BehaviourWording.hero(heroBySlot, slot);
   }
 
   /** A stored upper-case name as words: {@code FIGHT_WIN} as {@code fight win}. */
   public static String words(String stored) {
-    return stored == null ? UNKNOWN : stored.toLowerCase(Locale.ROOT).replace('_', ' ');
+    return BehaviourWording.words(stored);
   }
 
   /** A role 1 to 5 as {@code 1 carry}; anything else as {@code unknown}. */
@@ -197,10 +180,7 @@ public final class LoopWording {
 
   /** Where a hero stood: {@code mid lane}, {@code river}, {@code jungle}, {@code base}. */
   public static String place(String zone, String lane) {
-    if (zone == null) {
-      return "unknown";
-    }
-    return "LANE".equals(zone) && lane != null ? words(lane) + " lane" : words(zone);
+    return BehaviourWording.place(zone, lane);
   }
 
   /** A drafted or used ability by its readable name. */

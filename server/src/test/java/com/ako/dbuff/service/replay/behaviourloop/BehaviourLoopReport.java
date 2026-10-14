@@ -13,6 +13,7 @@ import com.ako.dbuff.service.replay.analysis.behaviour.RotationReason;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
+import com.ako.dbuff.service.replay.report.BehaviourWording;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -137,21 +138,11 @@ final class BehaviourLoopReport {
   private static String reasonCounts(MatchData d) {
     Map<RotationReason, Long> counts =
         d.rotations().stream()
-            .flatMap(r -> reasons(r).stream())
+            .flatMap(r -> BehaviourWording.reasons(r).stream())
             .collect(Collectors.groupingBy(reason -> reason, Collectors.counting()));
     return Arrays.stream(RotationReason.values())
         .map(reason -> "%s %d".formatted(reason.words(), counts.getOrDefault(reason, 0L)))
         .collect(Collectors.joining(", "));
-  }
-
-  private static List<RotationReason> reasons(TeamRotationDomain r) {
-    if (r.getReasons() == null || r.getReasons().isBlank()) {
-      return List.of();
-    }
-    return Arrays.stream(r.getReasons().split(","))
-        .map(code -> Enums.find(RotationReason.class, code))
-        .filter(Objects::nonNull)
-        .toList();
   }
 
   private static Map<String, Long> teams(MatchData d) {
@@ -227,35 +218,14 @@ final class BehaviourLoopReport {
   }
 
   private static String why(MatchData d, TeamRotationDomain r) {
-    List<String> sentences = reasons(r).stream().map(reason -> sentence(d, r, reason)).toList();
+    List<String> sentences =
+        BehaviourWording.reasons(r).stream().map(reason -> sentence(d, r, reason)).toList();
     return sentences.isEmpty() ? "nothing to add" : String.join("; ", sentences);
   }
 
   private static String sentence(MatchData d, TeamRotationDomain r, RotationReason reason) {
-    String hero = LoopWording.hero(d.heroNames(), r.getPlayerSlot());
-    return switch (reason) {
-      case DIED -> "%s died on the trip".formatted(hero);
-      case DID_NOTHING ->
-          "%s did nothing there (no fight, no damage to enemy heroes or towers, no kill, no creeps)"
-              .formatted(hero);
-      case INCOME_DROP -> incomeDrop(hero, r);
-      case ARRIVED_AFTER_FIGHT_ENDED ->
-          "%s arrived after the fight in that lane was over".formatted(hero);
-      case LEFT_LANE_UNDEFENDED ->
-          "the lane %s left lost the creep count (his partners %d, the enemy %d)"
-              .formatted(hero, r.getProxyOwnKills(), r.getProxyEnemyKills());
-      case TOWER_LOST_WHILE_AWAY -> "an own tower fell while %s was away".formatted(hero);
-    };
-  }
-
-  private static String incomeDrop(String hero, TeamRotationDomain r) {
-    return "%s's farm dropped from %s to %s gold per minute (experience from %s to %s per minute)"
-        .formatted(
-            hero,
-            LoopWording.gold(r.getIncomeBefore()),
-            LoopWording.gold(r.getIncomeDuring()),
-            LoopWording.gold(r.getXpBefore()),
-            LoopWording.gold(r.getXpDuring()));
+    return BehaviourWording.rotationSentence(
+        reason, LoopWording.hero(d.heroNames(), r.getPlayerSlot()), r, true);
   }
 
   private static String plural(int n) {
