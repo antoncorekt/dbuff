@@ -3,12 +3,15 @@ package com.ako.dbuff.service.replay.itemloop;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
+import com.ako.dbuff.service.replay.report.FarmingKindWording;
 import com.ako.dbuff.service.replay.report.ItemWording;
 import java.util.Map;
 import java.util.function.Function;
 
 /** The farming group: creeps, creep gold and camps per minute before and after the purchase. */
 final class FarmingWording implements Wording {
+  private static final FarmingKindWording KIND = new FarmingKindWording();
+
   @Override
   public boolean showsUses() {
     return false;
@@ -16,7 +19,7 @@ final class FarmingWording implements Wording {
 
   @Override
   public String result(ItemEfficiency row, Function<String, String> itemNames) {
-    return ItemWording.farming(row);
+    return KIND.longVerdict(row);
   }
 
   @Override
@@ -40,12 +43,12 @@ final class FarmingWording implements Wording {
       "%d creeps (%s per min), creep gold %s per min, camps %s per min"
           .formatted(
               Math.round(f.get("kills")),
-              Wording.number(f.get("killsPerMinute")),
+              ItemWording.number(f.get("killsPerMinute")),
               LoopWording.gold(f.get("goldPerMinute")),
-              Wording.number(f.get("campsPerMinute"))),
+              ItemWording.number(f.get("campsPerMinute"))),
       "%s minutes %s the first purchase"
           .formatted(
-              Wording.number(f.get("minutes")),
+              ItemWording.number(f.get("minutes")),
               "BEFORE".equals(detail.label()) ? "before" : "after")
     };
   }

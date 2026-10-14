@@ -106,7 +106,7 @@ final class ItemLoopReport {
                   LoopWording.clock(r.purchaseSeconds()),
                   wording.showsUses() ? String.valueOf(r.count()) : "-",
                   ReviewLoopReport.tableCell(wording.result(r, d.itemNames())),
-                  ratio(r.ratio())));
+                  ItemWording.ratio(r.ratio())));
     }
     return out;
   }
@@ -158,9 +158,5 @@ final class ItemLoopReport {
               LoopWording.words(detail.label()) + " at " + LoopWording.clock(detail.seconds());
         };
     return label(d, r) + ", " + what;
-  }
-
-  static String ratio(Double ratio) {
-    return ItemWording.ratio(ratio);
   }
 }

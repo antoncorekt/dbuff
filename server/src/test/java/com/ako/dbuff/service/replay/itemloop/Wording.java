@@ -2,8 +2,6 @@ package com.ako.dbuff.service.replay.itemloop;
 
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
-import com.ako.dbuff.service.replay.report.ItemWording;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -32,18 +30,6 @@ interface Wording {
 
   /** The cells time, on what, what it gave and evidence of one detail row. */
   String[] detail(ItemEfficiency row, Detail detail);
-
-  static String limits(List<String> flags) {
-    return ItemWording.limits(flags);
-  }
-
-  static String plural(long count, String noun) {
-    return ItemWording.plural(count, noun);
-  }
-
-  static String number(Double value) {
-    return ItemWording.number(value);
-  }
 
   static String creep(String unit) {
     if (unit == null || unit.isBlank()) {

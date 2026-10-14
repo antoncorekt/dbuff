@@ -104,6 +104,19 @@ class SectionSwitchContextTest {
   }
 
   @Test
+  void everyRealSectionHasItsOwnOrder() {
+    runner()
+        .run(
+            context -> {
+              List<Integer> orders =
+                  context.getBeansOfType(ReplayReportSection.class).values().stream()
+                      .map(ReplayReportSection::order)
+                      .toList();
+              assertThat(orders).doesNotHaveDuplicates();
+            });
+  }
+
+  @Test
   void aSectionWithoutTheOverrideIsOffByDefault() {
     ReplayReportSection section = new TestSection("fresh");
     assertThat(section.defaultEnabled()).isFalse();

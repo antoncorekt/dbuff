@@ -1,175 +1,39 @@
 package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
-import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * The words of the item efficiency rows that the Discord items section and the item loop report
- * share: what an item gave a hero, in plain words, and what the data could not tell.
+ * The phrases the item kinds share: what the data could not tell, counts, numbers and times. The
+ * wording of one kind is its {@link ItemKindWording}.
  */
 public final class ItemWording {
-  public static final String MAGIC_STICK = "magic-stick";
-  public static final String HAND_OF_MIDAS = "hand-of-midas";
-  public static final String FARMING_GROUP = "farming-group";
-
   private static final String UNKNOWN = "?";
 
   private ItemWording() {}
 
-  /** Whether the row is of a kind this class words. */
-  public static boolean words(String kind) {
-    return MAGIC_STICK.equals(kind) || HAND_OF_MIDAS.equals(kind) || FARMING_GROUP.equals(kind);
+  /** Whether the figures hold a value, not null, for every key. */
+  public static boolean has(Map<String, Double> figures, String... keys) {
+    return figures != null && java.util.Arrays.stream(keys).allMatch(k -> figures.get(k) != null);
   }
 
-  /** Whether the row has every figure its wording prints; without them it would say "?". */
-  public static boolean complete(ItemEfficiency row) {
-    if (row.figures() == null || row.flags() == null || row.rows() == null) {
-      return false;
-    }
-    Map<String, Double> f = row.figures();
-    return switch (row.kind()) {
-      case MAGIC_STICK -> row.count() == 0 || has(f, "hp", "mana");
-      case HAND_OF_MIDAS ->
-          row.count() == 0 || has(f, "gold", "xp", "idleSeconds", "farmingSeconds");
-      case FARMING_GROUP ->
-          rates(row, "BEFORE")
-              && rates(row, "AFTER")
-              && (row.ratio() == null || has(f, "netGoldPerMinute"));
-      default -> false;
-    };
+  /** A figure, 0 when it is missing or null. */
+  public static double figure(Map<String, Double> figures, String key) {
+    Double value = figures == null ? null : figures.get(key);
+    return value == null ? 0 : value;
   }
 
-  private static boolean rates(ItemEfficiency row, String label) {
-    return row.rows().stream()
-        .anyMatch(
-            d ->
-                d != null
-                    && label.equals(d.label())
-                    && d.figures() != null
-                    && has(d.figures(), "killsPerMinute", "goldPerMinute", "campsPerMinute"));
-  }
-
-  private static boolean has(Map<String, Double> figures, String... keys) {
-    return Arrays.stream(keys).allMatch(key -> figures.get(key) != null);
-  }
-
-  /** What a row of a known kind gave, with the limits of the data in brackets. */
-  public static String result(ItemEfficiency row) {
-    return switch (row.kind()) {
-      case MAGIC_STICK -> stick(row);
-      case HAND_OF_MIDAS -> midas(row);
-      case FARMING_GROUP -> farming(row);
-      default -> throw new IllegalArgumentException("No wording for " + row.kind());
-    };
-  }
-
-  /** Magic Stick and Wand: health and mana restored, saves, deaths soon after a use. */
-  public static String stick(ItemEfficiency row) {
-    if (row.count() == 0) {
-      return "bought, never used" + limits(row.flags());
-    }
-    Map<String, Double> f = row.figures();
-    long saves = Math.round(f.getOrDefault("saves", 0.0));
-    long died = Math.round(f.getOrDefault("diedSoon", 0.0));
-    return "%s, restored %s HP and %s mana, %s%s, worth %s its cost%s"
-        .formatted(
-            plural(row.count(), "use"),
-            BehaviourWording.gold(f.get("hp")),
-            BehaviourWording.gold(f.get("mana")),
-            saves == 0 ? "no saves" : saves == 1 ? "1 save" : saves + " saves",
-            died == 0 ? "" : ", died within 10 s after %d of them".formatted(died),
-            ratio(row.ratio()),
-            limits(row.flags()));
-  }
-
-  /** Hand of Midas: gold and experience of the uses, payback, idle time. */
-  public static String midas(ItemEfficiency row) {
-    if (row.count() == 0) {
-      return "bought, never used" + limits(row.flags());
-    }
-    Map<String, Double> f = row.figures();
-    double heroGold = f.getOrDefault("heroGold", 0.0);
-    String share =
-        heroGold > 0
-            ? " (%d%% of his gold)".formatted(Math.round(100 * f.get("gold") / heroGold))
-            : "";
-    return ("%s, gave %s gold%s and %s XP, %s, ready but unused %s of the %s he farmed with"
-            + " it, worth %s its cost%s")
-        .formatted(
-            plural(row.count(), "use"),
-            BehaviourWording.gold(f.get("gold")),
-            share,
-            BehaviourWording.gold(f.get("xp")),
-            row.paybackSeconds() == null
-                ? "never paid for itself"
-                : "paid for itself at " + clock(row.paybackSeconds()),
-            clock(f.get("idleSeconds")),
-            clock(f.get("farmingSeconds")),
-            ratio(row.ratio()),
-            limits(row.flags()) + attackSpeed(f));
-  }
-
-  /** The attack speed it also gives is named, not counted. */
-  private static String attackSpeed(Map<String, Double> f) {
-    return f.containsKey("bonusAttackSpeed")
-        ? " (it also gives +%s attack speed, not counted)"
-            .formatted(BehaviourWording.gold(f.get("bonusAttackSpeed")))
-        : "";
-  }
-
-  /** The farming group: creeps, creep gold and camps per minute before and after the purchase. */
-  public static String farming(ItemEfficiency row) {
-    Map<String, Double> before = figures(row, "BEFORE");
-    Map<String, Double> after = figures(row, "AFTER");
-    String rates =
-        "creeps %s per min before and %s after, creep gold %s and %s per min, camps %s and %s per min"
-            .formatted(
-                number(before.get("killsPerMinute")),
-                number(after.get("killsPerMinute")),
-                BehaviourWording.gold(before.get("goldPerMinute")),
-                BehaviourWording.gold(after.get("goldPerMinute")),
-                number(before.get("campsPerMinute")),
-                number(after.get("campsPerMinute")));
-    if (row.ratio() == null) {
-      return rates + limits(row.flags());
-    }
-    String payback =
-        row.paybackSeconds() == null
-            ? "not paid back by the end"
-            : "paid back at " + clock(row.paybackSeconds());
-    String net = BehaviourWording.gold(row.figures().get("netGoldPerMinute"));
-    if (row.figures().containsKey("damageValue") && row.cost() != null) {
-      return "%s, net %s gold per min, %s, %s in total, %s%s"
-          .formatted(rates, net, parts(row), ratio(row.ratio()), payback, limits(row.flags()));
-    }
-    return "%s, net %s gold per min, %s, worth %s its cost%s"
-        .formatted(rates, net, payback, ratio(row.ratio()), limits(row.flags()));
-  }
-
-  /** The gold part and the damage part of the worth, each against the cost. */
-  private static String parts(ItemEfficiency row) {
-    Map<String, Double> f = row.figures();
-    return "creeps %s its cost, damage %s"
-        .formatted(
-            signedRatio(f.getOrDefault("creepGain", 0.0) / row.cost()),
-            signedRatio(f.get("damageValue") / row.cost()));
-  }
-
-  private static String signedRatio(double ratio) {
+  /** The ratio as {@code +0.3x}, or {@code -0.3x}. */
+  public static String signedRatio(double ratio) {
     return (ratio >= 0 ? "+" : "") + ratio(ratio);
   }
 
-  private static Map<String, Double> figures(ItemEfficiency row, String label) {
-    return row.rows().stream()
-        .filter(d -> label.equals(d.label()))
-        .findFirst()
-        .map(Detail::figures)
-        .orElse(Map.of("killsPerMinute", 0.0, "goldPerMinute", 0.0, "campsPerMinute", 0.0));
+  /** {@code 1.5x its cost} when the cost is known, nothing otherwise. */
+  public static String worth(ItemEfficiency row) {
+    return row.ratio() == null ? "" : ratio(row.ratio()) + " its cost";
   }
 
   /** What the flags of a row say the data could not tell, in words, in brackets. */

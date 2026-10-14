@@ -3,15 +3,17 @@ package com.ako.dbuff.service.replay.itemloop;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
-import com.ako.dbuff.service.replay.report.ItemWording;
+import com.ako.dbuff.service.replay.report.MidasKindWording;
 import java.util.Map;
 import java.util.function.Function;
 
 /** Hand of Midas: gold and experience of the uses, payback, idle time. */
 final class MidasWording implements Wording {
+  private static final MidasKindWording KIND = new MidasKindWording();
+
   @Override
   public String result(ItemEfficiency row, Function<String, String> itemNames) {
-    return ItemWording.midas(row);
+    return KIND.longVerdict(row);
   }
 
   @Override

@@ -4,14 +4,17 @@ import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
 import com.ako.dbuff.service.replay.report.ItemWording;
+import com.ako.dbuff.service.replay.report.StickKindWording;
 import java.util.Map;
 import java.util.function.Function;
 
 /** Magic Stick and Wand: health and mana restored, saves, deaths soon after a use. */
 final class StickWording implements Wording {
+  private static final StickKindWording KIND = new StickKindWording();
+
   @Override
   public String result(ItemEfficiency row, Function<String, String> itemNames) {
-    return ItemWording.stick(row);
+    return KIND.longVerdict(row);
   }
 
   @Override
@@ -35,7 +38,7 @@ final class StickWording implements Wording {
           .formatted(
               LoopWording.gold(f.get("hp")),
               LoopWording.gold(f.get("mana")),
-              Wording.plural(Math.round(f.get("charges")), "charge")),
+              ItemWording.plural(Math.round(f.get("charges")), "charge")),
       "%s, %s damage within 3 s, %s"
           .formatted(health, LoopWording.gold(f.get("damageAround")), verdict)
     };

@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.itemloop;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
+import com.ako.dbuff.service.replay.report.ItemWording;
 import java.util.function.Function;
 
 /** A kind the report has no wording for yet: its totals as they are. */
@@ -11,10 +12,10 @@ final class GenericWording implements Wording {
   public String result(ItemEfficiency row, Function<String, String> itemNames) {
     return "%s, gain %s, cost %s%s"
         .formatted(
-            Wording.plural(row.count(), "use"),
+            ItemWording.plural(row.count(), "use"),
             LoopWording.gold(row.gain()),
             LoopWording.gold(row.cost()),
-            Wording.limits(row.flags()));
+            ItemWording.limits(row.flags()));
   }
 
   @Override

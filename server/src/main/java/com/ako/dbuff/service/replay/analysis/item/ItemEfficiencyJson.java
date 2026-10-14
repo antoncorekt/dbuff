@@ -35,7 +35,12 @@ public final class ItemEfficiencyJson {
   }
 
   public static ItemEfficiency fromRow(ItemEfficiencyDomain row) {
-    Rows rows = read(row.getDetails(), new TypeReference<>() {});
+    Rows stored =
+        row.getDetails() == null ? null : read(row.getDetails(), new TypeReference<Rows>() {});
+    Rows rows =
+        new Rows(
+            stored == null || stored.flags() == null ? List.of() : stored.flags(),
+            stored == null || stored.rows() == null ? List.of() : stored.rows());
     return new ItemEfficiency(
         row.getPlayerSlot(),
         row.getEntryKey(),
@@ -47,7 +52,9 @@ public final class ItemEfficiencyJson {
         row.getCost(),
         row.getRatio(),
         row.getPaybackSeconds(),
-        read(row.getFigures(), new TypeReference<Map<String, Double>>() {}),
+        row.getFigures() == null
+            ? Map.of()
+            : read(row.getFigures(), new TypeReference<Map<String, Double>>() {}),
         rows.flags(),
         rows.rows());
   }
