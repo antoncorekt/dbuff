@@ -982,4 +982,35 @@ class ReplayReportServiceTest {
 
     verify(discord, never()).sendThreadMessageBlocking(any(), any());
   }
+
+  @Test
+  void aSectionThatPostsOwnMessages_sendsThemAsTheyAreEvenInComponentsFormat() {
+    storedRun(ReplayStatus.DONE);
+    properties.setFormat(ReportFormat.COMPONENTS);
+    String table = "**Lanes**\n| a | b |\n" + "x".repeat(1900) + "\n- last line";
+    ReplayReportSection raw =
+        new ReplaySection() {
+          @Override
+          public String name() {
+            return "raw";
+          }
+
+          @Override
+          public boolean postsOwnMessages() {
+            return true;
+          }
+
+          @Override
+          public List<String> lines(ReplayReportInput input) {
+            return List.of(table, "second message");
+          }
+        };
+    service = serviceWith(raw);
+
+    assertThat(service.deliverSection(1L, "i1", "raw")).isEqualTo(ReportDelivery.POSTED);
+
+    verify(discord).sendThreadMessageBlocking(thread, table);
+    verify(discord).sendThreadMessageBlocking(thread, "second message");
+    verify(discord, never()).sendThreadComponentsBlocking(any(), any());
+  }
 }

@@ -372,9 +372,29 @@ public class ReplayReportService {
   }
 
   private List<ReportMessage> render(List<ReplayReportSection> active, ReplayReportInput input) {
+    List<ReportMessage> all = new ArrayList<>();
+    List<ReplayReportSection> batch = new ArrayList<>();
+    for (ReplayReportSection section : active) {
+      if (!section.postsOwnMessages()) {
+        batch.add(section);
+        continue;
+      }
+      all.addAll(renderBatch(batch, input));
+      batch.clear();
+      section.lines(input).forEach(text -> all.add(new ReportMessage.Plain(text)));
+    }
+    all.addAll(renderBatch(batch, input));
+    return all;
+  }
+
+  private List<ReportMessage> renderBatch(
+      List<ReplayReportSection> batch, ReplayReportInput input) {
+    if (batch.isEmpty()) {
+      return List.of();
+    }
     return properties.getFormat() == ReportFormat.COMPONENTS
-        ? components(active, input)
-        : plain(active, input);
+        ? components(batch, input)
+        : plain(batch, input);
   }
 
   private List<ReportMessage> plain(List<ReplayReportSection> active, ReplayReportInput input) {

@@ -134,12 +134,12 @@ public class MatchCommand implements DbuffCommand {
                             "The model to use, instead of the server default",
                             false)
                         .setAutoComplete(true)),
-            new SubcommandData("report", "Post a section of the replay report, or all of them")
+            new SubcommandData("report", "Post one replay report section, or all (the ones set to post automatically)")
                 .addOptions(
                     new OptionData(
                             OptionType.STRING,
                             ReportCommandHandler.SECTION_OPTION,
-                            "The section to post, or all",
+                            "A section, or all = every section this channel posts automatically",
                             true)
                         .setAutoComplete(true)));
   }

@@ -85,7 +85,7 @@ class ReportCommandHandlerTest {
 
     handler.handle(context, MATCH, config);
 
-    assertThat(context.getPosts()).singleElement().asString().contains("no report section applies");
+    assertThat(context.getPosts()).singleElement().asString().contains("Nothing is set to post automatically");
   }
 
   @Test
@@ -190,5 +190,46 @@ class ReportCommandHandlerTest {
     assertThat(context.getEphemeralReplies()).singleElement().asString().contains("17 s");
     assertThat(context.getAcknowledgeSummary()).isNull();
     verify(reports, never()).deliverSection(anyLong(), anyString(), anyString());
+  }
+
+  @Test
+  void nothingPosted_releasesTheWaitButAPostKeepsIt() {
+    for (ReportDelivery miss :
+        List.of(
+            ReportDelivery.SECTION_EMPTY,
+            ReportDelivery.THREAD_NOT_FOUND,
+            ReportDelivery.FAILED)) {
+      when(reports.deliverSection(MATCH, "i1", "lanes")).thenReturn(miss);
+      handler.handle(context("lanes"), MATCH, config);
+    }
+    verify(cooldown, org.mockito.Mockito.times(3)).release("thread-1");
+
+    when(reports.deliverSection(MATCH, "i1", "lanes")).thenReturn(ReportDelivery.POSTED);
+    handler.handle(context("lanes"), MATCH, config);
+    verify(cooldown, org.mockito.Mockito.times(3)).release("thread-1");
+  }
+
+  @Test
+  void anException_releasesTheWait() {
+    when(reports.deliverSection(MATCH, "i1", "lanes")).thenThrow(new IllegalStateException("x"));
+
+    handler.handle(context("lanes"), MATCH, config);
+
+    verify(cooldown).release("thread-1");
+  }
+
+  @Test
+  void allWithNothingSetToPostAutomatically_saysSoPlainlyAndReleases() {
+    when(reports.redeliver(MATCH, "i1")).thenReturn(ReportDelivery.NO_SECTIONS);
+    FakeCommandContext context = context("all");
+
+    handler.handle(context, MATCH, config);
+
+    assertThat(context.getPosts())
+        .singleElement()
+        .asString()
+        .contains("Nothing is set to post automatically in this channel")
+        .contains("name a section instead");
+    verify(cooldown).release("thread-1");
   }
 }

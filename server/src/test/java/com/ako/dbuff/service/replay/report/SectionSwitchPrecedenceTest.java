@@ -155,4 +155,10 @@ class SectionSwitchPrecedenceTest {
     properties.setOnDemandCooldownSeconds(0);
     properties.validate();
   }
+
+  @Test
+  void find_toleratesSpacesLikeDashesAndUnderscores() {
+    assertThat(sw.find("important fights")).containsSame(off);
+    assertThat(sw.find("  Important   Fights ")).containsSame(off);
+  }
 }

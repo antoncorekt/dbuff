@@ -70,4 +70,12 @@ class OnDemandCooldownTest {
     assertThat(cooldown.acquire("t1")).isZero();
     assertThat(cooldown.acquire("t1")).isZero();
   }
+
+  @Test
+  void release_letsTheThreadAskAgainAtOnce() {
+    cooldown.acquire("t1");
+    cooldown.release("t1");
+
+    assertThat(cooldown.acquire("t1")).isZero();
+  }
 }

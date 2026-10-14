@@ -470,4 +470,10 @@ class MatchCommandTest {
               assertThat(s.getOptions().get(0).isRequired()).isTrue();
             });
   }
+
+  @Test
+  void theTextFormOfReportJoinsASpacedSectionName() {
+    assertThat(command.parseTextArguments("report", "important", "fights"))
+        .containsEntry("section", "important fights");
+  }
 }

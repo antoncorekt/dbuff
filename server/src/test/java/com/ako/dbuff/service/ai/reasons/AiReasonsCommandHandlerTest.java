@@ -162,4 +162,40 @@ class AiReasonsCommandHandlerTest {
     assertThat(context.getAcknowledgeSummary()).isNull();
     verify(reports, never()).deliverSection(MATCH, "i1", "ai-reasons", null);
   }
+
+  @Test
+  void nothingPosted_releasesTheWait() {
+    when(reports.deliverSection(MATCH, "i1", "ai-reasons", null))
+        .thenReturn(ReportDelivery.SECTION_EMPTY);
+    FakeCommandContext context =
+        FakeCommandContext.builder().threadName("Match " + MATCH).channelId("thread-1").build();
+
+    handler.handle(context, MATCH, config);
+
+    verify(cooldown).release("thread-1");
+  }
+
+  @Test
+  void anException_releasesTheWait() {
+    when(reports.deliverSection(MATCH, "i1", "ai-reasons", null))
+        .thenThrow(new IllegalStateException("x"));
+    FakeCommandContext context =
+        FakeCommandContext.builder().threadName("Match " + MATCH).channelId("thread-1").build();
+
+    handler.handle(context, MATCH, config);
+
+    verify(cooldown).release("thread-1");
+  }
+
+  @Test
+  void aPost_keepsTheWait() {
+    when(reports.deliverSection(MATCH, "i1", "ai-reasons", null))
+        .thenReturn(ReportDelivery.POSTED);
+    FakeCommandContext context =
+        FakeCommandContext.builder().threadName("Match " + MATCH).channelId("thread-1").build();
+
+    handler.handle(context, MATCH, config);
+
+    verify(cooldown, never()).release(any());
+  }
 }

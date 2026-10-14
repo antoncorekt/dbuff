@@ -26,6 +26,13 @@ public class OnDemandCooldown {
     this.clock = clock;
   }
 
+  /** Ends the wait of a request that posted nothing, so a miss does not cost the thread. */
+  public void release(String threadKey) {
+    if (threadKey != null) {
+      readyAtMillis.remove(threadKey);
+    }
+  }
+
   /**
    * Starts the wait for the thread unless one is running.
    *

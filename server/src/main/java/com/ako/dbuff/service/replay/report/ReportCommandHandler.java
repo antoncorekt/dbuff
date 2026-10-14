@@ -76,18 +76,32 @@ public class ReportCommandHandler {
       if (delivery == ReportDelivery.POSTED) {
         return;
       }
-      reply.post(
-          delivery == ReportDelivery.SECTION_EMPTY && !all
-              ? "Section `"
-                  + section.get().name()
-                  + "` has nothing to show for match "
-                  + matchId
-                  + ": its data does not exist for this match."
-              : "Not posted: " + delivery.reason() + ".");
+      cooldown.release(context.getChannelId());
+      reply.post(notPosted(delivery, all, section, matchId));
     } catch (RuntimeException e) {
+      cooldown.release(context.getChannelId());
       log.warn("Report {} of match {} failed: {}", requested, matchId, e.getMessage(), e);
       reply.fail("❌ The report of match " + matchId + " failed, see the log.");
     }
+  }
+
+  private static String notPosted(
+      ReportDelivery delivery,
+      boolean all,
+      Optional<ReplayReportSection> section,
+      long matchId) {
+    if (all && delivery == ReportDelivery.NO_SECTIONS) {
+      return "Nothing is set to post automatically in this channel; name a section instead"
+          + " (see `/dbuff settings sections:`).";
+    }
+    if (!all && delivery == ReportDelivery.SECTION_EMPTY) {
+      return "Section `"
+          + section.get().name()
+          + "` has nothing to show for match "
+          + matchId
+          + ": its data does not exist for this match.";
+    }
+    return "Not posted: " + delivery.reason() + ".";
   }
 
   private String choices() {

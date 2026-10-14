@@ -66,9 +66,11 @@ public class AiReasonsCommandHandler {
       ReportDelivery delivery =
           reports.deliverSection(matchId, config.getId(), AiReasonsSection.NAME, model);
       if (delivery != ReportDelivery.POSTED) {
+        cooldown.release(context.getChannelId());
         reply.post("The top reasons were not posted: " + delivery.reason() + ".");
       }
     } catch (RuntimeException e) {
+      cooldown.release(context.getChannelId());
       log.warn("AI reasons of match {} failed: {}", matchId, e.getMessage(), e);
       reply.fail("❌ The top reasons of match " + matchId + " failed, see the log.");
     }

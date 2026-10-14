@@ -26,6 +26,11 @@ public class OpenDotaSection implements ReplayReportSection {
   }
 
   @Override
+  public boolean postsOwnMessages() {
+    return true;
+  }
+
+  @Override
   public int order() {
     return 200;
   }

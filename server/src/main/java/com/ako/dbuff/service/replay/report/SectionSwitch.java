@@ -144,6 +144,6 @@ public class SectionSwitch {
   }
 
   private static String normalise(String name) {
-    return name.toLowerCase(Locale.ROOT).replace("-", "").replace("_", "");
+    return name.toLowerCase(Locale.ROOT).replaceAll("[-_\\s]", "");
   }
 }
