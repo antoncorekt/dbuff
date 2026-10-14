@@ -134,7 +134,9 @@ public class MatchCommand implements DbuffCommand {
                             "The model to use, instead of the server default",
                             false)
                         .setAutoComplete(true)),
-            new SubcommandData("report", "Post one replay report section, or all (the ones set to post automatically)")
+            new SubcommandData(
+                    "report",
+                    "Post one replay report section, or all (the ones set to post automatically)")
                 .addOptions(
                     new OptionData(
                             OptionType.STRING,

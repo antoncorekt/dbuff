@@ -85,7 +85,10 @@ class ReportCommandHandlerTest {
 
     handler.handle(context, MATCH, config);
 
-    assertThat(context.getPosts()).singleElement().asString().contains("Nothing is set to post automatically");
+    assertThat(context.getPosts())
+        .singleElement()
+        .asString()
+        .contains("Nothing is set to post automatically");
   }
 
   @Test
@@ -196,9 +199,7 @@ class ReportCommandHandlerTest {
   void nothingPosted_releasesTheWaitButAPostKeepsIt() {
     for (ReportDelivery miss :
         List.of(
-            ReportDelivery.SECTION_EMPTY,
-            ReportDelivery.THREAD_NOT_FOUND,
-            ReportDelivery.FAILED)) {
+            ReportDelivery.SECTION_EMPTY, ReportDelivery.THREAD_NOT_FOUND, ReportDelivery.FAILED)) {
       when(reports.deliverSection(MATCH, "i1", "lanes")).thenReturn(miss);
       handler.handle(context("lanes"), MATCH, config);
     }

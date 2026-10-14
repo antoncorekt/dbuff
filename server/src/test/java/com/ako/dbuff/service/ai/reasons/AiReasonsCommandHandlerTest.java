@@ -189,8 +189,7 @@ class AiReasonsCommandHandlerTest {
 
   @Test
   void aPost_keepsTheWait() {
-    when(reports.deliverSection(MATCH, "i1", "ai-reasons", null))
-        .thenReturn(ReportDelivery.POSTED);
+    when(reports.deliverSection(MATCH, "i1", "ai-reasons", null)).thenReturn(ReportDelivery.POSTED);
     FakeCommandContext context =
         FakeCommandContext.builder().threadName("Match " + MATCH).channelId("thread-1").build();
 

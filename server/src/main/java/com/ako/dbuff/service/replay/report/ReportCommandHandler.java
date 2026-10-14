@@ -86,10 +86,7 @@ public class ReportCommandHandler {
   }
 
   private static String notPosted(
-      ReportDelivery delivery,
-      boolean all,
-      Optional<ReplayReportSection> section,
-      long matchId) {
+      ReportDelivery delivery, boolean all, Optional<ReplayReportSection> section, long matchId) {
     if (all && delivery == ReportDelivery.NO_SECTIONS) {
       return "Nothing is set to post automatically in this channel; name a section instead"
           + " (see `/dbuff settings sections:`).";
