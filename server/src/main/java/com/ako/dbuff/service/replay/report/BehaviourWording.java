@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.TeamRotationDomain;
 import com.ako.dbuff.service.replay.analysis.behaviour.RotationReason;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 public final class BehaviourWording {
   private static final String UNKNOWN = "?";
   private static final long THOUSAND = 1000;
+  private static final int TEAM_SIZE = 5;
 
   private BehaviourWording() {}
 
@@ -49,16 +51,24 @@ public final class BehaviourWording {
         + "k";
   }
 
-  /** The hero of a slot; without a known hero, "Dire player 2", never an id. */
+  /**
+   * The hero of a slot; without a known hero, "Dire player 2", or "player 40" for a slot that
+   * belongs to neither team, never an id and never an exception.
+   */
   public static String hero(Map<Long, String> heroBySlot, Long slot) {
     if (slot == null) {
       return UNKNOWN;
     }
-    String name = heroBySlot.get(slot);
+    String name = heroBySlot == null ? null : heroBySlot.get(slot);
     if (name != null && !name.isBlank()) {
       return name;
     }
-    long number = slot >= TeamSide.FIRST_DIRE_SLOT ? slot - TeamSide.FIRST_DIRE_SLOT : slot;
+    boolean radiant = slot >= 0 && slot < TEAM_SIZE;
+    boolean dire = slot >= TeamSide.FIRST_DIRE_SLOT && slot < TeamSide.FIRST_DIRE_SLOT + TEAM_SIZE;
+    if (!radiant && !dire) {
+      return "player " + slot;
+    }
+    long number = dire ? slot - TeamSide.FIRST_DIRE_SLOT : slot;
     return "%s player %d".formatted(Prettify.team(TeamSide.ofSlot(slot).name()), number + 1);
   }
 
@@ -110,17 +120,66 @@ public final class BehaviourWording {
     };
   }
 
+  private record Group(List<Long> slots, boolean unreadable) {}
+
+  private static Group parse(String stored) {
+    if (stored == null) {
+      return new Group(List.of(), false);
+    }
+    List<Long> slots = new ArrayList<>();
+    boolean unreadable = false;
+    for (String part : stored.split(",")) {
+      String text = part.strip();
+      if (text.isEmpty()) {
+        continue;
+      }
+      Long slot = slot(text);
+      if (slot == null) {
+        unreadable = true;
+      } else {
+        slots.add(slot);
+      }
+    }
+    return new Group(slots, unreadable);
+  }
+
   /** The heroes of a smoke's group, as stored; a slot that is not a number is left out. */
   public static List<Long> groupSlots(String stored) {
-    if (stored == null) {
-      return List.of();
+    return parse(stored).slots();
+  }
+
+  /**
+   * Who was with the user: {@code alone}, {@code with A and B}, and where the stored group cannot
+   * be read fully, {@code with a group that is not known} or {@code and others who are not known}.
+   */
+  public static String smokeCompany(SmokeUseDomain smoke, Map<Long, String> heroNames) {
+    Group group = parse(smoke.getGroupSlots());
+    if (group.slots().isEmpty()) {
+      return "with a group that is not known";
     }
-    return Arrays.stream(stored.split(","))
-        .map(String::strip)
-        .filter(s -> !s.isEmpty())
-        .map(BehaviourWording::slot)
-        .filter(Objects::nonNull)
-        .toList();
+    List<String> others =
+        group.slots().stream()
+            .filter(slot -> !slot.equals(smoke.getUserSlot()))
+            .map(slot -> hero(heroNames, slot))
+            .toList();
+    if (others.isEmpty()) {
+      return group.unreadable() ? "with others who are not known" : "alone";
+    }
+    return "with "
+        + LaneWording.joinNames(others)
+        + (group.unreadable() ? " and others who are not known" : "");
+  }
+
+  /** What a good trip won: {@code killed 2 and won the fight}; empty when it won nothing. */
+  public static String tripWon(Integer kills, Integer fightsWon) {
+    List<String> parts = new ArrayList<>();
+    if (kills != null && kills > 0) {
+      parts.add("killed " + kills);
+    }
+    if (fightsWon != null && fightsWon > 0) {
+      parts.add(fightsWon == 1 ? "won the fight" : "won " + fightsWon + " fights");
+    }
+    return String.join(" and ", parts);
   }
 
   /** The names of the group's heroes, comma separated. */

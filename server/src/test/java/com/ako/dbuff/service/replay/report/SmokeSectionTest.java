@@ -143,4 +143,44 @@ class SmokeSectionTest {
     properties.setMaxBehaviourLineLength(59);
     assertThatThrownBy(properties::validate).hasMessageContaining("max-behaviour-line-length");
   }
+
+  @Test
+  void anUnreadableGroupIsNeverCalledAlone() {
+    row(0, null, 100, "PAID_OFF");
+    row(0, " ", 200, "PAID_OFF");
+    row(0, "x,y", 300, "PAID_OFF");
+    properties.setMaxSmokeLines(5);
+
+    List<String> lines = section.lines(input());
+
+    assertThat(lines.subList(1, 4))
+        .allSatisfy(l -> assertThat(l).contains("with a group that is not known"));
+  }
+
+  @Test
+  void aPartlyCorruptGroupNamesTheReadableHeroesAndAdmitsTheRest() {
+    row(0, "0,1,oops", 100, "PAID_OFF");
+    row(0, "0,oops", 200, "PAID_OFF");
+    properties.setMaxSmokeLines(5);
+
+    List<String> lines = section.lines(input());
+
+    assertThat(lines.get(1)).contains("with Lion and others who are not known");
+    assertThat(lines.get(2)).contains("with others who are not known").doesNotContain("alone");
+  }
+
+  @Test
+  void anUnknownOrMissingOutcomeRanksBelowNothingWhenTheCapBites() {
+    properties.setMaxSmokeLines(2);
+    row(0, "0", 100, null);
+    row(0, "0", 200, "WHATEVER");
+    row(0, "0", 300, "NOTHING");
+    row(0, "0", 400, "BACKFIRED");
+
+    List<String> lines = section.lines(input());
+
+    assertThat(lines).hasSize(3);
+    assertThat(lines.get(1)).startsWith("5:00 to").contains("came to nothing");
+    assertThat(lines.get(2)).startsWith("6:40 to").contains("backfired");
+  }
 }

@@ -58,28 +58,19 @@ public class RotationsSection implements ReplayReportSection {
   @Override
   public List<String> lines(ReplayReportInput input) {
     List<TeamRotationDomain> rows = rotationRepo.findByMatchId(input.matchId());
-    List<TeamRotationDomain> listed =
-        rows == null
-            ? List.of()
-            : rows.stream()
-                .filter(Objects::nonNull)
-                .filter(r -> verdict(r) != null)
-                .sorted(byWorth())
-                .limit(properties.getMaxRotationLines())
-                .sorted(CHRONOLOGICAL)
-                .toList();
-    if (listed.isEmpty()) {
+    if (rows == null || rows.stream().noneMatch(r -> r != null && verdict(r) != null)) {
       return List.of();
     }
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
-    int max = Math.max(LineText.ELLIPSIS.length() + 1, properties.getMaxBehaviourLineLength());
-    List<String> lines = new ArrayList<>();
-    lines.add("**Team rotations**");
-    for (TeamRotationDomain row : listed) {
-      lines.add(LineText.cut(line(row, heroes, yours), max));
-    }
-    return lines;
+    return BehaviourLines.render(
+        "**Team rotations**",
+        rows.stream().filter(r -> r != null && verdict(r) != null).toList(),
+        byWorth(),
+        CHRONOLOGICAL,
+        properties.getMaxRotationLines(),
+        properties.getMaxBehaviourLineLength(),
+        row -> line(row, heroes, yours));
   }
 
   private static RotationVerdict verdict(TeamRotationDomain row) {
@@ -89,7 +80,7 @@ public class RotationsSection implements ReplayReportSection {
 
   private static Comparator<TeamRotationDomain> byWorth() {
     return Comparator.comparingInt((TeamRotationDomain r) -> PRIORITY.get(verdict(r)))
-        .thenComparing(Comparator.comparingInt(RotationsSection::gain).reversed())
+        .thenComparingInt(r -> verdict(r) == RotationVerdict.GOOD ? -gain(r) : 0)
         .thenComparing(CHRONOLOGICAL);
   }
 
@@ -100,11 +91,24 @@ public class RotationsSection implements ReplayReportSection {
 
   private static String line(TeamRotationDomain row, Map<Long, String> heroes, TeamSide yours) {
     String hero = BehaviourWording.hero(heroes, row.getPlayerSlot());
+    List<String> parts = new ArrayList<>();
+    if (verdict(row) == RotationVerdict.GOOD) {
+      String won = BehaviourWording.tripWon(row.getKills(), row.getFightsWon());
+      if (!won.isEmpty()) {
+        parts.add(LaneWording.capitalised(won) + ".");
+      }
+    }
     String why =
         BehaviourWording.reasons(row).stream()
             .map(reason -> BehaviourWording.rotationSentence(reason, hero, row, false))
             .collect(Collectors.joining("; "));
-    return "%s %s (%s) went%s to %s: %s.%s"
+    if (!why.isEmpty()) {
+      parts.add("Why: " + why + ".");
+    }
+    if (parts.isEmpty()) {
+      parts.add("No reason recorded.");
+    }
+    return "%s %s (%s) went%s to %s: %s. %s"
         .formatted(
             row.getStartSeconds() == null ? "?" : GameTime.clock(row.getStartSeconds()),
             hero,
@@ -114,6 +118,6 @@ public class RotationsSection implements ReplayReportSection {
                 : " from " + BehaviourWording.place(row.getFromZone(), row.getFromLane()),
             BehaviourWording.place(row.getToZone(), row.getToLane()),
             BehaviourWording.words(row.getVerdict()),
-            why.isEmpty() ? "" : " Why: " + why + ".");
+            String.join(" ", parts));
   }
 }

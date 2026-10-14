@@ -72,13 +72,7 @@ public class ReplayReportProperties {
    */
   @PostConstruct
   public void validate() {
-    if (maxImportantFightLines < 1 || maxImportantFightLines > MAX_IMPORTANT_FIGHT_LINES) {
-      throw new IllegalStateException(
-          "replay.report.max-important-fight-lines must be 1 to "
-              + MAX_IMPORTANT_FIGHT_LINES
-              + ", got "
-              + maxImportantFightLines);
-    }
+    requireRange("max-important-fight-lines", maxImportantFightLines, 1, MAX_IMPORTANT_FIGHT_LINES);
     requireRange("max-rotation-lines", maxRotationLines, 1, MAX_BEHAVIOUR_LINES);
     requireRange("max-smoke-lines", maxSmokeLines, 1, MAX_BEHAVIOUR_LINES);
     requireRange(
@@ -86,15 +80,8 @@ public class ReplayReportProperties {
         maxBehaviourLineLength,
         MIN_LANE_LINE_LENGTH,
         MAX_LANE_LINE_LENGTH);
-    if (maxLaneLineLength < MIN_LANE_LINE_LENGTH || maxLaneLineLength > MAX_LANE_LINE_LENGTH) {
-      throw new IllegalStateException(
-          "replay.report.max-lane-line-length must be "
-              + MIN_LANE_LINE_LENGTH
-              + " to "
-              + MAX_LANE_LINE_LENGTH
-              + ", got "
-              + maxLaneLineLength);
-    }
+    requireRange(
+        "max-lane-line-length", maxLaneLineLength, MIN_LANE_LINE_LENGTH, MAX_LANE_LINE_LENGTH);
     if (!(laneClearMargin > 0
         && laneClearMargin < laneBigMargin
         && laneBigMargin <= MAX_LANE_MARGIN)) {

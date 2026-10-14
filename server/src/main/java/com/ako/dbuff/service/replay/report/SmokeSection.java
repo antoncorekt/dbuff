@@ -7,7 +7,6 @@ import com.ako.dbuff.service.replay.analysis.behaviour.SmokeOutcome;
 import com.ako.dbuff.service.replay.analysis.behaviour.SmokeUse;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -57,40 +56,28 @@ public class SmokeSection implements ReplayReportSection {
   @Override
   public List<String> lines(ReplayReportInput input) {
     List<SmokeUseDomain> rows = smokeRepo.findByMatchId(input.matchId());
-    List<SmokeUseDomain> listed =
-        rows == null
-            ? List.of()
-            : rows.stream()
-                .filter(Objects::nonNull)
-                .sorted(BY_WORTH)
-                .limit(properties.getMaxSmokeLines())
-                .sorted(CHRONOLOGICAL)
-                .toList();
-    if (listed.isEmpty()) {
+    if (rows == null || rows.stream().allMatch(Objects::isNull)) {
       return List.of();
     }
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
-    int max = Math.max(LineText.ELLIPSIS.length() + 1, properties.getMaxBehaviourLineLength());
-    List<String> lines = new ArrayList<>();
-    lines.add("**Smoke**");
-    for (SmokeUseDomain row : listed) {
-      lines.add(LineText.cut(line(row, heroes, yours), max));
-    }
-    return lines;
+    return BehaviourLines.render(
+        "**Smoke**",
+        rows,
+        BY_WORTH,
+        CHRONOLOGICAL,
+        properties.getMaxSmokeLines(),
+        properties.getMaxBehaviourLineLength(),
+        row -> line(row, heroes, yours));
   }
 
   private static int rank(SmokeUseDomain row) {
-    return Enums.find(SmokeOutcome.class, row.getOutcome()) == SmokeOutcome.NOTHING ? 1 : 0;
+    SmokeOutcome outcome = Enums.find(SmokeOutcome.class, row.getOutcome());
+    return outcome == null ? 2 : outcome == SmokeOutcome.NOTHING ? 1 : 0;
   }
 
   private static String line(SmokeUseDomain row, Map<Long, String> heroes, TeamSide yours) {
     String user = BehaviourWording.hero(heroes, row.getUserSlot());
-    List<String> others =
-        BehaviourWording.groupSlots(row.getGroupSlots()).stream()
-            .filter(slot -> !slot.equals(row.getUserSlot()))
-            .map(slot -> BehaviourWording.hero(heroes, slot))
-            .toList();
     SmokeOutcome outcome = Enums.find(SmokeOutcome.class, row.getOutcome());
     SmokeUse.End end = Enums.find(SmokeUse.End.class, row.getEndReason());
     return "%s to %s %s (%s) used a Smoke of Deceit %s: %s; %s; %s."
@@ -99,7 +86,7 @@ public class SmokeSection implements ReplayReportSection {
             time(row.getEndSeconds()),
             user,
             BehaviourWording.teamTag(row.getTeam(), yours),
-            others.isEmpty() ? "alone" : "with " + LaneWording.joinNames(others),
+            BehaviourWording.smokeCompany(row, heroes),
             BehaviourWording.smokeWhere(row),
             outcome == null ? "outcome not known" : outcome.words(),
             end == null || end == SmokeUse.End.UNKNOWN

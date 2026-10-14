@@ -169,4 +169,47 @@ class RotationsSectionTest {
     properties.setMaxRotationLines(10);
     properties.validate();
   }
+
+  @Test
+  void aGoodTripSaysWhatItWonEvenWithoutReasons() {
+    TeamRotationDomain one = row(0, 100, "GOOD", "");
+    one.setKills(2);
+    one.setFightsWon(1);
+    TeamRotationDomain two = row(1, 200, "GOOD", "");
+    two.setKills(1);
+    two.setFightsWon(3);
+    row(0, 300, "GOOD", "");
+
+    List<String> lines = section.lines(input());
+
+    assertThat(lines.get(1)).endsWith("good. Killed 2 and won the fight.");
+    assertThat(lines.get(2)).endsWith("good. Killed 1 and won 3 fights.");
+    assertThat(lines.get(3)).endsWith("good. No reason recorded.");
+  }
+
+  @Test
+  void diedAndWastedKeepTheEarliestWhenTheCapBitesAndOnlyGoodRanksByWhatItWon() {
+    properties.setMaxRotationLines(2);
+    TeamRotationDomain late = row(0, 900, "DIED", "DIED");
+    late.setKills(9);
+    row(0, 100, "DIED", "DIED");
+    row(1, 200, "DIED", "DIED");
+
+    List<String> lines = section.lines(input());
+
+    assertThat(lines).hasSize(3);
+    assertThat(lines.get(1)).startsWith("1:40");
+    assertThat(lines.get(2)).startsWith("3:20");
+  }
+
+  @Test
+  void diedAndWastedWithNoKnownReasonSayNoReasonWasRecorded() {
+    row(0, 100, "DIED", "");
+    row(1, 200, "WASTED", "NOPE");
+
+    List<String> lines = section.lines(input());
+
+    assertThat(lines.get(1)).endsWith("died. No reason recorded.");
+    assertThat(lines.get(2)).endsWith("wasted. No reason recorded.");
+  }
 }
