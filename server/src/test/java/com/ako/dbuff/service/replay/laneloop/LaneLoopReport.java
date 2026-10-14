@@ -121,6 +121,7 @@ final class LaneLoopReport {
     return "even";
   }
 
+  /** The report section reads the same cut-offs from replay.report properties. */
   private static String strength(double margin) {
     String how = LaneWording.strength(margin, LaneWording.CLEAR_MARGIN, LaneWording.BIG_MARGIN);
     return "%s (%s)".formatted(how, signed(margin));

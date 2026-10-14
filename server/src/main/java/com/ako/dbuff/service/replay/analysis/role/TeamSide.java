@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis.role;
 
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -18,9 +19,19 @@ public enum TeamSide {
     return playerSlot >= FIRST_DIRE_SLOT ? DIRE : RADIANT;
   }
 
-  /** The side all the slots are on; null when there are none or they are on both sides. */
+  /**
+   * The side all the slots are on; null when there are none, they are on both sides, or the set is
+   * null. A null slot is ignored.
+   */
   public static TeamSide commonSide(Set<Long> playerSlots) {
-    Set<TeamSide> sides = playerSlots.stream().map(TeamSide::ofSlot).collect(Collectors.toSet());
+    if (playerSlots == null) {
+      return null;
+    }
+    Set<TeamSide> sides =
+        playerSlots.stream()
+            .filter(Objects::nonNull)
+            .map(TeamSide::ofSlot)
+            .collect(Collectors.toSet());
     return sides.size() == 1 ? sides.iterator().next() : null;
   }
 }

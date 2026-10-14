@@ -7,6 +7,7 @@ import com.ako.dbuff.dao.repo.LaneAssignmentRepo;
 import com.ako.dbuff.dao.repo.LaneReasonRepo;
 import com.ako.dbuff.dao.repo.LaneResultRepo;
 import com.ako.dbuff.service.replay.analysis.lane.LaneProperties;
+import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -207,18 +208,131 @@ class LanesSectionTest {
         .startsWith("Mid lane (lasted 10:35): Radiant was alone");
   }
 
+  private void wonBottom() {
+    result(0, "BOTTOM", "RADIANT", "WON", 0.5);
+    result(0, "BOTTOM", "DIRE", "LOST", -0.5);
+    hero(0, 0, "RADIANT");
+    hero(0, 128, "DIRE");
+  }
+
   @Test
-  void showsAtMostTwoReasonsAndCutsALongLineWithAnEllipsis() {
-    threeLanes();
+  void dropsTheSecondReasonThenTheWholeWhyBeforeCuttingAndKeepsTheLevelNote() {
+    wonBottom();
+    reason(0, "RADIANT", "A", "HELPED", 0.9, "First reason is here");
+    reason(0, "RADIANT", "B", "HELPED", 0.8, "Second reason is here");
+    reason(0, "RADIANT", ULTIMATE, "HELPED", 0.2, "x");
+    String fixed =
+        "Bottom lane (lasted 10:35): Radiant won clearly. Radiant Phantom Assassin, Dire"
+            + " Venomancer.";
+    String note = " Radiant reached level 6 when the lane ended, Dire did not.";
+    String both = fixed + " Why: First reason is here; Second reason is here." + note;
+    String one = fixed + " Why: First reason is here." + note;
+    String none = fixed + note;
+
+    properties.setMaxLaneLineLength(both.length());
+    assertThat(section.lines(input()).get(1)).isEqualTo(both);
+    properties.setMaxLaneLineLength(both.length() - 1);
+    assertThat(section.lines(input()).get(1)).isEqualTo(one);
+    properties.setMaxLaneLineLength(one.length() - 1);
+    assertThat(section.lines(input()).get(1)).isEqualTo(none);
+  }
+
+  @Test
+  void lastResortCutsAtAWordBoundaryNeverInsideAWordOrSurrogatePair() {
+    wonBottom();
     properties.setMaxLaneLineLength(60);
+
+    String line = section.lines(input()).get(1);
+
+    assertThat(line).hasSizeLessThanOrEqualTo(60).endsWith("...");
+    assertThat(line.substring(0, line.length() - 3))
+        .isEqualTo("Bottom lane (lasted 10:35): Radiant won clearly. Radiant");
+  }
+
+  @Test
+  void aCutNeverSplitsASurrogatePairOrAWordWithoutSpaces() {
+    String text = "X".repeat(10) + "\uD83D\uDE00".repeat(20);
+
+    for (int max = 8; max < 30; max++) {
+      String cut = LanesSection.cut(text, max);
+      assertThat(cut).hasSizeLessThanOrEqualTo(max).endsWith("...");
+      assertThat(Character.isHighSurrogate(cut.charAt(cut.length() - 4))).isFalse();
+    }
+  }
+
+  @Test
+  void aSameCodeAboutDifferentHeroesKeepsBothButTheSameFactFromBothSidesIsSaidOnce() {
+    wonBottom();
+    reasons.add(
+        LaneReasonDomain.builder()
+            .pairId(0)
+            .team("DIRE")
+            .code("DIED")
+            .direction("HURT")
+            .subjectSlot(128L)
+            .severity(0.9)
+            .evidence("Venomancer died at 2:30")
+            .build());
+    reasons.add(
+        LaneReasonDomain.builder()
+            .pairId(0)
+            .team("DIRE")
+            .code("DIED")
+            .direction("HURT")
+            .subjectSlot(129L)
+            .severity(0.8)
+            .evidence("Nature's Prophet died at 3:00")
+            .build());
+    reason(0, "RADIANT", "HARASSMENT", "HELPED", 0.5, "Radiant dealt 5 and took 3");
+    reason(0, "DIRE", "HARASSMENT", "HURT", 0.5, "Dire dealt 3 and took 5");
+
+    assertThat(section.lines(input()).get(1))
+        .contains("Why: Venomancer died at 2:30; Nature's Prophet died at 3:00.");
+
+    properties.setMaxLaneLineLength(600);
+    reasons.removeIf(r -> "DIED".equals(r.getCode()));
+    String line = section.lines(input()).get(1);
+    assertThat(line).contains("Radiant dealt 5 and took 3").doesNotContain("Dire dealt 3");
+  }
+
+  @Test
+  void keepsTheLongestLastingPairWhenALaneHasSeveralAndNeverMoreThanThreeLanes() {
+    result(0, "TOP", "RADIANT", "WON", 0.5);
+    result(1, "TOP", "RADIANT", "LOST", -0.5);
+    results.get(1).setEndSeconds(900);
+    result(2, "MID", "RADIANT", "EVEN", 0.0);
+    result(3, "BOTTOM", "RADIANT", "EVEN", 0.0);
 
     List<String> lines = section.lines(input());
 
     assertThat(lines).hasSize(4);
-    assertThat(lines.get(1)).hasSize(60).endsWith("...");
-    assertThat(lines.get(1)).startsWith("Bottom lane (lasted 10:35): Dire won by a lot.");
-    properties.setMaxLaneLineLength(400);
-    assertThat(section.lines(input()).get(1)).doesNotContain("Dire had 13 denies");
+    assertThat(lines.get(1)).startsWith("Bottom lane");
+    assertThat(lines.get(3)).startsWith("Top lane (lasted 14:45): even");
+  }
+
+  @Test
+  void skipsAStoredLaneThatIsNotKnown() {
+    result(0, "SIDELINE", "RADIANT", "WON", 0.5);
+
+    assertThat(section.lines(input())).isEmpty();
+  }
+
+  @Test
+  void doesNotLoadReasonsWhenNoLaneHasAWinner() {
+    result(0, "MID", "RADIANT", "EVEN", 0.0);
+
+    section.lines(input());
+
+    org.mockito.Mockito.verify(reasonRepo, org.mockito.Mockito.never()).findByMatchId(1L);
+  }
+
+  @Test
+  void commonSideIsNullSafe() {
+    assertThat(TeamSide.commonSide(null)).isNull();
+    assertThat(TeamSide.commonSide(Set.of())).isNull();
+    assertThat(TeamSide.commonSide(new java.util.HashSet<>(java.util.Arrays.asList(null, 130L))))
+        .isEqualTo(TeamSide.DIRE);
+    assertThat(TeamSide.commonSide(Set.of(1L, 130L))).isNull();
   }
 
   @Test
@@ -234,7 +348,11 @@ class LanesSectionTest {
     properties.setMaxLaneLineLength(600);
     properties.validate();
 
-    double[][] badMargins = {{0, 0.6}, {0.6, 0.3}, {0.3, 0.3}, {0.3, 2.1}};
+    double nan = Double.NaN;
+    double inf = Double.POSITIVE_INFINITY;
+    double[][] badMargins = {
+      {0, 0.6}, {0.6, 0.3}, {0.3, 0.3}, {0.3, 2.1}, {nan, 0.6}, {0.3, nan}, {0.3, inf}, {-inf, 0.6}
+    };
     for (double[] bad : badMargins) {
       properties.setLaneClearMargin(bad[0]);
       properties.setLaneBigMargin(bad[1]);

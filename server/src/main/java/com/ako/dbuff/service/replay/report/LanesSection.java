@@ -12,17 +12,18 @@ import com.ako.dbuff.service.replay.analysis.lane.LaneReason;
 import com.ako.dbuff.service.replay.analysis.lane.LaneResult;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.map.Zone;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -38,9 +39,6 @@ public class LanesSection implements ReplayReportSection {
   private static final int MAX_REASONS = 2;
   private static final String ELLIPSIS = "...";
   private static final String UNKNOWN_HERO = "an unknown hero";
-  private static final Map<String, Integer> LANE_ORDER = Map.of("BOTTOM", 0, "MID", 1, "TOP", 2);
-  private static final Map<String, String> LANE_WORDS =
-      Map.of("BOTTOM", "Bottom", "MID", "Mid", "TOP", "Top");
 
   private final LaneResultRepo resultRepo;
   private final LaneAssignmentRepo assignmentRepo;
@@ -48,6 +46,10 @@ public class LanesSection implements ReplayReportSection {
   private final ReportHeroNames heroNames;
   private final LaneProperties laneProperties;
   private final ReplayReportProperties properties;
+
+  private record Pair(Zone.Lane lane, int pairId, Map<TeamSide, LaneResultDomain> sides) {}
+
+  private record Winner(TeamSide side, LaneResultDomain row) {}
 
   @Override
   public String name() {
@@ -66,45 +68,70 @@ public class LanesSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
-    Map<Integer, Map<TeamSide, LaneResultDomain>> lanes = lanes(input.matchId());
-    if (lanes.isEmpty()) {
+    List<Pair> pairs = pairs(input.matchId());
+    if (pairs.isEmpty()) {
       return List.of();
     }
-    List<LaneAssignmentDomain> assignments = assignmentRepo.findByMatchId(input.matchId());
-    List<LaneReasonDomain> reasons = reasonRepo.findByMatchId(input.matchId());
+    Map<Integer, List<LaneAssignmentDomain>> assignments =
+        assignmentRepo.findByMatchId(input.matchId()).stream()
+            .filter(a -> a.getPairId() != null)
+            .collect(Collectors.groupingBy(LaneAssignmentDomain::getPairId));
+    Map<Integer, List<LaneReasonDomain>> reasons =
+        pairs.stream().anyMatch(p -> winner(p.sides()) != null)
+            ? reasonRepo.findByMatchId(input.matchId()).stream()
+                .filter(r -> r.getPairId() != null)
+                .collect(Collectors.groupingBy(LaneReasonDomain::getPairId))
+            : Map.of();
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     List<String> lines = new ArrayList<>();
     lines.add("**Laning stage**");
-    for (Map.Entry<Integer, Map<TeamSide, LaneResultDomain>> lane : lanes.entrySet()) {
-      lines.add(cut(line(lane.getKey(), lane.getValue(), assignments, reasons, heroes, yours)));
+    for (Pair pair : pairs) {
+      lines.add(
+          line(
+              pair,
+              assignments.getOrDefault(pair.pairId(), List.of()),
+              reasons.getOrDefault(pair.pairId(), List.of()),
+              heroes,
+              yours));
     }
     return lines;
   }
 
-  /** The rows of each lane by side, in bottom, mid, top order; rows that cannot be read are out. */
-  private Map<Integer, Map<TeamSide, LaneResultDomain>> lanes(long matchId) {
-    Map<Integer, Map<TeamSide, LaneResultDomain>> byPair = new TreeMap<>();
+  /**
+   * One pair per lane, the longest lasting when a lane has several, in bottom, mid, top order; rows
+   * that cannot be read are out.
+   */
+  private List<Pair> pairs(long matchId) {
+    Map<Integer, Pair> byPair = new HashMap<>();
     for (LaneResultDomain row : resultRepo.findByMatchId(matchId)) {
       TeamSide side = Enums.find(TeamSide.class, row.getTeam());
-      if (row.getPairId() == null
-          || side == null
-          || row.getLane() == null
-          || !LANE_ORDER.containsKey(row.getLane())) {
+      Zone.Lane lane = Enums.find(Zone.Lane.class, row.getLane());
+      if (row.getPairId() == null || side == null || lane == null) {
         continue;
       }
-      byPair.computeIfAbsent(row.getPairId(), k -> new EnumMap<>(TeamSide.class)).put(side, row);
+      byPair
+          .computeIfAbsent(row.getPairId(), id -> new Pair(lane, id, new EnumMap<>(TeamSide.class)))
+          .sides()
+          .put(side, row);
     }
-    return byPair.entrySet().stream()
-        .sorted(Comparator.comparing(e -> laneIndex(e.getValue())))
-        .limit(LANE_ORDER.size())
-        .collect(
-            Collectors.toMap(
-                Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, LinkedHashMap::new));
+    Map<Zone.Lane, Pair> longest = new EnumMap<>(Zone.Lane.class);
+    byPair.values().stream()
+        .sorted(Comparator.comparingInt(Pair::pairId))
+        .forEach(p -> longest.merge(p.lane(), p, LanesSection::longer));
+    return new ArrayList<>(longest.values());
   }
 
-  private static int laneIndex(Map<TeamSide, LaneResultDomain> sides) {
-    return LANE_ORDER.get(any(sides).getLane());
+  private static Pair longer(Pair a, Pair b) {
+    return length(b) > length(a) ? b : a;
+  }
+
+  private static long length(Pair pair) {
+    return pair.sides().values().stream()
+        .filter(r -> r.getStartSeconds() != null && r.getEndSeconds() != null)
+        .mapToLong(r -> (long) r.getEndSeconds() - r.getStartSeconds())
+        .max()
+        .orElse(-1);
   }
 
   private static LaneResultDomain any(Map<TeamSide, LaneResultDomain> sides) {
@@ -112,25 +139,46 @@ public class LanesSection implements ReplayReportSection {
   }
 
   private String line(
-      int pairId,
-      Map<TeamSide, LaneResultDomain> sides,
+      Pair pair,
       List<LaneAssignmentDomain> assignments,
       List<LaneReasonDomain> reasons,
       Map<Long, String> heroes,
       TeamSide yours) {
-    LaneResultDomain first = any(sides);
-    StringBuilder text = new StringBuilder(LANE_WORDS.get(first.getLane())).append(" lane");
-    duration(first).ifPresent(d -> text.append(" (lasted ").append(d).append(")"));
-    text.append(": ").append(verdict(sides, yours)).append(". ");
-    text.append(heroLine(pairId, sides, assignments, heroes));
-    List<LaneReasonDomain> forPair =
-        reasons.stream().filter(r -> Objects.equals(r.getPairId(), pairId)).toList();
-    String why = why(sides, forPair);
-    if (!why.isEmpty()) {
-      text.append(" Why: ").append(why).append(".");
+    LaneResultDomain first = any(pair.sides());
+    StringBuilder head =
+        new StringBuilder(LaneWording.capitalised(pair.lane().name().toLowerCase(Locale.ROOT)))
+            .append(" lane");
+    duration(first).ifPresent(d -> head.append(" (lasted ").append(d).append(")"));
+    head.append(": ").append(verdict(pair.sides(), yours)).append(".");
+    String heroLine = heroLine(pair, assignments, heroes);
+    String fixed = heroLine.isEmpty() ? head.toString() : head + " " + heroLine;
+    List<String> why = why(pair.sides(), reasons);
+    String note = levelNote(reasons).map(n -> " " + n + ".").orElse("");
+    int max = Math.max(ELLIPSIS.length() + 1, properties.getMaxLaneLineLength());
+    for (int count = why.size(); count >= 0; count--) {
+      String line =
+          fixed
+              + (count == 0 ? "" : " Why: " + String.join("; ", why.subList(0, count)) + ".")
+              + note;
+      if (line.length() <= max) {
+        return line;
+      }
     }
-    levelNote(forPair).ifPresent(n -> text.append(" ").append(n).append("."));
-    return text.toString();
+    return cut(fixed + note, max);
+  }
+
+  static String cut(String line, int max) {
+    if (line.length() <= max) {
+      return line;
+    }
+    int end = max - ELLIPSIS.length();
+    int space = line.lastIndexOf(' ', end);
+    if (space > 0) {
+      end = space;
+    } else if (Character.isHighSurrogate(line.charAt(end - 1))) {
+      end--;
+    }
+    return line.substring(0, end).stripTrailing() + ELLIPSIS;
   }
 
   private static Optional<String> duration(LaneResultDomain row) {
@@ -141,45 +189,45 @@ public class LanesSection implements ReplayReportSection {
   }
 
   private String verdict(Map<TeamSide, LaneResultDomain> sides, TeamSide yours) {
-    LaneResultDomain winner = winner(sides);
+    Winner winner = winner(sides);
     if (winner != null) {
-      TeamSide side = TeamSide.valueOf(winner.getTeam());
       String how =
-          winner.getMargin() == null
+          winner.row().getMargin() == null
               ? ""
               : " "
                   + LaneWording.strength(
-                      winner.getMargin(),
+                      winner.row().getMargin(),
                       properties.getLaneClearMargin(),
                       properties.getLaneBigMargin());
-      return Prettify.team(side.name()) + (side == yours ? " (your team)" : "") + " won" + how;
+      return Prettify.team(winner.side().name())
+          + (winner.side() == yours ? " (your team)" : "")
+          + " won"
+          + how;
     }
-    LaneResultDomain first = any(sides);
+    Map.Entry<TeamSide, LaneResultDomain> only = sides.entrySet().iterator().next();
     if (sides.size() == 1
-        && Enums.find(LaneResult.class, first.getResult()) == LaneResult.UNCONTESTED) {
-      return Prettify.team(first.getTeam()) + " was alone";
+        && Enums.find(LaneResult.class, only.getValue().getResult()) == LaneResult.UNCONTESTED) {
+      return Prettify.team(only.getKey().name()) + " was alone";
     }
     return "even";
   }
 
-  private static LaneResultDomain winner(Map<TeamSide, LaneResultDomain> sides) {
-    return sides.values().stream()
-        .filter(r -> Enums.find(LaneResult.class, r.getResult()) == LaneResult.WON)
+  private static Winner winner(Map<TeamSide, LaneResultDomain> sides) {
+    return sides.entrySet().stream()
+        .filter(e -> Enums.find(LaneResult.class, e.getValue().getResult()) == LaneResult.WON)
+        .map(e -> new Winner(e.getKey(), e.getValue()))
         .findFirst()
         .orElse(null);
   }
 
   private static String heroLine(
-      int pairId,
-      Map<TeamSide, LaneResultDomain> sides,
-      List<LaneAssignmentDomain> assignments,
-      Map<Long, String> heroes) {
+      Pair pair, List<LaneAssignmentDomain> assignments, Map<Long, String> heroes) {
     List<String> parts = new ArrayList<>();
-    for (TeamSide side : sides.keySet()) {
+    for (TeamSide side : pair.sides().keySet()) {
       List<String> names =
           assignments.stream()
-              .filter(a -> Objects.equals(a.getPairId(), pairId) && a.getPlayerSlot() != null)
-              .filter(a -> side == Enums.find(TeamSide.class, a.getTeam()))
+              .filter(
+                  a -> a.getPlayerSlot() != null && side == Enums.find(TeamSide.class, a.getTeam()))
               .sorted(Comparator.comparing(LaneAssignmentDomain::getPlayerSlot))
               .map(a -> heroes.getOrDefault(a.getPlayerSlot(), UNKNOWN_HERO))
               .toList();
@@ -191,35 +239,39 @@ public class LanesSection implements ReplayReportSection {
   }
 
   /**
-   * What helped the winner and what hurt the loser, strongest first, one per code (the two sides
-   * state the same fact); nothing for an even lane.
+   * What helped the winner and what hurt the loser, strongest first, at most {@link #MAX_REASONS}.
+   * A fact both sides stored (same evidence, or same code about the same hero or the side) is said
+   * once; the same code about different heroes is different facts. Nothing for an even lane.
    */
-  private String why(Map<TeamSide, LaneResultDomain> sides, List<LaneReasonDomain> reasons) {
-    LaneResultDomain winner = winner(sides);
+  private List<String> why(Map<TeamSide, LaneResultDomain> sides, List<LaneReasonDomain> reasons) {
+    Winner winner = winner(sides);
     if (winner == null) {
-      return "";
+      return List.of();
     }
-    Set<String> codes = new HashSet<>();
+    Set<String> seenFacts = new HashSet<>();
+    Set<String> seenEvidence = new HashSet<>();
     return reasons.stream()
         .filter(r -> !LaneReason.NO_ULTIMATE_AT_LANE_END.equals(r.getCode()))
         .filter(r -> r.getEvidence() != null && !r.getEvidence().isBlank())
-        .filter(r -> r.getTeam() != null)
-        .filter(r -> explainsResult(r, winner.getTeam()))
+        .filter(r -> explainsResult(r, winner.side()))
         .sorted(
             Comparator.comparing(
                     (LaneReasonDomain r) -> r.getSeverity() == null ? 0 : r.getSeverity())
                 .reversed())
-        .filter(r -> codes.add(String.valueOf(r.getCode())))
+        .filter(r -> seenFacts.add(r.getCode() + "/" + r.getSubjectSlot()))
         .map(r -> evidence(r.getEvidence()))
+        .filter(e -> seenEvidence.add(e.toLowerCase(Locale.ROOT)))
         .limit(MAX_REASONS)
-        .collect(Collectors.joining("; "));
+        .toList();
   }
 
-  private static boolean explainsResult(LaneReasonDomain reason, String winnerTeam) {
-    boolean ofWinner = winnerTeam.equals(reason.getTeam());
-    return ofWinner
-        ? LaneReason.Direction.HELPED.name().equals(reason.getDirection())
-        : LaneReason.Direction.HURT.name().equals(reason.getDirection());
+  private static boolean explainsResult(LaneReasonDomain reason, TeamSide winner) {
+    TeamSide side = Enums.find(TeamSide.class, reason.getTeam());
+    if (side == null) {
+      return false;
+    }
+    String direction = side == winner ? "HELPED" : "HURT";
+    return direction.equals(reason.getDirection());
   }
 
   private static String evidence(String stored) {
@@ -231,7 +283,7 @@ public class LanesSection implements ReplayReportSection {
   private Optional<String> levelNote(List<LaneReasonDomain> reasons) {
     return reasons.stream()
         .filter(r -> LaneReason.NO_ULTIMATE_AT_LANE_END.equals(r.getCode()))
-        .filter(r -> LaneReason.Direction.HELPED.name().equals(r.getDirection()))
+        .filter(r -> "HELPED".equals(r.getDirection()))
         .map(r -> Enums.find(TeamSide.class, r.getTeam()))
         .filter(Objects::nonNull)
         .findFirst()
@@ -242,10 +294,5 @@ public class LanesSection implements ReplayReportSection {
                         Prettify.team(side.name()),
                         laneProperties.getUltimateLevel(),
                         Prettify.team(side.opponent().name())));
-  }
-
-  private String cut(String line) {
-    int max = Math.max(ELLIPSIS.length() + 1, properties.getMaxLaneLineLength());
-    return line.length() <= max ? line : line.substring(0, max - ELLIPSIS.length()) + ELLIPSIS;
   }
 }

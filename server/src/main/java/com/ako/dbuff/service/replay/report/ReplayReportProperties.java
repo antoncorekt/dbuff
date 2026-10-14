@@ -78,9 +78,9 @@ public class ReplayReportProperties {
               + ", got "
               + maxLaneLineLength);
     }
-    if (laneClearMargin <= 0
-        || laneClearMargin >= laneBigMargin
-        || laneBigMargin > MAX_LANE_MARGIN) {
+    if (!(laneClearMargin > 0
+        && laneClearMargin < laneBigMargin
+        && laneBigMargin <= MAX_LANE_MARGIN)) {
       throw new IllegalStateException(
           "replay.report.lane-clear-margin and lane-big-margin must satisfy 0 < clear < big <= "
               + MAX_LANE_MARGIN
