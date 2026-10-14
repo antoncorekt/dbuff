@@ -49,6 +49,8 @@ import net.dv8tion.jda.api.components.MessageTopLevelComponent;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
+import net.dv8tion.jda.api.exceptions.ErrorResponseException;
+import net.dv8tion.jda.api.requests.ErrorResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -712,14 +714,34 @@ class ReplayReportServiceTest {
         .isEqualTo("_(2 more left out)_");
   }
 
+  private static ErrorResponseException rejected(ErrorResponse code) {
+    ErrorResponseException e = mock(ErrorResponseException.class);
+    when(e.getErrorResponse()).thenReturn(code);
+    return e;
+  }
+
+  @Test
+  void deliver_otherFailuresOfAComponentsMessageAreNotRetriedAsPlainText() {
+    properties.setFormat(ReportFormat.COMPONENTS);
+    service = serviceWith(bulky("a"));
+    Mockito.doThrow(new IllegalStateException("timeout"))
+        .when(discord)
+        .sendThreadComponentsBlocking(any(), any());
+    service.deliver(1L);
+    ErrorResponseException denied = rejected(ErrorResponse.MISSING_PERMISSIONS);
+    Mockito.doThrow(denied).when(discord).sendThreadComponentsBlocking(any(), any());
+    service.deliver(1L);
+
+    verify(discord, never()).sendThreadMessageBlocking(any(), any());
+  }
+
   @Test
   void deliver_aRejectedComponentsMessageFallsBackToItsPlainTextAndTheRestIsStillPosted() {
     properties.setFormat(ReportFormat.COMPONENTS);
     properties.setMaxMessages(4);
     service = serviceWith(bulky("a"), bulky("b"), bulky("c"));
-    when(discord.sendThreadComponentsBlocking(any(), any()))
-        .thenThrow(new IllegalStateException("rejected"))
-        .thenReturn(null);
+    ErrorResponseException invalid = rejected(ErrorResponse.INVALID_FORM_BODY);
+    when(discord.sendThreadComponentsBlocking(any(), any())).thenThrow(invalid).thenReturn(null);
 
     service.deliver(1L);
 

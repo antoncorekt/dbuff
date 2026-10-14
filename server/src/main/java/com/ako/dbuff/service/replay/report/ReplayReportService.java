@@ -40,6 +40,8 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
+import net.dv8tion.jda.api.exceptions.ErrorResponseException;
+import net.dv8tion.jda.api.requests.ErrorResponse;
 import org.springframework.stereotype.Service;
 
 /**
@@ -179,7 +181,10 @@ public class ReplayReportService {
       case ReportMessage.Components cards -> {
         try {
           discord.sendThreadComponentsBlocking(channel, cards.components());
-        } catch (RuntimeException e) {
+        } catch (ErrorResponseException e) {
+          if (e.getErrorResponse() != ErrorResponse.INVALID_FORM_BODY) {
+            throw e;
+          }
           log.warn(
               "Components of the replay report of match {} rejected, posting plain text: {}",
               matchId,

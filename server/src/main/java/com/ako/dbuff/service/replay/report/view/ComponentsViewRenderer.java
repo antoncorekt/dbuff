@@ -12,10 +12,11 @@ import org.springframework.stereotype.Component;
 
 /**
  * A view as Discord Components V2: one container in the accent colour with the title and verdict, a
- * divider and a text block per bullet. A view that does not fit the message limits is split over
- * several cards that repeat the title with its page, and an item longer than a message is cut with
- * an ellipsis. Every card keeps room for the "left out" note. {@link #renderAll} packs consecutive
- * cards into one message while they fit.
+ * divider and a text block per bullet (an entry of several lines stays one block without a bullet
+ * character). A view that does not fit the message limits is split over several cards that repeat
+ * the title with its page, and an item longer than a message is cut with an ellipsis. Every card
+ * keeps room for the "left out" note. {@link #renderAll} packs consecutive cards into one message
+ * while they fit.
  */
 @Component
 @RequiredArgsConstructor
@@ -23,37 +24,38 @@ public class ComponentsViewRenderer implements ViewRenderer {
   private static final String ELLIPSIS = "…";
   private static final String BULLET = "- ";
   private static final String FOOTNOTE = "-# ";
-  private static final String PAGE_RESERVE = " (99/99)";
-  private static final int CONTAINER_HEADER_AND_DIVIDER = 3;
 
   private final PlainViewRenderer plain;
+
+  private record Item(String raw, String shown) {}
+
+  private record Page(List<Item> bullets, Item footnote) {}
+
+  private record Budget(int text, int components) {}
 
   @Override
   public List<ReportMessage> render(SectionView view) {
     String title = cut(view.title(), MessageLimits.HEADER_PART);
     String verdict =
         view.verdict() == null ? "" : cut(view.verdict().strip(), MessageLimits.HEADER_PART);
-    int textBudget =
-        MessageLimits.COMPONENTS_TEXT
-            - MessageLimits.NOTE_TEXT_RESERVE
-            - header(title + PAGE_RESERVE, verdict).length();
-    List<String> bullets =
-        view.bullets().stream()
-            .filter(b -> !b.isBlank())
-            .map(b -> cut(b, textBudget - BULLET.length()))
-            .toList();
-    String footnote =
-        view.footnote() == null || view.footnote().isBlank()
-            ? null
-            : cut(view.footnote(), textBudget - FOOTNOTE.length());
-    if (title.isBlank() && verdict.isEmpty() && bullets.isEmpty() && footnote == null) {
+    boolean hasHeader = !title.isBlank() || !verdict.isEmpty();
+    Budget single = budget(hasHeader ? header(title, verdict) : null);
+    List<Item> bullets = bullets(view, single.text());
+    Item footnote = footnote(view, single.text());
+    if (!hasHeader && bullets.isEmpty() && footnote == null) {
       return List.of();
     }
-    List<Page> pages = paginate(bullets, footnote, textBudget);
+    List<Page> pages = paginate(bullets, footnote, single);
+    if (pages.size() > 1) {
+      Budget split = budget(header(title + MessageLimits.PAGE_MARKER_RESERVE, verdict));
+      bullets = bullets(view, split.text());
+      footnote = footnote(view, split.text());
+      pages = paginate(bullets, footnote, split);
+    }
     List<ReportMessage> messages = new ArrayList<>();
     for (int i = 0; i < pages.size(); i++) {
-      String pageTitle = pageTitle(title, i + 1, pages.size());
-      messages.add(message(view.accent(), pageTitle, verdict, pages.get(i)));
+      messages.add(
+          message(view.accent(), pageTitle(title, i + 1, pages.size()), verdict, pages.get(i)));
     }
     return messages;
   }
@@ -75,7 +77,32 @@ public class ComponentsViewRenderer implements ViewRenderer {
     return List.copyOf(packed);
   }
 
-  private record Page(List<String> bullets, String footnote) {}
+  /** What is left of a card for its bullets once the header, if any, is placed. */
+  private static Budget budget(String header) {
+    int frame =
+        MessageLimits.CONTAINER_COMPONENTS + (header == null ? 0 : MessageLimits.HEADER_COMPONENTS);
+    return new Budget(
+        MessageLimits.CARD_TEXT - (header == null ? 0 : header.length()),
+        MessageLimits.CARD_COMPONENTS - frame);
+  }
+
+  private static List<Item> bullets(SectionView view, int textBudget) {
+    return view.bullets().stream()
+        .filter(b -> !b.isBlank())
+        .map(b -> item(b, b.contains("\n") ? "" : BULLET, textBudget))
+        .toList();
+  }
+
+  private static Item footnote(SectionView view, int textBudget) {
+    return view.footnote() == null || view.footnote().isBlank()
+        ? null
+        : item(view.footnote(), FOOTNOTE, textBudget);
+  }
+
+  private static Item item(String raw, String prefix, int textBudget) {
+    String cut = cut(raw, textBudget - prefix.length());
+    return new Item(cut, prefix + cut);
+  }
 
   private static String pageTitle(String title, int page, int pages) {
     if (pages == 1) {
@@ -85,33 +112,32 @@ public class ComponentsViewRenderer implements ViewRenderer {
     return title.isBlank() ? marker : title + " " + marker;
   }
 
-  private static List<Page> paginate(List<String> bullets, String footnote, int textBudget) {
-    int countBudget =
-        MessageLimits.COMPONENTS_COUNT
-            - MessageLimits.NOTE_COMPONENT_RESERVE
-            - CONTAINER_HEADER_AND_DIVIDER;
+  private static List<Page> paginate(List<Item> bullets, Item footnote, Budget budget) {
     List<Page> pages = new ArrayList<>();
-    List<String> page = new ArrayList<>();
+    List<Item> page = new ArrayList<>();
     int length = 0;
-    for (String bullet : bullets) {
-      int size = BULLET.length() + bullet.length();
-      if (!page.isEmpty() && (length + size > textBudget || page.size() + 1 > countBudget)) {
-        pages.add(new Page(page, null));
+    List<Item> all = new ArrayList<>(bullets);
+    if (footnote != null) {
+      all.add(footnote);
+    }
+    for (Item item : all) {
+      int size = item.shown().length();
+      if (!page.isEmpty()
+          && (length + size > budget.text() || page.size() + 1 > budget.components())) {
+        pages.add(split(page, footnote));
         page = new ArrayList<>();
         length = 0;
       }
-      page.add(bullet);
+      page.add(item);
       length += size;
     }
-    if (footnote != null) {
-      int size = FOOTNOTE.length() + footnote.length();
-      if (!page.isEmpty() && (length + size > textBudget || page.size() + 1 > countBudget)) {
-        pages.add(new Page(page, null));
-        page = new ArrayList<>();
-      }
-    }
-    pages.add(new Page(page, footnote));
+    pages.add(split(page, footnote));
     return pages;
+  }
+
+  private static Page split(List<Item> items, Item footnote) {
+    boolean ends = footnote != null && !items.isEmpty() && items.get(items.size() - 1) == footnote;
+    return ends ? new Page(items.subList(0, items.size() - 1), footnote) : new Page(items, null);
   }
 
   private ReportMessage.Components message(Accent accent, String title, String verdict, Page page) {
@@ -122,24 +148,30 @@ public class ComponentsViewRenderer implements ViewRenderer {
       children.add(TextDisplay.of(header));
       text += header.length();
     }
-    boolean items = !page.bullets().isEmpty() || page.footnote() != null;
-    if (!header.isEmpty() && items) {
+    List<Item> shown = new ArrayList<>(page.bullets());
+    if (page.footnote() != null) {
+      shown.add(page.footnote());
+    }
+    if (!header.isEmpty() && !shown.isEmpty()) {
       children.add(Separator.createDivider(Separator.Spacing.SMALL));
     }
-    for (String bullet : page.bullets()) {
-      children.add(TextDisplay.of(BULLET + bullet));
-      text += BULLET.length() + bullet.length();
-    }
-    if (page.footnote() != null) {
-      children.add(TextDisplay.of(FOOTNOTE + page.footnote()));
-      text += FOOTNOTE.length() + page.footnote().length();
+    for (Item item : shown) {
+      children.add(TextDisplay.of(item.shown()));
+      text += item.shown().length();
     }
     List<MessageTopLevelComponent> top =
         List.of(Container.of(children).withAccentColor(accent.rgb()));
     String fallback =
         String.join(
             "\n",
-            plain.lines(new SectionView(title, null, accent, page.bullets(), page.footnote())));
+            plain.lines(
+                new SectionView(
+                    title,
+                    verdict,
+                    accent,
+                    page.bullets().stream().map(Item::raw).toList(),
+                    page.footnote() == null ? null : page.footnote().raw()),
+                true));
     return new ReportMessage.Components(top, text, children.size() + 1, fallback);
   }
 

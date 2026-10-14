@@ -200,4 +200,34 @@ class ComponentsViewRendererTest {
 
     assertThat(messages).hasSize(2);
   }
+
+  @Test
+  void aViewWithoutTitleAndVerdictReservesNoHeader() {
+    String[] bullets = IntStream.range(0, 37).mapToObj(i -> "b").toArray(String[]::new);
+
+    List<ReportMessage> messages =
+        renderer.render(new SectionView("", null, Accent.INFO, List.of(bullets), null));
+
+    assertThat(messages).hasSize(1);
+    ReportMessage.Components only = (ReportMessage.Components) messages.get(0);
+    assertThat(container(only).getComponents()).hasSize(37);
+    assertThat(only.componentCount()).isEqualTo(38);
+  }
+
+  @Test
+  void aMultiLineEntryStaysOneBlockWithoutABulletCharacter() {
+    List<ReportMessage> messages =
+        renderer.render(view(Accent.INFO, null, null, "one\ntwo", "three"));
+
+    assertThat(texts(messages.get(0))).containsExactly("**Title**", "one\ntwo", "- three");
+  }
+
+  @Test
+  void theFallbackKeepsTheVerdictUnderTheTitle() {
+    ReportMessage.Components card =
+        (ReportMessage.Components)
+            renderer.render(view(Accent.WIN, "Radiant won 1 of 2", "small", "a")).get(0);
+
+    assertThat(card.fallback()).isEqualTo("**Title**\nRadiant won 1 of 2\na\nsmall");
+  }
 }

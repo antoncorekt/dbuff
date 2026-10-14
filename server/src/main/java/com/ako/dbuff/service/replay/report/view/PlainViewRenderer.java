@@ -13,9 +13,17 @@ import org.springframework.stereotype.Component;
 public class PlainViewRenderer implements ViewRenderer {
 
   public List<String> lines(SectionView view) {
+    return lines(view, false);
+  }
+
+  /** The lines of the view, with its verdict under the title when asked for. */
+  public List<String> lines(SectionView view, boolean withVerdict) {
     List<String> lines = new ArrayList<>();
     if (!view.title().isBlank()) {
       lines.add("**" + view.title() + "**");
+    }
+    if (withVerdict && view.verdict() != null && !view.verdict().isBlank()) {
+      lines.add(view.verdict());
     }
     lines.addAll(view.bullets());
     if (view.footnote() != null && !view.footnote().isBlank()) {

@@ -61,10 +61,8 @@ public sealed interface ReportMessage {
     }
 
     boolean fitsWith(Components next) {
-      return textLength + next.textLength
-              <= MessageLimits.COMPONENTS_TEXT - MessageLimits.NOTE_TEXT_RESERVE
-          && componentCount + next.componentCount
-              <= MessageLimits.COMPONENTS_COUNT - MessageLimits.NOTE_COMPONENT_RESERVE;
+      return textLength + next.textLength <= MessageLimits.CARD_TEXT
+          && componentCount + next.componentCount <= MessageLimits.CARD_COMPONENTS;
     }
   }
 }

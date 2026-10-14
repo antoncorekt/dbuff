@@ -165,12 +165,12 @@ class ImportantFightsSectionTest {
 
     SectionView lost = section.view(input(0L)).orElseThrow();
     assertThat(lost.title()).isEqualTo("Important fights");
-    assertThat(lost.verdict()).isEqualTo("Radiant (your team) won 1 of 3");
+    assertThat(lost.verdict()).isEqualTo("Radiant (your team) won 1 of 3 important fights");
     assertThat(lost.accent()).isEqualTo(Accent.LOSS);
     assertThat(lost.bullets()).hasSize(3);
 
     SectionView won = section.view(input(130L)).orElseThrow();
-    assertThat(won.verdict()).isEqualTo("Dire (your team) won 2 of 3");
+    assertThat(won.verdict()).isEqualTo("Dire (your team) won 2 of 3 important fights");
     assertThat(won.accent()).isEqualTo(Accent.WIN);
   }
 
@@ -217,7 +217,7 @@ class ImportantFightsSectionTest {
     SectionView view = section.view(input(0L)).orElseThrow();
 
     assertThat(view.bullets()).hasSize(3);
-    assertThat(view.verdict()).isEqualTo("Radiant (your team) won 3 of 6");
+    assertThat(view.verdict()).isEqualTo("Radiant (your team) won 3 of 6 important fights");
     assertThat(view.accent()).isEqualTo(Accent.NEUTRAL);
   }
 
@@ -228,7 +228,8 @@ class ImportantFightsSectionTest {
         fight(2, 200, "DIRE", 100L, false),
         fight(3, 300, "RADIANT", 100L, false));
 
-    assertThat(section.view(input()).orElseThrow().verdict()).isEqualTo("Dire won 2 of 3");
+    assertThat(section.view(input()).orElseThrow().verdict())
+        .isEqualTo("Dire won 2 of 3 important fights");
   }
 
   @Test

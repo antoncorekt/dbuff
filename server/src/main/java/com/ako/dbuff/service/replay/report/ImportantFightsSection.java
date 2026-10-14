@@ -104,7 +104,11 @@ public class ImportantFightsSection implements ReplayReportSection {
       Accent accent = won > lost ? Accent.WIN : won < lost ? Accent.LOSS : Accent.NEUTRAL;
       return new Outcome(
           String.format(
-              Locale.ROOT, "%s won %d of %d", Prettify.teamOf(yours.name(), yours), won, total),
+              Locale.ROOT,
+              "%s won %d of %d important fights",
+              Prettify.teamOf(yours.name(), yours),
+              won,
+              total),
           accent);
     }
     long radiant = wonBy(fights, TeamSide.RADIANT);
@@ -114,7 +118,7 @@ public class ImportantFightsSection implements ReplayReportSection {
             ? String.format(Locale.ROOT, "Radiant and Dire won %d each", radiant)
             : String.format(
                 Locale.ROOT,
-                "%s won %d of %d",
+                "%s won %d of %d important fights",
                 radiant > dire ? "Radiant" : "Dire",
                 Math.max(radiant, dire),
                 total);
