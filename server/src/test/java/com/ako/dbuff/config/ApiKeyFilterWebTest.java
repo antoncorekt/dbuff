@@ -25,7 +25,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {"app.api.key=test-key", "app.api.required=true"})
+    properties = {
+      "app.api.key=test-key",
+      "app.api.required=true",
+      "management.endpoints.web.exposure.include=health,metrics"
+    })
 @ActiveProfiles("test")
 class ApiKeyFilterWebTest {
 
@@ -100,6 +104,23 @@ class ApiKeyFilterWebTest {
   @Test
   void theHealthCheckNeedsNoKey() throws Exception {
     assertThat(status("/actuator/health", null)).isNotEqualTo(401);
+  }
+
+  @Test
+  void theMetricsEndpointNeedsTheKey() throws Exception {
+    assertThat(status("/actuator/metrics", null)).isEqualTo(401);
+    assertThat(status("/actuator/metrics/dbuff.replay.runs", null)).isEqualTo(401);
+    assertThat(status("/actuator/metrics", "wrong")).isEqualTo(401);
+    assertThat(status("/actuator/metrics", "test-key")).isEqualTo(200);
+    assertThat(status("/actuator/metrics/dbuff.replay.runs?tag=status:DONE", "test-key"))
+        .isEqualTo(200);
+  }
+
+  @Test
+  void theOtherActuatorEndpointsStayClosedEvenWithTheKey() throws Exception {
+    assertThat(status("/actuator/env", "test-key")).isEqualTo(404);
+    assertThat(status("/actuator/beans", "test-key")).isEqualTo(404);
+    assertThat(status("/actuator/heapdump", "test-key")).isEqualTo(404);
   }
 
   @Test

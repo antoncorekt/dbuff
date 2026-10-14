@@ -9,8 +9,10 @@ import com.ako.dbuff.service.replay.analysis.ReplayAnalysisService;
 import com.ako.dbuff.service.replay.file.ReplayFile;
 import com.ako.dbuff.service.replay.file.ReplayFileProvider;
 import com.ako.dbuff.service.replay.map.MapLayouts;
+import com.ako.dbuff.service.replay.metrics.ReplayMetrics;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.GameModeRegistry;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +46,7 @@ public class ReplayRunService {
   private final MapLayouts mapLayouts;
   private final ReplayAnalysisService analysis;
   private final GameModeRegistry modes;
+  private final ReplayMetrics metrics;
 
   public ReplayRunService(
       ReplayParseRunRepo runRepo,
@@ -57,7 +60,8 @@ public class ReplayRunService {
       @Qualifier("replayParseSemaphore") Semaphore parseSemaphore,
       MapLayouts mapLayouts,
       ReplayAnalysisService analysis,
-      GameModeRegistry modes) {
+      GameModeRegistry modes,
+      ReplayMetrics metrics) {
     this.runRepo = runRepo;
     this.playerStatRepo = playerStatRepo;
     this.eligibility = eligibility;
@@ -70,18 +74,23 @@ public class ReplayRunService {
     this.mapLayouts = mapLayouts;
     this.analysis = analysis;
     this.modes = modes;
+    this.metrics = metrics;
   }
 
   /**
    * @return the status the run ended with
    */
   public ReplayStatus process(MatchDomain match) {
+    long started = System.nanoTime();
+    ReplayStatus status;
     try {
-      return run(match);
+      status = run(match);
     } catch (RuntimeException e) {
       log.error("Replay run for match {} could not be recorded", match.getId(), e);
-      return ReplayStatus.FAILED_RESOURCE;
+      status = ReplayStatus.FAILED_RESOURCE;
     }
+    metrics.runFinished(status, Duration.ofNanos(System.nanoTime() - started));
+    return status;
   }
 
   private ReplayStatus run(MatchDomain match) {

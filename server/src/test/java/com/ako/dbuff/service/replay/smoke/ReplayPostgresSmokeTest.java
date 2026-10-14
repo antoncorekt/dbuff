@@ -127,6 +127,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private AbilityDraftPickRepo draftPickRepo;
   @Autowired private AbilityDraftPoolRepo draftPoolRepo;
   @Autowired private ReplayRunService runService;
+  @Autowired private io.micrometer.core.instrument.MeterRegistry meterRegistry;
   @Autowired private ReplayDataService dataService;
   @Autowired private ReplayParseRunRepo runRepo;
   @Autowired private ReplayPlayerRepo playerRepo;
@@ -253,6 +254,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     ReplayStatus again = runService.process(seedMatch(MATCHES[0]));
     assertThat(again).as("a second run replaces the first").isEqualTo(ReplayStatus.DONE);
     assertThat(deathRepo.findByMatchId(Long.parseLong(MATCHES[0]))).hasSizeGreaterThan(40);
+    assertReplayMeters();
     dataService.deleteByMatchId(Long.parseLong(MATCHES[0]));
     assertThat(deathRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
     assertThat(reasonRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
@@ -321,6 +323,30 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                   .map(d -> d.getAbilityName())
                   .toList());
     }
+  }
+
+  private void assertReplayMeters() {
+    io.micrometer.core.instrument.Timer timer =
+        meterRegistry.get("dbuff.replay.run.duration").tag("status", "DONE").timer();
+    double done = meterRegistry.get("dbuff.replay.runs").tag("status", "DONE").gauge().value();
+    double heap = meterRegistry.get("dbuff.replay.last.heap.used.bytes").gauge().value();
+    System.out.println(
+        "METERS runs{DONE}="
+            + done
+            + " runs{RUNNING}="
+            + meterRegistry.get("dbuff.replay.runs").tag("status", "RUNNING").gauge().value()
+            + " duration{DONE} count="
+            + timer.count()
+            + " total="
+            + timer.totalTime(java.util.concurrent.TimeUnit.SECONDS)
+            + "s max="
+            + timer.max(java.util.concurrent.TimeUnit.SECONDS)
+            + "s heapAfterRun="
+            + heap / 1_048_576
+            + "MiB");
+    assertThat(timer.count()).isEqualTo(MATCHES.length + 1);
+    assertThat(done).isEqualTo(MATCHES.length);
+    assertThat(heap).isPositive();
   }
 
   private void saveSwingKeyItems(String id, long matchId) {

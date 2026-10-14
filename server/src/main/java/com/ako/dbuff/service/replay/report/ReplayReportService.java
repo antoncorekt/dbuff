@@ -21,6 +21,7 @@ import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.TextReport;
 import com.ako.dbuff.service.match.report.formatter.ReportFormatter;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
+import com.ako.dbuff.service.replay.metrics.ReplayMetrics;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.GameModeRegistry;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
@@ -65,6 +66,7 @@ public class ReplayReportService {
   private final DiscordMessageService discord;
   private final QuietHoursGuard quietHours;
   private final GameModeRegistry modes;
+  private final ReplayMetrics metrics;
 
   /** Delivers what is waiting for the matches whose replay run finished lately. */
   public void deliverPending() {
@@ -130,11 +132,22 @@ public class ReplayReportService {
       List<PlayerMatchStatisticDomain> stats,
       DbufInstanceConfigDomain instance) {
     InstanceSettings settings = instance.effectiveSettings();
-    if (instance.getDiscordChannelId() == null
-        || !settings.isReplayReportOn()
-        || settings.detail() == ReportDetail.MINIMAL
-        || postedRepo.findByMatchIdAndInstanceId(match.getId(), instance.getId()).isPresent()
-        || quietHours.isQuietTime(settings)) {
+    if (instance.getDiscordChannelId() == null) {
+      return;
+    }
+    if (!settings.isReplayReportOn()) {
+      metrics.reportSkipped("switched_off");
+      return;
+    }
+    if (settings.detail() == ReportDetail.MINIMAL) {
+      metrics.reportSkipped("minimal_detail");
+      return;
+    }
+    if (postedRepo.findByMatchIdAndInstanceId(match.getId(), instance.getId()).isPresent()) {
+      return;
+    }
+    if (quietHours.isQuietTime(settings)) {
+      metrics.reportSkipped("quiet_hours");
       return;
     }
     MatchReportThreadDomain thread =
@@ -144,10 +157,12 @@ public class ReplayReportService {
           "No thread of match {} in instance {}, nothing to follow up",
           match.getId(),
           instance.getId());
+      metrics.reportSkipped("no_thread");
       return;
     }
     List<String> messages = messages(match, stats, instance, settings);
     if (messages.isEmpty()) {
+      metrics.reportSkipped("no_content");
       return;
     }
     ThreadChannel channel = discord.getThreadById(thread.getThreadId());
@@ -156,6 +171,7 @@ public class ReplayReportService {
           "Discord thread {} of match {} not found, will try again",
           thread.getThreadId(),
           match.getId());
+      metrics.reportSkipped("thread_not_found");
       return;
     }
     postedRepo.save(
@@ -168,6 +184,7 @@ public class ReplayReportService {
     for (String message : messages) {
       discord.sendThreadMessageBlocking(channel, message);
     }
+    metrics.reportPosted();
     log.info("Replay report of match {} posted in {} messages", match.getId(), messages.size());
   }
 

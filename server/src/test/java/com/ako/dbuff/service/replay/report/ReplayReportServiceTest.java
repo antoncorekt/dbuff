@@ -32,9 +32,12 @@ import com.ako.dbuff.service.discord.DiscordMessageService;
 import com.ako.dbuff.service.match.report.formatter.DiscordReportFormatter;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.lane.LaneProperties;
+import com.ako.dbuff.service.replay.metrics.ReplayMetrics;
+import com.ako.dbuff.service.replay.metrics.ReplayRunCounts;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -56,6 +59,7 @@ import static org.mockito.Mockito.when;
 class ReplayReportServiceTest {
 
   private final ReplayReportProperties properties = new ReplayReportProperties();
+  private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
   private final MatchRepo matchRepo = mock(MatchRepo.class);
   private final PlayerGameStatisticRepo statRepo = mock(PlayerGameStatisticRepo.class);
   private final DbufInstanceConfigRepository instanceRepo =
@@ -97,7 +101,8 @@ class ReplayReportServiceTest {
             new DiscordReportFormatter(),
             discord,
             quiet,
-            TestModes.registry());
+            TestModes.registry(),
+            new ReplayMetrics(registry, mock(ReplayRunCounts.class)));
     when(matchRepo.findById(1L))
         .thenReturn(Optional.of(MatchDomain.builder().id(1L).gameModeId(18L).build()));
     when(statRepo.findAllByMatchId(1L))
@@ -178,7 +183,8 @@ class ReplayReportServiceTest {
             new DiscordReportFormatter(),
             discord,
             quiet,
-            TestModes.registry());
+            TestModes.registry(),
+            new ReplayMetrics(registry, mock(ReplayRunCounts.class)));
     when(matchRepo.findById(2L))
         .thenReturn(Optional.of(MatchDomain.builder().id(2L).gameModeId(22L).build()));
     when(statRepo.findAllByMatchId(2L))
@@ -228,7 +234,8 @@ class ReplayReportServiceTest {
         new DiscordReportFormatter(),
         discord,
         quiet,
-        TestModes.registry());
+        TestModes.registry(),
+        new ReplayMetrics(registry, mock(ReplayRunCounts.class)));
   }
 
   private static ReplayReportSection named(String name, boolean defaultEnabled) {
@@ -590,5 +597,28 @@ class ReplayReportServiceTest {
 
     verify(discord, never()).sendThreadMessageBlocking(any(), any());
     verify(postedRepo, never()).save(any());
+  }
+
+  @Test
+  void deliver_countsThePostedReportAndEachSkipByCause() {
+    service.deliver(1L);
+    when(quiet.isQuietTime(any())).thenReturn(true);
+    when(postedRepo.findByMatchIdAndInstanceId(1L, "i1")).thenReturn(Optional.empty());
+    service.deliver(1L);
+    when(quiet.isQuietTime(any())).thenReturn(false);
+    when(threadRepo.findByMatchIdAndInstanceId(1L, "i1")).thenReturn(Optional.empty());
+    service.deliver(1L);
+
+    assertThat(registry.get("dbuff.replay.report.posted").counter().count()).isEqualTo(1);
+    assertThat(
+            registry
+                .get("dbuff.replay.report.skipped")
+                .tag("cause", "quiet_hours")
+                .counter()
+                .count())
+        .isEqualTo(1);
+    assertThat(
+            registry.get("dbuff.replay.report.skipped").tag("cause", "no_thread").counter().count())
+        .isEqualTo(1);
   }
 }

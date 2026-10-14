@@ -36,6 +36,19 @@ public interface ReplayParseRunRepo extends JpaRepository<ReplayParseRunDomain, 
   List<ReplayParseRunDomain> findFinishedSince(
       @Param("version") Integer version, @Param("since") LocalDateTime since);
 
+  interface StatusCount {
+    ReplayStatus getStatus();
+
+    Long getTotal();
+  }
+
+  @Query(
+      """
+      select r.status as status, count(r) as total from ReplayParseRunDomain r
+      where r.parserVersion = :version group by r.status
+      """)
+  List<StatusCount> countByStatus(@Param("version") Integer version);
+
   String DUE_RETRY =
       """
       select m from ReplayParseRunDomain r, MatchDomain m

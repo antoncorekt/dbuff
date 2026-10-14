@@ -97,6 +97,11 @@ public abstract class ReplayPipelineFixture {
   @TestConfiguration
   static class Config {
     @Bean
+    io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry() {
+      return new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+    }
+
+    @Bean
     ObjectMapper objectMapper() {
       return new ObjectMapper();
     }
