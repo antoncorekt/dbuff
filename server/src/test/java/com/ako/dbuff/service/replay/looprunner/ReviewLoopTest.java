@@ -9,6 +9,7 @@ import com.ako.dbuff.service.replay.ReplayRunService;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisService;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.StoredMatchModes;
+import com.ako.dbuff.service.replay.report.AbilityLabels;
 import com.ako.dbuff.service.replay.smoke.ReplayPipelineFixture;
 import com.ako.dbuff.service.replay.smoke.ReplayPipelineTest;
 import java.io.IOException;
@@ -41,11 +42,13 @@ class ReviewLoopTest extends ReplayPipelineFixture {
   @Autowired private ReplayProcessingProperties properties;
   @Autowired private ReplayParseRunRepo runRepo;
   @Autowired private MatchRepo matchRepo;
+  @Autowired private AbilityLabels abilityLabels;
 
   @Test
   @Commit
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   void writesTheReviewReportsOfOneRound() {
+    LoopWording.useLabels(abilityLabels);
     ReviewLoopTopic topic = selectedTopic();
     List<Long> matches = ReviewLoopMatchList.read(topic.matchList());
     ReviewLoopRound round =

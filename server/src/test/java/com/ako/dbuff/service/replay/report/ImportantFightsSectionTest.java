@@ -113,6 +113,29 @@ class ImportantFightsSectionTest {
   }
 
   @Test
+  void namesACooldownAbilityByItsDisplayName() {
+    RankedReason cooldown =
+        new RankedReason(
+            1,
+            FightReasonDomain.builder()
+                .scope("PLAYER")
+                .subjectSlot(2L)
+                .code("ABILITY_ON_COOLDOWN")
+                .evidence("terrorblade_metamorphosis, sven_gods_strength")
+                .severity(0.5)
+                .build(),
+            List.of(),
+            true);
+    stored(fight(1, 600, "DIRE", 1200L, false, cooldown));
+    ImportantFightsSection real =
+        new ImportantFightsSection(
+            reader, heroNames, new ReasonWording(TestLabels.labels()), properties);
+
+    assertThat(real.lines(input(2L)).get(1))
+        .endsWith("Terrorblade had Metamorphosis and Gods Strength on cooldown");
+  }
+
+  @Test
   void marksTheTrackedSideWhenAllTrackedPlayersShareIt() {
     stored(fight(1, 600, "DIRE", 1200L, false));
 

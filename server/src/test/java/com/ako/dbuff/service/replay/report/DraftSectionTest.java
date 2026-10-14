@@ -15,7 +15,8 @@ import static org.mockito.Mockito.when;
 class DraftSectionTest {
 
   private final AbilityDraftPickRepo repo = mock(AbilityDraftPickRepo.class);
-  private final DraftSection section = new DraftSection(repo, new AbilityDraftProfile());
+  private final DraftSection section =
+      new DraftSection(repo, new AbilityDraftProfile(), Prettify::ability);
 
   private AbilityDraftPickDomain pick(int order, long slot, String ability) {
     return AbilityDraftPickDomain.builder()
@@ -44,6 +45,17 @@ class DraftSectionTest {
             "**Draft**",
             "Anton drafted Faceless Void Chronosphere (2nd), Sven Gods Strength (6th), Sven Storm"
                 + " Bolt (11th)");
+  }
+
+  @Test
+  void lines_nameACrossHeroPickByItsAbilityNotItsSourceHero() {
+    when(repo.findByMatchId(1L))
+        .thenReturn(
+            List.of(pick(3, 0, "terrorblade_metamorphosis"), pick(12, 0, "sven_gods_strength")));
+    DraftSection real = new DraftSection(repo, new AbilityDraftProfile(), TestLabels.labels());
+
+    assertThat(real.lines(new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3)))
+        .containsExactly("**Draft**", "Anton drafted Metamorphosis (2nd), Gods Strength (6th)");
   }
 
   @Test

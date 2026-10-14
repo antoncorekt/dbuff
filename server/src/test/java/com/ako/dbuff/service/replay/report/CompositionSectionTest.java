@@ -136,7 +136,7 @@ class CompositionSectionTest {
   @Test
   void sitsAfterTheDraftAtStandardDetailForEveryMode() {
     assertThat(section.minimumDetail()).isEqualTo(ReportDetail.STANDARD);
-    assertThat(section.order()).isGreaterThan(new DraftSection(null, null).order());
+    assertThat(section.order()).isGreaterThan(new DraftSection(null, null, null).order());
     assertThat(section.supports(com.ako.dbuff.service.replay.mode.TestModes.ALL_PICK)).isTrue();
     assertThat(section.supports(com.ako.dbuff.service.replay.mode.TestModes.ABILITY_DRAFT))
         .isTrue();

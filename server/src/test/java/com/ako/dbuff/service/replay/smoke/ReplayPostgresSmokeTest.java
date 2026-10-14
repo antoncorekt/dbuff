@@ -281,6 +281,27 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertFightExplanations(id, match.getId());
       assertAnalysisDocument(id, match.getId());
       printAbilityDraft(id, match.getId(), profiles);
+      System.out.println(
+          "DRAFT LINES "
+              + id
+              + "\n"
+              + String.join(
+                  "\n",
+                  draftSection.lines(
+                      new ReplayReportInput(
+                          match.getId(),
+                          match,
+                          java.util.Set.of(0L),
+                          java.util.Map.of(0L, "P0"),
+                          3))));
+      System.out.println(
+          "DRAFT RAW "
+              + id
+              + " "
+              + draftPickRepo.findByMatchId(match.getId()).stream()
+                  .filter(d -> Long.valueOf(0).equals(d.getPlayerSlot()))
+                  .map(d -> d.getAbilityName())
+                  .toList());
     }
   }
 
