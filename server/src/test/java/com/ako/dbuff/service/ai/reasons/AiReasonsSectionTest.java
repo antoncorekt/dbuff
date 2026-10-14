@@ -51,7 +51,7 @@ class AiReasonsSectionTest {
 
   @Test
   void aWonMatchGivesAGreenCardWithNumberedBulletsAndPlainEvidenceLabels() {
-    when(service.reasons(ReasonsFixtures.input()))
+    when(service.reasons(ReasonsFixtures.input(), null))
         .thenReturn(
             new ReasonsResult(
                 Status.READY,
@@ -60,7 +60,8 @@ class AiReasonsSectionTest {
                     reason(2, "LANE_1"),
                     reason(3, "RESULT"),
                     reason(4, "VISION_2"),
-                    reason(5, "ENDGAME_1"))));
+                    reason(5, "ENDGAME_1")),
+                "gpt-test"));
 
     SectionView view = section.view(ReasonsFixtures.input()).orElseThrow();
 
@@ -71,7 +72,7 @@ class AiReasonsSectionTest {
     assertThat(view.bullets().get(0))
         .isEqualTo("1. Title 1: Because 1. (based on: important fights)");
     assertThat(view.bullets().get(1)).endsWith("(based on: lanes)");
-    assertThat(view.footnote()).doesNotContain("Only");
+    assertThat(view.footnote()).doesNotContain("Only").contains("Written by gpt-test");
     assertThat(String.join("\n", view.bullets())).doesNotContain("F3").doesNotContain("LANE_1");
   }
 
@@ -84,14 +85,26 @@ class AiReasonsSectionTest {
             java.util.Set.of(0L),
             java.util.Map.of(),
             3);
-    when(service.reasons(lost))
-        .thenReturn(new ReasonsResult(Status.CACHED, List.of(reason(1, "F1"), reason(2, "F1"))));
+    when(service.reasons(lost, null))
+        .thenReturn(
+            new ReasonsResult(Status.CACHED, List.of(reason(1, "F1"), reason(2, "F1")), "m2"));
 
     SectionView view = section.view(lost).orElseThrow();
 
     assertThat(view.verdict()).isEqualTo("Dire won; your team lost");
     assertThat(view.accent()).isEqualTo(Accent.LOSS);
     assertThat(view.footnote()).startsWith("Only 2 reasons had enough supporting data.");
+  }
+
+  @Test
+  void aSectionForAModelAsksThatModel() {
+    when(service.reasons(ReasonsFixtures.input(), "big"))
+        .thenReturn(new ReasonsResult(Status.READY, List.of(reason(1, "F1")), "big"));
+
+    SectionView view = section.forModel("big").view(ReasonsFixtures.input()).orElseThrow();
+
+    assertThat(view.footnote()).contains("Written by big");
+    assertThat(section.forModel("big").name()).isEqualTo("ai-reasons");
   }
 
   @Test
@@ -103,8 +116,8 @@ class AiReasonsSectionTest {
             java.util.Set.of(0L),
             java.util.Map.of(),
             3);
-    when(service.reasons(unknown))
-        .thenReturn(new ReasonsResult(Status.READY, List.of(reason(1, "F1"))));
+    when(service.reasons(unknown, null))
+        .thenReturn(new ReasonsResult(Status.READY, List.of(reason(1, "F1")), "m"));
 
     SectionView view = section.view(unknown).orElseThrow();
 
@@ -116,7 +129,7 @@ class AiReasonsSectionTest {
   void withoutReasonsTheSectionSaysNothing() {
     for (Status status :
         List.of(Status.SWITCHED_OFF, Status.NO_API_KEY, Status.CALL_LIMIT, Status.FAILED)) {
-      when(service.reasons(ReasonsFixtures.input())).thenReturn(ReasonsResult.of(status));
+      when(service.reasons(ReasonsFixtures.input(), null)).thenReturn(ReasonsResult.of(status));
 
       assertThat(section.view(ReasonsFixtures.input())).isEqualTo(Optional.empty());
       assertThat(section.lines(ReasonsFixtures.input())).isEmpty();

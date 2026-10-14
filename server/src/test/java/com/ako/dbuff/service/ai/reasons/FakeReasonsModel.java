@@ -6,6 +6,7 @@ import java.util.List;
 /** A model that answers with a set text, or fails, and remembers what it was asked. */
 class FakeReasonsModel implements ReasonsModel {
   final List<ReasonsPrompt> asked = new ArrayList<>();
+  final List<String> askedModels = new ArrayList<>();
   boolean available = true;
   String answer = "[]";
   RuntimeException failure;
@@ -16,16 +17,17 @@ class FakeReasonsModel implements ReasonsModel {
   }
 
   @Override
-  public String modelName() {
+  public String defaultModel() {
     return "fake-model";
   }
 
   @Override
-  public ModelAnswer ask(ReasonsPrompt prompt) {
+  public ModelAnswer ask(ReasonsPrompt prompt, String model) {
     asked.add(prompt);
+    askedModels.add(model);
     if (failure != null) {
       throw failure;
     }
-    return new ModelAnswer(answer, 321, modelName());
+    return new ModelAnswer(answer, 321, model);
   }
 }

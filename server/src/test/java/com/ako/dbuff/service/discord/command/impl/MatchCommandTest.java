@@ -109,6 +109,23 @@ class MatchCommandTest {
   }
 
   @Test
+  void theTextFormOfAiTakesAnOptionalModel() {
+    assertThat(command.parseTextArguments("ai", null, "")).isEmpty();
+    assertThat(command.parseTextArguments("ai", "gpt-4o", "")).containsEntry("model", "gpt-4o");
+    assertThat(command.parseTextArguments("rerun", null, "")).isEmpty();
+    assertThat(command.getDefinition().getSubcommands())
+        .filteredOn(s -> s.getName().equals("ai"))
+        .singleElement()
+        .satisfies(
+            s -> {
+              assertThat(s.getOptions()).hasSize(1);
+              assertThat(s.getOptions().get(0).getName()).isEqualTo("model");
+              assertThat(s.getOptions().get(0).isAutoComplete()).isTrue();
+              assertThat(s.getOptions().get(0).isRequired()).isFalse();
+            });
+  }
+
+  @Test
   void ai_outsideAThreadIsRefusedInOneLine() {
     FakeCommandContext context = FakeCommandContext.builder().build();
 

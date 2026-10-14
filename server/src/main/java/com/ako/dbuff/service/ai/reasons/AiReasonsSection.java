@@ -50,7 +50,42 @@ public class AiReasonsSection implements ReplayReportSection {
 
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
-    ReasonsResult result = service.reasons(input);
+    return view(input, null);
+  }
+
+  /** The same section asking the named model, for one on-demand post. */
+  public ReplayReportSection forModel(String model) {
+    AiReasonsSection self = this;
+    return new ReplayReportSection() {
+      @Override
+      public String name() {
+        return self.name();
+      }
+
+      @Override
+      public int order() {
+        return self.order();
+      }
+
+      @Override
+      public ReportDetail minimumDetail() {
+        return self.minimumDetail();
+      }
+
+      @Override
+      public List<String> lines(ReplayReportInput input) {
+        return view(input).map(v -> plain.lines(v, true)).orElse(List.of());
+      }
+
+      @Override
+      public Optional<SectionView> view(ReplayReportInput input) {
+        return self.view(input, model);
+      }
+    };
+  }
+
+  private Optional<SectionView> view(ReplayReportInput input, String model) {
+    ReasonsResult result = service.reasons(input, model);
     if (!result.hasReasons()) {
       return Optional.empty();
     }
@@ -64,7 +99,9 @@ public class AiReasonsSection implements ReplayReportSection {
         (count < ReplayReportAiProperties.MAX_REASONS
                 ? "Only " + count + " reasons had enough supporting data. "
                 : "")
-            + "Written by a language model from the match facts; it can be wrong.";
+            + "Written by "
+            + result.model()
+            + " from the match facts; it can be wrong.";
     return Optional.of(
         new SectionView(
             "Top " + ReplayReportAiProperties.MAX_REASONS + " reasons",

@@ -2,12 +2,15 @@ package com.ako.dbuff.service.ai.reasons;
 
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.service.discord.command.FakeCommandContext;
+import com.ako.dbuff.service.replay.report.ReplayReportSection;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
 import com.ako.dbuff.service.replay.report.ReportDelivery;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -18,7 +21,10 @@ class AiReasonsCommandHandlerTest {
 
   private final AiReasonsService service = mock(AiReasonsService.class);
   private final ReplayReportService reports = mock(ReplayReportService.class);
-  private final AiReasonsCommandHandler handler = new AiReasonsCommandHandler(service, reports);
+  private final AiReasonsSection section = mock(AiReasonsSection.class);
+  private final ReplayReportSection forModel = mock(ReplayReportSection.class);
+  private final AiReasonsCommandHandler handler =
+      new AiReasonsCommandHandler(service, section, reports);
   private final DbufInstanceConfigDomain config = new DbufInstanceConfigDomain();
 
   @BeforeEach
@@ -26,6 +32,8 @@ class AiReasonsCommandHandlerTest {
     config.setId("i1");
     when(service.availability()).thenReturn(AiReasonsAvailability.AVAILABLE);
     when(reports.hasStoredAnalysis(MATCH)).thenReturn(true);
+    when(service.allowedModels()).thenReturn(List.of("fake-model", "big"));
+    when(section.forModel(any())).thenReturn(forModel);
   }
 
   private static FakeCommandContext context() {
@@ -73,7 +81,7 @@ class AiReasonsCommandHandlerTest {
 
   @Test
   void success_acknowledgesAndPostsTheSectionCard() {
-    when(reports.deliverSection(MATCH, "i1", "ai-reasons")).thenReturn(ReportDelivery.POSTED);
+    when(reports.deliverSection(MATCH, "i1", forModel)).thenReturn(ReportDelivery.POSTED);
     FakeCommandContext context = context();
 
     handler.handle(context, MATCH, config);
@@ -86,8 +94,7 @@ class AiReasonsCommandHandlerTest {
 
   @Test
   void nothingToPost_saysWhyInOneLine() {
-    when(reports.deliverSection(MATCH, "i1", "ai-reasons"))
-        .thenReturn(ReportDelivery.SECTION_EMPTY);
+    when(reports.deliverSection(MATCH, "i1", forModel)).thenReturn(ReportDelivery.SECTION_EMPTY);
     FakeCommandContext context = context();
 
     handler.handle(context, MATCH, config);
@@ -96,9 +103,41 @@ class AiReasonsCommandHandlerTest {
   }
 
   @Test
+  void aModelOptionOutsideTheAllowListIsRefusedBeforeAcknowledging() {
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .threadName("Match " + MATCH)
+            .option("model", "gpt-expensive")
+            .build();
+
+    handler.handle(context, MATCH, config);
+
+    assertThat(context.getEphemeralReplies())
+        .singleElement()
+        .asString()
+        .contains("`gpt-expensive` is not allowed")
+        .contains("fake-model, big");
+    assertThat(context.getAcknowledgeSummary()).isNull();
+    verify(reports, never())
+        .deliverSection(
+            org.mockito.ArgumentMatchers.anyLong(), any(), any(ReplayReportSection.class));
+  }
+
+  @Test
+  void anAllowedModelOptionIsPassedOnForThatPostOnly() {
+    when(reports.deliverSection(MATCH, "i1", forModel)).thenReturn(ReportDelivery.POSTED);
+    FakeCommandContext context =
+        FakeCommandContext.builder().threadName("Match " + MATCH).option("model", " big ").build();
+
+    handler.handle(context, MATCH, config);
+
+    verify(section).forModel(" big ");
+    assertThat(context.getAcknowledgeSummary()).isNotNull();
+  }
+
+  @Test
   void anUnexpectedFailureIsReportedInTheThread() {
-    when(reports.deliverSection(MATCH, "i1", "ai-reasons"))
-        .thenThrow(new IllegalStateException("x"));
+    when(reports.deliverSection(MATCH, "i1", forModel)).thenThrow(new IllegalStateException("x"));
     FakeCommandContext context = context();
 
     handler.handle(context, MATCH, config);

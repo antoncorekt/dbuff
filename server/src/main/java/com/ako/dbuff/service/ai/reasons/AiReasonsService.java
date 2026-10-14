@@ -15,6 +15,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -64,7 +65,28 @@ public class AiReasonsService {
     return model.available() ? AiReasonsAvailability.AVAILABLE : AiReasonsAvailability.NO_API_KEY;
   }
 
+  /** The models that may be asked for: the default one and the configured allow-list. */
+  public List<String> allowedModels() {
+    Set<String> allowed = new LinkedHashSet<>();
+    allowed.add(model.defaultModel());
+    if (properties.getAllowedModels() != null) {
+      allowed.addAll(properties.getAllowedModels());
+    }
+    return List.copyOf(allowed);
+  }
+
+  /** The reasons by the default model. */
   public ReasonsResult reasons(ReplayReportInput input) {
+    return reasons(input, null);
+  }
+
+  /**
+   * The reasons by the named model, which must be allowed; null or blank is the default model. The
+   * stored answer of another model is never reused.
+   */
+  public ReasonsResult reasons(ReplayReportInput input, String modelName) {
+    String chosen =
+        modelName == null || modelName.isBlank() ? model.defaultModel() : modelName.strip();
     AiReasonsAvailability availability = availability();
     if (availability == AiReasonsAvailability.SWITCHED_OFF) {
       return ReasonsResult.of(Status.SWITCHED_OFF);
@@ -74,6 +96,9 @@ public class AiReasonsService {
         log.warn("AI reasons asked for but no OpenAI API key is configured");
       }
       return ReasonsResult.of(Status.NO_API_KEY);
+    }
+    if (!allowedModels().contains(chosen)) {
+      return ReasonsResult.of(Status.MODEL_NOT_ALLOWED);
     }
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     if (yours == null) {
@@ -85,9 +110,9 @@ public class AiReasonsService {
     }
     FactTrimmer.Trimmed trimmed = trimmer.trim(facts, properties.getFactsTokenBudget());
     ReasonsPrompt prompt = promptBuilder.build(trimmed);
-    String hash = hash(prompt);
+    String hash = hash(prompt, chosen);
     synchronized (matchLocks[(int) Math.floorMod(input.matchId(), (long) LOCKS)]) {
-      return answer(input.matchId(), yours, trimmed, prompt, hash);
+      return answer(input.matchId(), yours, trimmed, prompt, hash, chosen);
     }
   }
 
@@ -96,10 +121,11 @@ public class AiReasonsService {
       TeamSide yours,
       FactTrimmer.Trimmed trimmed,
       ReasonsPrompt prompt,
-      String hash) {
+      String hash,
+      String chosen) {
     Optional<List<Reason>> stored = stored(matchId, yours, hash);
     if (stored.isPresent()) {
-      return new ReasonsResult(Status.CACHED, stored.get());
+      return new ReasonsResult(Status.CACHED, stored.get(), chosen);
     }
     long calls =
         repo.countByMatchIdAndCreatedAtAfter(
@@ -114,23 +140,17 @@ public class AiReasonsService {
     }
     Set<String> ids = trimmed.kept().stream().map(Fact::id).collect(Collectors.toSet());
     try {
-      ModelAnswer answer = model.ask(prompt);
+      ModelAnswer answer = model.ask(prompt, chosen);
       List<Reason> reasons = parser.parse(answer.text(), ids);
       if (reasons.isEmpty()) {
         throw new IllegalArgumentException("no reason has valid evidence");
       }
       save(matchId, yours, hash, answer, toJson(reasons), AiReasonsStatus.DONE);
       log.info("AI reasons of match {}: {} reasons", matchId, reasons.size());
-      return new ReasonsResult(Status.READY, reasons);
+      return new ReasonsResult(Status.READY, reasons, answer.model());
     } catch (RuntimeException e) {
       log.warn("AI reasons of match {} failed: {}", matchId, e.getMessage());
-      save(
-          matchId,
-          yours,
-          hash,
-          new ModelAnswer(null, null, model.modelName()),
-          null,
-          AiReasonsStatus.FAILED);
+      save(matchId, yours, hash, new ModelAnswer(null, null, chosen), null, AiReasonsStatus.FAILED);
       return ReasonsResult.of(Status.FAILED);
     }
   }
@@ -178,12 +198,12 @@ public class AiReasonsService {
   }
 
   /** The prompt carries the facts and the language; the model name is part of the question too. */
-  private String hash(ReasonsPrompt prompt) {
+  private String hash(ReasonsPrompt prompt, String chosen) {
     try {
       byte[] digest =
           MessageDigest.getInstance("SHA-256")
               .digest(
-                  (model.modelName() + "\n" + prompt.system() + "\n" + prompt.user())
+                  (chosen + "\n" + prompt.system() + "\n" + prompt.user())
                       .getBytes(StandardCharsets.UTF_8));
       return HexFormat.of().formatHex(digest);
     } catch (NoSuchAlgorithmException e) {

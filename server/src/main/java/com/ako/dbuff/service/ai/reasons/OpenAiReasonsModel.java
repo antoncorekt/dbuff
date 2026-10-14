@@ -30,15 +30,14 @@ public class OpenAiReasonsModel implements ReasonsModel {
   }
 
   @Override
-  public String modelName() {
+  public String defaultModel() {
     return properties.getModel() != null ? properties.getModel() : openAi.getModel();
   }
 
   @Override
-  public ModelAnswer ask(ReasonsPrompt prompt) {
+  public ModelAnswer ask(ReasonsPrompt prompt, String model) {
     OpenAIClient client =
         clients.client().orElseThrow(() -> new ReasonsModelException("no OpenAI API key", null));
-    String model = modelName();
     int seconds =
         properties.getTimeoutSeconds() != null
             ? properties.getTimeoutSeconds()

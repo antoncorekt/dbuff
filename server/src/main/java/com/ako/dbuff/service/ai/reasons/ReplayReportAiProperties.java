@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.ai.reasons;
 
 import jakarta.annotation.PostConstruct;
+import java.util.List;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -36,6 +37,12 @@ public class ReplayReportAiProperties {
   /** The model; the {@code openai.model} value when not set. */
   private String model;
 
+  /**
+   * The models {@code /match ai} may be asked to use instead of {@link #model}; the default model
+   * is always allowed. Unset means the default model only.
+   */
+  private List<String> allowedModels;
+
   /** The most paid model calls per match in a day; stored answers are reused without a call. */
   private int maxCallsPerMatchPerDay = 3;
 
@@ -59,6 +66,13 @@ public class ReplayReportAiProperties {
     }
     if (model != null && model.isBlank()) {
       throw new IllegalStateException("replay.report.ai.model must not be blank when set");
+    }
+    if (allowedModels != null
+        && (allowedModels.isEmpty()
+            || allowedModels.stream().anyMatch(m -> m == null || m.isBlank()))) {
+      throw new IllegalStateException(
+          "replay.report.ai.allowed-models must list at least one model and no blank one, got "
+              + allowedModels);
     }
     if (maxCallsPerMatchPerDay < 1 || maxCallsPerMatchPerDay > MAX_CALLS_PER_DAY) {
       throw new IllegalStateException(

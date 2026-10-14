@@ -16,18 +16,33 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 public class AiReasonsCommandHandler {
+  public static final String MODEL_OPTION = "model";
+
   private final AiReasonsService service;
+  private final AiReasonsSection section;
   private final ReplayReportService reports;
 
-  public AiReasonsCommandHandler(AiReasonsService service, @Lazy ReplayReportService reports) {
+  public AiReasonsCommandHandler(
+      AiReasonsService service, AiReasonsSection section, @Lazy ReplayReportService reports) {
     this.service = service;
+    this.section = section;
     this.reports = reports;
   }
 
   public void handle(CommandContext context, long matchId, DbufInstanceConfigDomain config) {
+    String model = context.getOption(MODEL_OPTION);
     AiReasonsAvailability availability = service.availability();
     if (availability != AiReasonsAvailability.AVAILABLE) {
       context.replyEphemeral("❌ Not available: " + availability.reason() + ".");
+      return;
+    }
+    if (model != null && !model.isBlank() && !service.allowedModels().contains(model.strip())) {
+      context.replyEphemeral(
+          "❌ Model `"
+              + model.strip()
+              + "` is not allowed. Allowed: "
+              + String.join(", ", service.allowedModels())
+              + ".");
       return;
     }
     if (!reports.hasStoredAnalysis(matchId)) {
@@ -42,7 +57,7 @@ public class AiReasonsCommandHandler {
             "🔄 Working out the top reasons for match " + matchId + "…", "Match " + matchId);
     try {
       ReportDelivery delivery =
-          reports.deliverSection(matchId, config.getId(), AiReasonsSection.NAME);
+          reports.deliverSection(matchId, config.getId(), section.forModel(model));
       if (delivery != ReportDelivery.POSTED) {
         reply.post("The top reasons were not posted: " + delivery.reason() + ".");
       }

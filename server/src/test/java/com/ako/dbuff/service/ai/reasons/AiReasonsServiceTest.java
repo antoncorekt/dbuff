@@ -155,6 +155,50 @@ class AiReasonsServiceTest {
   }
 
   @Test
+  void aModelOutsideTheAllowListIsRefusedWithNoCall() {
+    ReasonsResult result = service.reasons(ReasonsFixtures.input(), "gpt-expensive");
+
+    assertThat(result.status()).isEqualTo(Status.MODEL_NOT_ALLOWED);
+    assertThat(model.asked).isEmpty();
+    org.mockito.Mockito.verifyNoInteractions(repo);
+  }
+
+  @Test
+  void theDefaultModelIsAlwaysAllowed_andTheAllowListAddsToIt() {
+    assertThat(service.allowedModels()).containsExactly("fake-model");
+
+    properties.setAllowedModels(List.of("small", "big"));
+
+    assertThat(service.allowedModels()).containsExactly("fake-model", "small", "big");
+  }
+
+  @Test
+  void anAllowedOverrideIsUsedForThatCallOnly_andNamedInTheResult() {
+    properties.setAllowedModels(List.of("big"));
+
+    ReasonsResult result = service.reasons(ReasonsFixtures.input(), "big");
+    service.reasons(ReasonsFixtures.input());
+
+    assertThat(result.status()).isEqualTo(Status.READY);
+    assertThat(result.model()).isEqualTo("big");
+    assertThat(model.askedModels).containsExactly("big", "fake-model");
+  }
+
+  @Test
+  void theCacheKeyIncludesTheModel() {
+    properties.setAllowedModels(List.of("big"));
+    service.reasons(ReasonsFixtures.input(), "big");
+    service.reasons(ReasonsFixtures.input());
+    ArgumentCaptor<MatchAiReasonsDomain> saved =
+        ArgumentCaptor.forClass(MatchAiReasonsDomain.class);
+    verify(repo, org.mockito.Mockito.times(2)).save(saved.capture());
+
+    assertThat(saved.getAllValues().get(0).getFactsHash())
+        .isNotEqualTo(saved.getAllValues().get(1).getFactsHash());
+    assertThat(saved.getAllValues().get(0).getModel()).isEqualTo("big");
+  }
+
+  @Test
   void aTrackedTeamOnBothSidesOrNoneHasNoSideToJudge() {
     var both =
         new com.ako.dbuff.service.replay.report.ReplayReportInput(

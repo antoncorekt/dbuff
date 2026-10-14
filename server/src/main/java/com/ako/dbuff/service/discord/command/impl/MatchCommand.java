@@ -22,7 +22,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
+import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import org.springframework.context.annotation.Lazy;
@@ -92,7 +94,11 @@ public class MatchCommand implements DbuffCommand {
 
   @Override
   public Map<String, String> parseTextArguments(String alias, String subcommand, String arguments) {
-    return Map.of();
+    if (!"ai".equals(alias)) {
+      return Map.of();
+    }
+    String model = ((subcommand == null ? "" : subcommand) + " " + arguments).strip();
+    return model.isEmpty() ? Map.of() : Map.of(AiReasonsCommandHandler.MODEL_OPTION, model);
   }
 
   @Override
@@ -106,7 +112,14 @@ public class MatchCommand implements DbuffCommand {
         .addSubcommands(
             new SubcommandData("rerun", "Re-report using the data already stored"),
             new SubcommandData("retry", "Delete the stored data and re-fetch from OpenDota"),
-            new SubcommandData("ai", "Post the AI top reasons this match was won or lost"));
+            new SubcommandData("ai", "Post the AI top reasons this match was won or lost")
+                .addOptions(
+                    new OptionData(
+                            OptionType.STRING,
+                            AiReasonsCommandHandler.MODEL_OPTION,
+                            "The model to use, instead of the server default",
+                            false)
+                        .setAutoComplete(true)));
   }
 
   @Override

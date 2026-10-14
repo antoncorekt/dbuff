@@ -155,12 +155,24 @@ public class ReplayReportService {
    * for automatic posting can still be asked for.
    */
   public ReportDelivery deliverSection(long matchId, String instanceId, String sectionName) {
+    return deliverSection(
+        matchId,
+        instanceId,
+        sections.stream().filter(s -> s.name().equals(sectionName)).findFirst().orElse(null));
+  }
+
+  /** The same for a section that is not a bean, such as a bean's variant for one request. */
+  public ReportDelivery deliverSection(
+      long matchId, String instanceId, ReplayReportSection section) {
+    return deliverSectionOf(matchId, instanceId, section);
+  }
+
+  private ReportDelivery deliverSectionOf(
+      long matchId, String instanceId, ReplayReportSection section) {
     try {
       if (!hasStoredAnalysis(matchId)) {
         return logSkipped(matchId, ReportDelivery.NOT_STORED);
       }
-      ReplayReportSection section =
-          sections.stream().filter(s -> s.name().equals(sectionName)).findFirst().orElse(null);
       MatchDomain match = matchRepo.findById(matchId).orElse(null);
       DbufInstanceConfigDomain instance = instanceRepo.findById(instanceId).orElse(null);
       if (section == null || match == null || instance == null) {
@@ -176,7 +188,7 @@ public class ReplayReportService {
               ReportDelivery.SECTION_EMPTY,
               false));
     } catch (RuntimeException e) {
-      log.warn("Section {} of match {} failed: {}", sectionName, matchId, e.getMessage(), e);
+      log.warn("Section {} of match {} failed: {}", section.name(), matchId, e.getMessage(), e);
       return ReportDelivery.FAILED;
     }
   }

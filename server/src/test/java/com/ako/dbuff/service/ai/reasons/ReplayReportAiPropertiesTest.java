@@ -43,6 +43,21 @@ class ReplayReportAiPropertiesTest {
   }
 
   @Test
+  void theAllowListMustHoldAtLeastOneModelAndNoBlankOne() {
+    ReplayReportAiProperties empty = new ReplayReportAiProperties();
+    empty.setAllowedModels(java.util.List.of());
+    ReplayReportAiProperties blank = new ReplayReportAiProperties();
+    blank.setAllowedModels(java.util.Arrays.asList("gpt-4o", " "));
+    ReplayReportAiProperties fine = new ReplayReportAiProperties();
+    fine.setAllowedModels(java.util.List.of("gpt-4o-mini", "gpt-4o"));
+
+    assertThatThrownBy(empty::validate).hasMessageContaining("allowed-models");
+    assertThatThrownBy(blank::validate).hasMessageContaining("allowed-models");
+    assertThatCode(fine::validate).doesNotThrowAnyException();
+    assertThat(new ReplayReportAiProperties().getAllowedModels()).isNull();
+  }
+
+  @Test
   void rejectsValuesThatCannotWork() {
     ReplayReportAiProperties tiny = new ReplayReportAiProperties();
     tiny.setFactsTokenBudget(10);
