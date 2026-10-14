@@ -99,7 +99,10 @@ public class MatchCommand implements DbuffCommand {
   public SlashCommandData getDefinition() {
     return Commands.slash("match", "Reprocess the match this thread is about")
         .addSubcommands(
-            new SubcommandData("rerun", "Re-report using the data already stored"),
+            new SubcommandData(
+                "rerun",
+                "Refresh the header, re-post the replay report (staged flow off: re-report stored"
+                    + " data)"),
             new SubcommandData("retry", "Delete the stored data and re-fetch from OpenDota"));
   }
 
@@ -149,8 +152,9 @@ public class MatchCommand implements DbuffCommand {
     try {
       log.info(
           "Rerunning report for match {} in channel {}", matchId, config.getDiscordChannelId());
-      matchReportOrchestrator.processAndReport(List.of(match.get()), config);
-      if (stageService.enabled()) {
+      if (!stageService.enabled()) {
+        matchReportOrchestrator.processAndReport(List.of(match.get()), config);
+      } else {
         String note = refreshForTesting(match.get(), config);
         if (!note.isEmpty()) {
           reply.post(note);
@@ -165,13 +169,16 @@ public class MatchCommand implements DbuffCommand {
   /** Stage test aid: retitles the header and posts the replay report again; never fails. */
   private String refreshForTesting(MatchDomain match, DbufInstanceConfigDomain config) {
     List<String> notes = new ArrayList<>();
+    boolean refreshed = false;
     try {
-      if (stageService.refresh(match, config)) {
-        notes.add("Header refreshed.");
-      }
+      refreshed = stageService.refresh(match, config);
     } catch (RuntimeException e) {
       log.warn("Header refresh of match {} failed: {}", match.getId(), e.getMessage(), e);
     }
+    notes.add(
+        refreshed
+            ? "Header refreshed."
+            : "Header not changed (plain header, no stored thread or the edit failed).");
     try {
       ReportDelivery delivery = replayReportService.redeliver(match.getId(), config.getId());
       notes.add(
@@ -180,6 +187,7 @@ public class MatchCommand implements DbuffCommand {
               : "Replay report not posted: " + delivery.reason() + ".");
     } catch (RuntimeException e) {
       log.warn("Replay report repost of match {} failed: {}", match.getId(), e.getMessage(), e);
+      notes.add("Replay report repost failed.");
     }
     return String.join(" ", notes);
   }

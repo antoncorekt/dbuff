@@ -86,6 +86,8 @@ A match found by the app after the switch was on gets a staged header. In the te
 | 2 (timeout) | `... OpenDota did not parse this match` | parse timeout |
 | 3 | `... replay analysis ready`, `... replay analysis ready (partial)`, or `... replay analysis not available` | the replay run reached a final state |
 
+With the switch on the thread holds only the stage 1 card, then the replay report sections when a replay run finishes; the old OpenDota report (lanes, damage, abilities, items tables and the AI placeholder) is not posted at stage 2 or by `~rerun`. The Dotabuff link is in the header.
+
 The shortest path for an existing match: `/match retry` in its thread (stage 1 and 2), then let the replay run (step 7), then `~rerun` (step 8).
 
 ## 7. Make the match go through replay processing
@@ -103,7 +105,7 @@ Wherever a command below says `<matchId>`, type the match number instead (no ang
 
 ## 8. Use `~rerun`
 
-1. In the match thread send `~rerun` (or `/match rerun`; `~rerun` is the text alias of it, and your test bot's prefix is `~` so the production bot, which still reads `!`, does not answer it; `~retry` is the alias of `/match retry`, which you do not want here). The command reads the match id from the thread name, which must be `Match <id>`: the app names every thread it creates that way (`MatchCommand` reads the prefix `Match `), and the thread's parent channel must be a registered channel. The bot answers "Rerunning analysis for match <id>" and rebuilds the OpenDota report from stored data.
+1. In the match thread send `~rerun` (or `/match rerun`; `~rerun` is the text alias of it, and your test bot's prefix is `~` so the production bot, which still reads `!`, does not answer it; `~retry` is the alias of `/match retry`, which you do not want here). The command reads the match id from the thread name, which must be `Match <id>`: the app names every thread it creates that way (`MatchCommand` reads the prefix `Match `), and the thread's parent channel must be a registered channel. The bot answers "Rerunning analysis for match <id>". With the switch off it rebuilds the OpenDota report from stored data; with the switch on it posts no OpenDota report (only the steps below).
 2. With the switch on, it then also:
    1. sets the header title again from what is stored now: `replay analysis ready` (or `(partial)`, or `not available`) when the match has a final run; `replay processing` when a replay is still expected; `OpenDota data ready` when the match is stored and no replay is expected. This is the one place where a title may go back to an earlier stage, for example after you deleted the run in step 7.2. It only touches a staged header; a plain header is left alone.
    2. posts the replay report sections again, if the match has a DONE or PARTIAL run, even if the report was already posted for it. It follows the section switches, the channel's `replay_report` setting and detail level; it ignores quiet hours because you asked.
