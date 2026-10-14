@@ -36,13 +36,21 @@ import com.ako.dbuff.service.replay.metrics.ReplayMetrics;
 import com.ako.dbuff.service.replay.metrics.ReplayRunCounts;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.TestModes;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.ComponentsViewRenderer;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import net.dv8tion.jda.api.components.MessageTopLevelComponent;
+import net.dv8tion.jda.api.components.container.Container;
+import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
+import net.dv8tion.jda.api.exceptions.ErrorResponseException;
+import net.dv8tion.jda.api.requests.ErrorResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -85,24 +93,7 @@ class ReplayReportServiceTest {
   @BeforeEach
   void setUp() {
     properties.setEnabled(true);
-    ReplaySection section = new ReplaySection();
-    service =
-        new ReplayReportService(
-            properties,
-            new ReplayProcessingProperties(),
-            runRepo,
-            matchRepo,
-            statRepo,
-            instanceRepo,
-            threadRepo,
-            postedRepo,
-            List.of(section),
-            new SectionSwitch(properties, List.of(section)),
-            new DiscordReportFormatter(),
-            discord,
-            quiet,
-            TestModes.registry(),
-            new ReplayMetrics(registry, mock(ReplayRunCounts.class)));
+    service = serviceWith(new ReplaySection());
     when(matchRepo.findById(1L))
         .thenReturn(Optional.of(MatchDomain.builder().id(1L).gameModeId(18L).build()));
     when(statRepo.findAllByMatchId(1L))
@@ -168,23 +159,7 @@ class ReplayReportServiceTest {
 
   @Test
   void deliver_leavesOutASectionThatDoesNotApplyToTheMatchMode() {
-    service =
-        new ReplayReportService(
-            properties,
-            new ReplayProcessingProperties(),
-            mock(ReplayParseRunRepo.class),
-            matchRepo,
-            statRepo,
-            instanceRepo,
-            threadRepo,
-            postedRepo,
-            List.of(new AbilityDraftOnlySection()),
-            new SectionSwitch(properties, List.of(new AbilityDraftOnlySection())),
-            new DiscordReportFormatter(),
-            discord,
-            quiet,
-            TestModes.registry(),
-            new ReplayMetrics(registry, mock(ReplayRunCounts.class)));
+    service = serviceWith(new AbilityDraftOnlySection());
     when(matchRepo.findById(2L))
         .thenReturn(Optional.of(MatchDomain.builder().id(2L).gameModeId(22L).build()));
     when(statRepo.findAllByMatchId(2L))
@@ -235,7 +210,8 @@ class ReplayReportServiceTest {
         discord,
         quiet,
         TestModes.registry(),
-        new ReplayMetrics(registry, mock(ReplayRunCounts.class)));
+        new ReplayMetrics(registry, mock(ReplayRunCounts.class)),
+        new ComponentsViewRenderer(new PlainViewRenderer()));
   }
 
   private static ReplayReportSection named(String name, boolean defaultEnabled) {
@@ -608,5 +584,189 @@ class ReplayReportServiceTest {
 
     assertThat(registry.get("dbuff.replay.report.posted").counter().count()).isEqualTo(1);
     assertThat(registry.find("dbuff.replay.report.skipped").counters()).isEmpty();
+  }
+
+  @Test
+  void format_isPlainByDefault() {
+    assertThat(new ReplayReportProperties().getFormat()).isEqualTo(ReportFormat.PLAIN);
+    new ReplayReportProperties().validate();
+  }
+
+  @Test
+  void validate_rejectsANullFormat() {
+    ReplayReportProperties bad = new ReplayReportProperties();
+    bad.setFormat(null);
+
+    assertThatThrownBy(bad::validate)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("replay.report.format");
+  }
+
+  @Test
+  void format_bindsFromTheYamlForm() {
+    ReplayReportProperties bound =
+        new org.springframework.boot.context.properties.bind.Binder(
+                new org.springframework.boot.context.properties.source
+                    .MapConfigurationPropertySource(
+                    java.util.Map.of("replay.report.format", "components")))
+            .bindOrCreate("replay.report", ReplayReportProperties.class);
+
+    assertThat(bound.getFormat()).isEqualTo(ReportFormat.COMPONENTS);
+  }
+
+  @Test
+  void deliver_plainFormatPostsExactlyTheFormattedTextOfTheSectionLines() {
+    service = serviceWith(named("alpha", true), named("beta", true));
+
+    service.deliver(1L);
+
+    ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
+    verify(discord, Mockito.times(2)).sendThreadMessageBlocking(Mockito.eq(thread), text.capture());
+    assertThat(text.getAllValues())
+        .containsExactly("**alpha**\n10:00: line of alpha", "**beta**\n10:00: line of beta");
+    verify(discord, never()).sendThreadComponentsBlocking(any(), any());
+  }
+
+  @Test
+  void deliver_plainFormatCapsLongReportsWithTheLeftOutNote() {
+    properties.setMaxMessages(1);
+    service = serviceWith(longSection("alpha"), longSection("beta"), longSection("gamma"));
+
+    service.deliver(1L);
+
+    ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
+    verify(discord, Mockito.times(1)).sendThreadMessageBlocking(Mockito.eq(thread), text.capture());
+    assertThat(text.getValue()).contains("more left out").hasSizeLessThanOrEqualTo(2000);
+  }
+
+  private static ReplayReportSection longSection(String name) {
+    return new ReplaySection() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public int order() {
+        return name.charAt(0);
+      }
+
+      @Override
+      public List<String> lines(ReplayReportInput input) {
+        return java.util.stream.IntStream.range(0, 12)
+            .mapToObj(i -> name + "x".repeat(150))
+            .toList();
+      }
+    };
+  }
+
+  @Test
+  void deliver_componentsFormatPacksTheSectionCardsIntoOneMessageInOrder() {
+    properties.setFormat(ReportFormat.COMPONENTS);
+    service = serviceWith(named("alpha", true), named("beta", true));
+
+    service.deliver(1L);
+
+    ArgumentCaptor<List<MessageTopLevelComponent>> cards = ArgumentCaptor.forClass(List.class);
+    verify(discord).sendThreadComponentsBlocking(Mockito.eq(thread), cards.capture());
+    verify(discord, never()).sendThreadMessageBlocking(any(), any());
+    List<MessageTopLevelComponent> message = cards.getValue();
+    assertThat(message).hasSize(2).allMatch(c -> c instanceof Container);
+    assertThat(((Container) message.get(0)).getAccentColorRaw()).isEqualTo(Accent.INFO.rgb());
+    ArgumentCaptor<ReplayReportPostedDomain> posted =
+        ArgumentCaptor.forClass(ReplayReportPostedDomain.class);
+    verify(postedRepo).save(posted.capture());
+    assertThat(posted.getValue().getMessages()).isEqualTo(1);
+  }
+
+  private static ReplayReportSection bulky(String name) {
+    return new ReplaySection() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public int order() {
+        return name.charAt(0);
+      }
+
+      @Override
+      public List<String> lines(ReplayReportInput input) {
+        return java.util.stream.IntStream.range(0, 3).mapToObj(i -> "x".repeat(900)).toList();
+      }
+    };
+  }
+
+  @Test
+  void deliver_componentsFormatCapsMessagesNotSectionsAndAddsTheLeftOutNote() {
+    properties.setFormat(ReportFormat.COMPONENTS);
+    properties.setMaxMessages(2);
+    service = serviceWith(bulky("a"), bulky("b"), bulky("c"), bulky("d"));
+
+    service.deliver(1L);
+
+    ArgumentCaptor<List<MessageTopLevelComponent>> cards = ArgumentCaptor.forClass(List.class);
+    verify(discord, Mockito.times(2))
+        .sendThreadComponentsBlocking(Mockito.eq(thread), cards.capture());
+    List<MessageTopLevelComponent> last = cards.getAllValues().get(1);
+    assertThat(((TextDisplay) last.get(last.size() - 1)).getContent())
+        .isEqualTo("_(2 more left out)_");
+  }
+
+  private static ErrorResponseException rejected(ErrorResponse code) {
+    ErrorResponseException e = mock(ErrorResponseException.class);
+    when(e.getErrorResponse()).thenReturn(code);
+    return e;
+  }
+
+  @Test
+  void deliver_otherFailuresOfAComponentsMessageAreNotRetriedAsPlainText() {
+    properties.setFormat(ReportFormat.COMPONENTS);
+    service = serviceWith(bulky("a"));
+    Mockito.doThrow(new java.io.UncheckedIOException(new java.io.IOException("timeout")))
+        .when(discord)
+        .sendThreadComponentsBlocking(any(), any());
+    service.deliver(1L);
+    ErrorResponseException denied = rejected(ErrorResponse.MISSING_PERMISSIONS);
+    Mockito.doThrow(denied).when(discord).sendThreadComponentsBlocking(any(), any());
+    service.deliver(1L);
+
+    verify(discord, never()).sendThreadMessageBlocking(any(), any());
+  }
+
+  @Test
+  void deliver_aPayloadJdaRejectsLocallyAlsoFallsBackToPlainText() {
+    properties.setFormat(ReportFormat.COMPONENTS);
+    service = serviceWith(bulky("a"));
+    Mockito.doThrow(new IllegalArgumentException("too long"))
+        .when(discord)
+        .sendThreadComponentsBlocking(any(), any());
+    service.deliver(1L);
+    Mockito.doThrow(new IllegalStateException("too many"))
+        .when(discord)
+        .sendThreadComponentsBlocking(any(), any());
+    service.deliver(1L);
+
+    verify(discord, Mockito.atLeast(2)).sendThreadMessageBlocking(Mockito.eq(thread), any());
+  }
+
+  @Test
+  void deliver_aRejectedComponentsMessageFallsBackToItsPlainTextAndTheRestIsStillPosted() {
+    properties.setFormat(ReportFormat.COMPONENTS);
+    properties.setMaxMessages(4);
+    service = serviceWith(bulky("a"), bulky("b"), bulky("c"));
+    ErrorResponseException invalid = rejected(ErrorResponse.INVALID_FORM_BODY);
+    when(discord.sendThreadComponentsBlocking(any(), any())).thenThrow(invalid).thenReturn(null);
+
+    service.deliver(1L);
+
+    ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
+    verify(discord, Mockito.atLeastOnce())
+        .sendThreadMessageBlocking(Mockito.eq(thread), text.capture());
+    assertThat(String.join("\n", text.getAllValues())).contains("x".repeat(900));
+    text.getAllValues().forEach(t -> assertThat(t.length()).isLessThanOrEqualTo(2000));
+    verify(discord, Mockito.atLeast(2)).sendThreadComponentsBlocking(any(), any());
+    verify(postedRepo).save(any());
   }
 }

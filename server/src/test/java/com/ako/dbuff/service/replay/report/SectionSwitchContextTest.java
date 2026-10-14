@@ -135,6 +135,21 @@ class SectionSwitchContextTest {
   }
 
   @Test
+  void theReportFormatIsPlainUnlessTheConfigAsksForComponents() {
+    runner()
+        .run(
+            context ->
+                assertThat(context.getBean(ReplayReportProperties.class).getFormat())
+                    .isEqualTo(ReportFormat.PLAIN));
+    runner()
+        .withPropertyValues("replay.report.format=COMPONENTS")
+        .run(
+            context ->
+                assertThat(context.getBean(ReplayReportProperties.class).getFormat())
+                    .isEqualTo(ReportFormat.COMPONENTS));
+  }
+
+  @Test
   void aSectionWithoutTheOverrideIsOffByDefault() {
     ReplayReportSection section = new TestSection("fresh");
     assertThat(section.defaultEnabled()).isFalse();

@@ -12,6 +12,7 @@ import com.ako.dbuff.service.match.report.analyzer.item.ChosenItemPlayerReport;
 import com.ako.dbuff.service.match.report.analyzer.item.ItemEfficiencyReport;
 import com.ako.dbuff.service.match.report.analyzer.item.ItemHistoryStatReport;
 import com.ako.dbuff.service.match.report.analyzer.lane.LaneMatchupReport;
+import com.ako.dbuff.service.replay.report.view.MessageLimits;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -22,7 +23,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class DiscordReportFormatter implements ReportFormatter {
 
-  private static final int MSG_LIMIT = 2000;
+  private static final int MSG_LIMIT = MessageLimits.PLAIN_TEXT;
 
   @Override
   public List<String> formatForDiscord(List<Report> reports, Map<Long, String> playerNames) {

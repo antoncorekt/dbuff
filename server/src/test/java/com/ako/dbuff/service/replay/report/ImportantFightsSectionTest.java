@@ -7,6 +7,9 @@ import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.LostFight;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.RankedReason;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,7 +33,11 @@ class ImportantFightsSectionTest {
   private final SectionSwitch sectionSwitch = new SectionSwitch(properties, List.of());
   private final ImportantFightsSection section =
       new ImportantFightsSection(
-          reader, heroNames, new ReasonWording(Prettify::ability), properties);
+          reader,
+          heroNames,
+          new ReasonWording(Prettify::ability),
+          properties,
+          new PlainViewRenderer());
 
   ImportantFightsSectionTest() {
     when(heroNames.bySlot(1L)).thenReturn(Map.of(2L, "Terrorblade", 130L, "Venomancer"));
@@ -129,7 +136,11 @@ class ImportantFightsSectionTest {
     stored(fight(1, 600, "DIRE", 1200L, false, cooldown));
     ImportantFightsSection real =
         new ImportantFightsSection(
-            reader, heroNames, new ReasonWording(TestLabels.labels()), properties);
+            reader,
+            heroNames,
+            new ReasonWording(TestLabels.labels()),
+            properties,
+            new PlainViewRenderer());
 
     assertThat(real.lines(input(2L)).get(1))
         .endsWith("Terrorblade had Metamorphosis and Gods Strength on cooldown");
@@ -143,6 +154,84 @@ class ImportantFightsSectionTest {
         .contains("10:00 Dire (your team) won the fight, 1.2k net worth swing");
     assertThat(section.lines(input(2L, 130L)))
         .contains("10:00 Dire won the fight, 1.2k net worth swing");
+  }
+
+  @Test
+  void viewTellsTheTrackedTeamsScoreAndColoursTheCard() {
+    stored(
+        fight(1, 600, "DIRE", 1200L, false),
+        fight(2, 900, "DIRE", 1200L, false),
+        fight(3, 1200, "RADIANT", 1200L, false));
+
+    SectionView lost = section.view(input(0L)).orElseThrow();
+    assertThat(lost.title()).isEqualTo("Important fights");
+    assertThat(lost.verdict()).isEqualTo("Radiant (your team) won 1 of 3 important fights");
+    assertThat(lost.accent()).isEqualTo(Accent.LOSS);
+    assertThat(lost.bullets()).hasSize(3);
+
+    SectionView won = section.view(input(130L)).orElseThrow();
+    assertThat(won.verdict()).isEqualTo("Dire (your team) won 2 of 3 important fights");
+    assertThat(won.accent()).isEqualTo(Accent.WIN);
+  }
+
+  @Test
+  void viewIsNeutralWhenTheTrackedTeamSplitsOrBothTeamsAreTracked() {
+    stored(fight(1, 600, "DIRE", 1200L, false), fight(2, 900, "RADIANT", 1200L, false));
+
+    SectionView tied = section.view(input(0L)).orElseThrow();
+    assertThat(tied.accent()).isEqualTo(Accent.NEUTRAL);
+    assertThat(tied.verdict()).isEqualTo("Radiant (your team) split 1 to 1 in important fights");
+    SectionView both = section.view(input(2L, 130L)).orElseThrow();
+    assertThat(both.accent()).isEqualTo(Accent.NEUTRAL);
+    assertThat(both.verdict()).isEqualTo("Radiant and Dire won 1 each");
+  }
+
+  @Test
+  void linesAreTheViewThroughThePlainRenderer() {
+    stored(fight(1, 600, "RADIANT", 1200L, false));
+
+    SectionView view = section.view(input(0L)).orElseThrow();
+
+    assertThat(section.lines(input(0L)))
+        .isEqualTo(new PlainViewRenderer().lines(view))
+        .startsWith("**Important fights**");
+    assertThat(section.view(input(0L))).isPresent();
+  }
+
+  @Test
+  void viewIsEmptyWithoutImportantFights() {
+    when(reader.importantFights(1L)).thenReturn(List.of());
+
+    assertThat(section.view(input(0L))).isEmpty();
+  }
+
+  @Test
+  void viewJudgesAllImportantFightsNotOnlyTheListedOnes() {
+    properties.setMaxImportantFightLines(3);
+    stored(
+        fight(1, 100, "RADIANT", 100L, false),
+        fight(2, 200, "RADIANT", 100L, false),
+        fight(3, 300, "RADIANT", 100L, false),
+        fight(4, 400, "DIRE", 9000L, false),
+        fight(5, 500, "DIRE", 8000L, false),
+        fight(6, 600, "DIRE", 7000L, false));
+
+    SectionView view = section.view(input(0L)).orElseThrow();
+
+    assertThat(view.bullets()).hasSize(3);
+    assertThat(view.verdict()).isEqualTo("Radiant (your team) split 3 to 3 in important fights");
+    assertThat(view.accent()).isEqualTo(Accent.NEUTRAL);
+  }
+
+  @Test
+  void viewNamesTheLeaderWhenNoTeamIsTracked() {
+    stored(
+        fight(1, 100, "DIRE", 100L, false),
+        fight(2, 200, "DIRE", 100L, false),
+        fight(3, 300, "RADIANT", 100L, false));
+
+    assertThat(section.view(input()).orElseThrow().verdict())
+        .isEqualTo("Dire won 2 of 3 important fights");
   }
 
   @Test

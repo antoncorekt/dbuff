@@ -23,6 +23,9 @@ public class ReplayReportProperties {
   /** The server-wide switch; nothing is posted until it is turned on. */
   private boolean enabled = false;
 
+  /** How the report is shown: plain text, or Discord Components V2 cards. */
+  private ReportFormat format = ReportFormat.PLAIN;
+
   /** The most messages one match's replay analysis takes at the full detail level. */
   private int maxMessages = 4;
 
@@ -103,6 +106,9 @@ public class ReplayReportProperties {
    */
   @PostConstruct
   public void validate() {
+    if (format == null) {
+      throw new IllegalStateException("replay.report.format must be PLAIN or COMPONENTS");
+    }
     requireRange("max-important-fight-lines", maxImportantFightLines, 1, MAX_IMPORTANT_FIGHT_LINES);
     requireRange("max-rotation-lines", maxRotationLines, 1, MAX_BEHAVIOUR_LINES);
     requireRange("max-smoke-lines", maxSmokeLines, 1, MAX_BEHAVIOUR_LINES);

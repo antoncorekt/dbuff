@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.discord.command.adapter;
 
 import com.ako.dbuff.service.discord.command.AsyncReply;
+import com.ako.dbuff.service.replay.report.view.MessageLimits;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +22,7 @@ import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 public class ThreadAsyncReply implements AsyncReply {
 
   /** Discord rejects message content longer than this. */
-  static final int MAX_MESSAGE_LENGTH = 2000;
+  static final int MAX_MESSAGE_LENGTH = MessageLimits.PLAIN_TEXT;
 
   private final MessageChannel channel;
 

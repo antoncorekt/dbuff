@@ -6,11 +6,15 @@ import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.LostFight;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -28,6 +32,7 @@ public class ImportantFightsSection implements ReplayReportSection {
   private final ReportHeroNames heroNames;
   private final ReasonWording wording;
   private final ReplayReportProperties properties;
+  private final PlainViewRenderer plain;
 
   @Override
   public String name() {
@@ -46,12 +51,17 @@ public class ImportantFightsSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return view(input).map(plain::lines).orElse(List.of());
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
     List<LostFight> important =
         explanationReader.importantFights(input.matchId()).stream()
             .filter(l -> Enums.find(TeamSide.class, l.importance().getWinningTeam()) != null)
             .toList();
     if (important.isEmpty()) {
-      return List.of();
+      return Optional.empty();
     }
     List<LostFight> listed =
         important.stream()
@@ -67,13 +77,59 @@ public class ImportantFightsSection implements ReplayReportSection {
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     List<String> lines = new ArrayList<>();
-    lines.add("**Important fights**");
     for (LostFight fight : listed) {
       int index = fight.fight().getFightIndex();
       LostFight full = withReasons.getOrDefault(index, fight);
       lines.add(line(fight, full, heroes, yours));
     }
-    return lines;
+    Outcome outcome = outcome(important, yours);
+    return Optional.of(
+        new SectionView("Important fights", outcome.verdict(), outcome.accent(), lines, null));
+  }
+
+  private record Outcome(String verdict, Accent accent) {}
+
+  private static long wonBy(List<LostFight> fights, TeamSide side) {
+    return fights.stream()
+        .filter(l -> Enums.find(TeamSide.class, l.importance().getWinningTeam()) == side)
+        .count();
+  }
+
+  /** Who won more of all the important fights of the match, not only the listed ones. */
+  private static Outcome outcome(List<LostFight> fights, TeamSide yours) {
+    long total = fights.size();
+    if (yours != null) {
+      long won = wonBy(fights, yours);
+      long lost = total - won;
+      Accent accent = won > lost ? Accent.WIN : won < lost ? Accent.LOSS : Accent.NEUTRAL;
+      String verdict =
+          won == lost
+              ? String.format(
+                  Locale.ROOT,
+                  "%s split %d to %d in important fights",
+                  Prettify.teamOf(yours.name(), yours),
+                  won,
+                  lost)
+              : String.format(
+                  Locale.ROOT,
+                  "%s won %d of %d important fights",
+                  Prettify.teamOf(yours.name(), yours),
+                  won,
+                  total);
+      return new Outcome(verdict, accent);
+    }
+    long radiant = wonBy(fights, TeamSide.RADIANT);
+    long dire = total - radiant;
+    String verdict =
+        radiant == dire
+            ? String.format(Locale.ROOT, "Radiant and Dire won %d each", radiant)
+            : String.format(
+                Locale.ROOT,
+                "%s won %d of %d important fights",
+                radiant > dire ? "Radiant" : "Dire",
+                Math.max(radiant, dire),
+                total);
+    return new Outcome(verdict, Accent.NEUTRAL);
   }
 
   /** The tenths of a thousand gold the fight moved, 0 when too small to tell, -1 when unknown. */
