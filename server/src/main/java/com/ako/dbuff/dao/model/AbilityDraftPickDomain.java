@@ -49,6 +49,12 @@ public class AbilityDraftPickDomain {
   /** Null for the first pick. */
   private Double secondsSincePrevPick;
 
+  /** 1 to 50 over the skill and hero turns of the draft; null when the hero turns are unknown. */
+  private Integer turnNumber;
+
+  /** Game clock at the pick, negative before the horn. */
+  private Double clockSeconds;
+
   private Long abilityId;
 
   /** Null when the ability id is not in the constants. */

@@ -11,6 +11,7 @@ import lombok.Builder;
  * parser library.
  *
  * @param draft the Ability Draft, null for a mode that has none or a replay with no pool
+ * @param heroDraft the hero side of the Ability Draft, null where {@code draft} is
  * @param samples per-player state over time, null when the replay was not read past the draft
  * @param combatLog the hero-relevant combat-log entries, null when none were read
  * @param map the buildings and jungle camps of the map the game was played on
@@ -24,6 +25,7 @@ public record ReplayFacts(
     double gameStartTime,
     List<ReplayPlayerFact> players,
     AbilityDraftFacts draft,
+    HeroDraftFacts heroDraft,
     SampleFacts samples,
     CombatLogFacts combatLog,
     MapFacts map,

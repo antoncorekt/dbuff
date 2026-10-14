@@ -72,6 +72,41 @@ class AbilityDraftExtractorTest {
   }
 
   @Test
+  void extract_stampsTheClockAndLeavesTheTurnNumberOutWithoutAHeroDraft() {
+    extractor.extract(facts(fullDraft()), MATCH);
+
+    AbilityDraftPickDomain first =
+        pickRepo.findAll().stream()
+            .min(Comparator.comparing(AbilityDraftPickDomain::getPickOrder))
+            .orElseThrow();
+    assertThat(first.getClockSeconds()).isEqualTo((2000 - 17136) / 30.0);
+    assertThat(first.getTurnNumber()).isNull();
+  }
+
+  @Test
+  void extract_numbersEverySkillTurnAmongTheHeroTurns() {
+    List<DraftPick> heroPicks = List.of(new DraftPick(1, 0, 0, 2000 + 105));
+    HeroDraftFacts heroes = new HeroDraftFacts(List.of(), heroPicks);
+
+    extractor.extract(
+        ReplayFacts.builder()
+            .clockStartTick(17136)
+            .players(players)
+            .draft(fullDraft())
+            .heroDraft(heroes)
+            .build(),
+        MATCH);
+
+    List<AbilityDraftPickDomain> picks =
+        pickRepo.findAll().stream()
+            .sorted(Comparator.comparing(AbilityDraftPickDomain::getPickOrder))
+            .toList();
+    assertThat(picks.get(0).getTurnNumber()).isEqualTo(1);
+    assertThat(picks.get(1).getTurnNumber()).isEqualTo(3);
+    assertThat(picks.getLast().getTurnNumber()).isEqualTo(41);
+  }
+
+  @Test
   void extract_storesThePoolWithSkippedSkillsHavingNoPicker() {
     extractor.extract(facts(fullDraft()), MATCH);
 

@@ -32,6 +32,7 @@ export REPLAY_REPORT_SECTIONS_IMPORTANTFIGHTS_ENABLED=true
 export REPLAY_REPORT_SECTIONS_LANES_ENABLED=true
 export REPLAY_REPORT_SECTIONS_VISION_ENABLED=true
 export REPLAY_REPORT_SECTIONS_ITEMS_ENABLED=true
+export REPLAY_REPORT_SECTIONS_DRAFTBOARD_ENABLED=true
 export REPLAY_PROCESSING_TEMP_DIR=$HOME/dbuff-replay-tmp
 export SCHEDULER_QUIET_HOURS_ENABLED=false
 mkdir -p $REPLAY_PROCESSING_TEMP_DIR
@@ -56,7 +57,7 @@ What each one does:
 | `REPLAY_PROCESSING_ENABLED` | `replay.processing.enabled` | fetch and analyse replays. Default false |
 | `REPLAY_REPORT_ENABLED` | `replay.report.enabled` | post the replay report in the thread. Default false |
 | `REPLAY_REPORT_FORMAT` | `replay.report.format` | `components` posts the report as Components V2 cards, `plain` (default) as text |
-| `REPLAY_REPORT_SECTIONS_<NAME>_ENABLED` | `replay.report.sections.<name>.enabled` | six sections are on by default (swing, deaths, fights, movement, composition, draft); the others are off. The name has no dash or underscore: `IMPORTANTFIGHTS` is the section `important-fights`. Other names: `LANES`, `ROTATIONS`, `SMOKE`, `OBJECTIVES`, `OPENING`, `VISION`, `ITEMS`, `OUTLIERS`, `ENDGAME`. **A name that is not a section stops the app from starting while the report is on** |
+| `REPLAY_REPORT_SECTIONS_<NAME>_ENABLED` | `replay.report.sections.<name>.enabled` | six sections are on by default (swing, deaths, fights, movement, composition, draft); the others are off. The name has no dash or underscore: `IMPORTANTFIGHTS` is the section `important-fights`. Other names: `LANES`, `ROTATIONS`, `SMOKE`, `OBJECTIVES`, `OPENING`, `VISION`, `ITEMS`, `OUTLIERS`, `ENDGAME`, `DRAFTBOARD` (Ability Draft only; needs a match parsed after the draft board shipped). **A name that is not a section stops the app from starting while the report is on** |
 | `REPLAY_PROCESSING_TEMP_DIR` | `replay.processing.temp-dir` | where the replay is downloaded and unpacked (up to about 250 MB per match). Default is `<java.io.tmpdir>/dbuff-replays`, so setting it is optional on macOS |
 | `SCHEDULER_QUIET_HOURS_ENABLED` | `scheduler.quiet-hours.enabled` | by default the replay job and the match jobs sleep from 01:00 to 09:00 server time. Only needed if you test at night |
 

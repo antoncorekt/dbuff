@@ -125,6 +125,7 @@ Two parts of the first draft of this plan were wrong and are fixed here: per-min
   - invisible heroes present (from the hero constants: Riki, Clinkz, Weaver, Nyx Assassin, Templar Assassin, invisibility items) and the other team's detection;
   - enemy wards destroyed.
 - **Topic `vision`:** one row per important fight window with those columns and empty verdict columns. Reason codes after acceptance: `NO_VISION`, `INVISIBLE_HERO_NO_DETECTION`, `LATE_WARD`.
+- **Draft board (built, off by default):** `hero_draft_pick`, turn numbers and clock on `ability_draft_pick`, and the `draft-board` section for Ability Draft. Icons come next, in one PR, through `ReportHeroNames.heroName` and `AbilityLabels`; All Pick hero picks are not recorded yet.
 
 ## 9. A3: runes and the pre-game fight
 

@@ -9,6 +9,8 @@ final class Parsers {
 
   static ClarityReplayParser standard() {
     return new ClarityReplayParser(
-        List.of(new AbilityDraftReaderFactory()), new ReplayProcessingProperties());
+        List.of(new AbilityDraftReaderFactory()),
+        List.of(new HeroDraftReaderFactory()),
+        new ReplayProcessingProperties());
   }
 }

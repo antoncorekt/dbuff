@@ -37,4 +37,9 @@ public class ReportHeroNames {
     }
     return names;
   }
+
+  /** The name of a hero by its OpenDota id; the one place where a hero label could gain an icon. */
+  public String heroName(long heroId) {
+    return heroKits.hero(heroId).map(HeroConstant::getLocalized_name).orElse("Hero " + heroId);
+  }
 }

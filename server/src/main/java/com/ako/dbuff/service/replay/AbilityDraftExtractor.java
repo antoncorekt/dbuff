@@ -23,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class AbilityDraftExtractor implements ReplayExtractor {
   private static final int ULTIMATE_SLOT = 3;
   private static final int RADIANT = 2;
-  private static final double TICKS_PER_SECOND = 30.0;
 
   private final AbilityDraftPickRepo pickRepo;
   private final AbilityDraftPoolRepo poolRepo;
@@ -60,7 +59,9 @@ public class AbilityDraftExtractor implements ReplayExtractor {
       return;
     }
     Map<Integer, ReplayPlayerFact> players = facts.playersById();
-    List<AbilityDraftPickDomain> picks = pickRows(match.getId(), draft, players);
+    DraftTimeline.Turns turns = DraftTimeline.turns(draft, facts.heroDraft());
+    List<AbilityDraftPickDomain> picks =
+        pickRows(match.getId(), draft, players, turns, facts.clockStartTick());
     pickRepo.saveAll(picks);
     poolRepo.saveAll(poolRows(match.getId(), draft, picks));
   }
@@ -73,7 +74,11 @@ public class AbilityDraftExtractor implements ReplayExtractor {
   }
 
   private List<AbilityDraftPickDomain> pickRows(
-      long matchId, AbilityDraftFacts draft, Map<Integer, ReplayPlayerFact> players) {
+      long matchId,
+      AbilityDraftFacts draft,
+      Map<Integer, ReplayPlayerFact> players,
+      DraftTimeline.Turns turns,
+      int clockStartTick) {
     List<AbilityDraftPickDomain> rows = new ArrayList<>();
     Map<Integer, Integer> picksPerTeam = new HashMap<>();
     int firstTick = draft.picks().getFirst().tick();
@@ -94,9 +99,13 @@ public class AbilityDraftExtractor implements ReplayExtractor {
               .team(team)
               .teamPickIndex(picksPerTeam.merge(team, 1, Integer::sum))
               .pickTick(pick.tick())
-              .secondsIntoDraft((pick.tick() - firstTick) / TICKS_PER_SECOND)
+              .turnNumber(turns.skill(pick.order()))
+              .clockSeconds(DraftTimeline.clockSeconds(pick.tick(), clockStartTick))
+              .secondsIntoDraft((pick.tick() - firstTick) / DraftTimeline.TICKS_PER_SECOND)
               .secondsSincePrevPick(
-                  pick.order() == 1 ? null : (pick.tick() - previousTick) / TICKS_PER_SECOND)
+                  pick.order() == 1
+                      ? null
+                      : (pick.tick() - previousTick) / DraftTimeline.TICKS_PER_SECOND)
               .abilityId((long) entry.abilityId())
               .abilityName(abilityNames.nameOf(entry.abilityId()).orElse(null))
               .finalAbilitySlot(entry.finalSlot())
