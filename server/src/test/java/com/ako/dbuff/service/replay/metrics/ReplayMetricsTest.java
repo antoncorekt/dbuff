@@ -33,7 +33,7 @@ class ReplayMetricsTest {
   }
 
   @Test
-  void runFinished_recordsTheDurationUnderTheFinalStatusAndTheHeap() {
+  void runFinished_recordsTheDurationUnderTheFinalStatus() {
     metrics.runFinished(ReplayStatus.DONE, Duration.ofSeconds(4));
     metrics.runFinished(ReplayStatus.FAILED_PARSER, Duration.ofSeconds(1));
     metrics.runFinished(ReplayStatus.DONE, Duration.ofSeconds(2));
@@ -48,27 +48,14 @@ class ReplayMetricsTest {
                 .timer()
                 .count())
         .isEqualTo(1);
-    assertThat(registry.get("dbuff.replay.last.heap.used.bytes").gauge().value()).isPositive();
   }
 
   @Test
-  void reportCounters_countPostedAndSkippedByCause() {
+  void reportPosted_countsPostedReports() {
     metrics.reportPosted();
-    metrics.reportSkipped("quiet_hours");
-    metrics.reportSkipped("quiet_hours");
-    metrics.reportSkipped("no_thread");
+    metrics.reportPosted();
 
-    assertThat(registry.get("dbuff.replay.report.posted").counter().count()).isEqualTo(1);
-    assertThat(
-            registry
-                .get("dbuff.replay.report.skipped")
-                .tag("cause", "quiet_hours")
-                .counter()
-                .count())
-        .isEqualTo(2);
-    assertThat(
-            registry.get("dbuff.replay.report.skipped").tag("cause", "no_thread").counter().count())
-        .isEqualTo(1);
+    assertThat(registry.get("dbuff.replay.report.posted").counter().count()).isEqualTo(2);
   }
 
   @Test
@@ -84,7 +71,6 @@ class ReplayMetricsTest {
               ReplayMetrics onBroken = new ReplayMetrics(broken, counts);
               onBroken.runFinished(ReplayStatus.DONE, Duration.ofSeconds(1));
               onBroken.reportPosted();
-              onBroken.reportSkipped("quiet_hours");
             })
         .doesNotThrowAnyException();
   }

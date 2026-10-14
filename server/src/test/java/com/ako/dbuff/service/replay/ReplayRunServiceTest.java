@@ -14,6 +14,7 @@ import com.ako.dbuff.service.replay.metrics.ReplayMetrics;
 import com.ako.dbuff.service.replay.metrics.ReplayRunCounts;
 import com.ako.dbuff.service.replay.mode.GameModeRegistry;
 import com.ako.dbuff.service.replay.mode.TestModes;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -104,12 +106,36 @@ class ReplayRunServiceTest {
   }
 
   @Test
+  void process_doesNotCountTimeSpentWaitingForTheParsePermit() throws Exception {
+    semaphore.acquire();
+    Thread worker = new Thread(() -> service.process(match()));
+    worker.start();
+    Thread.sleep(500);
+    semaphore.release();
+    worker.join();
+
+    var timer = registry.get("dbuff.replay.run.duration").tag("status", "DONE").timer();
+    assertThat(timer.count()).isEqualTo(1);
+    assertThat(timer.totalTime(TimeUnit.MILLISECONDS)).isLessThan(400);
+  }
+
+  @Test
+  void process_doesNotTimeARunThatNeverParses() {
+    MatchDomain other = match();
+    other.setGameModeId(3L);
+
+    service.process(other);
+
+    assertThat(registry.find("dbuff.replay.run.duration").timers()).isEmpty();
+  }
+
+  @Test
   void process_isNotFailedByABrokenMetricsRegistry() {
-    var broken = mock(io.micrometer.core.instrument.MeterRegistry.class);
+    MeterRegistry broken = mock(MeterRegistry.class);
     when(broken.timer(any(String.class), any(String[].class)))
         .thenThrow(new IllegalStateException("registry closed"));
-    metricsOverride = new ReplayMetrics(broken, mock(ReplayRunCounts.class));
-    service = serviceWith(List.of(goodExtractor));
+    service =
+        serviceWith(List.of(goodExtractor), new ReplayMetrics(broken, mock(ReplayRunCounts.class)));
 
     assertThat(service.process(match())).isEqualTo(ReplayStatus.DONE);
   }
@@ -312,11 +338,14 @@ class ReplayRunServiceTest {
     verify(fileProvider, never()).open(any());
   }
 
-  private ReplayMetrics metricsOverride;
   private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
   private final ReplayMetrics metrics = new ReplayMetrics(registry, mock(ReplayRunCounts.class));
 
   private ReplayRunService serviceWith(List<ReplayExtractor> extractors) {
+    return serviceWith(extractors, metrics);
+  }
+
+  private ReplayRunService serviceWith(List<ReplayExtractor> extractors, ReplayMetrics metrics) {
     return new ReplayRunService(
         runRepo,
         statRepo,
@@ -330,7 +359,7 @@ class ReplayRunServiceTest {
         mapLayouts,
         analysis,
         modes,
-        metricsOverride != null ? metricsOverride : metrics);
+        metrics);
   }
 
   private static MatchDomain match() {

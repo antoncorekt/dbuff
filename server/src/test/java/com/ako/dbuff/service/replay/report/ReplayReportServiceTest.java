@@ -600,25 +600,13 @@ class ReplayReportServiceTest {
   }
 
   @Test
-  void deliver_countsThePostedReportAndEachSkipByCause() {
+  void deliver_countsTheReportOnlyWhenItIsPosted() {
     service.deliver(1L);
-    when(quiet.isQuietTime(any())).thenReturn(true);
-    when(postedRepo.findByMatchIdAndInstanceId(1L, "i1")).thenReturn(Optional.empty());
-    service.deliver(1L);
-    when(quiet.isQuietTime(any())).thenReturn(false);
-    when(threadRepo.findByMatchIdAndInstanceId(1L, "i1")).thenReturn(Optional.empty());
+    when(postedRepo.findByMatchIdAndInstanceId(1L, "i1"))
+        .thenReturn(Optional.of(ReplayReportPostedDomain.builder().build()));
     service.deliver(1L);
 
     assertThat(registry.get("dbuff.replay.report.posted").counter().count()).isEqualTo(1);
-    assertThat(
-            registry
-                .get("dbuff.replay.report.skipped")
-                .tag("cause", "quiet_hours")
-                .counter()
-                .count())
-        .isEqualTo(1);
-    assertThat(
-            registry.get("dbuff.replay.report.skipped").tag("cause", "no_thread").counter().count())
-        .isEqualTo(1);
+    assertThat(registry.find("dbuff.replay.report.skipped").counters()).isEmpty();
   }
 }

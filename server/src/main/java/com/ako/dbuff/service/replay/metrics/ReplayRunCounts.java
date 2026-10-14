@@ -7,6 +7,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -25,9 +27,10 @@ public class ReplayRunCounts {
   private final ReplayProcessingProperties properties;
   private final Clock clock;
 
-  private Map<ReplayStatus, Long> counts = Map.of();
-  private long loadedAtMillis;
-  private boolean loaded;
+  private record Snapshot(Map<ReplayStatus, Long> counts, long loadedAtMillis) {}
+
+  private final AtomicReference<Snapshot> snapshot = new AtomicReference<>();
+  private final ReentrantLock refreshing = new ReentrantLock();
 
   @Autowired
   public ReplayRunCounts(ReplayParseRunRepo runRepo, ReplayProcessingProperties properties) {
@@ -40,25 +43,40 @@ public class ReplayRunCounts {
     this.clock = clock;
   }
 
-  public synchronized long countOf(ReplayStatus status) {
-    long now = clock.millis();
-    if (!loaded || now - loadedAtMillis >= TTL.toMillis()) {
-      reload(now);
+  /**
+   * One caller refreshes at a time; the others, and a refresh that fails, serve the last counts.
+   */
+  public long countOf(ReplayStatus status) {
+    Snapshot current = snapshot.get();
+    if ((current == null || isStale(current)) && refreshing.tryLock()) {
+      try {
+        current = snapshot.get();
+        if (current == null || isStale(current)) {
+          current = reload(current);
+        }
+      } finally {
+        refreshing.unlock();
+      }
     }
-    return counts.getOrDefault(status, 0L);
+    return current == null ? 0L : current.counts().getOrDefault(status, 0L);
   }
 
-  private void reload(long now) {
-    loadedAtMillis = now;
-    loaded = true;
+  private boolean isStale(Snapshot current) {
+    return clock.millis() - current.loadedAtMillis() >= TTL.toMillis();
+  }
+
+  private Snapshot reload(Snapshot last) {
     try {
       Map<ReplayStatus, Long> fresh = new EnumMap<>(ReplayStatus.class);
       for (var row : runRepo.countByStatus(properties.getParserVersion())) {
         fresh.put(row.getStatus(), row.getTotal());
       }
-      counts = fresh;
+      Snapshot loaded = new Snapshot(fresh, clock.millis());
+      snapshot.set(loaded);
+      return loaded;
     } catch (RuntimeException e) {
       log.warn("Replay run counts could not be read, keeping the last ones: {}", e.getMessage());
+      return last;
     }
   }
 }

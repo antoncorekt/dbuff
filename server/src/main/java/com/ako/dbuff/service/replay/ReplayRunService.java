@@ -81,16 +81,12 @@ public class ReplayRunService {
    * @return the status the run ended with
    */
   public ReplayStatus process(MatchDomain match) {
-    long started = System.nanoTime();
-    ReplayStatus status;
     try {
-      status = run(match);
+      return run(match);
     } catch (RuntimeException e) {
       log.error("Replay run for match {} could not be recorded", match.getId(), e);
-      status = ReplayStatus.FAILED_RESOURCE;
+      return ReplayStatus.FAILED_RESOURCE;
     }
-    metrics.runFinished(status, Duration.ofNanos(System.nanoTime() - started));
-    return status;
   }
 
   private ReplayStatus run(MatchDomain match) {
@@ -102,33 +98,45 @@ public class ReplayRunService {
     }
     GameModeProfile mode = activeMode.get();
     boolean acquired = false;
+    long started = 0;
     List<String> failedExtractors;
     try {
       parseSemaphore.acquire();
       acquired = true;
+      started = System.nanoTime();
       failedExtractors = readAndExtract(match, mode, run);
     } catch (ReplayException e) {
-      return fail(run, e.getStatus(), e.getMessage());
+      return timed(started, fail(run, e.getStatus(), e.getMessage()));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       return release(run, "Interrupted while waiting to parse");
     } catch (OutOfMemoryError e) {
-      return fail(run, ReplayStatus.FAILED_RESOURCE, "Out of memory while parsing");
+      return timed(started, fail(run, ReplayStatus.FAILED_RESOURCE, "Out of memory while parsing"));
     } catch (LinkageError e) {
       log.error("Replay libraries cannot be loaded", e);
-      return fail(run, ReplayStatus.FAILED_RESOURCE, "Library failure: " + e);
+      return timed(started, fail(run, ReplayStatus.FAILED_RESOURCE, "Library failure: " + e));
     } catch (StackOverflowError e) {
-      return fail(run, ReplayStatus.FAILED_PARSER, "Stack overflow while parsing");
+      return timed(started, fail(run, ReplayStatus.FAILED_PARSER, "Stack overflow while parsing"));
     } catch (RuntimeException e) {
       log.warn("Replay run for match {} failed unexpectedly", match.getId(), e);
-      return fail(
-          run, ReplayStatus.FAILED_PARSER, e.getClass().getSimpleName() + ": " + e.getMessage());
+      return timed(
+          started,
+          fail(
+              run,
+              ReplayStatus.FAILED_PARSER,
+              e.getClass().getSimpleName() + ": " + e.getMessage()));
     } finally {
       if (acquired) {
         parseSemaphore.release();
       }
     }
-    return conclude(match, mode, run, failedExtractors);
+    return timed(started, conclude(match, mode, run, failedExtractors));
+  }
+
+  /** Times from the parse permit to the end, so queue waits and early exits are not counted. */
+  private ReplayStatus timed(long startedNanos, ReplayStatus status) {
+    metrics.runFinished(status, Duration.ofNanos(System.nanoTime() - startedNanos));
+    return status;
   }
 
   /** The analyzers read stored data only, so they run after the parse permit is given back. */

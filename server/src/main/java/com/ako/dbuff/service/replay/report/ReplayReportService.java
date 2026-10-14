@@ -132,22 +132,11 @@ public class ReplayReportService {
       List<PlayerMatchStatisticDomain> stats,
       DbufInstanceConfigDomain instance) {
     InstanceSettings settings = instance.effectiveSettings();
-    if (instance.getDiscordChannelId() == null) {
-      return;
-    }
-    if (!settings.isReplayReportOn()) {
-      metrics.reportSkipped("switched_off");
-      return;
-    }
-    if (settings.detail() == ReportDetail.MINIMAL) {
-      metrics.reportSkipped("minimal_detail");
-      return;
-    }
-    if (postedRepo.findByMatchIdAndInstanceId(match.getId(), instance.getId()).isPresent()) {
-      return;
-    }
-    if (quietHours.isQuietTime(settings)) {
-      metrics.reportSkipped("quiet_hours");
+    if (instance.getDiscordChannelId() == null
+        || !settings.isReplayReportOn()
+        || settings.detail() == ReportDetail.MINIMAL
+        || postedRepo.findByMatchIdAndInstanceId(match.getId(), instance.getId()).isPresent()
+        || quietHours.isQuietTime(settings)) {
       return;
     }
     MatchReportThreadDomain thread =
@@ -157,12 +146,10 @@ public class ReplayReportService {
           "No thread of match {} in instance {}, nothing to follow up",
           match.getId(),
           instance.getId());
-      metrics.reportSkipped("no_thread");
       return;
     }
     List<String> messages = messages(match, stats, instance, settings);
     if (messages.isEmpty()) {
-      metrics.reportSkipped("no_content");
       return;
     }
     ThreadChannel channel = discord.getThreadById(thread.getThreadId());
@@ -171,7 +158,6 @@ public class ReplayReportService {
           "Discord thread {} of match {} not found, will try again",
           thread.getThreadId(),
           match.getId());
-      metrics.reportSkipped("thread_not_found");
       return;
     }
     postedRepo.save(

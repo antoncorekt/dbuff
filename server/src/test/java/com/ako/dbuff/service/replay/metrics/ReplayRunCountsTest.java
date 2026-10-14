@@ -8,10 +8,15 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -72,10 +77,42 @@ class ReplayRunCountsTest {
   }
 
   @Test
-  void countOf_isZeroWhenTheFirstReadFails() {
+  void countOf_retriesOnTheNextCallWhenTheFirstReadFailed() {
     when(repo.countByStatus(any())).thenThrow(new IllegalStateException("db down"));
-
     assertThat(counts.countOf(ReplayStatus.DONE)).isZero();
+
+    doReturn(List.of(row(ReplayStatus.DONE, 4))).when(repo).countByStatus(any());
+
+    assertThat(counts.countOf(ReplayStatus.DONE)).isEqualTo(4);
+  }
+
+  @Test
+  void countOf_servesTheStaleCountsWhileAnotherCallerIsRefreshing() throws Exception {
+    when(repo.countByStatus(any())).thenReturn(List.of(row(ReplayStatus.DONE, 1)));
+    counts.countOf(ReplayStatus.DONE);
+    clock.advanceSeconds(31);
+    CountDownLatch inQuery = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    when(repo.countByStatus(any()))
+        .thenAnswer(
+            call -> {
+              inQuery.countDown();
+              release.await();
+              return List.of(row(ReplayStatus.DONE, 2));
+            });
+    ExecutorService pool = Executors.newSingleThreadExecutor();
+    try {
+      Future<Long> refresher = pool.submit(() -> counts.countOf(ReplayStatus.DONE));
+      inQuery.await();
+
+      assertThat(counts.countOf(ReplayStatus.DONE)).isEqualTo(1);
+
+      release.countDown();
+      assertThat(refresher.get()).isEqualTo(2);
+      assertThat(counts.countOf(ReplayStatus.DONE)).isEqualTo(2);
+    } finally {
+      pool.shutdownNow();
+    }
   }
 
   private static class MutableClock extends Clock {

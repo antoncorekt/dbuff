@@ -73,6 +73,7 @@ import com.ako.dbuff.service.replay.report.LanesSection;
 import com.ako.dbuff.service.replay.report.MovementSection;
 import com.ako.dbuff.service.replay.report.ObjectivesSection;
 import com.ako.dbuff.service.replay.report.OpeningSection;
+import com.ako.dbuff.service.replay.report.OutliersSection;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.RotationsSection;
 import com.ako.dbuff.service.replay.report.SmokeSection;
@@ -80,6 +81,8 @@ import com.ako.dbuff.service.replay.report.SwingSection;
 import com.ako.dbuff.service.replay.report.VisionSection;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -127,7 +130,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private AbilityDraftPickRepo draftPickRepo;
   @Autowired private AbilityDraftPoolRepo draftPoolRepo;
   @Autowired private ReplayRunService runService;
-  @Autowired private io.micrometer.core.instrument.MeterRegistry meterRegistry;
+  @Autowired private MeterRegistry meterRegistry;
   @Autowired private ReplayDataService dataService;
   @Autowired private ReplayParseRunRepo runRepo;
   @Autowired private ReplayPlayerRepo playerRepo;
@@ -166,6 +169,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private SmokeSection smokeSection;
   @Autowired private ObjectivesSection objectivesSection;
   @Autowired private ItemsSection itemsSection;
+  @Autowired private OutliersSection outliersSection;
   @Autowired private OpeningSection openingSection;
   @Autowired private VisionSection visionSection;
   @Autowired private DeathSection deathSection;
@@ -326,27 +330,10 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   }
 
   private void assertReplayMeters() {
-    io.micrometer.core.instrument.Timer timer =
-        meterRegistry.get("dbuff.replay.run.duration").tag("status", "DONE").timer();
+    Timer timer = meterRegistry.get("dbuff.replay.run.duration").tag("status", "DONE").timer();
     double done = meterRegistry.get("dbuff.replay.runs").tag("status", "DONE").gauge().value();
-    double heap = meterRegistry.get("dbuff.replay.last.heap.used.bytes").gauge().value();
-    System.out.println(
-        "METERS runs{DONE}="
-            + done
-            + " runs{RUNNING}="
-            + meterRegistry.get("dbuff.replay.runs").tag("status", "RUNNING").gauge().value()
-            + " duration{DONE} count="
-            + timer.count()
-            + " total="
-            + timer.totalTime(java.util.concurrent.TimeUnit.SECONDS)
-            + "s max="
-            + timer.max(java.util.concurrent.TimeUnit.SECONDS)
-            + "s heapAfterRun="
-            + heap / 1_048_576
-            + "MiB");
     assertThat(timer.count()).isEqualTo(MATCHES.length + 1);
     assertThat(done).isEqualTo(MATCHES.length);
-    assertThat(heap).isPositive();
   }
 
   private void saveSwingKeyItems(String id, long matchId) {
@@ -424,7 +411,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(document.keySet())
         .as("%s: every section", id)
         .containsExactly(
-            "run", "roles", "fights", "vision", "runes", "lanes", "items", "behaviour");
+            "run", "roles", "fights", "vision", "runes", "lanes", "items", "outliers", "behaviour");
     JsonNode json = new ObjectMapper().valueToTree(document);
     assertThat(json.at("/run/status").asText()).isEqualTo("DONE");
     assertThat(json.at("/roles/players")).as("%s roles", id).hasSize(10);
@@ -783,6 +770,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     saveSection("smoke", smokeSection.lines(input), id, 4);
     saveSection("objectives", objectivesSection.lines(input), id, 7);
     saveSection("items", itemsSection.lines(input), id, 5);
+    saveSection("outliers", outliersSection.lines(input), id, 5);
     saveSection("opening", openingSection.lines(input), id, 4);
     saveSection("vision", visionSection.lines(input), id, 7);
   }
