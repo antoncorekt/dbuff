@@ -34,6 +34,21 @@ public class DiscordMessageService {
   }
 
   /**
+   * Sends Components V2 to a text channel; the message then carries only the components.
+   *
+   * @return the sent Message, or null if the channel was not found
+   */
+  public Message sendChannelComponents(
+      String channelId, List<MessageTopLevelComponent> components) {
+    TextChannel channel = jda.getTextChannelById(channelId);
+    if (channel == null) {
+      log.warn("Discord text channel not found: {}", channelId);
+      return null;
+    }
+    return channel.sendMessageComponents(components).useComponentsV2(true).complete();
+  }
+
+  /**
    * Creates a thread on a parent message.
    *
    * @param parentMessage the message to create a thread on
@@ -85,5 +100,19 @@ public class DiscordMessageService {
       return;
     }
     channel.editMessageById(messageId, newContent).queue();
+  }
+
+  /**
+   * Replaces a message with Components V2 and waits for Discord's answer, so that a rejection
+   * reaches the caller.
+   */
+  public void editComponentsMessage(
+      String channelId, long messageId, List<MessageTopLevelComponent> components) {
+    TextChannel channel = jda.getTextChannelById(channelId);
+    if (channel == null) {
+      log.warn("Discord text channel not found for edit: {}", channelId);
+      return;
+    }
+    channel.editMessageComponentsById(messageId, components).useComponentsV2(true).complete();
   }
 }

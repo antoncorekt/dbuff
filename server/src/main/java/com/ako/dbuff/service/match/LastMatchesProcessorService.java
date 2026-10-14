@@ -5,10 +5,13 @@ import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.service.instance.DbufInstanceConfigService;
+import com.ako.dbuff.service.match.DotaApiLastMatchesService.PlayerLine;
 import com.ako.dbuff.service.match.DotaApiLastMatchesService.RecentMatch;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
+import com.ako.dbuff.service.match.report.stage.NewMatchSummary;
 import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -135,6 +138,10 @@ public class LastMatchesProcessorService {
     Set<Long> gameModeIds = config.getGameModeIds();
 
     Map<Long, RecentMatch> recentMatches = new LinkedHashMap<>();
+    Map<Long, List<PlayerLine>> linesByMatch = new HashMap<>();
+    // The first record of a match wins above; the header takes what any player's record knows.
+    Map<Long, Long> durations = new HashMap<>();
+    Map<Long, Long> gameModes = new HashMap<>();
     // A match is history only if it is history for every tracked player who has it, so the
     // effective cutoff is the earliest one. LocalDateTime.MIN means "no cutoff": always report.
     Map<Long, LocalDateTime> cutoffs = new HashMap<>();
@@ -143,6 +150,15 @@ public class LastMatchesProcessorService {
           Optional.ofNullable(config.trackingSinceFor(playerId)).orElse(LocalDateTime.MIN);
       for (RecentMatch recent : dotaApiLastMatchesService.fetchLastMatches(playerId)) {
         recentMatches.putIfAbsent(recent.id(), recent);
+        if (recent.duration() != null) {
+          durations.putIfAbsent(recent.id(), recent.duration());
+        }
+        if (recent.gameMode() != null) {
+          gameModes.putIfAbsent(recent.id(), recent.gameMode());
+        }
+        if (recent.line() != null) {
+          linesByMatch.computeIfAbsent(recent.id(), id -> new ArrayList<>()).add(recent.line());
+        }
         cutoffs.merge(recent.id(), cutoff, (a, b) -> a.isBefore(b) ? a : b);
       }
     }
@@ -192,10 +208,16 @@ public class LastMatchesProcessorService {
       matchRepo.save(match);
 
       // Send partial report (header + thread + partial-data analyzers)
-      var partialResult = matchReportOrchestrator.processAndReportPartial(match, config);
+      NewMatchSummary summary =
+          new NewMatchSummary(
+              durations.get(match.getId()),
+              gameModes.get(match.getId()),
+              linesByMatch.get(match.getId()));
+      var partialResult = matchReportOrchestrator.processAndReportPartial(match, config, summary);
 
       // Schedule parse-wait job with discord thread ID and header message ID for full report later
-      Long discordThreadId = partialResult != null ? partialResult.threadId() : null;
+      Long discordThreadId =
+          partialResult != null && partialResult.hasThread() ? partialResult.threadId() : null;
       Long headerMessageId = partialResult != null ? partialResult.headerMessageId() : null;
       matchParseSchedulerService.scheduleParseWait(
           match.getId(), config.getId(), discordThreadId, headerMessageId);

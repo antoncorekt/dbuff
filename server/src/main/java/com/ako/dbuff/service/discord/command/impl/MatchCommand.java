@@ -169,7 +169,9 @@ public class MatchCommand implements DbuffCommand {
       // Falls back to the current thread when the orchestrator did not create its own, so the
       // scheduler still knows where to post the completed analysis.
       Long threadId =
-          partialResult != null ? partialResult.threadId() : parseLong(context.getChannelId());
+          partialResult != null && partialResult.hasThread()
+              ? partialResult.threadId()
+              : parseLong(context.getChannelId());
       Long headerMessageId = partialResult != null ? partialResult.headerMessageId() : null;
       matchParseSchedulerService.scheduleParseWait(
           matchId, config.getId(), threadId, headerMessageId);

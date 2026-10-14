@@ -9,6 +9,7 @@ import com.ako.dbuff.service.details.MatchParserHandler;
 import com.ako.dbuff.service.instance.DbufInstanceConfigService;
 import com.ako.dbuff.service.match.DotaApiParseRequestService;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
+import com.ako.dbuff.service.match.report.stage.MatchReportStageService;
 import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import java.time.Duration;
@@ -34,6 +35,7 @@ public class MatchParseCheckJob implements Job {
   @Autowired private MatchParseSchedulerService matchParseSchedulerService;
   @Autowired private DotaApiConfigurationProperties config;
   @Autowired private QuietHoursGuard quietHoursGuard;
+  @Autowired private MatchReportStageService stageService;
 
   @Override
   public void execute(JobExecutionContext context) throws JobExecutionException {
@@ -42,13 +44,18 @@ public class MatchParseCheckJob implements Job {
     long discordThreadId = context.getJobDetail().getJobDataMap().getLong("discordThreadId");
     long headerMessageId = context.getJobDetail().getJobDataMap().getLong("headerMessageId");
 
+    DbufInstanceConfigDomain instance =
+        instanceId == null ? null : instanceConfigService.getDomainById(instanceId).orElse(null);
     InstanceSettings settings =
-        instanceId == null
-            ? new InstanceSettings()
-            : instanceConfigService
-                .getDomainById(instanceId)
-                .map(DbufInstanceConfigDomain::effectiveSettings)
-                .orElseGet(InstanceSettings::new);
+        instance == null ? new InstanceSettings() : instance.effectiveSettings();
+    // With stages a timed-out match gets its title even in quiet hours; without them the order is
+    // the one the job always had.
+    boolean timeoutFirst = stageService.enabled();
+    MatchDomain match = timeoutFirst ? matchRepo.findById(matchId).orElse(null) : null;
+    if (timeoutFirst && expireIfTimedOut(match, matchId, instanceId)) {
+      return;
+    }
+
     if (quietHoursGuard.isQuietTime(settings)) {
       log.debug("Skipping parse check for match {} during quiet hours", matchId);
       return;
@@ -56,20 +63,16 @@ public class MatchParseCheckJob implements Job {
 
     log.debug("Checking parse status for match {}", matchId);
 
-    MatchDomain match = matchRepo.findById(matchId).orElse(null);
+    if (!timeoutFirst) {
+      match = matchRepo.findById(matchId).orElse(null);
+    }
     if (match == null || match.getEndProcess() != null) {
       log.debug("Match {} already processed or not found, unscheduling", matchId);
       matchParseSchedulerService.unscheduleParseWait(matchId);
       return;
     }
 
-    if (isTimedOut(match)) {
-      log.warn(
-          "Match {} parse wait timed out after {} hours", matchId, config.getParseMaxWaitHours());
-      match.setError("Parse timeout exceeded");
-      match.setEndProcess(LocalDateTime.now());
-      matchRepo.save(match);
-      matchParseSchedulerService.unscheduleParseWait(matchId);
+    if (!timeoutFirst && expireIfTimedOut(match, matchId, instanceId)) {
       return;
     }
 
@@ -82,12 +85,38 @@ public class MatchParseCheckJob implements Job {
     try {
       MatchDomain processed = matchParserHandler.handle(matchId);
       if (processed != null && instanceId != null) {
+        announceParsed(processed, instanceId);
         triggerFullReport(processed, instanceId, discordThreadId, headerMessageId);
       }
     } catch (Exception e) {
       log.error("Failed to process parsed match {}: {}", matchId, e.getMessage(), e);
     }
     matchParseSchedulerService.unscheduleParseWait(matchId);
+  }
+
+  private void announceParsed(MatchDomain match, String instanceId) {
+    try {
+      instanceConfigService
+          .getDomainById(instanceId)
+          .ifPresent(current -> stageService.parsed(match, current));
+    } catch (RuntimeException e) {
+      log.warn("Could not retitle match {}: {}", match.getId(), e.getMessage(), e);
+    }
+  }
+
+  /** Closes the match when OpenDota never parsed it; true when it did. */
+  private boolean expireIfTimedOut(MatchDomain match, long matchId, String instanceId) {
+    if (match == null || match.getEndProcess() != null || !isTimedOut(match)) {
+      return false;
+    }
+    log.warn(
+        "Match {} parse wait timed out after {} hours", matchId, config.getParseMaxWaitHours());
+    match.setError("Parse timeout exceeded");
+    match.setEndProcess(LocalDateTime.now());
+    matchRepo.save(match);
+    stageService.parseTimedOut(match, instanceId);
+    matchParseSchedulerService.unscheduleParseWait(matchId);
+    return true;
   }
 
   private boolean isTimedOut(MatchDomain match) {

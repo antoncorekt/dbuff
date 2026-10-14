@@ -18,7 +18,9 @@ class ReplayRequestAnnouncerTest {
   private final ReplayProcessingProperties properties = new ReplayProcessingProperties();
   private final ReplayRequestAnnouncer announcer =
       new ReplayRequestAnnouncer(
-          publisher, new ReplayEligibility(properties), TestModes.registry(properties), properties);
+          publisher,
+          new ReplayForecast(
+              new ReplayEligibility(properties), TestModes.registry(properties), properties));
 
   @Test
   void announce_publishesForAFreshEligibleMatch() {

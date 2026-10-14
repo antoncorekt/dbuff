@@ -183,6 +183,18 @@ class MatchCommandTest {
   }
 
   @Test
+  void retry_aHeaderWithoutAThread_schedulesAgainstTheCurrentThreadAndKeepsTheHeader() {
+    Mockito.when(orchestrator.processAndReportPartial(Mockito.any(), Mockito.any()))
+        .thenReturn(new PartialReportResult(0L, 666L));
+
+    FakeCommandContext context =
+        FakeCommandContext.builder().threadName(THREAD).channelId("12345").build();
+    command.execute("retry", context);
+
+    Mockito.verify(schedulerService).scheduleParseWait(MATCH_ID, "instance-1", 12345L, 666L);
+  }
+
+  @Test
   void retry_matchNotStored_skipsDeletionButStillReprocesses() {
     Mockito.when(matchRepo.findById(MATCH_ID)).thenReturn(Optional.empty());
     Mockito.when(orchestrator.processAndReportPartial(Mockito.any(), Mockito.any()))

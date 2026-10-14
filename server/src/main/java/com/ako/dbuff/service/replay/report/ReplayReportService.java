@@ -24,6 +24,7 @@ import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.metrics.ReplayMetrics;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.GameModeRegistry;
+import com.ako.dbuff.service.replay.report.view.ComponentsFallback;
 import com.ako.dbuff.service.replay.report.view.ComponentsViewRenderer;
 import com.ako.dbuff.service.replay.report.view.MessageLimits;
 import com.ako.dbuff.service.replay.report.view.ReportMessage;
@@ -40,8 +41,6 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
-import net.dv8tion.jda.api.exceptions.ErrorResponseException;
-import net.dv8tion.jda.api.requests.ErrorResponse;
 import org.springframework.stereotype.Service;
 
 /**
@@ -182,7 +181,7 @@ public class ReplayReportService {
         try {
           discord.sendThreadComponentsBlocking(channel, cards.components());
         } catch (RuntimeException e) {
-          if (!payloadRejected(e)) {
+          if (!ComponentsFallback.payloadRejected(e)) {
             throw e;
           }
           log.warn(
@@ -193,14 +192,6 @@ public class ReplayReportService {
         }
       }
     }
-  }
-
-  /** Discord, or JDA before sending, found the components payload itself invalid. */
-  private static boolean payloadRejected(RuntimeException e) {
-    return e instanceof IllegalArgumentException
-        || e instanceof IllegalStateException
-        || (e instanceof ErrorResponseException r
-            && r.getErrorResponse() == ErrorResponse.INVALID_FORM_BODY);
   }
 
   private List<String> plainTexts(String text) {

@@ -6,13 +6,11 @@ import com.ako.dbuff.dao.model.InstanceSettings;
 import com.ako.dbuff.dao.model.ItemDomain;
 import com.ako.dbuff.dao.model.KillLogDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
-import com.ako.dbuff.dao.model.MatchReportThreadDomain;
 import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.ItemRepository;
 import com.ako.dbuff.dao.repo.KillLogRepo;
-import com.ako.dbuff.dao.repo.MatchReportThreadRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.service.discord.DiscordMessageService;
 import com.ako.dbuff.service.match.report.analyzer.FullDataAvailable;
@@ -20,10 +18,12 @@ import com.ako.dbuff.service.match.report.analyzer.PartialDataAvailable;
 import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.ReportAnalyzer;
 import com.ako.dbuff.service.match.report.formatter.ReportFormatter;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
+import com.ako.dbuff.service.match.report.stage.HeaderRenderer;
+import com.ako.dbuff.service.match.report.stage.MatchFacts;
+import com.ako.dbuff.service.match.report.stage.MatchReportStageService;
+import com.ako.dbuff.service.match.report.stage.MatchReportStageService.HeaderKind;
+import com.ako.dbuff.service.match.report.stage.MatchThreadRecorder;
+import com.ako.dbuff.service.match.report.stage.NewMatchSummary;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -42,9 +42,6 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class MatchReportOrchestrator {
 
-  private static final DateTimeFormatter DATE_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-
   private final DiscordMessageService discordMessageService;
   private final List<ReportAnalyzer> analyzers;
   private final ReportFormatter reportFormatter;
@@ -52,7 +49,9 @@ public class MatchReportOrchestrator {
   private final AbilityRepo abilityRepo;
   private final ItemRepository itemRepository;
   private final KillLogRepo killLogRepo;
-  private final MatchReportThreadRepo threadRepo;
+  private final MatchThreadRecorder threadRecorder;
+  private final HeaderRenderer headerRenderer;
+  private final MatchReportStageService stageService;
 
   public void processAndReport(
       List<MatchDomain> processedMatches, DbufInstanceConfigDomain config) {
@@ -93,7 +92,12 @@ public class MatchReportOrchestrator {
             + " past matches for `/stats`. Live reports start with your next game.");
   }
 
-  public record PartialReportResult(long threadId, long headerMessageId) {}
+  /** {@code threadId} is 0 when the header was posted but its thread could not be made. */
+  public record PartialReportResult(long threadId, long headerMessageId) {
+    public boolean hasThread() {
+      return threadId > 0;
+    }
+  }
 
   /**
    * Phase 1: Send partial report with header + thread + partial-data analyzers. Returns the Discord
@@ -101,9 +105,21 @@ public class MatchReportOrchestrator {
    */
   public PartialReportResult processAndReportPartial(
       MatchDomain match, DbufInstanceConfigDomain config) {
+    return processAndReportPartial(match, config, NewMatchSummary.empty());
+  }
+
+  /**
+   * Phase 1 with what the recent-matches list said of the match, which the staged header and card
+   * are made of; channels without stages ignore it.
+   */
+  public PartialReportResult processAndReportPartial(
+      MatchDomain match, DbufInstanceConfigDomain config, NewMatchSummary summary) {
     if (config.getDiscordChannelId() == null) {
       log.info("Discord channel ID is null, skipping partial report");
       return null;
+    }
+    if (stageService.enabled()) {
+      return stageService.start(match, config, summary, buildPlayerNameMap(config));
     }
 
     Set<Long> focusPlayerIds = config.getPlayerIds();
@@ -116,7 +132,7 @@ public class MatchReportOrchestrator {
             .sorted(Comparator.comparingInt(ReportAnalyzer::getOrder))
             .toList();
 
-    String header = buildPartialHeader(match);
+    String header = headerRenderer.legacyWaiting(match.getId());
 
     Message headerMessage =
         discordMessageService.sendChannelMessage(config.getDiscordChannelId(), header);
@@ -127,7 +143,7 @@ public class MatchReportOrchestrator {
 
     String threadName = "Match " + match.getId();
     ThreadChannel thread = discordMessageService.createThread(headerMessage, threadName);
-    rememberThread(match, config, thread, headerMessage);
+    threadRecorder.remember(match, config, thread, headerMessage, null, null);
 
     List<Report> partialReports = runAnalyzers(context, partialAnalyzers);
     List<String> formatted =
@@ -153,9 +169,9 @@ public class MatchReportOrchestrator {
     MatchReportContext context = buildContext(match, config, focusPlayerIds);
 
     // Update header with full match info
-    if (headerMessageId > 0) {
+    if (headerMessageId > 0 && mayEditHeaderAsText(match.getId(), config.getId())) {
       String winLoss = determineWinLoss(context);
-      String fullHeader = buildHeader(match, winLoss);
+      String fullHeader = headerRenderer.legacyParsed(match, winLoss);
       discordMessageService.editMessage(config.getDiscordChannelId(), headerMessageId, fullHeader);
     }
 
@@ -187,6 +203,15 @@ public class MatchReportOrchestrator {
     }
 
     log.info("Full report sent for match {} in thread {}", match.getId(), threadId);
+  }
+
+  /**
+   * A plain header is edited as text. When the lookup failed the header is left alone, except with
+   * stages off, where the old code always edited it.
+   */
+  private boolean mayEditHeaderAsText(long matchId, String instanceId) {
+    HeaderKind kind = stageService.headerKind(matchId, instanceId);
+    return kind == HeaderKind.PLAIN || (kind == HeaderKind.UNKNOWN && !stageService.enabled());
   }
 
   /** The analyzers this channel's settings allow. */
@@ -236,7 +261,7 @@ public class MatchReportOrchestrator {
       List<ReportAnalyzer> sortedAnalyzers) {
 
     String winLoss = determineWinLoss(context);
-    String header = buildHeader(match, winLoss);
+    String header = headerRenderer.legacyParsed(match, winLoss);
 
     Message headerMessage =
         discordMessageService.sendChannelMessage(config.getDiscordChannelId(), header);
@@ -250,36 +275,13 @@ public class MatchReportOrchestrator {
 
     String threadName = "Match " + match.getId();
     ThreadChannel thread = discordMessageService.createThread(headerMessage, threadName);
-    rememberThread(match, config, thread, headerMessage);
+    threadRecorder.remember(match, config, thread, headerMessage, null, null);
 
     List<String> formatted = reportFormatter.formatForDiscord(allReports, context.getPlayerNames());
     for (String message : formatted) {
       if (message != null && !message.isEmpty()) {
         discordMessageService.sendThreadMessageBlocking(thread, message);
       }
-    }
-  }
-
-  /** Keeps the thread, so that a replay analysis arriving hours later can find it. */
-  private void rememberThread(
-      MatchDomain match,
-      DbufInstanceConfigDomain config,
-      ThreadChannel thread,
-      Message headerMessage) {
-    try {
-      MatchReportThreadDomain row =
-          threadRepo
-              .findByMatchIdAndInstanceId(match.getId(), config.getId())
-              .orElseGet(MatchReportThreadDomain::new);
-      row.setMatchId(match.getId());
-      row.setInstanceId(config.getId());
-      row.setChannelId(config.getDiscordChannelId());
-      row.setThreadId(thread.getIdLong());
-      row.setHeaderMessageId(headerMessage.getIdLong());
-      row.setCreatedAt(LocalDateTime.now());
-      threadRepo.save(row);
-    } catch (RuntimeException e) {
-      log.warn("Could not remember the thread of match {}", match.getId(), e);
     }
   }
 
@@ -310,65 +312,12 @@ public class MatchReportOrchestrator {
     return context;
   }
 
-  private String buildHeader(MatchDomain match, String winLoss) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("Match ").append(match.getId());
-
-    if (match.getGameModeName() != null) {
-      sb.append(" - ").append(match.getGameModeName());
-    }
-
-    sb.append(" - ").append(winLoss);
-
-    if (match.getRadiantScore() != null && match.getDireScore() != null) {
-      sb.append(" (")
-          .append(match.getRadiantScore())
-          .append("-")
-          .append(match.getDireScore())
-          .append(")");
-    }
-
-    if (match.getStartTime() != null) {
-      String date =
-          Instant.ofEpochSecond(match.getStartTime())
-              .atZone(ZoneId.systemDefault())
-              .format(DATE_FORMATTER);
-      sb.append("; match date - ").append(date);
-    } else if (match.getStartLocalDate() != null) {
-      sb.append("; match date - ").append(match.getStartLocalDate());
-    }
-
-    if (match.getDuration() != null) {
-      long minutes = match.getDuration() / 60;
-      sb.append(" with duration ").append(minutes).append(" min");
-    }
-
-    return sb.toString();
-  }
-
-  private String buildPartialHeader(MatchDomain match) {
-    return "Match " + match.getId() + " — waiting for parsed data...";
-  }
-
   private static String determineWinLoss(MatchReportContext context) {
-    List<PlayerMatchStatisticDomain> focusStats =
-        context.getPlayerStatistics().stream()
-            .filter(s -> context.getFocusPlayerIds().contains(s.getPlayerId()))
-            .toList();
-
-    if (focusStats.isEmpty()) {
-      return "Unknown";
-    }
-
-    long wins = focusStats.stream().filter(s -> s.getWin() != null && s.getWin() == 1).count();
-    long losses = focusStats.size() - wins;
-
-    if (wins > 0 && losses == 0) {
-      return "Win";
-    } else if (losses > 0 && wins == 0) {
-      return "Loss";
-    }
-    return "Mixed (" + wins + "W/" + losses + "L)";
+    return MatchFacts.Result.ofStats(
+            context.getPlayerStatistics().stream()
+                .filter(s -> context.getFocusPlayerIds().contains(s.getPlayerId()))
+                .toList())
+        .label();
   }
 
   private Map<Long, String> buildPlayerNameMap(DbufInstanceConfigDomain config) {
