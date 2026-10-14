@@ -9,7 +9,7 @@ Status 2026-10-14. Processing and the report are off in production today (`repla
 | Whole pipeline on a real PostgreSQL 16 | `ReplayPostgresSmokeTest` on the 4 stored fixtures (2 Ability Draft, 2 All Pick), all DONE; also green inside a linux/arm64 container (see the zstd row). Needs an empty database: it counts runs in `replay_parse_run`. |
 | 20 replays one after another at `-Xmx512m` | `ReplayLoadTest` (`./gradlew :server:replayTest --tests '*ReplayLoadTest*'`): 20 of 20 DONE, none PARTIAL, no out-of-memory, 87 s in total. Table: `~/dbuff-fixtures/send/load-test.md`. |
 | Time per replay | 2.5 s (31 to 33 minute games) to 6.1 s (60 to 64 minutes), 5.7 s for a 76-minute game. This is the parse permit to the end, from a local file served by a stand-in for Valve. |
-| Heap | Live heap after a forced GC stays at 96 to 100 MB after every run, against 88 MB before the first one: no growth over 20 runs. Peak of the old generation 114 to 161 MB (161 MB for the 76-minute game). Peak of all heap pools added together 279 to 369 MB (an upper bound: the pools do not peak together). All inside the 512 MB heap, with the test's Spring context included. |
+| Heap | Live heap after a forced GC stays at 96 to 100 MB after every run, against 88 MB before the first one: no growth over 20 runs. Peak of the old generation 114 to 161 MB (161 MB for the 76-minute game). Peak of all heap pools added together 279 to 369 MB (an upper bound: the pools do not peak together). All inside the 512 MB heap, with the test's Spring context included. The live figure is approximate (`System.gc()` is a hint; default collector, no `-XX:+DisableExplicitGC`) and the pool peaks include garbage left by the previous run. |
 | Rows stored per match | 8.6 thousand (30-minute game) to 21.6 thousand (76 minutes) over 49 tables; the largest are `replay_state_change` (2.7 to 7.4 thousand), `player_activity_segment` (1.5 to 3.8 thousand), `creep_kill` (1.1 to 3.8 thousand), `fight_ability_use` (1.0 to 2.6 thousand). |
 | A real download from Valve | 17 downloads from `http://replay<cluster>.valve.net/570/<id>_<salt>.dem.bz2`, cluster and salt from OpenDota's match JSON: all HTTP 200, `application/octet-stream`, and the body is zstd (`28 b5 2f fd`) although the URL says `.bz2`. Sizes 36.5 to 91.7 MB compressed, 1.8 to 10.9 s each except one of 96 s (61 MB; the limit `max-download-seconds` is 300). The matches were 1 to 2 hours old. Clusters 151 to 417. |
 | Valve's zstd handled by the app's decompressor | `ReplayFileProvider` picks `ZstdDecompressor` from the magic bytes; every stored `.dem.zst` of the 20 went through it. |
@@ -34,40 +34,37 @@ Commands run from a machine with AWS credentials. The REST API key is read on th
 ```
 export AWS_REGION=eu-north-1
 INSTANCE=$(aws cloudformation describe-stack-resources --stack-name dbuff --query "StackResources[?LogicalResourceId=='AppInstance'].PhysicalResourceId" --output text)
-onhost() {  # onhost '<shell command run as root on the host>'
-  local id=$(aws ssm send-command --instance-ids "$INSTANCE" --document-name AWS-RunShellScript --parameters "$(jq -n --arg s "$1" '{commands: [$s]}')" --query Command.CommandId --output text)
-  aws ssm wait command-executed --command-id "$id" --instance-id "$INSTANCE" || true
-  aws ssm get-command-invocation --command-id "$id" --instance-id "$INSTANCE" --query StandardOutputContent --output text
-}
-hostcurl() {  # hostcurl '<path>': an authenticated GET to the app on the host, the key never leaves it
-  onhost "printf 'header = \"X-Api-Key: %s\"\n' \"\$(aws ssm get-parameter --name /dbuff/DBUFF_API_KEY --with-decryption --region eu-north-1 --query Parameter.Value --output text)\" | curl -s -K - 'localhost:8080$1'"
-}
+host()    { scripts/replay-host.sh "$INSTANCE" sh "$1"; }   # a shell command as root on the host
+hostget() { scripts/replay-host.sh "$INSTANCE" get "$1"; }  # an authenticated GET to localhost:8080 on the host
 ```
+
+`scripts/replay-host.sh` sources `scripts/lib/ssm.sh` and calls its `run_ssm`, as `deploy-release.sh` and `set-api-key.sh` do: it waits for the command, prints its output, and exits non-zero (with the stderr) when the command or SSM fails. The API key is read from SSM on the host and handed to curl on stdin. After every restart, check the start: `host "journalctl -u dbuff -n 50 --no-pager"` and `hostget /actuator/health`.
 
 ### Step 1: backup and merge (creates the tables only)
 
 1. `./infrastructure/cloudformation/deploy.sh backup-now`. The last lines of `/var/log/dbuff/backup.log` must show a finished dump; note the S3 key.
 2. Merge to `main`; CI deploys and gates on `/actuator/health`. Nothing replay-related runs (`replay.processing.enabled` is false); Hibernate adds the tables on start.
-3. Check: `onhost "sudo -u postgres psql dbuff -c '\dt'" | grep replay` lists `replay_parse_run_domain` and the analysis tables, and `onhost "free -m; df -h /tmp /var/tmp"` for the memory baseline and the temp directory type (unverified item 4).
-4. Rollback: nothing to turn off; restore the dump only if the app does not start (`deploy.sh restore <key>`).
+3. Check: `host "sudo -u postgres psql dbuff -c '\dt'" | grep replay` lists `replay_parse_run_domain` and the analysis tables, and `host "free -m; mount | grep -E ' /tmp | /var/tmp '; df -h / /tmp /var/tmp"` for the memory baseline and the type of the temp directory (unverified item 4). `/var/tmp` is normally on the root volume, shared with `/` (the Postgres data and the logs), so compare the free space of both with the up to 250 MB a parse needs.
+4. Temp directory (only if `/tmp` is a tmpfs): `host "install -d -o dbuff -g dbuff -m 700 /var/tmp/dbuff-replays && sudo -u dbuff touch /var/tmp/dbuff-replays/.w && rm /var/tmp/dbuff-replays/.w && echo writable"` must print `writable` before `REPLAY_PROCESSING_TEMP_DIR` points at it. The unit (`template.yaml`, `dbuff.service`) sets `User=dbuff` and has no `PrivateTmp`, `ProtectSystem` or `ReadWritePaths`, so the service sees the real `/tmp` and `/var/tmp` and may write to any path its user owns; no unit change is needed for that directory.
+5. Rollback: nothing to turn off; restore the dump only if the app does not start (`deploy.sh restore <key>`).
 
 ### Step 2: processing on, one match per run
 
 1. Write a drop-in (the same mechanism as `scripts/set-api-key.sh`, which survives JAR deploys) and restart:
    ```
-   onhost "install -d /etc/systemd/system/dbuff.service.d; printf '[Service]\nEnvironment=REPLAY_PROCESSING_ENABLED=true\nEnvironment=REPLAY_PROCESSING_BATCH_SIZE=1\n' > /etc/systemd/system/dbuff.service.d/replay.conf; systemctl daemon-reload; systemctl restart dbuff"
+   host "install -d /etc/systemd/system/dbuff.service.d; printf '[Service]\nEnvironment=REPLAY_PROCESSING_ENABLED=true\nEnvironment=REPLAY_PROCESSING_BATCH_SIZE=1\n' > /etc/systemd/system/dbuff.service.d/replay.conf; systemctl daemon-reload; systemctl restart dbuff"
    ```
-   Add `Environment=REPLAY_PROCESSING_TEMP_DIR=/var/tmp/dbuff-replays` (and `mkdir -p` it, owned by `dbuff`) if `/tmp` is a tmpfs.
-2. Watch the log: `onhost "grep -E 'Replay (run|batch|libraries|extractor|analyzer)' /var/log/dbuff/dbuff.log | tail -20"`. The line to expect for each run:
-   `Replay run for match <id>: DONE (attempt 1, <bytes> bytes, <ms> ms)`, then `Replay batch: 1 of 1 matches stored`. Bad signs: `Replay run for match <id>: FAILED_*`, `Replay libraries cannot be loaded` (zstd native), `Replay extractor <name> failed` (the run ends PARTIAL), `Replay batch stopped after`, `Replay of the game was cut short`.
-3. One run's outcome: `hostcurl /api/v1/replay/<matchId>` (status, attempts, error), and the stored analysis: `.../api/v1/replay/<matchId>/analysis?sections=run,roles,fights`.
-4. Metrics (`hostcurl '/actuator/metrics/<name>'`, for the tagged ones `'/actuator/metrics/dbuff.replay.runs?tag=status:DONE'`):
+   Add `Environment=REPLAY_PROCESSING_TEMP_DIR=/var/tmp/dbuff-replays` only after the write test of step 1 passed. Then `journalctl -u dbuff -n 50`.
+2. Watch the log: `host "grep -i replay /var/log/dbuff/dbuff.log | tail -30"`. The line to expect for each run:
+   `Replay run for match <id>: DONE (attempt 1, <bytes> bytes, <ms> ms)`, then `Replay batch: 1 of 1 matches stored`. Bad signs (grep for them explicitly: `host "grep -E 'FAILED_|PARTIAL|cut short|cannot be loaded|failed|stopped' /var/log/dbuff/dbuff.log | grep -i replay | tail"`): `Replay run for match <id>: FAILED_*` or `PARTIAL`, `Replay libraries cannot be loaded` (zstd native), `Replay extractor <name> failed` (the run ends PARTIAL), `Replay analyzer <name> failed for match <id>`, `Replay batch stopped after`, `Replay of the game was cut short`, `Replay report ... failed`, `Replay metric not recorded`, `Replay run counts could not be read`.
+3. One run's outcome: `hostget /api/v1/replay/<matchId>` (status, attempts, error), and the stored analysis: `.../api/v1/replay/<matchId>/analysis?sections=run,roles,fights`.
+4. Metrics (`hostget '/actuator/metrics/<name>'`, for the tagged ones `'/actuator/metrics/dbuff.replay.runs?tag=status:DONE'`):
    - `dbuff.replay.runs?tag=status:DONE`, `status:PARTIAL`, `status:FAILED_RESOURCE`, and the other `FAILED_*` (counts for the current parser version, so a version bump makes them fall);
    - `dbuff.replay.run.duration?tag=status:DONE`: compare with the load test, 2.5 to 6.1 s per replay locally; a host several times slower is worth a look, one over `max-parse-seconds` (120) ends `FAILED_TIMEOUT`;
-   - `jvm.memory.used?tag=area:heap` read during a parse and `jvm.gc.live.data.size` after it: live data should return to about 100 to 150 MB (load test: about 100 MB with the test context); the old generation peak in the load test was at most 161 MB, so the heap staying under about 350 MB used is expected and 480 MB or more is not;
+   - `jvm.memory.used?tag=area:heap` read during a parse and `jvm.gc.live.data.size` after it: live data should return to roughly the level before the parse. Expected range seen in the 20-replay run (a test context, not the service, so only a rough guide, and the figures are approximate: `System.gc()` is a hint and the pool peaks include garbage of the previous run): live heap about 100 MB, old generation peak 114 to 161 MB, all pools together up to 369 MB. These are observations, not limits; what matters is that live data does not climb run after run;
    - on the host `free -m`: swap use must not grow during a parse (the heap is 512 MB of a 2 GiB host with Postgres).
 5. Let several runs finish, including one long game and one PARTIAL if it comes. Read at least one `/analysis` document against the match.
-6. Rollback: `onhost "rm /etc/systemd/system/dbuff.service.d/replay.conf; systemctl daemon-reload; systemctl restart dbuff"` (or set `REPLAY_PROCESSING_ENABLED=false`). The stored rows stay and are harmless; a stuck `RUNNING` run is cleaned by the janitor.
+6. Rollback: `host "rm /etc/systemd/system/dbuff.service.d/replay.conf; systemctl daemon-reload; systemctl restart dbuff"` (or set `REPLAY_PROCESSING_ENABLED=false`). The stored rows stay and are harmless; a stuck `RUNNING` run is cleaned by the janitor.
 
 ### Step 3: raise the batch size
 
@@ -77,11 +74,11 @@ hostcurl() {  # hostcurl '<path>': an authenticated GET to the app on the host, 
 
 ### Step 4: the report (Discord), last
 
-1. `REPLAY_REPORT_ENABLED=true` in the drop-in, restart. This alone already posts the six sections that are on by default (below); every other section needs its own switch `REPLAY_REPORT_SECTIONS_<NAME>_ENABLED=true` (for `important-fights` the variable must be `REPLAY_REPORT_SECTIONS_IMPORTANTFIGHTS_ENABLED`, with no underscore inside the name: `..._IMPORTANT_FIGHTS_...` does not bind, the dash cannot be written in a variable name; `ReplayProcessingPropertiesTest` pins this). Start with only the default ones, in one test channel.
-2. Log lines: `Replay report of match <id> posted in <n> messages` and `Replay report of match <id> not posted: every section is switched off`; bad: `Replay report of match <id> for instance <n> failed`, `Replay report delivery for match <id> failed`. Metric `dbuff.replay.report.posted`.
+1. `REPLAY_REPORT_ENABLED=true` in the drop-in, restart. This alone already posts the six sections that are on by default (below). Every other section needs its own switch `REPLAY_REPORT_SECTIONS_<NAME>_ENABLED=true` with exactly one of these names (checked against the sections' `name()` in the code): `SWING`, `DEATHS`, `FIGHTS`, `MOVEMENT`, `DRAFT`, `COMPOSITION`, `IMPORTANTFIGHTS` (the section `important-fights`; no underscore inside the name, `..._IMPORTANT_FIGHTS_...` does not bind), `LANES`, `ROTATIONS`, `SMOKE`, `OBJECTIVES`, `OPENING`, `VISION`, `ITEMS`, `OUTLIERS`, `ENDGAME`. **A key for a name that is not a section makes the application refuse to start while `REPLAY_REPORT_ENABLED=true`** (`SectionSwitch` lists the known sections in the error). Start with only the default ones, in one test channel, and check `journalctl -u dbuff -n 50` and `hostget /actuator/health` after every restart.
+2. Log lines (`host "grep -i 'replay report' /var/log/dbuff/dbuff.log | tail"`): `Replay report of match <id> posted in <n> messages` and `Replay report of match <id> not posted: every section is switched off`; bad: `Replay report of match <id> for instance <n> failed`, `Replay report delivery for match <id> failed`, `Replay report delivery failed`. Metric `dbuff.replay.report.posted`.
 3. Read the real thread in Discord: message length and count (`max-messages` 4 at full detail, 2 at standard), wording, a player who was not in the channel. This is unverified item 2.
 4. Turn on the accepted sections one at a time as separate config changes.
-5. Rollback: `REPLAY_REPORT_ENABLED=false` (posted messages stay in Discord; the posted marker stops a repost).
+5. Rollback: `REPLAY_REPORT_ENABLED=false` (posted messages stay in Discord; the posted marker stops a repost). If the app does not start after a wrong section key, remove that bad key from `replay.conf` first (or set `REPLAY_REPORT_ENABLED=false`), then `systemctl daemon-reload; systemctl restart dbuff`, then read `journalctl -u dbuff -n 50`.
 
 ## 4. Report sections and their switches
 

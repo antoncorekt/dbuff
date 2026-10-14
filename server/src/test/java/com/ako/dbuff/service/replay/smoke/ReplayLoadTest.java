@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
+import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.ReplayRunService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,9 +43,25 @@ class ReplayLoadTest extends ReplayPipelineFixture {
   private static final Map<Long, String> MODES = Map.of(18L, "Ability Draft", 22L, "All Pick");
   private static final long MB = 1024 * 1024;
 
+  /**
+   * The live heap after the last run may exceed the one after the first by this many MB. In the
+   * 20-replay run of 2026-10-14 it stayed within 3 MB, so 128 MB is generous and only a real leak
+   * trips it; {@code LOAD_TEST_HEAP_GROWTH_MB} overrides it.
+   */
+  private static final long MAX_HEAP_GROWTH_MB = growthLimit();
+
+  /**
+   * Ceiling for the old generation peak of one run under the 512 MB heap. The 20-replay run peaked
+   * at 161 MB (a 76-minute game), so 400 MB leaves room for a longer game and for garbage that the
+   * previous run left in the pools, while staying below the heap that would end in an
+   * OutOfMemoryError.
+   */
+  private static final long MAX_OLD_GEN_PEAK_MB = 400;
+
   @Autowired private ReplayRunService runService;
   @Autowired private ReplayParseRunRepo runRepo;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private ReplayProcessingProperties properties;
 
   @Test
   @Commit
@@ -54,6 +71,11 @@ class ReplayLoadTest extends ReplayPipelineFixture {
     assertThat(ids.stream().filter(id -> !hasFixture(id)))
         .as("matches missing from REPLAY_FIXTURE_DIR")
         .isEmpty();
+    assertThat(runRepo.count())
+        .as(
+            "replay_parse_run is not empty: start a fresh postgres container (see"
+                + " docs/replay-fixtures.md)")
+        .isZero();
     HeapProbe heap = new HeapProbe();
     long baseline = HeapProbe.liveMbAfterGc();
     List<LoadTestRun> runs = new ArrayList<>();
@@ -73,14 +95,36 @@ class ReplayLoadTest extends ReplayPipelineFixture {
             rowsPerTable);
     String text = report.render();
     System.out.println(text);
-    Path target = fixture("").toAbsolutePath().resolveSibling("send").resolve("load-test.md");
-    Files.createDirectories(target.getParent());
-    Files.writeString(target, text);
+    writeReport(text);
 
     assertThat(runs).hasSize(ids.size());
     assertThat(runs.stream().filter(run -> !run.passed()))
-        .as("runs that did not end DONE or PARTIAL")
+        .as("runs that did not end DONE (a PARTIAL one is a failure, its note says why)")
         .isEmpty();
+    assertThat(runs.stream().filter(run -> run.rows() <= 0))
+        .as("runs with no stored rows")
+        .isEmpty();
+    assertThat(runs.getLast().liveMb())
+        .as("live heap after the last run against the first")
+        .isLessThanOrEqualTo(runs.getFirst().liveMb() + MAX_HEAP_GROWTH_MB);
+    assertThat(runs.stream().filter(run -> run.peakOldMb() > MAX_OLD_GEN_PEAK_MB))
+        .as("runs whose old generation peak passed %d MB", MAX_OLD_GEN_PEAK_MB)
+        .isEmpty();
+  }
+
+  private static void writeReport(String text) {
+    try {
+      Path target = fixture("").toAbsolutePath().resolveSibling("send").resolve("load-test.md");
+      Files.createDirectories(target.getParent());
+      Files.writeString(target, text);
+    } catch (IOException | RuntimeException e) {
+      System.out.println("The load test table was not written to a file: " + e);
+    }
+  }
+
+  private static long growthLimit() {
+    String value = System.getenv("LOAD_TEST_HEAP_GROWTH_MB");
+    return value == null || value.isBlank() ? 128 : Long.parseLong(value.trim());
   }
 
   private LoadTestRun processOne(String id, HeapProbe heap, Map<String, List<Long>> rowsPerTable)
@@ -97,11 +141,11 @@ class ReplayLoadTest extends ReplayPipelineFixture {
       if (result != ReplayStatus.DONE) {
         note =
             runRepo
-                .findByMatchIdAndParserVersion(match.getId(), 1)
+                .findByMatchIdAndParserVersion(match.getId(), properties.getParserVersion())
                 .map(ReplayParseRunDomain::getError)
                 .orElse("");
       }
-    } catch (Throwable t) {
+    } catch (Exception t) {
       status = "CRASH";
       note = t.getClass().getName() + ": " + t.getMessage();
     }

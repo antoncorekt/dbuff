@@ -30,9 +30,13 @@ OpenDota's explorer answers a recent-matches query without a key, for example `G
 
 ## Running the load test
 
+The test refuses to start when `replay_parse_run` already holds runs, and `ReplayPostgresSmokeTest` expects an empty database too (it counts the runs in its meter checks). Always use a fresh container and remove it afterwards:
+
 ```
+docker rm -f dbuff-load-pg 2>/dev/null
 docker run -d --name dbuff-load-pg -e POSTGRES_PASSWORD=password -e POSTGRES_DB=dbuff -p 5666:5432 postgres:16-alpine
 SMOKE_PG_URL=jdbc:postgresql://localhost:5666/dbuff REPLAY_FIXTURE_DIR=<dir> ./gradlew :server:replayTest --tests '*ReplayLoadTest*'
+docker rm -f dbuff-load-pg
 ```
 
-The table is printed and written to `send/load-test.md` next to `REPLAY_FIXTURE_DIR`. `:server:replayTest` runs at `-Xmx512m`, the production heap.
+The table is printed and, when the directory can be written, saved as `send/load-test.md` next to `REPLAY_FIXTURE_DIR`. `:server:replayTest` runs at `-Xmx512m`, the production heap. The test fails on any run that is not DONE (PARTIAL included), on a run with no stored rows, when the live heap after the last run is more than 128 MB above the one after the first (`LOAD_TEST_HEAP_GROWTH_MB` changes it), and when an old generation peak passes 400 MB. An out-of-memory error aborts the test.

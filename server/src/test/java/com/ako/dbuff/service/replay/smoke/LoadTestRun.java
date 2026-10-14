@@ -16,6 +16,6 @@ record LoadTestRun(
     String note) {
 
   boolean passed() {
-    return status.equals(ReplayStatus.DONE.name()) || status.equals(ReplayStatus.PARTIAL.name());
+    return status.equals(ReplayStatus.DONE.name());
   }
 }

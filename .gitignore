@@ -41,3 +41,5 @@ out/
 
 ### Credentials (Google service-account keys, etc.) ###
 credentials/
+
+*.hprof

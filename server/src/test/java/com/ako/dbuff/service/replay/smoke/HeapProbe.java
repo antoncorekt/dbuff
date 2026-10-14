@@ -5,7 +5,13 @@ import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.MemoryType;
 import java.util.List;
 
-/** Heap figures of one run: live bytes after a forced GC, and the peak the memory pools saw. */
+/**
+ * Heap figures of one run: live bytes after a forced GC, and the peak the memory pools saw. The
+ * live figure is approximate: {@code System.gc()} is a hint (the figures were taken with the
+ * default collector and without {@code -XX:+DisableExplicitGC}, where it runs a full collection).
+ * The pool peaks include garbage the previous run left behind, so they are upper bounds, not the
+ * live set during the run.
+ */
 final class HeapProbe {
   private static final long MB = 1024 * 1024;
 
