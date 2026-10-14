@@ -34,10 +34,11 @@ class SectionSwitchContextTest {
           LanesSection.class,
           RotationsSection.class,
           SmokeSection.class,
-          ObjectivesSection.class);
+          ObjectivesSection.class,
+          OpeningSection.class);
 
   private static final Set<String> OFF_BY_DEFAULT =
-      Set.of("important-fights", "lanes", "rotations", "smoke", "objectives");
+      Set.of("important-fights", "lanes", "rotations", "smoke", "objectives", "opening");
 
   @Configuration
   @EnableConfigurationProperties(ReplayReportProperties.class)
@@ -91,7 +92,8 @@ class SectionSwitchContextTest {
                       "lanes",
                       "rotations",
                       "smoke",
-                      "objectives");
+                      "objectives",
+                      "opening");
               assertThat(byName.values())
                   .filteredOn(s -> !OFF_BY_DEFAULT.contains(s.name()))
                   .allMatch(ReplayReportSection::defaultEnabled);

@@ -70,6 +70,11 @@ public class ReplayReportProperties {
   /** The longest a rotation or smoke line may be; a longer one ends in an ellipsis. */
   private int maxBehaviourLineLength = 400;
 
+  /**
+   * The longest a line of the opening and runes section may be; a longer one ends in an ellipsis.
+   */
+  private int maxOpeningLineLength = 400;
+
   /** How far back a finished replay run is looked at for an analysis not yet posted. */
   private int lookbackHours = 48;
 
@@ -101,6 +106,11 @@ public class ReplayReportProperties {
     requireRange(
         "max-behaviour-line-length",
         maxBehaviourLineLength,
+        MIN_LANE_LINE_LENGTH,
+        MAX_LANE_LINE_LENGTH);
+    requireRange(
+        "max-opening-line-length",
+        maxOpeningLineLength,
         MIN_LANE_LINE_LENGTH,
         MAX_LANE_LINE_LENGTH);
     requireRange(
