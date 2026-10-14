@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
+import com.ako.dbuff.service.replay.report.ItemWording;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -105,7 +106,7 @@ final class ItemLoopReport {
                   LoopWording.clock(r.purchaseSeconds()),
                   wording.showsUses() ? String.valueOf(r.count()) : "-",
                   ReviewLoopReport.tableCell(wording.result(r, d.itemNames())),
-                  ratio(r.ratio())));
+                  ItemWording.ratio(r.ratio())));
     }
     return out;
   }
@@ -157,9 +158,5 @@ final class ItemLoopReport {
               LoopWording.words(detail.label()) + " at " + LoopWording.clock(detail.seconds());
         };
     return label(d, r) + ", " + what;
-  }
-
-  static String ratio(Double ratio) {
-    return ratio == null ? "-" : String.format(java.util.Locale.ROOT, "%.1fx", ratio);
   }
 }

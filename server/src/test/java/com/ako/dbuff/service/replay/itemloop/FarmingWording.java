@@ -3,11 +3,15 @@ package com.ako.dbuff.service.replay.itemloop;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
+import com.ako.dbuff.service.replay.report.FarmingKindWording;
+import com.ako.dbuff.service.replay.report.ItemWording;
 import java.util.Map;
 import java.util.function.Function;
 
 /** The farming group: creeps, creep gold and camps per minute before and after the purchase. */
 final class FarmingWording implements Wording {
+  private static final FarmingKindWording KIND = new FarmingKindWording();
+
   @Override
   public boolean showsUses() {
     return false;
@@ -15,54 +19,7 @@ final class FarmingWording implements Wording {
 
   @Override
   public String result(ItemEfficiency row, Function<String, String> itemNames) {
-    Map<String, Double> before = figures(row, "BEFORE");
-    Map<String, Double> after = figures(row, "AFTER");
-    String rates =
-        "creeps %s per min before and %s after, creep gold %s and %s per min, camps %s and %s per min"
-            .formatted(
-                Wording.number(before.get("killsPerMinute")),
-                Wording.number(after.get("killsPerMinute")),
-                LoopWording.gold(before.get("goldPerMinute")),
-                LoopWording.gold(after.get("goldPerMinute")),
-                Wording.number(before.get("campsPerMinute")),
-                Wording.number(after.get("campsPerMinute")));
-    if (row.ratio() == null) {
-      return rates + Wording.limits(row.flags());
-    }
-    String payback =
-        row.paybackSeconds() == null
-            ? "not paid back by the end"
-            : "paid back at " + LoopWording.clock(row.paybackSeconds());
-    String net = LoopWording.gold(row.figures().get("netGoldPerMinute"));
-    if (row.figures().containsKey("damageValue") && row.cost() != null) {
-      return "%s, net %s gold per min, %s, %s in total, %s%s"
-          .formatted(
-              rates,
-              net,
-              parts(row),
-              ItemLoopReport.ratio(row.ratio()),
-              payback,
-              Wording.limits(row.flags()));
-    }
-    return "%s, net %s gold per min, %s, worth %s its cost%s"
-        .formatted(
-            rates, net, payback, ItemLoopReport.ratio(row.ratio()), Wording.limits(row.flags()));
-  }
-
-  /** The gold part and the damage part of the worth, each against the cost. */
-  private static String parts(ItemEfficiency row) {
-    Map<String, Double> f = row.figures();
-    if (!f.containsKey("damageValue") || row.cost() == null) {
-      return "creeps only";
-    }
-    return "creeps %s its cost, damage %s"
-        .formatted(
-            signedRatio(f.getOrDefault("creepGain", 0.0) / row.cost()),
-            signedRatio(f.get("damageValue") / row.cost()));
-  }
-
-  private static String signedRatio(double ratio) {
-    return (ratio >= 0 ? "+" : "") + ItemLoopReport.ratio(ratio);
+    return KIND.longVerdict(row);
   }
 
   @Override
@@ -86,12 +43,12 @@ final class FarmingWording implements Wording {
       "%d creeps (%s per min), creep gold %s per min, camps %s per min"
           .formatted(
               Math.round(f.get("kills")),
-              Wording.number(f.get("killsPerMinute")),
+              ItemWording.number(f.get("killsPerMinute")),
               LoopWording.gold(f.get("goldPerMinute")),
-              Wording.number(f.get("campsPerMinute"))),
+              ItemWording.number(f.get("campsPerMinute"))),
       "%s minutes %s the first purchase"
           .formatted(
-              Wording.number(f.get("minutes")),
+              ItemWording.number(f.get("minutes")),
               "BEFORE".equals(detail.label()) ? "before" : "after")
     };
   }
@@ -122,13 +79,5 @@ final class FarmingWording implements Wording {
               LoopWording.gold(f.get("afterPerMinute")),
               stats)
     };
-  }
-
-  private static Map<String, Double> figures(ItemEfficiency row, String label) {
-    return row.rows().stream()
-        .filter(d -> label.equals(d.label()))
-        .findFirst()
-        .map(Detail::figures)
-        .orElse(Map.of("killsPerMinute", 0.0, "goldPerMinute", 0.0, "campsPerMinute", 0.0));
   }
 }

@@ -36,10 +36,19 @@ class SectionSwitchContextTest {
           SmokeSection.class,
           ObjectivesSection.class,
           OpeningSection.class,
-          VisionSection.class);
+          VisionSection.class,
+          ItemsSection.class);
 
   private static final Set<String> OFF_BY_DEFAULT =
-      Set.of("important-fights", "lanes", "rotations", "smoke", "objectives", "opening", "vision");
+      Set.of(
+          "important-fights",
+          "lanes",
+          "rotations",
+          "smoke",
+          "objectives",
+          "opening",
+          "vision",
+          "items");
 
   @Configuration
   @EnableConfigurationProperties(ReplayReportProperties.class)
@@ -95,13 +104,27 @@ class SectionSwitchContextTest {
                       "smoke",
                       "objectives",
                       "opening",
-                      "vision");
+                      "vision",
+                      "items");
               assertThat(byName.values())
                   .filteredOn(s -> !OFF_BY_DEFAULT.contains(s.name()))
                   .allMatch(ReplayReportSection::defaultEnabled);
               assertThat(byName.get("important-fights").defaultEnabled()).isFalse();
               OFF_BY_DEFAULT.forEach(
                   name -> assertThat(byName.get(name).defaultEnabled()).isFalse());
+            });
+  }
+
+  @Test
+  void everyRealSectionHasItsOwnOrder() {
+    runner()
+        .run(
+            context -> {
+              List<Integer> orders =
+                  context.getBeansOfType(ReplayReportSection.class).values().stream()
+                      .map(ReplayReportSection::order)
+                      .toList();
+              assertThat(orders).doesNotHaveDuplicates();
             });
   }
 
