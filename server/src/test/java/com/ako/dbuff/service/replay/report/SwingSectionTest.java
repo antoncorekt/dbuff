@@ -38,6 +38,7 @@ class SwingSectionTest {
           reader,
           heroNames,
           new ReasonWording(Prettify::ability),
+          Prettify::ability,
           properties);
 
   SwingSectionTest() {
@@ -124,6 +125,7 @@ class SwingSectionTest {
             reader,
             heroNames,
             new ReasonWording(TestLabels.labels()),
+            TestLabels.labels(),
             properties);
 
     assertThat(real.lines(input()))
@@ -165,6 +167,51 @@ class SwingSectionTest {
     assertThat(lines.get(2))
         .startsWith("28:00-31:00: Dire gained 7.4k net worth and took the lead")
         .contains("a won fight (kills 62%, Roshan 21%)");
+  }
+
+  private static GameSpikeFactorDomain itemFactor(String ref, Long slot, String detail) {
+    return GameSpikeFactorDomain.builder()
+        .spikeIndex(0)
+        .factorType("ITEM")
+        .ref(ref)
+        .playerSlot(slot)
+        .goldValue(3975L)
+        .detail(detail)
+        .build();
+  }
+
+  @Test
+  void lines_nameTheKeyItemBehindTheSwing() {
+    when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spike(0, 1800, 5000, "FIGHT_WIN", false)));
+    heroes();
+    when(factorRepo.findByMatchId(1L))
+        .thenReturn(List.of(itemFactor("black_king_bar", 2L, "1660")));
+
+    assertThat(section.lines(input()).get(1))
+        .endsWith("; it came after Dire finished a Black King Bar (Terrorblade) at 27:40");
+  }
+
+  @Test
+  void lines_sayAnBeforeAVowelAndSkipTheHeroWhenUnknown() {
+    when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spike(0, 1800, 5000, "FIGHT_WIN", false)));
+    heroes();
+    when(factorRepo.findByMatchId(1L)).thenReturn(List.of(itemFactor("aether_lens", 9L, "600")));
+
+    assertThat(section.lines(input()).get(1)).endsWith("finished an Aether Lens at 10:00");
+  }
+
+  @Test
+  void lines_ignoreAnItemRowWithoutATimeAndAnUnknownFactorType() {
+    when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spike(0, 1800, 5000, "FIGHT_WIN", false)));
+    when(factorRepo.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                itemFactor("black_king_bar", 2L, null),
+                itemFactor("black_king_bar", 2L, "soon"),
+                GameSpikeFactorDomain.builder().spikeIndex(0).factorType("FUTURE").build(),
+                GameSpikeFactorDomain.builder().spikeIndex(0).build()));
+
+    assertThat(section.lines(input()).get(1)).doesNotContain("finished");
   }
 
   @Test

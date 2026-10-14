@@ -53,6 +53,7 @@ public class SwingSection implements ReplayReportSection {
   private final FightExplanationReader explanationReader;
   private final ReportHeroNames heroNames;
   private final ReasonWording wording;
+  private final AbilityLabels labels;
   private final ReplayReportProperties properties;
 
   @Override
@@ -89,7 +90,8 @@ public class SwingSection implements ReplayReportSection {
     List<String> lines = new ArrayList<>();
     lines.add("**Swings**");
     for (GameSpikeDomain spike : spikes) {
-      lines.add(line(spike, factors.getOrDefault(spike.getSpikeIndex(), List.of())));
+      List<GameSpikeFactorDomain> found = factors.getOrDefault(spike.getSpikeIndex(), List.of());
+      lines.add(line(spike, found) + keyItemClause(spike, found, heroes));
       SwingExplanation told = lostBySwing.get(spike.getSpikeIndex());
       (told == null ? List.<LostFight>of() : told.fights())
           .stream()
@@ -141,11 +143,51 @@ public class SwingSection implements ReplayReportSection {
             reasons));
   }
 
+  private String keyItemClause(
+      GameSpikeDomain spike, List<GameSpikeFactorDomain> factors, Map<Long, String> heroes) {
+    return factors.stream()
+        .filter(f -> "ITEM".equals(f.getFactorType()) && f.getRef() != null)
+        .findFirst()
+        .map(
+            f -> {
+              Optional<Double> seconds = completedAt(f.getDetail());
+              String item = labels.label("item_" + f.getRef());
+              if (seconds.isEmpty() || item.isBlank()) {
+                return "";
+              }
+              String hero = heroes.get(f.getPlayerSlot());
+              return String.format(
+                  Locale.ROOT,
+                  "; it came after %s finished %s%s at %s",
+                  Prettify.team(spike.getBenefitingTeam()),
+                  withArticle(item),
+                  hero == null ? "" : " (" + hero + ")",
+                  GameTime.clock(seconds.get()));
+            })
+        .orElse("");
+  }
+
+  private static Optional<Double> completedAt(String detail) {
+    try {
+      return detail == null ? Optional.empty() : Optional.of(Double.parseDouble(detail));
+    } catch (NumberFormatException e) {
+      return Optional.empty();
+    }
+  }
+
+  private static String withArticle(String name) {
+    return ("aeiouAEIOU".indexOf(name.charAt(0)) >= 0 ? "an " : "a ") + name;
+  }
+
   private static String line(GameSpikeDomain spike, List<GameSpikeFactorDomain> factors) {
     String team = Prettify.team(spike.getBenefitingTeam());
     String because =
         factors.stream()
-            .filter(f -> f.getFactorType().equals("SOURCE") && f.getSharePercent() >= MIN_SHARE)
+            .filter(
+                f ->
+                    "SOURCE".equals(f.getFactorType())
+                        && f.getSharePercent() != null
+                        && f.getSharePercent() >= MIN_SHARE)
             .sorted(Comparator.comparingDouble(GameSpikeFactorDomain::getSharePercent).reversed())
             .limit(MAX_CAUSES)
             .map(
