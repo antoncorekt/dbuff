@@ -8,6 +8,7 @@ import net.dv8tion.jda.api.components.MessageTopLevelComponent;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
+import net.dv8tion.jda.api.utils.FileUpload;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -86,7 +87,23 @@ public class DiscordMessageService {
    */
   public Message sendThreadComponentsBlocking(
       ThreadChannel thread, List<MessageTopLevelComponent> components) {
-    return thread.sendMessageComponents(components).useComponentsV2(true).complete();
+    return sendThreadComponentsBlocking(thread, components, List.of());
+  }
+
+  /** The same, with files the components refer to as {@code attachment://name}. */
+  public Message sendThreadComponentsBlocking(
+      ThreadChannel thread, List<MessageTopLevelComponent> components, List<FileUpload> files) {
+    return thread
+        .sendMessageComponents(components)
+        .useComponentsV2(true)
+        .addFiles(files)
+        .complete();
+  }
+
+  /** Sends text with files to a thread and waits for completion. */
+  public Message sendThreadMessageBlocking(
+      ThreadChannel thread, String message, List<FileUpload> files) {
+    return thread.sendMessage(message).addFiles(files).complete();
   }
 
   public ThreadChannel getThreadById(long threadId) {
