@@ -72,8 +72,10 @@ import com.ako.dbuff.service.replay.report.DeathSection;
 import com.ako.dbuff.service.replay.report.DraftBoardSection;
 import com.ako.dbuff.service.replay.report.DraftSection;
 import com.ako.dbuff.service.replay.report.EndGameSection;
+import com.ako.dbuff.service.replay.report.FarmChartBuilder;
 import com.ako.dbuff.service.replay.report.FightSection;
 import com.ako.dbuff.service.replay.report.GraphAdvantageSection;
+import com.ako.dbuff.service.replay.report.GraphFarmSection;
 import com.ako.dbuff.service.replay.report.GraphIncomeSection;
 import com.ako.dbuff.service.replay.report.ImportantFightsSection;
 import com.ako.dbuff.service.replay.report.ItemsSection;
@@ -87,6 +89,7 @@ import com.ako.dbuff.service.replay.report.RotationsSection;
 import com.ako.dbuff.service.replay.report.SmokeSection;
 import com.ako.dbuff.service.replay.report.SwingSection;
 import com.ako.dbuff.service.replay.report.VisionSection;
+import com.ako.dbuff.service.replay.report.chart.ChartRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -193,6 +196,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private DraftSection draftSection;
   @Autowired private DraftBoardSection draftBoardSection;
   @Autowired private GraphAdvantageSection graphAdvantageSection;
+  @Autowired private GraphFarmSection graphFarmSection;
+  @Autowired private FarmChartBuilder farmChartBuilder;
+  @Autowired private ChartRenderer chartRenderer;
   @Autowired private GraphIncomeSection graphIncomeSection;
   @Autowired private CompositionSection compositionSection;
   @Autowired private PlayerGameStatisticRepo playerStatRepo;
@@ -394,6 +400,35 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
     Files.createDirectories(dir);
     Files.write(dir.resolve("graph-advantage.png"), view.image().bytes());
+  }
+
+  @Test
+  @Commit
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void theFarmGraphOfARealMatchIsDrawnFromWhatWasStored() throws Exception {
+    Assumptions.assumeTrue(hasFixture(GRAPH_MATCH), GRAPH_MATCH + " fixture missing");
+    MatchDomain match = seedMatch(GRAPH_MATCH);
+    assertThat(runService.process(match)).isEqualTo(ReplayStatus.DONE);
+    Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
+    Files.createDirectories(dir);
+    ReplayReportInput input =
+        new ReplayReportInput(match.getId(), match, Set.of(0L, 1L, 2L, 3L, 4L), Map.of(), 4);
+
+    SectionView view = graphFarmSection.view(input).orElseThrow();
+
+    assertThat(view.image()).as("the graph was drawn").isNotNull();
+    System.out.println("GRAPH FARM " + String.join(" | ", graphFarmSection.lines(input)));
+    Files.write(dir.resolve("graph-farm-radiant.png"), view.image().bytes());
+    for (long[] slots : new long[][] {{128, 129}, {130}, {131, 132}, {2}}) {
+      Set<Long> focus =
+          java.util.Arrays.stream(slots).boxed().collect(java.util.stream.Collectors.toSet());
+      var chart = farmChartBuilder.build(match.getId(), focus, 2).orElseThrow();
+      System.out.println("GRAPH FARM " + focus + " " + chart.verdict() + " " + chart.lines());
+      if (chart.spec() != null) {
+        Files.write(
+            dir.resolve("graph-farm-" + slots[0] + ".png"), chartRenderer.render(chart.spec()));
+      }
+    }
   }
 
   @Test
