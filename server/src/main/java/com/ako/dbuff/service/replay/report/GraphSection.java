@@ -12,6 +12,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -86,6 +87,19 @@ abstract class GraphSection implements ReplayReportSection {
 
   /** The pages of one delivery; empty when the stored data has nothing to draw. */
   protected abstract List<SectionView> build(ReplayReportInput input);
+
+  /** One page for each chart, numbered when there are several. */
+  protected <C> List<SectionView> pagesOf(List<C> charts, PageBuilder<C> page) {
+    return IntStream.range(0, charts.size())
+        .mapToObj(i -> page.build(charts.get(i), i, charts.size()))
+        .toList();
+  }
+
+  /** Builds the page of one chart, knowing its place among {@code count}. */
+  @FunctionalInterface
+  protected interface PageBuilder<C> {
+    SectionView build(C chart, int index, int count);
+  }
 
   /** The heading of page {@code index} of {@code count}: the title, with the page when several. */
   protected String pageTitle(String title, int index, int count) {

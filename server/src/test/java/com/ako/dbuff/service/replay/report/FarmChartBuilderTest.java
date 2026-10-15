@@ -110,6 +110,8 @@ class FarmChartBuilderTest {
 
     assertThat(five).extracting(c -> c.spec().panels().size()).containsExactly(2, 2, 1);
     assertThat(capped).hasSize(2);
+    assertThat(capped.getLast().lines()).contains("1 more tracked hero is not shown.");
+    assertThat(five.getLast().lines()).noneMatch(l -> l.contains("not shown"));
   }
 
   @Test

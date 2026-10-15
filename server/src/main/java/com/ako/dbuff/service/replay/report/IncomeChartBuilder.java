@@ -70,20 +70,18 @@ public class IncomeChartBuilder {
     Map<Long, String> heroes = heroNames.bySlot(matchId);
     IncomeReasons.Explainer why = reasons.read(matchId, heroes);
     IncomePins.Events events = pins.read(matchId);
-    int size = Math.max(1, perImage);
+    List<List<Long>> groups = HeroGroups.of(choice.slots(), perImage);
     List<IncomeChart> charts = new ArrayList<>();
-    for (int from = 0; from < choice.slots().size(); from += size) {
-      List<Long> slots = choice.slots().subList(from, Math.min(choice.slots().size(), from + size));
-      boolean last = from + size >= choice.slots().size();
+    for (int i = 0; i < groups.size(); i++) {
       charts.add(
           chart(
-              slots,
+              groups.get(i),
               gold,
               heroes,
               why,
               events,
-              from == 0 ? choice.note() : "",
-              last ? choice.hidden() : 0,
+              i == 0 ? choice.note() : "",
+              i == groups.size() - 1 ? choice.hidden() : 0,
               maxFindings,
               lineLength));
     }

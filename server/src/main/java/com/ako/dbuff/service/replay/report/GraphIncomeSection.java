@@ -5,7 +5,6 @@ import com.ako.dbuff.service.replay.report.chart.ChartService;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
-import java.util.stream.IntStream;
 import org.springframework.stereotype.Component;
 
 /**
@@ -53,9 +52,7 @@ public class GraphIncomeSection extends GraphSection {
             properties.getGraphMaxImages(),
             input.maxFindings(),
             properties.getMaxBehaviourLineLength());
-    return IntStream.range(0, charts.size())
-        .mapToObj(i -> view(input.matchId(), charts.get(i), i, charts.size()))
-        .toList();
+    return pagesOf(charts, (chart, i, count) -> view(input.matchId(), chart, i, count));
   }
 
   private SectionView view(long matchId, IncomeChart chart, int index, int count) {
