@@ -12,6 +12,9 @@ import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.Lo
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.MatchExplanation;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.RankedReason;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.SwingExplanation;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -407,5 +410,39 @@ class SwingSectionTest {
     List<String> lines = section.lines(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3));
 
     assertThat(lines).hasSize(1 + 3 * 3);
+  }
+
+  @Test
+  void view_namesTheBiggestSwingAndKeepsPlainTextAsItWas() {
+    when(spikeRepo.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                spike(0, 1380, 5000, "FIGHT_WIN", false), spike(1, 2400, 9000, "OBJECTIVE", true)));
+    ReplayReportInput dire = new ReplayReportInput(1L, null, Set.of(128L), Map.of(), 2);
+    ReplayReportInput radiant = new ReplayReportInput(1L, null, Set.of(0L), Map.of(), 2);
+
+    SectionView view = section.view(dire).orElseThrow();
+
+    ViewRendering.assertWithinLimits(view);
+    assertThat(view.title()).isEqualTo("Swings");
+    assertThat(view.verdict())
+        .isEqualTo("Biggest swing: Dire (your team) gained 9.0k net worth between 40:00 and 43:00");
+    assertThat(view.accent()).isEqualTo(Accent.WIN);
+    assertThat(section.view(radiant).orElseThrow().accent()).isEqualTo(Accent.LOSS);
+    assertThat(section.view(input()).orElseThrow().accent()).isEqualTo(Accent.NEUTRAL);
+    assertThat(String.join("\n", section.lines(input())))
+        .isEqualTo(
+            "**Swings**\n"
+                + "23:00-26:00: Dire gained 5.0k net worth, mostly from a won fight\n"
+                + "40:00-43:00: Dire gained 9.0k net worth and took the lead, mostly from"
+                + " buildings");
+    assertThat(new PlainViewRenderer().lines(view)).isEqualTo(section.lines(dire));
+  }
+
+  @Test
+  void view_isEmptyWithoutSwings() {
+    when(spikeRepo.findByMatchId(1L)).thenReturn(List.of());
+
+    assertThat(section.view(input())).isEmpty();
   }
 }

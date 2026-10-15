@@ -7,10 +7,14 @@ import com.ako.dbuff.service.replay.analysis.behaviour.SmokeOutcome;
 import com.ako.dbuff.service.replay.analysis.behaviour.SmokeUse;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -55,8 +59,44 @@ public class SmokeSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return render(input, usableRows(input));
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    List<SmokeUseDomain> rows = usableRows(input);
+    return SectionViews.titled(render(input, rows), smokeVerdict(rows, input));
+  }
+
+  private List<SmokeUseDomain> usableRows(ReplayReportInput input) {
     List<SmokeUseDomain> rows = smokeRepo.findByMatchId(input.matchId());
-    if (rows == null || rows.stream().allMatch(Objects::isNull)) {
+    return rows == null ? List.of() : rows.stream().filter(Objects::nonNull).toList();
+  }
+
+  private static Verdict smokeVerdict(List<SmokeUseDomain> rows, ReplayReportInput input) {
+    SectionViews.Scope<SmokeUseDomain> scope =
+        SectionViews.scope(rows, SmokeUseDomain::getTeam, TeamSide.commonSide(input.focusSlots()));
+    long paid = outcomes(scope.rows(), SmokeOutcome.PAID_OFF);
+    long backfired = outcomes(scope.rows(), SmokeOutcome.BACKFIRED);
+    long nothing = outcomes(scope.rows(), SmokeOutcome.NOTHING);
+    return new Verdict(
+        "%s: %d paid off, %d backfired, %d came to nothing"
+            .formatted(
+                scope.ownTeam() ? "Your team's Smokes of Deceit" : "Smokes of Deceit, both teams",
+                paid,
+                backfired,
+                nothing),
+        scope.ownTeam() ? SectionViews.balance(paid, backfired) : Accent.NEUTRAL);
+  }
+
+  private static long outcomes(List<SmokeUseDomain> rows, SmokeOutcome outcome) {
+    return rows.stream()
+        .filter(r -> Enums.find(SmokeOutcome.class, r.getOutcome()) == outcome)
+        .count();
+  }
+
+  private List<String> render(ReplayReportInput input, List<SmokeUseDomain> rows) {
+    if (rows.isEmpty()) {
       return List.of();
     }
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
