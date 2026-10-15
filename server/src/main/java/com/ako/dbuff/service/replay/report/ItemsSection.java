@@ -107,7 +107,7 @@ public class ItemsSection implements ReplayReportSection {
     if (rows.isEmpty()) {
       return new Rendered(List.of(), List.of());
     }
-    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
     Set<Long> focus = input.focusSlots() == null ? Set.of() : input.focusSlots();
     Comparator<Entry> byWorth =
         Comparator.comparingInt((Entry e) -> focus.contains(e.row().slot()) ? 0 : 1)
@@ -158,7 +158,7 @@ public class ItemsSection implements ReplayReportSection {
     return "%s's %s (%s)"
         .formatted(
             BehaviourWording.hero(heroes, row.slot()),
-            labels.label("item_" + row.itemKey()),
+            labels.decorated("item_" + row.itemKey()),
             bought(row.purchaseSeconds()));
   }
 

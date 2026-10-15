@@ -103,7 +103,7 @@ public class OpeningSection implements ReplayReportSection {
     }
     List<RunePickupDomain> pickups =
         present(pickupRepo.findByMatchId(input.matchId())).stream().sorted(CHRONOLOGICAL).toList();
-    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     int max = Math.max(LineText.ELLIPSIS.length() + 1, properties.getMaxOpeningLineLength());
     Optional<Result> result =

@@ -10,11 +10,15 @@ import com.ako.dbuff.dao.repo.DbufInstanceConfigRepository;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.MatchReportThreadRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
+import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.discord.DiscordMessageService;
+import com.ako.dbuff.service.discord.icon.TestIcons;
 import com.ako.dbuff.service.match.DotaApiLastMatchesService.PlayerLine;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator.PartialReportResult;
 import com.ako.dbuff.service.replay.ReplayForecast;
+import com.ako.dbuff.service.replay.analysis.role.HeroKits;
+import com.ako.dbuff.service.replay.report.ReportHeroNames;
 import com.ako.dbuff.service.replay.report.view.ComponentsViewRenderer;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import java.util.List;
@@ -53,6 +57,7 @@ class MatchReportStageServiceTest {
   private final MatchReportThreadRepo threadRepo = mock(MatchReportThreadRepo.class);
   private final PlayerGameStatisticRepo statRepo = mock(PlayerGameStatisticRepo.class);
   private final ConstantsManagers constants = mock(ConstantsManagers.class);
+  private final HeroKits heroKits = mock(HeroKits.class);
   private final ReplayForecast forecast = mock(ReplayForecast.class);
   private final ReplayStageTargets targets = mock(ReplayStageTargets.class);
   private final MatchRepo matchRepo = mock(MatchRepo.class);
@@ -70,7 +75,12 @@ class MatchReportStageServiceTest {
             new MatchFactsFactory(constants, statRepo, mock(DbufInstanceConfigRepository.class)),
             new HeaderRenderer(),
             new ReportHeaderPublisher(discord),
-            new StageOneCardBuilder(constants),
+            new StageOneCardBuilder(
+                new ReportHeroNames(
+                    mock(PlayerGameStatisticRepo.class),
+                    mock(ReplayPlayerRepo.class),
+                    heroKits,
+                    TestIcons.off())),
             new ComponentsViewRenderer(new PlainViewRenderer()),
             discord,
             new MatchThreadRecorder(threadRepo),
@@ -403,7 +413,7 @@ class MatchReportStageServiceTest {
   void stageOne_aFailingCardStillReturnsTheRealThread() {
     when(discord.sendThreadComponentsBlocking(any(), anyList()))
         .thenThrow(new RuntimeException("boom"));
-    when(constants.getHeroConstantMap()).thenThrow(new IllegalStateException("down"));
+    when(heroKits.hero(anyLong())).thenThrow(new IllegalStateException("down"));
 
     PartialReportResult result =
         service.start(MatchDomain.builder().id(MATCH).build(), config, summary(), Map.of());

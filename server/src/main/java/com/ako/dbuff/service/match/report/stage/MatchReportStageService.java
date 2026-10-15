@@ -7,6 +7,7 @@ import com.ako.dbuff.dao.model.MatchReportThreadDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.service.discord.DiscordMessageService;
+import com.ako.dbuff.service.discord.icon.IconText;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator.PartialReportResult;
 import com.ako.dbuff.service.replay.ReplayForecast;
 import com.ako.dbuff.service.replay.report.view.ComponentsFallback;
@@ -303,7 +304,9 @@ public class MatchReportStageService {
       log.warn("Player card components rejected, posting plain text: {}", e.getMessage());
       String text = cards.fallback();
       discord.sendThreadMessageBlocking(
-          thread, text.substring(0, Math.min(text.length(), MessageLimits.PLAIN_TEXT)));
+          thread,
+          text.substring(
+              0, IconText.safeEnd(text, Math.min(text.length(), MessageLimits.PLAIN_TEXT))));
     }
   }
 }

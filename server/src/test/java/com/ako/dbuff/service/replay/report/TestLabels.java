@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.report;
 import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import com.ako.dbuff.service.discord.icon.TestIcons;
 import java.util.Map;
 
 import static org.mockito.Mockito.mock;
@@ -26,6 +27,6 @@ final class TestLabels {
             Map.of(
                 "1", HeroConstant.builder().name("npc_dota_hero_sven").build(),
                 "2", HeroConstant.builder().name("npc_dota_hero_terrorblade").build()));
-    return new ConstantAbilityLabels(constants);
+    return new ConstantAbilityLabels(constants, TestIcons.off());
   }
 }

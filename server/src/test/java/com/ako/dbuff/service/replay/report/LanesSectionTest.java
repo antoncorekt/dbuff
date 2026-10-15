@@ -43,7 +43,7 @@ class LanesSectionTest {
     when(resultRepo.findByMatchId(1L)).thenReturn(results);
     when(assignmentRepo.findByMatchId(1L)).thenReturn(assignments);
     when(reasonRepo.findByMatchId(1L)).thenReturn(reasons);
-    when(heroNames.bySlot(1L))
+    when(heroNames.iconBySlot(1L))
         .thenReturn(
             Map.of(
                 0L, "Phantom Assassin",

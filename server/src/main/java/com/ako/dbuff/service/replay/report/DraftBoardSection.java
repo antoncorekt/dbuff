@@ -32,6 +32,12 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class DraftBoardSection implements ReplayReportSection {
+  /** A wrapped line stays well under the 2000 characters of a plain message. */
+  private static final int ROW_LIMIT = 1500;
+
+  /** A bullet stays under what a Components card text may hold, with room for the title. */
+  private static final int BULLET_LIMIT = 3000;
+
   private static final String FOOTNOTE =
       "Turns count skill and hero picks together; times are on the game clock, before the horn.";
   private static final String ORDER_UNKNOWN = " Where no turn is shown, the order is not known.";
@@ -82,11 +88,11 @@ public class DraftBoardSection implements ReplayReportSection {
     List<AbilityDraftPoolDomain> pool = poolRepo.findByMatchId(input.matchId());
     Board board = new Board(input, heroes);
     List<String> cards = new ArrayList<>();
-    cards.add(board.heroPicks());
+    cards.addAll(bullets("**Hero picks**", board.heroPicks()));
     if (!skills.isEmpty()) {
-      cards.add(board.skillPicks(skills));
+      cards.addAll(bullets("**Skill picks**", board.skillPicks(skills)));
     }
-    board.leftOver(pool).ifPresent(cards::add);
+    cards.addAll(bullets("**Left over**", board.leftOver(pool)));
     boolean numbersMissing =
         heroes.stream().anyMatch(h -> h.getPlayerSlot() != null && h.getTurnNumber() == null)
             || skills.stream().anyMatch(s -> s.getTurnNumber() == null);
@@ -97,6 +103,50 @@ public class DraftBoardSection implements ReplayReportSection {
             Accent.INFO,
             cards,
             numbersMissing ? FOOTNOTE + ORDER_UNKNOWN : FOOTNOTE));
+  }
+
+  /**
+   * The rows as bullets of at most {@link #BULLET_LIMIT} characters, the header on the first one; a
+   * list with icons is long, and a bullet over the message limit would lose its end.
+   */
+  private static List<String> bullets(String header, List<String> rows) {
+    if (rows.isEmpty()) {
+      return List.of();
+    }
+    List<String> bullets = new ArrayList<>();
+    StringBuilder current = new StringBuilder(header);
+    for (String row : rows) {
+      if (current.length() + 1 + row.length() > BULLET_LIMIT && !current.isEmpty()) {
+        bullets.add(current.toString());
+        current = new StringBuilder();
+      }
+      if (!current.isEmpty()) {
+        current.append('\n');
+      }
+      current.append(row);
+    }
+    bullets.add(current.toString());
+    return bullets;
+  }
+
+  /**
+   * {@code lead} and the parts joined by commas, wrapped into lines of at most {@link #ROW_LIMIT}.
+   */
+  private static List<String> wrapped(String lead, List<String> parts) {
+    List<String> lines = new ArrayList<>();
+    StringBuilder line = new StringBuilder(lead);
+    boolean empty = true;
+    for (String part : parts) {
+      if (!empty && line.length() + 2 + part.length() > ROW_LIMIT) {
+        lines.add(line.append(',').toString());
+        line = new StringBuilder(part);
+      } else {
+        line.append(empty ? "" : ", ").append(part);
+      }
+      empty = false;
+    }
+    lines.add(line.toString());
+    return lines;
   }
 
   private final class Board {
@@ -112,7 +162,7 @@ public class DraftBoardSection implements ReplayReportSection {
           .forEach(h -> heroBySlot.put(h.getPlayerSlot(), heroNames.heroName(h.getHeroId())));
     }
 
-    String heroPicks() {
+    List<String> heroPicks() {
       Stream<String> rows =
           heroes.stream()
               .filter(h -> h.getPlayerSlot() != null)
@@ -121,7 +171,7 @@ public class DraftBoardSection implements ReplayReportSection {
                       HeroDraftPickDomain::getPickTick,
                       Comparator.nullsLast(Comparator.naturalOrder())))
               .map(this::heroRow);
-      return Stream.concat(Stream.of("**Hero picks**"), rows).collect(Collectors.joining("\n"));
+      return rows.toList();
     }
 
     private String heroRow(HeroDraftPickDomain pick) {
@@ -137,7 +187,7 @@ public class DraftBoardSection implements ReplayReportSection {
           pick.getClockSeconds() == null ? "?" : GameTime.clock(pick.getClockSeconds()));
     }
 
-    String skillPicks(List<AbilityDraftPickDomain> skills) {
+    List<String> skillPicks(List<AbilityDraftPickDomain> skills) {
       Map<Long, List<AbilityDraftPickDomain>> bySlot =
           skills.stream()
               .filter(s -> s.getPlayerSlot() != null)
@@ -147,30 +197,31 @@ public class DraftBoardSection implements ReplayReportSection {
           Comparator.<Long, Boolean>comparing(
                   slot -> yours == null || TeamSide.ofSlot(slot) != yours)
               .thenComparing(Comparator.naturalOrder());
-      Stream<String> rows =
-          bySlot.keySet().stream().sorted(order).map(slot -> skillRow(slot, bySlot.get(slot)));
-      return Stream.concat(Stream.of("**Skill picks**"), rows).collect(Collectors.joining("\n"));
+      return bySlot.keySet().stream()
+          .sorted(order)
+          .flatMap(slot -> skillRow(slot, bySlot.get(slot)).stream())
+          .toList();
     }
 
-    private String skillRow(long slot, List<AbilityDraftPickDomain> picks) {
+    private List<String> skillRow(long slot, List<AbilityDraftPickDomain> picks) {
       String picker = input.namesBySlot().get(slot);
       String hero = heroBySlot.get(slot);
       String who =
           picker != null
               ? picker + (hero == null ? "" : " (" + hero + ")")
               : hero == null ? team(slot) + " player" : hero;
-      String chosen =
+      List<String> chosen =
           picks.stream()
               .sorted(Comparator.comparingInt(AbilityDraftPickDomain::getPickOrder))
               .map(
                   p ->
                       skillName(p.getAbilityName(), p.getAbilityId())
                           + (p.getTurnNumber() == null ? "" : " (" + p.getTurnNumber() + ")"))
-              .collect(Collectors.joining(", "));
-      return who + ": " + chosen;
+              .toList();
+      return wrapped(who + ": ", chosen);
     }
 
-    Optional<String> leftOver(List<AbilityDraftPoolDomain> pool) {
+    List<String> leftOver(List<AbilityDraftPoolDomain> pool) {
       List<String> leftHeroes =
           heroes.stream()
               .filter(h -> h.getPlayerSlot() == null)
@@ -184,18 +235,16 @@ public class DraftBoardSection implements ReplayReportSection {
               .toList();
       List<String> rows = new ArrayList<>();
       if (!leftHeroes.isEmpty()) {
-        rows.add("Heroes: " + String.join(", ", leftHeroes));
+        rows.addAll(wrapped("Heroes: ", leftHeroes));
       }
       if (!leftSkills.isEmpty()) {
-        rows.add("Skills: " + String.join(", ", leftSkills));
+        rows.addAll(wrapped("Skills: ", leftSkills));
       }
-      return rows.isEmpty()
-          ? Optional.empty()
-          : Optional.of("**Left over**\n" + String.join("\n", rows));
+      return rows;
     }
 
     private String skillName(String abilityName, Long abilityId) {
-      return abilityName == null ? "Skill " + abilityId : labels.label(abilityName);
+      return abilityName == null ? "Skill " + abilityId : labels.decorated(abilityName);
     }
 
     private String team(long slot) {

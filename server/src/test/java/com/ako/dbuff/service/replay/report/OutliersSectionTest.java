@@ -35,7 +35,7 @@ class OutliersSectionTest {
   OutliersSectionTest() {
     when(repo.findByMatchId(1L)).thenReturn(rows);
     when(rotationRepo.findByMatchId(1L)).thenReturn(rotations);
-    when(heroNames.bySlot(1L)).thenReturn(Map.of(0L, "Sven", 129L, "Mirana"));
+    when(heroNames.iconBySlot(1L)).thenReturn(Map.of(0L, "Sven", 129L, "Mirana"));
   }
 
   private PlayerOutlierDomain outlier(long slot, String kind, int start, int end, double share) {

@@ -141,7 +141,7 @@ public class ObjectivesSection implements ReplayReportSection {
     if (entries.isEmpty()) {
       return Optional.empty();
     }
-    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     List<String> lines = new ArrayList<>();
     int max = Math.max(LineText.ELLIPSIS.length() + 1, properties.getMaxBehaviourLineLength());

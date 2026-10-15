@@ -38,7 +38,8 @@ class ItemsSectionTest {
 
   ItemsSectionTest() {
     when(repo.findByMatchId(1L)).thenReturn(rows);
-    when(heroNames.bySlot(1L)).thenReturn(Map.of(0L, "Axe", 1L, "Lion", 2L, "Pudge", 128L, "Sven"));
+    when(heroNames.iconBySlot(1L))
+        .thenReturn(Map.of(0L, "Axe", 1L, "Lion", 2L, "Pudge", 128L, "Sven"));
   }
 
   private ItemEfficiencyDomain add(ItemEfficiency e) {
@@ -339,7 +340,7 @@ class ItemsSectionTest {
 
   @Test
   void saysABoughtButUnusedItemInPlainWordsAndNamesAHeroWithoutAKnownName() {
-    when(heroNames.bySlot(1L)).thenReturn(Map.of());
+    when(heroNames.iconBySlot(1L)).thenReturn(Map.of());
     add(
         new ItemEfficiency(
             129,

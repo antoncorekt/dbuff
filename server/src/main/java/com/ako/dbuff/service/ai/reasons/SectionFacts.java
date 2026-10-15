@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.ai.reasons;
 
+import com.ako.dbuff.service.discord.icon.IconService;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.ReplayReportSection;
 import com.ako.dbuff.service.replay.report.view.SectionView;
@@ -34,9 +35,11 @@ class SectionFacts {
           Map.entry("smoke", FactKind.SMOKE));
 
   private final ObjectProvider<ReplayReportSection> sections;
+  private final IconService icons;
 
-  SectionFacts(ObjectProvider<ReplayReportSection> sections) {
+  SectionFacts(ObjectProvider<ReplayReportSection> sections, IconService icons) {
     this.sections = sections;
+    this.icons = icons;
   }
 
   List<Fact> build(ReplayReportInput input) {
@@ -52,7 +55,7 @@ class SectionFacts {
   private List<Fact> factsOf(ReplayReportSection section, FactKind kind, ReplayReportInput input) {
     Optional<SectionView> view;
     try {
-      view = section.view(input);
+      view = icons.withoutIcons(() -> section.view(input));
     } catch (RuntimeException e) {
       log.warn(
           "Section {} of match {} left out of the AI facts: {}",

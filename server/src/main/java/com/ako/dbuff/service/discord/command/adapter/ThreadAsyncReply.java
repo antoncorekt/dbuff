@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.discord.command.adapter;
 
 import com.ako.dbuff.service.discord.command.AsyncReply;
+import com.ako.dbuff.service.discord.icon.IconText;
 import com.ako.dbuff.service.replay.report.view.MessageLimits;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,8 +63,9 @@ public class ThreadAsyncReply implements AsyncReply {
           chunks.add(current.toString());
           current.setLength(0);
         }
-        chunks.add(line.substring(0, MAX_MESSAGE_LENGTH));
-        line = line.substring(MAX_MESSAGE_LENGTH);
+        int cut = IconText.splitIndex(line, MAX_MESSAGE_LENGTH);
+        chunks.add(line.substring(0, cut));
+        line = line.substring(cut);
       }
       if (current.length() + line.length() + 1 > MAX_MESSAGE_LENGTH) {
         chunks.add(current.toString());

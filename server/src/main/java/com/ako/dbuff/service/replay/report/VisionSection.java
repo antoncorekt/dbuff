@@ -139,7 +139,7 @@ public class VisionSection implements ReplayReportSection {
     boolean ownView = yours != null && !own.isEmpty();
     List<Entry> shown = ownView ? own : problems;
     String scope = yours == null ? "" : ownView ? " for your team" : " for both teams";
-    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
     List<String> lines = new ArrayList<>();
     lines.add("**Vision**");
     summary(entries, shown, scope).ifPresent(lines::add);

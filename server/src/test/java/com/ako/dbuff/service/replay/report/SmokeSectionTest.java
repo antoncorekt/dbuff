@@ -26,7 +26,8 @@ class SmokeSectionTest {
 
   SmokeSectionTest() {
     when(repo.findByMatchId(1L)).thenReturn(rows);
-    when(heroNames.bySlot(1L)).thenReturn(Map.of(0L, "Axe", 1L, "Lion", 2L, "Pudge", 128L, "Sven"));
+    when(heroNames.iconBySlot(1L))
+        .thenReturn(Map.of(0L, "Axe", 1L, "Lion", 2L, "Pudge", 128L, "Sven"));
   }
 
   private SmokeUseDomain row(long user, String group, int start, String outcome) {

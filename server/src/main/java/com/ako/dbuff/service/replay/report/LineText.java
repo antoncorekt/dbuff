@@ -1,5 +1,7 @@
 package com.ako.dbuff.service.replay.report;
 
+import com.ako.dbuff.service.discord.icon.IconText;
+
 /** Keeps a line within its length. */
 final class LineText {
   static final String ELLIPSIS = "...";
@@ -18,6 +20,6 @@ final class LineText {
     } else if (Character.isHighSurrogate(line.charAt(end - 1))) {
       end--;
     }
-    return line.substring(0, end).stripTrailing() + ELLIPSIS;
+    return line.substring(0, IconText.safeEnd(line, end)).stripTrailing() + ELLIPSIS;
   }
 }

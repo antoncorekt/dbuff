@@ -116,6 +116,19 @@ class TextCommandParserTest {
     assertThat(String.join("", chunks)).hasSize(4500);
   }
 
+  @Test
+  void splitToLimit_neverSplitsAnEmojiTag() {
+    String tag = "<:h_antimage:11>";
+    String line = "z".repeat(1990) + tag + "z".repeat(50);
+
+    List<String> chunks = ThreadAsyncReply.splitToLimit(line);
+
+    assertThat(chunks).hasSize(2);
+    assertThat(chunks.get(0)).doesNotContain("<");
+    assertThat(chunks.get(1)).startsWith(tag);
+    assertThat(String.join("", chunks)).isEqualTo(line);
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"!", "~", "~~"})
   void parsesWithTheConfiguredPrefix(String prefix) {

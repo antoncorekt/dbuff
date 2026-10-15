@@ -4,6 +4,7 @@ import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.constant.data.ItemConstant;
+import com.ako.dbuff.service.discord.icon.IconService;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +17,8 @@ import org.springframework.stereotype.Component;
  * The display name of an ability or item from the constants. Without one, the prettified internal
  * name minus a leading hero token, since an Ability Draft hero holds abilities of other heroes and
  * the source hero's name would read as part of the ability. It never fails: missing constants give
- * the prettified name.
+ * the prettified name. The icon comes apart from the name ({@link #icon}, {@link #decorated}), so
+ * the cache holds names only.
  */
 @Component
 @RequiredArgsConstructor
@@ -25,6 +27,7 @@ public class ConstantAbilityLabels implements AbilityLabels {
   private static final String ITEM_PREFIX = "item_";
 
   private final ConstantsManagers constants;
+  private final IconService icons;
   private volatile Snapshot snapshot;
 
   @Override
@@ -34,6 +37,11 @@ public class ConstantAbilityLabels implements AbilityLabels {
     }
     Snapshot current = current();
     return current.labels().computeIfAbsent(internalName, current::compute);
+  }
+
+  @Override
+  public String icon(String internalName) {
+    return icons.ability(internalName);
   }
 
   private Snapshot current() {

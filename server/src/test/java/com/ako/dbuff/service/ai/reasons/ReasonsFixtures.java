@@ -7,6 +7,8 @@ import com.ako.dbuff.dao.model.PlayerRoleDomain;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleRepo;
+import com.ako.dbuff.service.discord.icon.IconService;
+import com.ako.dbuff.service.discord.icon.TestIcons;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.ReplayReportSection;
 import com.ako.dbuff.service.replay.report.ReportHeroNames;
@@ -119,6 +121,10 @@ final class ReasonsFixtures {
   }
 
   static AiMatchFactsBuilder builder(ReplayReportSection... sections) {
-    return new AiMatchFactsBuilder(basicFacts(), new SectionFacts(provider(sections)));
+    return builder(TestIcons.off(), sections);
+  }
+
+  static AiMatchFactsBuilder builder(IconService icons, ReplayReportSection... sections) {
+    return new AiMatchFactsBuilder(basicFacts(), new SectionFacts(provider(sections), icons));
   }
 }

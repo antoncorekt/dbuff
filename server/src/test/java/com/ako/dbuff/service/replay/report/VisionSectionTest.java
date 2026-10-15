@@ -38,7 +38,7 @@ class VisionSectionTest {
     when(repo.findByMatchId(1L)).thenReturn(rows);
     when(fightRepo.findByMatchId(1L)).thenReturn(fights);
     when(importanceRepo.findByMatchId(1L)).thenReturn(importance);
-    when(heroNames.bySlot(1L)).thenReturn(Map.of(0L, "Axe", 128L, "Riki", 129L, "Lion"));
+    when(heroNames.iconBySlot(1L)).thenReturn(Map.of(0L, "Axe", 128L, "Riki", 129L, "Lion"));
   }
 
   private FightVisionDomain row(int index, int start, String team, String verdict) {

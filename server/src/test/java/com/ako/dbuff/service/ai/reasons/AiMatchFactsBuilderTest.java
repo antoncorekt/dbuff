@@ -1,13 +1,28 @@
 package com.ako.dbuff.service.ai.reasons;
 
 import com.ako.dbuff.dao.model.MatchDomain;
+import com.ako.dbuff.dao.model.ReportDetail;
+import com.ako.dbuff.service.constant.ConstantsManagers;
+import com.ako.dbuff.service.constant.data.AbilityConstant;
+import com.ako.dbuff.service.discord.icon.IconKind;
+import com.ako.dbuff.service.discord.icon.IconService;
+import com.ako.dbuff.service.discord.icon.TestIcons;
+import com.ako.dbuff.service.replay.report.ConstantAbilityLabels;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
+import com.ako.dbuff.service.replay.report.ReplayReportSection;
+import com.ako.dbuff.service.replay.report.ReportHeroNames;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class AiMatchFactsBuilderTest {
 
@@ -46,6 +61,61 @@ class AiMatchFactsBuilderTest {
             "F2: 8:10 Dire (your team) won the fight, 4.1k net worth swing",
             "F3: 22:40 Dire (your team) won the fight, took the lead",
             "LANE_1: Bottom lane: Dire won clearly");
+  }
+
+  @Test
+  void sectionsBuiltWithIconsOnReachTheModelWithoutThemEndToEnd() {
+    IconService icons = TestIcons.on();
+    ConstantsManagers constants = mock(ConstantsManagers.class);
+    when(constants.getAllAbilityConstants())
+        .thenReturn(Map.of("antimage_blink", AbilityConstant.builder().dname("Blink").build()));
+    ConstantAbilityLabels labels = new ConstantAbilityLabels(constants, icons);
+    ReportHeroNames heroNames = mock(ReportHeroNames.class);
+    when(heroNames.iconBySlot(ReasonsFixtures.MATCH_ID))
+        .thenAnswer(call -> Map.of(128L, icons.hero(1) + "Anti-Mage", 0L, icons.hero(99) + "Axe"));
+    ReplayReportSection section =
+        new ReplayReportSection() {
+          public String name() {
+            return "important-fights";
+          }
+
+          public int order() {
+            return 1;
+          }
+
+          public ReportDetail minimumDetail() {
+            return ReportDetail.STANDARD;
+          }
+
+          public List<String> lines(ReplayReportInput input) {
+            return List.of();
+          }
+
+          public Optional<SectionView> view(ReplayReportInput input) {
+            Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
+            return Optional.of(
+                new SectionView(
+                    "Fights",
+                    heroes.get(128L) + " won",
+                    Accent.INFO,
+                    List.of(
+                        heroes.get(128L) + " cast " + labels.decorated("antimage_blink"),
+                        heroes.get(0L) + " had " + labels.decorated("item_blink")),
+                    null));
+          }
+        };
+    ReplayReportInput input = ReasonsFixtures.input();
+
+    List<String> lines = lines(ReasonsFixtures.builder(icons, section).build(input));
+
+    assertThat(lines)
+        .contains("F1: Anti-Mage won", "F2: Anti-Mage cast Blink", "F3: Axe had Blink");
+    assertThat(lines)
+        .noneMatch(
+            line ->
+                line.contains("<:")
+                    || Arrays.stream(IconKind.values())
+                        .anyMatch(kind -> line.contains(kind.getPlaceholder())));
   }
 
   @Test

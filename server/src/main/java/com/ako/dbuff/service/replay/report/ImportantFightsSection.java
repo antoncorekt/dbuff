@@ -74,7 +74,7 @@ public class ImportantFightsSection implements ReplayReportSection {
             input.matchId(),
             listed.stream().map(l -> l.fight().getFightIndex()).toList(),
             MAX_REASONS);
-    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     List<String> lines = new ArrayList<>();
     for (LostFight fight : listed) {

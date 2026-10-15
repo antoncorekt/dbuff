@@ -8,7 +8,10 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,7 +20,7 @@ import org.springframework.stereotype.Service;
  * The single way a report puts an icon before a name. The chain is fixed: the synced emoji, else a
  * Unicode placeholder of the kind, else nothing. The result is a prefix ready to put before the
  * name (with its trailing space) or an empty string; with icons switched off it is always empty, so
- * output stays as it was.
+ * output stays as it was. A fallback is counted once per key until the table is read again.
  */
 @Slf4j
 @Service
@@ -30,6 +33,9 @@ public class IconService {
   private final ConstantsManagers constants;
   private final MeterRegistry registry;
 
+  private final ThreadLocal<Boolean> suppressed = new ThreadLocal<>();
+  private final Set<String> countedFallbacks = ConcurrentHashMap.newKeySet();
+
   private volatile Snapshot snapshot;
   private volatile long lastIncompleteLoadNanos;
 
@@ -41,8 +47,27 @@ public class IconService {
       Map<Long, String> heroKeysById,
       boolean complete) {}
 
+  /** Runs the action with every icon lookup on this thread answering nothing, e.g. for AI input. */
+  public <T> T withoutIcons(Supplier<T> action) {
+    Boolean before = suppressed.get();
+    suppressed.set(true);
+    try {
+      return action.get();
+    } finally {
+      if (before == null) {
+        suppressed.remove();
+      } else {
+        suppressed.set(before);
+      }
+    }
+  }
+
+  private boolean off() {
+    return !properties.isEnabled() || suppressed.get() != null;
+  }
+
   public String hero(long heroId) {
-    if (!properties.isEnabled()) {
+    if (off()) {
       return "";
     }
     return prefix(IconKind.HERO, current().heroKeysById().get(heroId));
@@ -50,7 +75,7 @@ public class IconService {
 
   /** An ability by its internal name; an {@code item_} name is looked up as the item. */
   public String ability(String internalName) {
-    if (!properties.isEnabled() || internalName == null || internalName.isBlank()) {
+    if (off() || internalName == null || internalName.isBlank()) {
       return "";
     }
     if (internalName.startsWith(IconCandidates.ITEM_PREFIX)) {
@@ -61,12 +86,13 @@ public class IconService {
 
   /** An item by its key, without the {@code item_} prefix. */
   public String item(String key) {
-    return properties.isEnabled() ? prefix(IconKind.ITEM, key) : "";
+    return off() ? "" : prefix(IconKind.ITEM, key);
   }
 
   /** Reads the table again; called after a sync or a check changed it. */
   public void refresh() {
     Snapshot fresh = load();
+    countedFallbacks.clear();
     snapshot = fresh;
     lastIncompleteLoadNanos = fresh.complete() ? 0 : System.nanoTime();
   }
@@ -76,7 +102,9 @@ public class IconService {
     if (mention != null) {
       return mention + " ";
     }
-    registry.counter(FALLBACK_METER, "kind", kind.name()).increment();
+    if (countedFallbacks.add(kind + ":" + key)) {
+      registry.counter(FALLBACK_METER, "kind", kind.name()).increment();
+    }
     return properties.isPlaceholders() ? kind.getPlaceholder() + " " : "";
   }
 

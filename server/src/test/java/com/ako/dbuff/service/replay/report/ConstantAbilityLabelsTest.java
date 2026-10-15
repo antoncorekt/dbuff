@@ -4,6 +4,7 @@ import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.constant.data.ItemConstant;
+import com.ako.dbuff.service.discord.icon.TestIcons;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,8 @@ import static org.mockito.Mockito.when;
 class ConstantAbilityLabelsTest {
 
   private final ConstantsManagers constants = mock(ConstantsManagers.class);
-  private final ConstantAbilityLabels labels = new ConstantAbilityLabels(constants);
+  private final ConstantAbilityLabels labels =
+      new ConstantAbilityLabels(constants, TestIcons.off());
 
   ConstantAbilityLabelsTest() {
     when(constants.getAllAbilityConstants())

@@ -16,6 +16,7 @@ import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayReportPostedRepo;
 import com.ako.dbuff.service.discord.DiscordMessageService;
+import com.ako.dbuff.service.discord.icon.IconText;
 import com.ako.dbuff.service.match.report.analyzer.Report;
 import com.ako.dbuff.service.match.report.analyzer.TextReport;
 import com.ako.dbuff.service.match.report.formatter.ReportFormatter;
@@ -355,7 +356,7 @@ public class ReplayReportService {
                 l ->
                     l.length() <= MessageLimits.PLAIN_TEXT
                         ? l
-                        : l.substring(0, MessageLimits.PLAIN_TEXT - 1) + "…")
+                        : l.substring(0, IconText.safeEnd(l, MessageLimits.PLAIN_TEXT - 1)) + "…")
             .collect(Collectors.joining("\n"));
     return formatter.formatForDiscord(List.of(new TextReport("replay", cut)), Map.of());
   }
@@ -481,7 +482,7 @@ public class ReplayReportService {
                 .collect(
                     Collectors.toMap(
                         PlayerDomain::getId, p -> String.valueOf(p.getName()), (a, b) -> a));
-    Map<Long, String> heroes = heroNames.bySlot(match.getId());
+    Map<Long, String> heroes = heroNames.iconBySlot(match.getId());
     Map<Long, String> namesBySlot = new HashMap<>();
     stats.stream()
         .filter(s -> focusIds.contains(s.getPlayerId()))

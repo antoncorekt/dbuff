@@ -32,7 +32,7 @@ class OpeningSectionTest {
   OpeningSectionTest() {
     when(summaryRepo.findByMatchId(1L)).thenReturn(summaries);
     when(pickupRepo.findByMatchId(1L)).thenReturn(pickups);
-    when(heroNames.bySlot(1L))
+    when(heroNames.iconBySlot(1L))
         .thenReturn(Map.of(0L, "Axe", 1L, "Lion", 128L, "Sven", 129L, "Pudge"));
   }
 

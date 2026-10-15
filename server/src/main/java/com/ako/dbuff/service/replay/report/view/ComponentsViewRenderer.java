@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.report.view;
 
+import com.ako.dbuff.service.discord.icon.IconText;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -205,6 +206,8 @@ public class ComponentsViewRenderer implements ViewRenderer {
 
   private static String cut(String text, int max) {
     int limit = Math.max(1, max);
-    return text.length() <= limit ? text : text.substring(0, limit - 1) + ELLIPSIS;
+    return text.length() <= limit
+        ? text
+        : text.substring(0, IconText.safeEnd(text, limit - 1)) + ELLIPSIS;
   }
 }
