@@ -8,6 +8,7 @@ import com.ako.dbuff.dao.repo.RunePickupRepo;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.rune.RuneType;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -59,40 +60,68 @@ public class OpeningSection implements ReplayReportSection {
     return ReportDetail.STANDARD;
   }
 
+  private record Opening(Optional<Result> result, List<String> lines) {}
+
+  private record Result(String text, TeamSide winner) {}
+
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return opening(input).lines();
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    Opening opening = opening(input);
+    if (opening.lines().isEmpty()) {
+      return Optional.empty();
+    }
+    List<String> lines = opening.lines();
+    int first = opening.result().isPresent() ? 2 : 1;
+    String verdict = opening.result().isPresent() ? lines.get(1) : "Runes taken in the opening";
+    TeamSide winner = opening.result().map(Result::winner).orElse(null);
+    return Optional.of(
+        new SectionView(
+            SectionView.ofLines(lines).title(),
+            verdict,
+            SectionViews.forTeam(winner, TeamSide.commonSide(input.focusSlots())),
+            lines.subList(first, lines.size()),
+            null));
+  }
+
+  private Opening opening(ReplayReportInput input) {
     List<OpeningSummaryDomain> summaries = present(summaryRepo.findByMatchId(input.matchId()));
     if (summaries.isEmpty()) {
-      return List.of();
+      return new Opening(Optional.empty(), List.of());
     }
     List<RunePickupDomain> pickups =
         present(pickupRepo.findByMatchId(input.matchId())).stream().sorted(CHRONOLOGICAL).toList();
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     List<String> body = new ArrayList<>();
-    result(summaries, yours).ifPresent(body::add);
+    Optional<Result> result = result(summaries, yours);
+    result.map(Result::text).ifPresent(body::add);
     bounty(pickups, heroes, yours).ifPresent(body::add);
     midLane(pickups, heroes, properties.getOpeningRuneMinutes()).ifPresent(body::add);
     if (body.isEmpty()) {
-      return List.of();
+      return new Opening(Optional.empty(), List.of());
     }
     List<String> lines = new ArrayList<>();
     lines.add("**Opening and runes**");
     lines.addAll(body);
     int max = Math.max(LineText.ELLIPSIS.length() + 1, properties.getMaxOpeningLineLength());
-    return lines.stream().map(line -> LineText.cut(line, max)).toList();
+    return new Opening(result, lines.stream().map(line -> LineText.cut(line, max)).toList());
   }
 
   private static <T> List<T> present(List<T> rows) {
     return rows == null ? List.of() : rows.stream().filter(Objects::nonNull).toList();
   }
 
-  private static Optional<String> result(List<OpeningSummaryDomain> summaries, TeamSide yours) {
+  private static Optional<Result> result(List<OpeningSummaryDomain> summaries, TeamSide yours) {
     OpeningSummaryDomain won = withResult(summaries, "WON");
     OpeningSummaryDomain lost = withResult(summaries, "LOST");
     if (won == null && lost == null) {
       return summaries.stream().anyMatch(s -> "DRAW".equals(s.getResult()))
-          ? Optional.of(LEVEL)
+          ? Optional.of(new Result(LEVEL, null))
           : Optional.empty();
     }
     TeamSide winner =
@@ -112,21 +141,25 @@ public class OpeningSection implements ReplayReportSection {
     String took = OpeningWording.result("WON");
     if (balance != null && balance == 0) {
       if (!knownKills) {
-        return Optional.of("The opening was level in gold and XP.");
+        return Optional.of(new Result("The opening was level in gold and XP.", null));
       }
       return winnerKills.equals(enemyKills)
-          ? Optional.of(LEVEL)
+          ? Optional.of(new Result(LEVEL, null))
           : Optional.of(
-              "%s %s on kills, %s, after gold and XP were level.".formatted(team, took, kills));
+              new Result(
+                  "%s %s on kills, %s, after gold and XP were level.".formatted(team, took, kills),
+                  winner));
     }
     String by =
         balance == null
             ? ""
             : " by %s gold and XP".formatted(BehaviourWording.gold(Math.abs(balance)));
     return Optional.of(
-        kills.isEmpty()
-            ? "%s %s%s.".formatted(team, took, by)
-            : "%s %s%s; kills %s.".formatted(team, took, by, kills));
+        new Result(
+            kills.isEmpty()
+                ? "%s %s%s.".formatted(team, took, by)
+                : "%s %s%s; kills %s.".formatted(team, took, by, kills),
+            winner));
   }
 
   private static TeamSide opponent(TeamSide side) {

@@ -8,6 +8,9 @@ import com.ako.dbuff.dao.repo.LaneReasonRepo;
 import com.ako.dbuff.dao.repo.LaneResultRepo;
 import com.ako.dbuff.service.replay.analysis.lane.LaneProperties;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -360,5 +363,58 @@ class LanesSectionTest {
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining("lane-clear-margin");
     }
+  }
+
+  @Test
+  void view_sayswhoWonMoreLanesAndKeepsPlainTextAsItWas() {
+    threeLanes();
+
+    SectionView both = section.view(input(0L, 128L)).orElseThrow();
+    SectionView dire = section.view(input(128L)).orElseThrow();
+
+    ViewRendering.assertWithinLimits(both);
+    assertThat(both.title()).isEqualTo("Laning stage");
+    assertThat(both.verdict()).isEqualTo("Radiant and Dire won 1 each");
+    assertThat(both.accent()).isEqualTo(Accent.NEUTRAL);
+    assertThat(dire.verdict()).isEqualTo("Dire (your team) split 1 to 1 in lanes");
+    assertThat(both.bullets()).hasSize(3);
+    assertThat(String.join("\n", section.lines(input(0L, 128L))))
+        .isEqualTo(
+            "**Laning stage**\n"
+                + "Bottom lane (lasted 10:35): Dire won by a lot. Radiant Phantom Assassin, Dire"
+                + " Venomancer and Nature's Prophet. Why: Radiant dealt 4978 and took 8252; The"
+                + " kits of Radiant fit worse. Dire reached level 6 when the lane ended, Radiant"
+                + " did not.\n"
+                + "Mid lane (lasted 10:35): even. Radiant Enchantress, Dire Jakiro.\n"
+                + "Top lane (lasted 10:35): Radiant won narrowly. Radiant Sniper and Riki, Dire"
+                + " Terrorblade.");
+    assertThat(new PlainViewRenderer().lines(both)).isEqualTo(section.lines(input(0L, 128L)));
+  }
+
+  @Test
+  void view_isGreenWhenTheTrackedTeamWonMostLanes() {
+    result(0, "BOTTOM", "RADIANT", "WON", 0.7);
+    result(0, "BOTTOM", "DIRE", "LOST", -0.7);
+    result(1, "MID", "RADIANT", "EVEN", 0.0);
+    result(1, "MID", "DIRE", "EVEN", 0.0);
+
+    SectionView view = section.view(input(0L)).orElseThrow();
+
+    assertThat(view.verdict()).isEqualTo("Radiant (your team) won 1 of 2 lanes");
+    assertThat(view.accent()).isEqualTo(Accent.WIN);
+  }
+
+  @Test
+  void view_saysWhenNoLaneHadAWinner() {
+    result(1, "MID", "RADIANT", "EVEN", 0.0);
+    result(1, "MID", "DIRE", "EVEN", 0.0);
+
+    assertThat(section.view(input()).orElseThrow().verdict())
+        .isEqualTo("No lane had a clear winner");
+  }
+
+  @Test
+  void view_isEmptyWithoutLanes() {
+    assertThat(section.view(input())).isEmpty();
   }
 }

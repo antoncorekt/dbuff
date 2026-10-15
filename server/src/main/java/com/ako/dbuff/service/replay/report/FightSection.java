@@ -7,10 +7,14 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.FightAbilityUseRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
+import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -52,8 +56,33 @@ public class FightSection implements ReplayReportSection {
     return ReportDetail.FULL;
   }
 
+  private record Found(List<String> lines, int missed, int unused) {}
+
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return found(input).lines();
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    Found found = found(input);
+    if (found.lines().isEmpty()) {
+      return Optional.empty();
+    }
+    List<String> parts = new ArrayList<>();
+    if (found.missed() > 0) {
+      parts.add(
+          "Tracked players missed %s".formatted(SectionViews.count(found.missed(), "big fight")));
+    }
+    if (found.unused() > 0) {
+      parts.add(
+          "%s left a ready ability unused in several fights"
+              .formatted(SectionViews.count(found.unused(), "player")));
+    }
+    return SectionViews.titled(found.lines(), new Verdict(String.join("; ", parts), Accent.LOSS));
+  }
+
+  private Found found(ReplayReportInput input) {
     Map<Integer, FightDomain> fights =
         fightRepo.findByMatchId(input.matchId()).stream()
             .collect(
@@ -61,22 +90,30 @@ public class FightSection implements ReplayReportSection {
     List<FightPlayerDomain> parts = fightPlayerRepo.findByMatchId(input.matchId());
     List<FightAbilityUseDomain> uses = abilityRepo.findByMatchId(input.matchId());
     List<String> lines = new ArrayList<>();
+    int missed = 0;
+    int unused = 0;
     for (Map.Entry<Long, String> player : input.namesBySlot().entrySet()) {
       long slot = player.getKey();
-      parts.stream()
-          .filter(p -> p.getPlayerSlot() == slot && p.getAbsenceReason() != null)
-          .filter(p -> fights.containsKey(p.getFightIndex()) && big(fights.get(p.getFightIndex())))
-          .sorted(Comparator.comparing(p -> fights.get(p.getFightIndex()).getStartSeconds()))
-          .limit(input.maxFindings())
-          .map(p -> absenceLine(player.getValue(), slot, p, fights.get(p.getFightIndex())))
-          .forEach(lines::add);
-      unusedAbilityLine(player.getValue(), slot, uses).ifPresent(lines::add);
+      List<String> absences =
+          parts.stream()
+              .filter(p -> p.getPlayerSlot() == slot && p.getAbsenceReason() != null)
+              .filter(
+                  p -> fights.containsKey(p.getFightIndex()) && big(fights.get(p.getFightIndex())))
+              .sorted(Comparator.comparing(p -> fights.get(p.getFightIndex()).getStartSeconds()))
+              .limit(input.maxFindings())
+              .map(p -> absenceLine(player.getValue(), slot, p, fights.get(p.getFightIndex())))
+              .toList();
+      lines.addAll(absences);
+      missed += absences.size();
+      Optional<String> ability = unusedAbilityLine(player.getValue(), slot, uses);
+      ability.ifPresent(lines::add);
+      unused += ability.isPresent() ? 1 : 0;
     }
     if (lines.isEmpty()) {
-      return List.of();
+      return new Found(List.of(), 0, 0);
     }
     lines.addFirst("**Fights**");
-    return lines;
+    return new Found(lines, missed, unused);
   }
 
   private static boolean big(FightDomain fight) {
@@ -124,7 +161,7 @@ public class FightSection implements ReplayReportSection {
   }
 
   /** "Ravage ready, not cast in 3 of 5 fights", for the worst such ability. */
-  private java.util.Optional<String> unusedAbilityLine(
+  private Optional<String> unusedAbilityLine(
       String name, long slot, List<FightAbilityUseDomain> uses) {
     Map<String, List<FightAbilityUseDomain>> byAbility =
         uses.stream()

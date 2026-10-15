@@ -4,6 +4,8 @@ import com.ako.dbuff.dao.model.OpeningSummaryDomain;
 import com.ako.dbuff.dao.model.RunePickupDomain;
 import com.ako.dbuff.dao.repo.OpeningSummaryRepo;
 import com.ako.dbuff.dao.repo.RunePickupRepo;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -263,5 +265,57 @@ class OpeningSectionTest {
     }
     properties.setMaxOpeningLineLength(600);
     properties.validate();
+  }
+
+  private void firstRunes() {
+    summary("RADIANT", "WON", 1200, 3);
+    summary("DIRE", "LOST", -1200, 1);
+    rune(0, "BOUNTY", 0, 100, false);
+    rune(128, "BOUNTY", 2, 100, false);
+    rune(1, "BOUNTY", 180, 130, false);
+    rune(1, "WATER", 120, null, true);
+    rune(129, "DOUBLE_DAMAGE", 560, null, true);
+    rune(129, "HASTE", 600, null, false);
+    rune(1, "WATER", 240, null, true);
+    rune(0, "ARCANE", 700, null, true);
+    rune(0, "SHIELD", 601, null, true);
+    rune(0, "REGENERATION", 130, null, true);
+  }
+
+  @Test
+  void view_putsTheOpeningResultFirstAndKeepsPlainTextAsItWas() {
+    firstRunes();
+
+    SectionView view = section.view(input(128L)).orElseThrow();
+
+    ViewRendering.assertWithinLimits(view);
+    assertThat(view.title()).isEqualTo("Opening and runes");
+    assertThat(view.verdict())
+        .isEqualTo("Radiant won the opening by 1.2k gold and XP; kills 3 to 1.");
+    assertThat(view.accent()).isEqualTo(Accent.LOSS);
+    assertThat(view.bullets()).hasSize(2);
+    assertThat(String.join("\n", section.lines(input())))
+        .isEqualTo(
+            "**Opening and runes**\n"
+                + "Radiant won the opening by 1.2k gold and XP; kills 3 to 1.\n"
+                + "Radiant took 2 bounty runes worth 230 gold in total, the first was Axe at 0:00;"
+                + " Dire took 1 bounty rune worth 100 gold in total, the first was Sven at"
+                + " 0:02.\n"
+                + "In the mid lane in the first 10 minutes: Lion took water runes at 2:00 and"
+                + " 4:00; Pudge took a double damage rune at 9:20.");
+    assertThat(view.bullets()).containsExactlyElementsOf(section.lines(input(128L)).subList(2, 4));
+  }
+
+  @Test
+  void view_isGreenWhenTheTrackedTeamWonTheOpening() {
+    firstRunes();
+
+    assertThat(section.view(input(0L)).orElseThrow().accent()).isEqualTo(Accent.WIN);
+    assertThat(section.view(input()).orElseThrow().accent()).isEqualTo(Accent.NEUTRAL);
+  }
+
+  @Test
+  void view_isEmptyWithoutASummary() {
+    assertThat(section.view(input())).isEmpty();
   }
 }

@@ -5,6 +5,9 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyJson;
+import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -60,12 +63,44 @@ public class ItemsSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return render(input, entries(input));
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    List<Entry> rows = entries(input);
+    return SectionViews.titled(render(input, rows), paidBack(input, rows));
+  }
+
+  private List<Entry> entries(ReplayReportInput input) {
     List<ItemEfficiencyDomain> stored = itemRepo.findByMatchId(input.matchId());
     if (stored == null) {
       return List.of();
     }
-    List<Entry> rows =
-        stored.stream().map(row -> usable(input.matchId(), row)).flatMap(Optional::stream).toList();
+    return stored.stream()
+        .map(row -> usable(input.matchId(), row))
+        .flatMap(Optional::stream)
+        .toList();
+  }
+
+  private Verdict paidBack(ReplayReportInput input, List<Entry> rows) {
+    Set<Long> focus = input.focusSlots() == null ? Set.of() : input.focusSlots();
+    List<Entry> own = rows.stream().filter(e -> focus.contains(e.row().slot())).toList();
+    List<Entry> scope = own.isEmpty() ? rows : own;
+    long known = scope.stream().filter(e -> e.row().ratio() != null).count();
+    long paid = scope.stream().filter(e -> e.row().ratio() != null && e.row().ratio() >= 1).count();
+    String whose = own.isEmpty() ? "Items" : "Your players' items";
+    if (known == 0) {
+      return new Verdict(
+          "%s: %s checked".formatted(whose, SectionViews.count(scope.size(), "purchase")),
+          Accent.NEUTRAL);
+    }
+    return new Verdict(
+        "%s: %d of %d paid back their cost".formatted(whose, paid, known),
+        SectionViews.balance(paid, known - paid));
+  }
+
+  private List<String> render(ReplayReportInput input, List<Entry> rows) {
     if (rows.isEmpty()) {
       return List.of();
     }

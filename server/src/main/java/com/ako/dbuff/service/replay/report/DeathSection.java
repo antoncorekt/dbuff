@@ -3,11 +3,15 @@ package com.ako.dbuff.service.replay.report;
 import com.ako.dbuff.dao.model.DeathAnalysisDomain;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
+import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -71,6 +75,14 @@ public class DeathSection implements ReplayReportSection {
     }
     lines.addFirst("**Deaths**");
     return lines;
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    List<String> lines = lines(input);
+    long deaths = Math.max(0, lines.size() - 1);
+    return SectionViews.titled(
+        lines, new Verdict(SectionViews.count(deaths, "death") + " worth a look", Accent.LOSS));
   }
 
   private static String line(String name, DeathAnalysisDomain d) {

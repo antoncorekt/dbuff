@@ -5,10 +5,14 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
+import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -69,6 +73,16 @@ public class DraftSection implements ReplayReportSection {
     }
     lines.addFirst("**Draft**");
     return lines;
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    List<String> lines = lines(input);
+    long players = Math.max(0, lines.size() - 1);
+    return SectionViews.titled(
+        lines,
+        new Verdict(
+            "Ability picks of " + SectionViews.count(players, "tracked player"), Accent.NEUTRAL));
   }
 
   private static String position(AbilityDraftPickDomain pick) {

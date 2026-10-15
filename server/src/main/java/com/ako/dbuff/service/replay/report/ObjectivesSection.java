@@ -11,6 +11,8 @@ import com.ako.dbuff.service.replay.analysis.behaviour.ObjectiveKind;
 import com.ako.dbuff.service.replay.analysis.behaviour.ObjectiveResult;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -18,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -81,8 +84,41 @@ public class ObjectivesSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
-    List<ObjectiveConversionDomain> stored = objectiveRepo.findByMatchId(input.matchId());
-    List<Entry> entries = entries(input.matchId(), stored);
+    return render(input, entries(input.matchId(), objectiveRepo.findByMatchId(input.matchId())));
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    List<Entry> entries = entries(input.matchId(), objectiveRepo.findByMatchId(input.matchId()));
+    List<String> lines = render(input, entries);
+    if (lines.isEmpty()) {
+      return Optional.empty();
+    }
+    TeamSide yours = TeamSide.commonSide(input.focusSlots());
+    List<Entry> own =
+        entries.stream()
+            .filter(e -> Enums.find(TeamSide.class, e.row().getWinnerTeam()) == yours)
+            .toList();
+    List<String> bullets = lines.subList(2, lines.size());
+    String title = SectionView.ofLines(lines).title();
+    if (yours == null || own.isEmpty()) {
+      return Optional.of(new SectionView(title, lines.get(1), Accent.NEUTRAL, bullets, null));
+    }
+    long converted = own.stream().filter(e -> result(e) == ObjectiveResult.CONVERTED).count();
+    return Optional.of(
+        new SectionView(
+            title,
+            "%s turned %d of %s into objectives"
+                .formatted(
+                    Prettify.teamOf(yours.name(), yours),
+                    converted,
+                    SectionViews.count(own.size(), "won fight")),
+            SectionViews.balance(converted, own.size() - converted),
+            bullets,
+            null));
+  }
+
+  private List<String> render(ReplayReportInput input, List<Entry> entries) {
     if (entries.isEmpty()) {
       return List.of();
     }

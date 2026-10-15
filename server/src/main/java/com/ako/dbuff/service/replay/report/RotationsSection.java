@@ -6,11 +6,15 @@ import com.ako.dbuff.dao.repo.TeamRotationRepo;
 import com.ako.dbuff.service.replay.analysis.behaviour.RotationVerdict;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -57,15 +61,43 @@ public class RotationsSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return render(input, usableRows(input));
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    List<TeamRotationDomain> rows = usableRows(input);
+    return SectionViews.titled(render(input, rows), tripsVerdict(rows, input));
+  }
+
+  private List<TeamRotationDomain> usableRows(ReplayReportInput input) {
     List<TeamRotationDomain> rows = rotationRepo.findByMatchId(input.matchId());
-    if (rows == null || rows.stream().noneMatch(r -> r != null && verdict(r) != null)) {
+    return rows == null
+        ? List.of()
+        : rows.stream().filter(r -> r != null && verdict(r) != null).toList();
+  }
+
+  private static Verdict tripsVerdict(List<TeamRotationDomain> rows, ReplayReportInput input) {
+    SectionViews.Scope<TeamRotationDomain> scope =
+        SectionViews.scope(
+            rows, TeamRotationDomain::getTeam, TeamSide.commonSide(input.focusSlots()));
+    long good = scope.rows().stream().filter(r -> verdict(r) == RotationVerdict.GOOD).count();
+    long bad = scope.rows().size() - good;
+    return new Verdict(
+        "%s: %d good, %d wasted or ended in a death"
+            .formatted(scope.ownTeam() ? "Your team's trips" : "Trips of both teams", good, bad),
+        scope.ownTeam() ? SectionViews.balance(good, bad) : Accent.NEUTRAL);
+  }
+
+  private List<String> render(ReplayReportInput input, List<TeamRotationDomain> rows) {
+    if (rows.isEmpty()) {
       return List.of();
     }
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     return BehaviourLines.render(
         "**Team rotations**",
-        rows.stream().filter(r -> r != null && verdict(r) != null).toList(),
+        rows,
         byWorth(),
         CHRONOLOGICAL,
         properties.getMaxRotationLines(),

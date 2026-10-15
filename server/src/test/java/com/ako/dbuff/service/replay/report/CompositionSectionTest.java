@@ -5,6 +5,9 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.model.TeamCompositionDomain;
 import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -140,5 +143,52 @@ class CompositionSectionTest {
     assertThat(section.supports(com.ako.dbuff.service.replay.mode.TestModes.ALL_PICK)).isTrue();
     assertThat(section.supports(com.ako.dbuff.service.replay.mode.TestModes.ABILITY_DRAFT))
         .isTrue();
+  }
+
+  @Test
+  void view_saysHowManyPlayersChangedTheirRoleAndKeepsPlainTextAsItWas() {
+    when(profileRepo.findByMatchId(1L))
+        .thenReturn(List.of(profile(0, "INTENT", 1), profile(0, "FINAL", 5)));
+    when(compositionRepo.findByMatchId(1L))
+        .thenReturn(List.of(composition("RADIANT", "PICK", "3 carries; no frontline")));
+    ReplayReportInput in = input(Map.of(0L, "Anton"), 3);
+
+    SectionView view = section.view(in).orElseThrow();
+
+    ViewRendering.assertWithinLimits(view);
+    assertThat(view.title()).isEqualTo("Roles and composition");
+    assertThat(view.verdict())
+        .isEqualTo("1 of 1 tracked players played a different role than they were meant to");
+    assertThat(view.accent()).isEqualTo(Accent.NEUTRAL);
+    assertThat(view.bullets())
+        .containsExactly(
+            "Anton was meant to play carry and played hard support",
+            "Radiant at the draft: 3 carries; no frontline");
+    assertThat(String.join("\n", section.lines(in)))
+        .isEqualTo(
+            "**Roles and composition**\n"
+                + "Anton was meant to play carry and played hard support\n"
+                + "Radiant at the draft: 3 carries; no frontline");
+    assertThat(new PlainViewRenderer().lines(view)).isEqualTo(section.lines(in));
+  }
+
+  @Test
+  void view_isGreenWhenEveryoneKeptTheirRole() {
+    when(profileRepo.findByMatchId(1L))
+        .thenReturn(List.of(profile(0, "INTENT", 2), profile(0, "FINAL", 2)));
+    when(compositionRepo.findByMatchId(1L)).thenReturn(List.of());
+
+    SectionView view = section.view(input(Map.of(0L, "Anton"), 3)).orElseThrow();
+
+    assertThat(view.verdict()).isEqualTo("Every tracked player played the role they were meant to");
+    assertThat(view.accent()).isEqualTo(Accent.WIN);
+  }
+
+  @Test
+  void view_isEmptyWhenNothingIsStored() {
+    when(profileRepo.findByMatchId(1L)).thenReturn(List.of());
+    when(compositionRepo.findByMatchId(1L)).thenReturn(List.of());
+
+    assertThat(section.view(input(Map.of(0L, "Anton"), 3))).isEmpty();
   }
 }

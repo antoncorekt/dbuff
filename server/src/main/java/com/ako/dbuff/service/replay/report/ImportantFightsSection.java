@@ -6,7 +6,7 @@ import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.LostFight;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
-import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
@@ -82,12 +82,10 @@ public class ImportantFightsSection implements ReplayReportSection {
       LostFight full = withReasons.getOrDefault(index, fight);
       lines.add(line(fight, full, heroes, yours));
     }
-    Outcome outcome = outcome(important, yours);
+    Verdict outcome = outcome(important, yours);
     return Optional.of(
-        new SectionView("Important fights", outcome.verdict(), outcome.accent(), lines, null));
+        new SectionView("Important fights", outcome.text(), outcome.accent(), lines, null));
   }
-
-  private record Outcome(String verdict, Accent accent) {}
 
   private static long wonBy(List<LostFight> fights, TeamSide side) {
     return fights.stream()
@@ -96,40 +94,13 @@ public class ImportantFightsSection implements ReplayReportSection {
   }
 
   /** Who won more of all the important fights of the match, not only the listed ones. */
-  private static Outcome outcome(List<LostFight> fights, TeamSide yours) {
-    long total = fights.size();
-    if (yours != null) {
-      long won = wonBy(fights, yours);
-      long lost = total - won;
-      Accent accent = won > lost ? Accent.WIN : won < lost ? Accent.LOSS : Accent.NEUTRAL;
-      String verdict =
-          won == lost
-              ? String.format(
-                  Locale.ROOT,
-                  "%s split %d to %d in important fights",
-                  Prettify.teamOf(yours.name(), yours),
-                  won,
-                  lost)
-              : String.format(
-                  Locale.ROOT,
-                  "%s won %d of %d important fights",
-                  Prettify.teamOf(yours.name(), yours),
-                  won,
-                  total);
-      return new Outcome(verdict, accent);
-    }
-    long radiant = wonBy(fights, TeamSide.RADIANT);
-    long dire = total - radiant;
-    String verdict =
-        radiant == dire
-            ? String.format(Locale.ROOT, "Radiant and Dire won %d each", radiant)
-            : String.format(
-                Locale.ROOT,
-                "%s won %d of %d important fights",
-                radiant > dire ? "Radiant" : "Dire",
-                Math.max(radiant, dire),
-                total);
-    return new Outcome(verdict, Accent.NEUTRAL);
+  private static Verdict outcome(List<LostFight> fights, TeamSide yours) {
+    return SectionViews.contest(
+        yours,
+        wonBy(fights, TeamSide.RADIANT),
+        wonBy(fights, TeamSide.DIRE),
+        fights.size(),
+        "important fights");
   }
 
   /** The tenths of a thousand gold the fight moved, 0 when too small to tell, -1 when unknown. */

@@ -6,6 +6,9 @@ import com.ako.dbuff.dao.model.FightVisionDomain;
 import com.ako.dbuff.dao.repo.FightImportanceRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.FightVisionRepo;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -443,5 +446,72 @@ class VisionSectionTest {
     properties.setMaxVisionLines(10);
     properties.validate();
     assertThat(new ReplayReportProperties().getMaxVisionLines()).isEqualTo(4);
+  }
+
+  private void threeProblemFights() {
+    row(1, 1663, "DIRE", "NO_VISION");
+    row(1, 1663, "RADIANT", "FINE");
+    FightVisionDomain invisible = row(2, 1800, "RADIANT", "INVISIBLE_HERO_NO_DETECTION");
+    invisible.setInvisibleHeroes("128");
+    row(2, 1800, "DIRE", "FINE");
+    FightVisionDomain late = row(3, 2000, "DIRE", "LATE_WARD");
+    late.setActiveObservers(1);
+    late.setActiveSentries(0);
+    late.setLateWardSeconds(20);
+    row(3, 2000, "RADIANT", "FINE");
+  }
+
+  @Test
+  void view_countsTheProblemsAndKeepsPlainTextAsItWas() {
+    threeProblemFights();
+
+    SectionView all = section.view(input()).orElseThrow();
+
+    ViewRendering.assertWithinLimits(all);
+    assertThat(all.title()).isEqualTo("Vision");
+    assertThat(all.verdict()).isEqualTo("3 vision problems in important fights");
+    assertThat(all.accent()).isEqualTo(Accent.NEUTRAL);
+    assertThat(all.bullets()).hasSize(4);
+    assertThat(String.join("\n", section.lines(input())))
+        .isEqualTo(
+            "**Vision**\n"
+                + "Fights where only one team had vision: 1 of 3 important fights\n"
+                + "27:43 Dire fought without vision: no ward of theirs covered the fight.\n"
+                + "30:00 Radiant had no sentry or dust against Riki.\n"
+                + "33:20 Dire's only ward was placed 20 seconds before the fight.");
+    assertThat(new PlainViewRenderer().lines(all)).isEqualTo(section.lines(input()));
+  }
+
+  @Test
+  void view_isRedWhenTheTrackedTeamHasProblemsAndGreenWhenOnlyTheOtherDoes() {
+    threeProblemFights();
+
+    SectionView dire = section.view(input(128L)).orElseThrow();
+
+    assertThat(dire.verdict()).isEqualTo("2 vision problems for your team in important fights");
+    assertThat(dire.accent()).isEqualTo(Accent.LOSS);
+
+    rows.removeIf(r -> "DIRE".equals(r.getTeam()) && !"FINE".equals(r.getVerdict()));
+    rows.add(
+        FightVisionDomain.builder()
+            .id(nextId++)
+            .matchId(1L)
+            .fightIndex(9)
+            .team("DIRE")
+            .verdict("FINE")
+            .activeObservers(1)
+            .build());
+    SectionView clean = section.view(input(128L)).orElseThrow();
+    assertThat(clean.verdict())
+        .isEqualTo("No vision problems for your team; 1 vision problem for the other team");
+    assertThat(clean.accent()).isEqualTo(Accent.WIN);
+  }
+
+  @Test
+  void view_isEmptyWithoutProblems() {
+    row(1, 600, "DIRE", "NO_VISION");
+    row(1, 600, "RADIANT", "NO_VISION");
+
+    assertThat(section.view(input())).isEmpty();
   }
 }
