@@ -16,8 +16,7 @@ public final class ChartFormat {
 
   /** A number as {@code 850}, {@code 1.2k}, {@code -3k}. */
   public static String compact(double value) {
-    double abs = Math.abs(value);
-    if (abs < 1000) {
+    if (Math.round(Math.abs(value)) < 1000) {
       return String.valueOf(Math.round(value));
     }
     String thousands = String.format(Locale.ROOT, "%.1f", value / 1000);

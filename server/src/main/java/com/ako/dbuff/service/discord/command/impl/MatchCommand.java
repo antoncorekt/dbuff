@@ -14,6 +14,7 @@ import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator.PartialReportResult;
 import com.ako.dbuff.service.match.report.stage.MatchReportStageService;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
+import com.ako.dbuff.service.replay.report.ReportCommandHandler;
 import com.ako.dbuff.service.replay.report.ReportDelivery;
 import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
 import java.time.LocalDateTime;
@@ -40,7 +41,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>{@code rerun} re-reports from data already stored. {@code retry} throws that data away and
  * re-fetches from OpenDota — slower, and the right answer only when the stored data is wrong.
- * {@code ai} posts the AI top reasons card from the stored replay analysis.
+ * {@code ai} posts the AI top reasons card from the stored replay analysis; {@code report} posts a
+ * section of it, or all the sections the channel posts automatically.
  */
 @Slf4j
 @Component
@@ -58,6 +60,7 @@ public class MatchCommand implements DbuffCommand {
   private final MatchReportStageService stageService;
   private final ReplayReportService replayReportService;
   private final AiReasonsCommandHandler aiReasons;
+  private final ReportCommandHandler reportHandler;
 
   public MatchCommand(
       MatchRepo matchRepo,
@@ -68,7 +71,8 @@ public class MatchCommand implements DbuffCommand {
       @Lazy MatchParseSchedulerService matchParseSchedulerService,
       @Lazy MatchReportStageService stageService,
       @Lazy ReplayReportService replayReportService,
-      @Lazy AiReasonsCommandHandler aiReasons) {
+      @Lazy AiReasonsCommandHandler aiReasons,
+      @Lazy ReportCommandHandler reportHandler) {
     // Lazy for the same reason the old listener was: these pull in the whole match pipeline.
     this.matchRepo = matchRepo;
     this.instanceConfigRepo = instanceConfigRepo;
@@ -79,6 +83,7 @@ public class MatchCommand implements DbuffCommand {
     this.stageService = stageService;
     this.replayReportService = replayReportService;
     this.aiReasons = aiReasons;
+    this.reportHandler = reportHandler;
   }
 
   @Override
@@ -89,16 +94,22 @@ public class MatchCommand implements DbuffCommand {
   /** The aliases <em>are</em> the subcommands: {@code !rerun} means {@code /match rerun}. */
   @Override
   public List<String> getTextAliases() {
-    return List.of("rerun", "retry", "ai");
+    return List.of("rerun", "retry", "ai", "report");
   }
 
   @Override
   public Map<String, String> parseTextArguments(String alias, String subcommand, String arguments) {
-    if (!"ai".equals(alias)) {
+    String option =
+        switch (alias) {
+          case "ai" -> AiReasonsCommandHandler.MODEL_OPTION;
+          case "report" -> ReportCommandHandler.SECTION_OPTION;
+          default -> null;
+        };
+    if (option == null) {
       return Map.of();
     }
-    String model = ((subcommand == null ? "" : subcommand) + " " + arguments).strip();
-    return model.isEmpty() ? Map.of() : Map.of(AiReasonsCommandHandler.MODEL_OPTION, model);
+    String value = ((subcommand == null ? "" : subcommand) + " " + arguments).strip();
+    return value.isEmpty() ? Map.of() : Map.of(option, value);
   }
 
   @Override
@@ -122,6 +133,16 @@ public class MatchCommand implements DbuffCommand {
                             AiReasonsCommandHandler.MODEL_OPTION,
                             "The model to use, instead of the server default",
                             false)
+                        .setAutoComplete(true)),
+            new SubcommandData(
+                    "report",
+                    "Post one replay report section, or all (the ones set to post automatically)")
+                .addOptions(
+                    new OptionData(
+                            OptionType.STRING,
+                            ReportCommandHandler.SECTION_OPTION,
+                            "A section, or all = every section this channel posts automatically",
+                            true)
                         .setAutoComplete(true)));
   }
 
@@ -155,6 +176,8 @@ public class MatchCommand implements DbuffCommand {
       retry(context, matchId, config.get());
     } else if ("ai".equals(subcommand)) {
       aiReasons.handle(context, matchId, config.get());
+    } else if ("report".equals(subcommand)) {
+      reportHandler.handle(context, matchId, config.get());
     } else {
       rerun(context, matchId, config.get());
     }

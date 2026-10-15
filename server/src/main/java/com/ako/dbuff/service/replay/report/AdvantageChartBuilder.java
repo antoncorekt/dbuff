@@ -6,6 +6,7 @@ import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.LostFight;
 import com.ako.dbuff.service.replay.analysis.importance.AdvantageSeries;
 import com.ako.dbuff.service.replay.analysis.importance.AdvantageSeriesReader;
+import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.spike.SpikeCause;
 import com.ako.dbuff.service.replay.report.chart.ChartFormat;
@@ -49,6 +50,9 @@ public class AdvantageChartBuilder {
     AdvantageSeries series = read.get();
     TeamSide up = viewpoint(yours);
     int points = Math.min(series.radiantGold().length, series.radiantXp().length);
+    if (points == 0) {
+      return Optional.empty();
+    }
     double[] seconds = new double[points];
     double[] gold = new double[points];
     double[] xp = new double[points];
@@ -113,15 +117,22 @@ public class AdvantageChartBuilder {
   private List<ChartSpec.Marker> swingMarkers(long matchId, TeamSide yours, int maxSwings) {
     return spikeRepo.findByMatchId(matchId).stream()
         .filter(s -> !SpikeCause.OTHER.name().equals(s.getPrimaryCause()))
-        .filter(s -> s.getStartSeconds() != null && s.getEndSeconds() != null)
+        .filter(AdvantageChartBuilder::drawable)
         .sorted(Comparator.comparingLong(GameSpikeDomain::getDeltaGold).reversed())
         .limit(maxSwings)
         .map(s -> marker(s, yours))
         .toList();
   }
 
+  private static boolean drawable(GameSpikeDomain spike) {
+    return spike.getStartSeconds() != null
+        && spike.getEndSeconds() != null
+        && spike.getDeltaGold() != null
+        && Enums.find(TeamSide.class, spike.getBenefitingTeam()) != null;
+  }
+
   private static ChartSpec.Marker marker(GameSpikeDomain spike, TeamSide yours) {
-    TeamSide winner = TeamSide.valueOf(spike.getBenefitingTeam());
+    TeamSide winner = Enums.find(TeamSide.class, spike.getBenefitingTeam());
     String cause = SwingCauses.phrase(spike.getPrimaryCause());
     String label =
         String.format(
@@ -137,9 +148,14 @@ public class AdvantageChartBuilder {
   private static String verdict(double[] seconds, double[] gold, TeamSide up, TeamSide yours) {
     int best = indexOf(gold, true);
     int worst = indexOf(gold, false);
+    boolean upLed = best >= 0 && gold[best] > 0;
+    boolean downLed = worst >= 0 && gold[worst] < 0;
+    if (!upLed && !downLed) {
+      return "Neither team led in gold.";
+    }
     TeamSide down = up.opponent();
     String lead =
-        best >= 0 && gold[best] > 0
+        upLed
             ? String.format(
                 Locale.ROOT,
                 "%s was ahead by up to %s gold (at %s)",
@@ -148,14 +164,14 @@ public class AdvantageChartBuilder {
                 ChartFormat.clock(seconds[best]))
             : Prettify.teamOf(up.name(), yours) + " never led in gold";
     String other =
-        worst >= 0 && gold[worst] < 0
+        downLed
             ? String.format(
                 Locale.ROOT,
                 "%s by up to %s (at %s)",
-                Prettify.team(down.name()),
+                Prettify.teamOf(down.name(), yours),
                 ChartFormat.compact(-gold[worst]),
                 ChartFormat.clock(seconds[worst]))
-            : Prettify.team(down.name()) + " never led";
+            : Prettify.teamOf(down.name(), yours) + " never led";
     return lead + "; " + other + ".";
   }
 

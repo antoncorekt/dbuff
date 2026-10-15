@@ -243,6 +243,19 @@ public class MatchReportOrchestrator {
     return runAnalyzers(context, sortedAnalyzers);
   }
 
+  /**
+   * The old OpenDota report of a stored match as Discord messages, the way the legacy post made it:
+   * the analyzers this channel's settings allow, in order. For the on-demand {@code opendota}
+   * section.
+   */
+  public List<String> legacyMessages(MatchDomain match, DbufInstanceConfigDomain config) {
+    MatchReportContext context = buildContext(match, config, config.getPlayerIds());
+    List<ReportAnalyzer> sorted =
+        enabledAnalyzers(config).sorted(Comparator.comparingInt(ReportAnalyzer::getOrder)).toList();
+    return reportFormatter.formatForDiscord(
+        runAnalyzers(context, sorted), context.getPlayerNames());
+  }
+
   private List<Report> runAnalyzers(
       MatchReportContext context, List<ReportAnalyzer> sortedAnalyzers) {
     List<Report> allReports = new ArrayList<>();

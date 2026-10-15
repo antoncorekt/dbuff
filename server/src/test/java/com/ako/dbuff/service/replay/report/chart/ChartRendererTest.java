@@ -80,5 +80,25 @@ class ChartRendererTest {
     assertThat(ChartFormat.compact(1200)).isEqualTo("1.2k");
     assertThat(ChartFormat.compact(-3000)).isEqualTo("-3k");
     assertThat(ChartFormat.compact(0)).isEqualTo("0");
+    assertThat(ChartFormat.compact(999.5)).isEqualTo("1k");
+    assertThat(ChartFormat.compact(999.4)).isEqualTo("999");
+    assertThat(ChartFormat.compact(-999.5)).isEqualTo("-1k");
+  }
+
+  @Test
+  void longAndCrowdedMarkerLabelsAreCutOrDroppedWithoutFailing() throws IOException {
+    ChartSpec base = ChartTestSpecs.sample();
+    java.util.List<ChartSpec.Marker> markers = new java.util.ArrayList<>();
+    markers.add(new ChartSpec.Marker(100, "x".repeat(400), ChartPalette.DIRE));
+    for (int i = 0; i < 12; i++) {
+      markers.add(
+          new ChartSpec.Marker(
+              100 + i, "Radiant gained 3.1k from a won fight", ChartPalette.RADIANT));
+    }
+    ChartSpec spec =
+        new ChartSpec(
+            base.title(), base.endSeconds(), base.panels(), base.bands(), markers, base.legend());
+
+    assertThat(decode(renderer.render(spec)).getWidth()).isEqualTo(ChartRenderer.MAX_WIDTH);
   }
 }

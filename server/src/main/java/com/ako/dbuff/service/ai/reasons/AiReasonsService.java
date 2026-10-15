@@ -103,7 +103,7 @@ public class AiReasonsService {
       return ReasonsResult.of(Status.NO_FACTS);
     }
     FactTrimmer.Trimmed trimmed = trimmer.trim(facts, properties.getFactsTokenBudget());
-    ReasonsPrompt prompt = promptBuilder.build(trimmed);
+    ReasonsPrompt prompt = promptBuilder.build(trimmed, input.channelLanguage());
     String hash = hash(prompt, chosen);
     synchronized (matchLocks.computeIfAbsent(input.matchId(), id -> new Object())) {
       return answer(input.matchId(), yours, trimmed, prompt, hash, chosen);

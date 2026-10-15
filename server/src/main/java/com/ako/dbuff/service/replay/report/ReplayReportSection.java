@@ -38,6 +38,14 @@ public interface ReplayReportSection {
   /** The lowest detail level of a channel that gets the section. */
   ReportDetail minimumDetail();
 
+  /**
+   * Whether {@link #lines} are finished Discord messages, each posted as it is in either report
+   * format and never wrapped in a card or merged with other sections.
+   */
+  default boolean postsOwnMessages() {
+    return false;
+  }
+
   /** The text of the section, empty when there is nothing worth saying. */
   List<String> lines(ReplayReportInput input);
 

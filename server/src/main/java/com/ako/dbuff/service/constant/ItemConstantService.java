@@ -20,6 +20,6 @@ public class ItemConstantService extends BaseApiConstantService<ItemConstant> {
 
   @Override
   protected int schemaVersion() {
-    return 1;
+    return 2;
   }
 }

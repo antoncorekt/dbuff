@@ -9,6 +9,9 @@ import com.ako.dbuff.resources.model.RegisterInstanceRequest;
 import com.ako.dbuff.resources.model.UpdateInstanceRequest;
 import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.GameModeResolver;
+import com.ako.dbuff.service.replay.report.ReplayReportProperties;
+import com.ako.dbuff.service.replay.report.SectionSwitch;
+import com.ako.dbuff.service.replay.report.TestSections;
 import com.ako.dbuff.service.scheduler.InstanceSchedulerService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
@@ -50,7 +53,11 @@ class DbufInstanceConfigServiceTest {
             Mockito.mock(ConstantsManagers.class),
             new ObjectMapper(),
             scheduler,
-            new InstanceSettingsApplier(Mockito.mock(GameModeResolver.class)));
+            new InstanceSettingsApplier(
+                Mockito.mock(GameModeResolver.class),
+                new SectionSwitch(
+                    new ReplayReportProperties(),
+                    List.of(TestSections.named("lanes", 20, false)))));
   }
 
   private static RegisterInstanceRequest request() {
@@ -299,5 +306,44 @@ class DbufInstanceConfigServiceTest {
     assertThat(settings.getQuietHours()).isEqualTo("server default");
     assertThat(settings.getTimezone()).isEqualTo("server default");
     assertThat(settings.getDefaultGameModes()).isEmpty();
+  }
+
+  @Test
+  void update_sectionsAndLanguage_areStoredAndReflectedInTheResponse() {
+    DbufInstanceConfigDomain instance = existing(true);
+    Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(instance));
+
+    var response =
+        service.update(
+            "instance-1",
+            UpdateInstanceRequest.builder().sections("Lanes").language("Russian").build());
+
+    assertThat(instance.effectiveSettings().getSections()).isEqualTo("lanes");
+    assertThat(instance.effectiveSettings().getLanguage()).isEqualTo("Russian");
+    assertThat(response.getSettings().getSections()).isEqualTo("lanes");
+    assertThat(response.getSettings().getLanguage()).isEqualTo("Russian");
+  }
+
+  @Test
+  void update_unknownSection_failsAndSavesNothing() {
+    Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(existing(true)));
+
+    assertThatThrownBy(
+            () ->
+                service.update(
+                    "instance-1", UpdateInstanceRequest.builder().sections("nope").build()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("lanes");
+    Mockito.verify(repository, Mockito.never()).save(Mockito.any());
+  }
+
+  @Test
+  void aChannelThatNeverChoseSectionsOrLanguage_reportsTheServerDefaults() {
+    Mockito.when(repository.findById("instance-1")).thenReturn(Optional.of(existing(true)));
+
+    var settings = service.getById("instance-1").orElseThrow().getSettings();
+
+    assertThat(settings.getSections()).isEqualTo("server default");
+    assertThat(settings.getLanguage()).isEqualTo("server default");
   }
 }

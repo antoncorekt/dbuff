@@ -12,6 +12,7 @@ import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator.PartialReportResult;
 import com.ako.dbuff.service.match.report.stage.MatchReportStageService;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
+import com.ako.dbuff.service.replay.report.ReportCommandHandler;
 import com.ako.dbuff.service.replay.report.ReportDelivery;
 import com.ako.dbuff.service.scheduler.MatchParseSchedulerService;
 import java.util.List;
@@ -36,6 +37,7 @@ class MatchCommandTest {
   private MatchReportStageService stageService;
   private ReplayReportService replayReportService;
   private AiReasonsCommandHandler aiReasons;
+  private ReportCommandHandler reportHandler;
   private MatchCommand command;
 
   @BeforeEach
@@ -49,6 +51,7 @@ class MatchCommandTest {
     stageService = Mockito.mock(MatchReportStageService.class);
     replayReportService = Mockito.mock(ReplayReportService.class);
     aiReasons = Mockito.mock(AiReasonsCommandHandler.class);
+    reportHandler = Mockito.mock(ReportCommandHandler.class);
 
     command =
         new MatchCommand(
@@ -60,7 +63,8 @@ class MatchCommandTest {
             schedulerService,
             stageService,
             replayReportService,
-            aiReasons);
+            aiReasons,
+            reportHandler);
 
     Mockito.when(instanceConfigRepo.findByDiscordChannelId(Mockito.anyString()))
         .thenReturn(Optional.of(config()));
@@ -87,12 +91,13 @@ class MatchCommandTest {
   void definitionExposesRerunAndRetry() {
     assertThat(command.getDefinition().getSubcommands())
         .extracting(subcommand -> subcommand.getName())
-        .containsExactlyInAnyOrder("rerun", "retry", "ai");
+        .containsExactlyInAnyOrder("rerun", "retry", "ai", "report");
   }
 
   @Test
   void theAliasesAreTheSubcommandNames() {
-    assertThat(command.getTextAliases()).containsExactlyInAnyOrder("rerun", "retry", "ai");
+    assertThat(command.getTextAliases())
+        .containsExactlyInAnyOrder("rerun", "retry", "ai", "report");
     assertThat(command.resolveTextSubcommand("ai", null)).isEqualTo("ai");
     assertThat(command.resolveTextSubcommand("rerun", null)).isEqualTo("rerun");
     assertThat(command.resolveTextSubcommand("retry", null)).isEqualTo("retry");
@@ -425,5 +430,50 @@ class MatchCommandTest {
     command.execute("rerun", context);
 
     Mockito.verify(orchestrator).processAndReport(Mockito.eq(List.of(match())), Mockito.any());
+  }
+
+  @Test
+  void report_inAThreadHandsTheMatchToTheReportHandlerAndTouchesNothingElse() {
+    FakeCommandContext context = inThread();
+
+    command.execute("report", context);
+
+    Mockito.verify(reportHandler).handle(context, MATCH_ID, config());
+    Mockito.verifyNoInteractions(
+        orchestrator, replayReportService, matchDeletionService, aiReasons);
+  }
+
+  @Test
+  void report_outsideAThreadIsRefusedInOneLine() {
+    FakeCommandContext context = FakeCommandContext.builder().build();
+
+    command.execute("report", context);
+
+    assertThat(context.getEphemeralReplies()).singleElement().asString().contains("/match report");
+    Mockito.verifyNoInteractions(reportHandler);
+  }
+
+  @Test
+  void theTextFormOfReportTakesTheSectionName() {
+    assertThat(command.parseTextArguments("report", "lanes", "")).containsEntry("section", "lanes");
+    assertThat(command.parseTextArguments("report", "all", "")).containsEntry("section", "all");
+    assertThat(command.parseTextArguments("report", null, "")).isEmpty();
+    assertThat(command.resolveTextSubcommand("report", "lanes")).isEqualTo("report");
+    assertThat(command.getDefinition().getSubcommands())
+        .filteredOn(s -> s.getName().equals("report"))
+        .singleElement()
+        .satisfies(
+            s -> {
+              assertThat(s.getOptions()).hasSize(1);
+              assertThat(s.getOptions().get(0).getName()).isEqualTo("section");
+              assertThat(s.getOptions().get(0).isAutoComplete()).isTrue();
+              assertThat(s.getOptions().get(0).isRequired()).isTrue();
+            });
+  }
+
+  @Test
+  void theTextFormOfReportJoinsASpacedSectionName() {
+    assertThat(command.parseTextArguments("report", "important", "fights"))
+        .containsEntry("section", "important fights");
   }
 }

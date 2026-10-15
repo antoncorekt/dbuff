@@ -125,4 +125,41 @@ class AdvantageChartBuilderTest {
 
     assertThat(builder.build(1L, null, 3).orElseThrow().verdict()).endsWith("Dire never led.");
   }
+
+  @Test
+  void isEmptyForASeriesWithoutSamples() {
+    when(reader.read(1L))
+        .thenReturn(
+            Optional.of(
+                new AdvantageSeries(new double[0], new double[0], new double[0], new double[0])));
+
+    assertThat(builder.build(1L, null, 3)).isEmpty();
+  }
+
+  @Test
+  void skipsBadSwingRowsInsteadOfFailing() {
+    series(new double[] {0, 1000, 3000}, new double[] {0, 500, 900});
+    when(fights.importantFights(1L)).thenReturn(List.of());
+    GameSpikeDomain noTeam = spike(null, 5000, 0, 60, "FIGHT_WIN");
+    GameSpikeDomain unknownTeam = spike("ROSHAN", 5000, 0, 60, "FIGHT_WIN");
+    GameSpikeDomain noGold = spike("DIRE", 0, 0, 60, "FIGHT_WIN");
+    noGold.setDeltaGold(null);
+    when(spikes.findByMatchId(1L))
+        .thenReturn(List.of(noTeam, unknownTeam, noGold, spike("DIRE", 900, 0, 60, "OBJECTIVE")));
+
+    List<ChartSpec.Marker> markers = builder.build(1L, null, 5).orElseThrow().spec().markers();
+
+    assertThat(markers).hasSize(1);
+    assertThat(markers.get(0).label()).isEqualTo("Dire gained 900 from buildings");
+  }
+
+  @Test
+  void saysNeitherTeamLedOnAFlatZeroLead() {
+    series(new double[] {0, 0, 0}, new double[] {0, 0, 0});
+    when(spikes.findByMatchId(1L)).thenReturn(List.of());
+    when(fights.importantFights(1L)).thenReturn(List.of());
+
+    assertThat(builder.build(1L, null, 3).orElseThrow().verdict())
+        .isEqualTo("Neither team led in gold.");
+  }
 }

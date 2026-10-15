@@ -51,4 +51,7 @@ public class AbilityConstant implements ConstantData {
   Boolean is_innate;
 
   List<AbilityAttribute> attrib;
+
+  /** CDN path of the icon; absent for talents. */
+  String img;
 }

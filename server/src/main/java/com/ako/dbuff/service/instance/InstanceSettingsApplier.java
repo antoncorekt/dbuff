@@ -5,16 +5,19 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.resources.model.UpdateInstanceRequest;
 import com.ako.dbuff.service.constant.GameModeResolver;
 import com.ako.dbuff.service.constant.GameModeSelection;
+import com.ako.dbuff.service.replay.report.ReplayReportSection;
+import com.ako.dbuff.service.replay.report.SectionSwitch;
 import java.time.DateTimeException;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 /**
@@ -23,7 +26,6 @@ import org.springframework.stereotype.Component;
  * the Discord command shows it to them as is.
  */
 @Component
-@RequiredArgsConstructor
 public class InstanceSettingsApplier {
 
   /** Value that clears a setting back to what applies when nothing is chosen. */
@@ -34,7 +36,19 @@ public class InstanceSettingsApplier {
       Pattern.compile("^\\s*(\\d{1,2}:\\d{2})\\s*-\\s*(\\d{1,2}:\\d{2})\\s*$");
   private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("H:mm");
 
+  private static final String NONE = "none";
+  private static final int MAX_LANGUAGE_LENGTH = 40;
+  private static final Pattern LANGUAGE = Pattern.compile("^\\p{L}[\\p{L} \\-]*$");
+
   private final GameModeResolver gameModeResolver;
+  private final SectionSwitch sectionSwitch;
+
+  /** The switch is lazy: it holds every report section, which reach back into the services. */
+  public InstanceSettingsApplier(
+      GameModeResolver gameModeResolver, @Lazy SectionSwitch sectionSwitch) {
+    this.gameModeResolver = gameModeResolver;
+    this.sectionSwitch = sectionSwitch;
+  }
 
   /** Applies whichever settings the request carries to {@code target}, leaving the rest alone. */
   public void apply(InstanceSettings target, UpdateInstanceRequest request) {
@@ -56,6 +70,57 @@ public class InstanceSettingsApplier {
     if (request.getDefaultGameModes() != null) {
       target.setDefaultGameModes(parseModes(request.getDefaultGameModes()));
     }
+    if (request.getSections() != null) {
+      target.setSections(parseSections(request.getSections()));
+    }
+    if (request.getLanguage() != null) {
+      target.setLanguage(parseLanguage(request.getLanguage()));
+    }
+  }
+
+  /** Canonical comma-separated names, empty string for none, null to follow the server. */
+  private String parseSections(String raw) {
+    String trimmed = raw.trim();
+    if (trimmed.isEmpty() || DEFAULT.equalsIgnoreCase(trimmed)) {
+      return null;
+    }
+    if (NONE.equalsIgnoreCase(trimmed)) {
+      return "";
+    }
+    Set<String> names = new LinkedHashSet<>();
+    for (String token : trimmed.split("[,\\s]+")) {
+      if (token.isEmpty()) {
+        continue;
+      }
+      ReplayReportSection section =
+          sectionSwitch
+              .find(token)
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          "Unknown report section `"
+                              + token
+                              + "`. Valid sections: "
+                              + String.join(", ", sectionSwitch.visibleNames())
+                              + ". Use `none` for no automatic sections or `default` for the"
+                              + " server's list."));
+      names.add(section.name());
+    }
+    return String.join(",", names);
+  }
+
+  private String parseLanguage(String raw) {
+    String trimmed = raw.trim();
+    if (trimmed.isEmpty() || DEFAULT.equalsIgnoreCase(trimmed)) {
+      return null;
+    }
+    if (trimmed.length() > MAX_LANGUAGE_LENGTH || !LANGUAGE.matcher(trimmed).matches()) {
+      throw new IllegalArgumentException(
+          "Could not read language `"
+              + trimmed
+              + "`. Use a language name such as English or Russian, or `default`.");
+    }
+    return trimmed;
   }
 
   /**

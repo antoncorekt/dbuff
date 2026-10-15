@@ -55,6 +55,15 @@ public class UpdateInstanceRequest {
   /** {@code MINIMAL}, {@code STANDARD} or {@code FULL} (optional) */
   private String reportDetail;
 
+  /**
+   * Report sections that post automatically, comma-separated; {@code none} for none, {@code
+   * default} to follow the server's list (optional)
+   */
+  private String sections;
+
+  /** Language of the AI reasons, or {@code default} for the server's (optional) */
+  private String language;
+
   /** Whether any per-channel setting is being changed. */
   public boolean hasSettingsChange() {
     return aiSummaryEnabled != null
@@ -62,6 +71,8 @@ public class UpdateInstanceRequest {
         || quietHours != null
         || timezone != null
         || defaultGameModes != null
-        || reportDetail != null;
+        || reportDetail != null
+        || sections != null
+        || language != null;
   }
 }

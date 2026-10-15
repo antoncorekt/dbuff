@@ -51,8 +51,26 @@ public class GraphAdvantageSection implements ReplayReportSection {
     return view(input).map(SectionView::image);
   }
 
+  /**
+   * The view of one delivery is built once: the plain path asks for the lines and the image
+   * separately, and both must come from the same read.
+   */
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
+    Built last = built;
+    if (last != null && last.input == input) {
+      return last.view;
+    }
+    Optional<SectionView> view = build(input);
+    built = new Built(input, view);
+    return view;
+  }
+
+  private record Built(ReplayReportInput input, Optional<SectionView> view) {}
+
+  private volatile Built built;
+
+  private Optional<SectionView> build(ReplayReportInput input) {
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     return builder
         .build(input.matchId(), yours, input.maxFindings())
@@ -60,7 +78,13 @@ public class GraphAdvantageSection implements ReplayReportSection {
   }
 
   private SectionView view(long matchId, TeamSide yours, AdvantageChart chart) {
-    String key = "advantage:" + matchId + ":" + AdvantageChartBuilder.viewpoint(yours);
+    String key =
+        "advantage:"
+            + matchId
+            + ":"
+            + AdvantageChartBuilder.viewpoint(yours)
+            + ":"
+            + chart.spec().fingerprint();
     Optional<ImageAttachment> image =
         charts
             .png(key, chart::spec)

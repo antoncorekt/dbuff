@@ -44,6 +44,9 @@ public class HeroConstant implements ConstantData {
   Double attack_rate;
   Double move_speed;
 
+  /** CDN path of the portrait; null for data stored before version 2. */
+  String img;
+
   public HeroConstant(String id, String name, String localized_name) {
     this.id = id;
     this.name = name;

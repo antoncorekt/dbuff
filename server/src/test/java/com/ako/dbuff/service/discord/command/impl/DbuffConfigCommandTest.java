@@ -242,6 +242,8 @@ class DbuffConfigCommandTest {
             .option("quiet_hours", "22:00-07:00")
             .option("timezone", "Europe/Kyiv")
             .option("game_mode", "ability_draft,all_pick")
+            .option("sections", "lanes,swing")
+            .option("language", "Russian")
             .build();
 
     command.execute("settings", context);
@@ -256,6 +258,8 @@ class DbuffConfigCommandTest {
     assertThat(request.getQuietHours()).isEqualTo("22:00-07:00");
     assertThat(request.getTimezone()).isEqualTo("Europe/Kyiv");
     assertThat(request.getDefaultGameModes()).containsExactly("ability_draft", "all_pick");
+    assertThat(request.getSections()).isEqualTo("lanes,swing");
+    assertThat(request.getLanguage()).isEqualTo("Russian");
     assertThat(context.getEmbeds()).hasSize(1);
   }
 

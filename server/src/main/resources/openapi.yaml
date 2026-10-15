@@ -41,6 +41,8 @@ tags:
     description: Match parsing, processing, reports and AI analysis
   - name: Replay
     description: Replay run status, the stored replay analysis and re-running the analyzers
+  - name: Discord
+    description: Owner operations on the bot's Discord assets (application emoji)
   - name: Register
     description: Registration and settings of Discord instances (tracked players, game modes)
   - name: History
@@ -684,6 +686,50 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '409':
           description: A re-analysis is already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+
+  /api/v1/discord/icons/sync:
+    post:
+      tags: [Discord]
+      summary: Sync hero, ability and item icons as application emoji
+      description: |
+        Starts a background run that downloads the icons from the Steam CDN, resizes them to
+        128 px PNG and creates one application emoji each. Only missing or changed icons are
+        touched; a failed icon is recorded in discord_icon and the run goes on. Abilities are
+        limited to those seen in stored matches unless kind is ABILITY and all is true. Needs
+        discord.icons.enabled. The result is only in the log and the discord_icon table.
+      operationId: syncDiscordIcons
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [HERO, ITEM, ABILITY, ALL]
+            default: ALL
+        - name: all
+          in: query
+          description: With kind ABILITY, every ability instead of the seen ones
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '202':
+          description: The run started
+        '400':
+          description: Unknown kind
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Icons are switched off, or a sync is already running
           content:
             application/json:
               schema:
@@ -1706,6 +1752,12 @@ components:
         reportDetail:
           type: string
           description: "MINIMAL, STANDARD or FULL"
+        sections:
+          type: string
+          description: "Replay report sections posted automatically, comma-separated, \"none\", or \"server default\""
+        language:
+          type: string
+          description: "Language of the AI reasons, or \"server default\""
     DbufInstanceConfigResponse:
       type: object
       description: "A registered instance configuration."
@@ -1838,6 +1890,12 @@ components:
         reportDetail:
           type: string
           description: "MINIMAL, STANDARD or FULL"
+        sections:
+          type: string
+          description: "Replay report sections posted automatically, comma-separated (case, \"-\" and \"_\" ignored), \"none\" for none, or \"default\" to follow the server list; an unknown name is rejected with the valid ones"
+        language:
+          type: string
+          description: "Language of the AI reasons (letters, spaces and hyphens, at most 40 characters), or \"default\" for the server's"
     MatchDomain:
       type: object
       description: "A stored match."

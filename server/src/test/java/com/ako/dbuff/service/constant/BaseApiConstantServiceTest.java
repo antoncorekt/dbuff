@@ -38,12 +38,12 @@ class BaseApiConstantServiceTest {
     assertEquals(ATTACK_TYPE, result.get("1").getAttack_type());
     ArgumentCaptor<ConstantDomain> saved = ArgumentCaptor.forClass(ConstantDomain.class);
     verify(repo).save(saved.capture());
-    assertEquals(1, saved.getValue().getSchemaVersion());
+    assertEquals(2, saved.getValue().getSchemaVersion());
   }
 
   @Test
   void storedRowWithCurrentVersion_isNotRefetched() {
-    when(repo.findById("heroes")).thenReturn(Optional.of(stored(1)));
+    when(repo.findById("heroes")).thenReturn(Optional.of(stored(2)));
 
     Map<String, HeroConstant> result = service.getConstantMap();
 
@@ -88,7 +88,24 @@ class BaseApiConstantServiceTest {
     assertEquals(List.of("magic_stick"), result.get("magic_wand").getComponents());
     ArgumentCaptor<ConstantDomain> saved = ArgumentCaptor.forClass(ConstantDomain.class);
     verify(repo).save(saved.capture());
-    assertEquals(1, saved.getValue().getSchemaVersion());
+    assertEquals(2, saved.getValue().getSchemaVersion());
+  }
+
+  @Test
+  void imgPath_isKeptOfHeroesItemsAndAbilities() {
+    GetConstantsByResource200Response response = mock(GetConstantsByResource200Response.class);
+    when(response.getMapStringObject())
+        .thenReturn(Map.of("x", Map.of("img", "/apps/dota2/x.png?t=1", "dname", "X")));
+    when(fetcher.fetch(any())).thenReturn(response);
+    when(repo.findById(any())).thenReturn(Optional.empty());
+
+    assertEquals("/apps/dota2/x.png?t=1", service.getConstantMap().get("x").getImg());
+    assertEquals(
+        "/apps/dota2/x.png?t=1",
+        new ItemConstantService(repo, fetcher).getConstantMap().get("x").getImg());
+    assertEquals(
+        "/apps/dota2/x.png?t=1",
+        new AbilitiesConstantService(repo, fetcher).getConstantMap().get("x").getImg());
   }
 
   private static ConstantDomain stored(Integer version) {

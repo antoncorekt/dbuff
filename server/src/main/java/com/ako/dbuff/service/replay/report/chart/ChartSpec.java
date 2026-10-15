@@ -1,6 +1,11 @@
 package com.ako.dbuff.service.replay.report.chart;
 
 import java.awt.Color;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.List;
 
 /**
@@ -22,6 +27,34 @@ public record ChartSpec(
     bands = List.copyOf(bands);
     markers = List.copyOf(markers);
     legend = List.copyOf(legend);
+  }
+
+  /** A short digest of everything drawn, so a cache key can tell two different pictures apart. */
+  public String fingerprint() {
+    StringBuilder all = new StringBuilder(title).append('|').append(endSeconds);
+    panels.forEach(
+        p -> {
+          all.append('|').append(p.label()).append(p.format());
+          p.series()
+              .forEach(
+                  s ->
+                      all.append(Arrays.hashCode(s.seconds()))
+                          .append(',')
+                          .append(Arrays.hashCode(s.values()))
+                          .append(s.positive())
+                          .append(s.positiveCaption())
+                          .append(s.negative())
+                          .append(s.negativeCaption()));
+        });
+    all.append(bands).append(markers).append(legend);
+    try {
+      byte[] digest =
+          MessageDigest.getInstance("SHA-256")
+              .digest(all.toString().getBytes(StandardCharsets.UTF_8));
+      return HexFormat.of().formatHex(digest, 0, 8);
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   /** One plot; {@code label} is written in its corner. */

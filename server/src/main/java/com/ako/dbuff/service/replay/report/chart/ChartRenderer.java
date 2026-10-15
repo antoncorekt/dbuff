@@ -90,13 +90,14 @@ public class ChartRenderer {
     }
     int plotTop = TOP + markerStrip;
     int plotBottom = MAX_HEIGHT - AXIS_HEIGHT - (spec.legend().isEmpty() ? 0 : LEGEND_HEIGHT);
+    List<ChartSpec.Marker> shown = labels.stream().map(l -> l.marker).toList();
     int panels = Math.max(1, spec.panels().size());
     int panelHeight = (plotBottom - plotTop - PANEL_GAP * (panels - 1)) / panels;
     Scale time = new Scale(0, Math.max(1, spec.endSeconds()), LEFT, plotRight);
 
     for (int i = 0; i < spec.panels().size(); i++) {
       int top = plotTop + i * (panelHeight + PANEL_GAP);
-      drawPanel(g, spec, spec.panels().get(i), time, top, top + panelHeight);
+      drawPanel(g, spec, spec.panels().get(i), time, top, top + panelHeight, shown);
     }
     drawTimeAxis(g, time, plotBottom);
     for (PlacedLabel label : labels) {
@@ -106,7 +107,13 @@ public class ChartRenderer {
   }
 
   private void drawPanel(
-      Graphics2D g, ChartSpec spec, ChartSpec.Panel panel, Scale time, int top, int bottom) {
+      Graphics2D g,
+      ChartSpec spec,
+      ChartSpec.Panel panel,
+      Scale time,
+      int top,
+      int bottom,
+      List<ChartSpec.Marker> markers) {
     Scale value = valueScale(panel, top, bottom);
     Rectangle plot = new Rectangle(LEFT, top, MAX_WIDTH - RIGHT - LEFT, bottom - top);
     g.setFont(ChartFonts.plain(LABEL_SIZE));
@@ -125,7 +132,7 @@ public class ChartRenderer {
       g.setColor(band.color());
       g.fillRect(x1, top, x2 - x1, bottom - top);
     }
-    for (ChartSpec.Marker marker : spec.markers()) {
+    for (ChartSpec.Marker marker : markers) {
       drawMarkerLine(g, marker, time.at(marker.seconds()), top, bottom);
     }
     Rectangle clip = g.getClipBounds();
@@ -236,16 +243,31 @@ public class ChartRenderer {
             .sorted(Comparator.comparingDouble(ChartSpec.Marker::seconds))
             .toList();
     for (ChartSpec.Marker marker : ordered) {
+      marker = fitted(marker, fm, plotRight - LEFT);
       int width = fm.stringWidth(marker.label()) + 8;
       int anchor = time.at(marker.seconds());
       int x = Math.max(LEFT, Math.min(anchor - 4, plotRight - width));
       int lane = 0;
-      while (lane < MAX_LANES - 1 && overlaps(placed, x, width, lane)) {
+      while (lane < MAX_LANES && overlaps(placed, x, width, lane)) {
         lane++;
       }
-      placed.add(new PlacedLabel(marker, x, width, lane));
+      if (lane < MAX_LANES) {
+        placed.add(new PlacedLabel(marker, x, width, lane));
+      }
     }
     return placed;
+  }
+
+  /** The marker with a label cut to fit the plot width. */
+  private static ChartSpec.Marker fitted(ChartSpec.Marker marker, FontMetrics fm, int plotWidth) {
+    String label = marker.label();
+    if (fm.stringWidth(label) + 8 <= plotWidth) {
+      return marker;
+    }
+    while (label.length() > 1 && fm.stringWidth(label + "…") + 8 > plotWidth) {
+      label = label.substring(0, label.length() - 1);
+    }
+    return new ChartSpec.Marker(marker.seconds(), label + "…", marker.color());
   }
 
   private static boolean overlaps(List<PlacedLabel> placed, int x, int width, int lane) {

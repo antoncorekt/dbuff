@@ -153,9 +153,9 @@ public class ReplayReportService {
 
   /**
    * Posts one section of a match with a stored replay into one channel's thread for a person who
-   * asked for it, in the report's format. Only the section's own output decides; the report and
-   * section switches, the detail level and the quiet hours do not apply, so a section that is off
-   * for automatic posting can still be asked for.
+   * asked for it, in the report's format. Only the section's own output decides; the report switch,
+   * the section lists, the detail level and the quiet hours do not apply, so a section that is off
+   * for automatic posting can still be asked for. A section hidden by its kill switch is refused.
    */
   public ReportDelivery deliverSection(long matchId, String instanceId, String sectionName) {
     return deliverSection(matchId, instanceId, sectionName, null);
@@ -177,6 +177,9 @@ public class ReplayReportService {
       DbufInstanceConfigDomain instance = instanceRepo.findById(instanceId).orElse(null);
       if (section == null || match == null || instance == null) {
         return logSkipped(matchId, ReportDelivery.NO_INSTANCE);
+      }
+      if (sectionSwitch.isHidden(section)) {
+        return logSkipped(matchId, ReportDelivery.SECTION_HIDDEN);
       }
       List<PlayerMatchStatisticDomain> stats = statRepo.findAllByMatchId(matchId);
       return logSkipped(
@@ -327,11 +330,11 @@ public class ReplayReportService {
               "Components of the replay report of match {} rejected, posting plain text: {}",
               matchId,
               e.getMessage());
-          List<String> texts = plainTexts(cards.fallback());
-          for (int i = 0; i < texts.size(); i++) {
-            boolean last = i == texts.size() - 1;
-            sendPlain(channel, texts.get(i), last ? firstImage(cards) : null);
-          }
+          plainTexts(cards.fallback()).forEach(t -> discord.sendThreadMessageBlocking(channel, t));
+          cards
+              .images()
+              .forEach(
+                  image -> discord.sendThreadMessageBlocking(channel, "", List.of(image.upload())));
         }
       }
     }
@@ -343,10 +346,6 @@ public class ReplayReportService {
     } else {
       discord.sendThreadMessageBlocking(channel, text, List.of(image.upload()));
     }
-  }
-
-  private static ImageAttachment firstImage(ReportMessage.Components cards) {
-    return cards.images().isEmpty() ? null : cards.images().get(0);
   }
 
   private List<String> plainTexts(String text) {
@@ -370,7 +369,7 @@ public class ReplayReportService {
     if (mode == null) {
       return List.of();
     }
-    if (sections.stream().noneMatch(sectionSwitch::isEnabled)) {
+    if (sections.stream().noneMatch(s -> sectionSwitch.isAutomatic(s, settings))) {
       log.info(
           "Replay report of match {} not posted: every section is switched off", match.getId());
       return List.of();
@@ -378,7 +377,7 @@ public class ReplayReportService {
     ReplayReportInput input = input(match, stats, instance);
     List<ReplayReportSection> active =
         sections.stream()
-            .filter(sectionSwitch::isEnabled)
+            .filter(s -> sectionSwitch.isAutomatic(s, settings))
             .filter(s -> s.supports(mode))
             .filter(s -> settings.detail().includes(s.minimumDetail()))
             .sorted(Comparator.comparingInt(ReplayReportSection::order))
@@ -394,9 +393,29 @@ public class ReplayReportService {
   }
 
   private List<ReportMessage> render(List<ReplayReportSection> active, ReplayReportInput input) {
+    List<ReportMessage> all = new ArrayList<>();
+    List<ReplayReportSection> batch = new ArrayList<>();
+    for (ReplayReportSection section : active) {
+      if (!section.postsOwnMessages()) {
+        batch.add(section);
+        continue;
+      }
+      all.addAll(renderBatch(batch, input));
+      batch.clear();
+      section.lines(input).forEach(text -> all.add(new ReportMessage.Plain(text)));
+    }
+    all.addAll(renderBatch(batch, input));
+    return all;
+  }
+
+  private List<ReportMessage> renderBatch(
+      List<ReplayReportSection> batch, ReplayReportInput input) {
+    if (batch.isEmpty()) {
+      return List.of();
+    }
     return properties.getFormat() == ReportFormat.COMPONENTS
-        ? components(active, input)
-        : plain(active, input);
+        ? components(batch, input)
+        : plain(batch, input);
   }
 
   private List<ReportMessage> plain(List<ReplayReportSection> active, ReplayReportInput input) {
@@ -408,12 +427,29 @@ public class ReplayReportService {
       if (image.isPresent()) {
         messages.addAll(formatted(reports));
         reports.clear();
-        messages.add(new ReportMessage.Plain(String.join("\n", lines), image.get()));
+        messages.addAll(withImage(lines, image.get()));
       } else if (!lines.isEmpty()) {
         reports.add(new TextReport("replay", String.join("\n", lines)));
       }
     }
     messages.addAll(formatted(reports));
+    return messages;
+  }
+
+  /** The section's text split to the message limit, the image on the last message. */
+  private List<ReportMessage> withImage(List<String> lines, ImageAttachment image) {
+    List<String> texts =
+        lines.isEmpty()
+            ? List.of()
+            : formatter.formatForDiscord(
+                List.of(new TextReport("replay", String.join("\n", lines))), Map.of());
+    if (texts.isEmpty()) {
+      return List.of(new ReportMessage.Plain("", image));
+    }
+    List<ReportMessage> messages = new ArrayList<>();
+    for (int i = 0; i < texts.size(); i++) {
+      messages.add(new ReportMessage.Plain(texts.get(i), i == texts.size() - 1 ? image : null));
+    }
     return messages;
   }
 
@@ -457,10 +493,11 @@ public class ReplayReportService {
                         names.getOrDefault(s.getPlayerId(), "Player"),
                         heroes.get(s.getPlayerSlot()))));
     return new ReplayReportInput(
-        match.getId(),
-        match,
-        Set.copyOf(namesBySlot.keySet()),
-        namesBySlot,
-        properties.getMaxFindingsPerSection());
+            match.getId(),
+            match,
+            Set.copyOf(namesBySlot.keySet()),
+            namesBySlot,
+            properties.getMaxFindingsPerSection())
+        .withInstance(instance);
   }
 }

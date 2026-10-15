@@ -18,6 +18,8 @@ public class InstanceSettingsResponse {
 
   private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
 
+  private static final String SERVER_DEFAULT = "server default";
+
   private boolean aiSummaryEnabled;
 
   private boolean replayReportEnabled;
@@ -34,6 +36,12 @@ public class InstanceSettingsResponse {
   private Set<String> defaultGameModes;
 
   private String reportDetail;
+
+  /** Comma-separated section names, {@code none}, or {@code server default}. */
+  private String sections;
+
+  /** A language name, or {@code server default}. */
+  private String language;
 
   public static InstanceSettingsResponse from(InstanceSettings settings) {
     Boolean quiet = settings.getQuietHoursEnabled();
@@ -52,6 +60,12 @@ public class InstanceSettingsResponse {
                 : settings.getTimezone())
         .defaultGameModes(settings.defaultGameModeTokens())
         .reportDetail(settings.detail().name())
+        .sections(
+            settings
+                .sectionNames()
+                .map(names -> names.isEmpty() ? "none" : String.join(",", names))
+                .orElse(SERVER_DEFAULT))
+        .language(settings.getLanguage() == null ? SERVER_DEFAULT : settings.getLanguage())
         .build();
   }
 

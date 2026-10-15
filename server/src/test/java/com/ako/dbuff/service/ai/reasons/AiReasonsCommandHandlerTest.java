@@ -2,6 +2,7 @@ package com.ako.dbuff.service.ai.reasons;
 
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.service.discord.command.FakeCommandContext;
+import com.ako.dbuff.service.replay.report.OnDemandCooldown;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
 import com.ako.dbuff.service.replay.report.ReportDelivery;
 import java.util.List;
@@ -20,7 +21,9 @@ class AiReasonsCommandHandlerTest {
 
   private final AiReasonsService service = mock(AiReasonsService.class);
   private final ReplayReportService reports = mock(ReplayReportService.class);
-  private final AiReasonsCommandHandler handler = new AiReasonsCommandHandler(service, reports);
+  private final OnDemandCooldown cooldown = mock(OnDemandCooldown.class);
+  private final AiReasonsCommandHandler handler =
+      new AiReasonsCommandHandler(service, reports, cooldown);
   private final DbufInstanceConfigDomain config = new DbufInstanceConfigDomain();
 
   @BeforeEach
@@ -145,5 +148,53 @@ class AiReasonsCommandHandlerTest {
     handler.handle(context, MATCH, config);
 
     assertThat(context.getFailures()).hasSize(1);
+  }
+
+  @Test
+  void cooldownRunning_refusesInOneLineBeforeAcknowledging() {
+    when(cooldown.acquire("thread-1")).thenReturn(12L);
+    FakeCommandContext context =
+        FakeCommandContext.builder().threadName("Match " + MATCH).channelId("thread-1").build();
+
+    handler.handle(context, MATCH, config);
+
+    assertThat(context.getEphemeralReplies()).singleElement().asString().contains("12 s");
+    assertThat(context.getAcknowledgeSummary()).isNull();
+    verify(reports, never()).deliverSection(MATCH, "i1", "ai-reasons", null);
+  }
+
+  @Test
+  void nothingPosted_releasesTheWait() {
+    when(reports.deliverSection(MATCH, "i1", "ai-reasons", null))
+        .thenReturn(ReportDelivery.SECTION_EMPTY);
+    FakeCommandContext context =
+        FakeCommandContext.builder().threadName("Match " + MATCH).channelId("thread-1").build();
+
+    handler.handle(context, MATCH, config);
+
+    verify(cooldown).release("thread-1");
+  }
+
+  @Test
+  void anException_releasesTheWait() {
+    when(reports.deliverSection(MATCH, "i1", "ai-reasons", null))
+        .thenThrow(new IllegalStateException("x"));
+    FakeCommandContext context =
+        FakeCommandContext.builder().threadName("Match " + MATCH).channelId("thread-1").build();
+
+    handler.handle(context, MATCH, config);
+
+    verify(cooldown).release("thread-1");
+  }
+
+  @Test
+  void aPost_keepsTheWait() {
+    when(reports.deliverSection(MATCH, "i1", "ai-reasons", null)).thenReturn(ReportDelivery.POSTED);
+    FakeCommandContext context =
+        FakeCommandContext.builder().threadName("Match " + MATCH).channelId("thread-1").build();
+
+    handler.handle(context, MATCH, config);
+
+    verify(cooldown, never()).release(any());
   }
 }

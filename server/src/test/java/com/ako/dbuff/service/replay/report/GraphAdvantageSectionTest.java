@@ -56,7 +56,16 @@ class GraphAdvantageSectionTest {
     assertThat(section.image(input)).map(ImageAttachment::name).contains("advantage-7.png");
     ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
     verify(charts, org.mockito.Mockito.atLeastOnce()).png(key.capture(), any());
-    assertThat(key.getValue()).isEqualTo("advantage:7:RADIANT");
+    assertThat(key.getValue()).startsWith("advantage:7:RADIANT:").hasSizeGreaterThan(20);
+    verify(builder, org.mockito.Mockito.times(1)).build(7L, TeamSide.RADIANT, 3);
+  }
+
+  @Test
+  void theCacheKeyChangesWhenTheDataBehindThePictureChanges() {
+    ChartSpec other = new ChartSpec("t", 120, List.of(), List.of(), List.of(), List.of());
+
+    assertThat(chart().spec().fingerprint()).isNotEqualTo(other.fingerprint());
+    assertThat(chart().spec().fingerprint()).isEqualTo(chart().spec().fingerprint());
   }
 
   @Test
