@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.smoke;
 
+import com.ako.dbuff.dao.model.AbilityDomain;
 import com.ako.dbuff.dao.model.DeathEventDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
@@ -7,6 +8,7 @@ import com.ako.dbuff.dao.model.PlayerTimelineDomain;
 import com.ako.dbuff.dao.model.TeamTimelineDomain;
 import com.ako.dbuff.dao.model.TeamfightDomain;
 import com.ako.dbuff.dao.model.TeamfightPlayerDomain;
+import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.DeathEventRepo;
 import com.ako.dbuff.dao.repo.DraftEventRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
@@ -43,8 +45,10 @@ import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.AfterAll;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -212,6 +216,7 @@ public abstract class ReplayPipelineFixture {
   @Autowired private PlayerGameStatisticRepo playerStatRepo;
   @Autowired private PlayerTimelineRepo timelineRepo;
   @Autowired protected MatchRepo matchRepo;
+  @Autowired private AbilityRepo abilityRepo;
   @Autowired private DeathEventRepo deathEventRepo;
   @Autowired private TeamfightRepo teamfightRepo;
   @Autowired private TeamfightPlayerRepo teamfightPlayerRepo;
@@ -277,7 +282,43 @@ public abstract class ReplayPipelineFixture {
     seedOpenDotaFights(match.getId(), json);
     seedTeamTimeline(match.getId(), json);
     seedMatchLogs(match, id);
+    seedAbilities(match.getId(), json);
     return match;
+  }
+
+  /** The skills a hero leveled and the damage each did, as the match detail import stores them. */
+  private void seedAbilities(long matchId, JsonNode json) throws IOException {
+    abilityRepo.deleteByMatchId(matchId);
+    Path idsFile = fixture("constants-ability-ids.json");
+    if (!Files.exists(idsFile)) {
+      return;
+    }
+    Map<Long, String> names = new HashMap<>();
+    new ObjectMapper()
+        .readTree(idsFile.toFile())
+        .fields()
+        .forEachRemaining(
+            e -> names.put(Long.parseLong(e.getKey().split(",")[0]), e.getValue().asText()));
+    for (JsonNode p : json.path("players")) {
+      Set<Long> leveled = new HashSet<>();
+      p.path("ability_upgrades_arr").forEach(id -> leveled.add(id.asLong()));
+      for (Long abilityId : leveled) {
+        String name = names.get(abilityId);
+        if (name == null) {
+          continue;
+        }
+        abilityRepo.save(
+            AbilityDomain.builder()
+                .matchId(matchId)
+                .playerSlot(p.path("player_slot").asLong())
+                .abilityId(abilityId)
+                .playerId(optLong(p, "account_id"))
+                .name(name)
+                .damageDealt(optLong(p.path("damage_inflictor"), name))
+                .useCount(optLong(p.path("ability_uses"), name))
+                .build());
+      }
+    }
   }
 
   /** The ward and rune logs of OpenDota's match data, as the match detail import stores them. */
