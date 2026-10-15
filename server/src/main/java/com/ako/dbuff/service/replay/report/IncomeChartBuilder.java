@@ -47,7 +47,8 @@ public class IncomeChartBuilder {
   public Optional<IncomeChart> build(
       long matchId, Set<Long> focusSlots, int maxHeroes, int maxFindings, int lineLength) {
     Map<Long, TreeMap<Integer, Long>> gold = goldBySlot(matchId);
-    List<Long> slots = chosen(gold, focusSlots == null ? Set.of() : focusSlots, maxHeroes);
+    Choice choice = chosen(gold, focusSlots == null ? Set.of() : focusSlots, maxHeroes);
+    List<Long> slots = choice.slots();
     if (slots.isEmpty()) {
       return Optional.empty();
     }
@@ -74,17 +75,18 @@ public class IncomeChartBuilder {
         found.stream()
             .sorted(Comparator.comparingDouble((Found f) -> f.dip().drop()).reversed())
             .toList();
-    List<String> bullets = new ArrayList<>();
-    worst.stream()
-        .skip(1)
-        .limit(maxFindings)
-        .map(f -> LineText.cut(line(f, heroes), lineLength))
-        .forEach(bullets::add);
-    midas.stream().map(m -> LineText.cut(m + ".", lineLength)).forEach(bullets::add);
+    List<String> lines = new ArrayList<>();
+    midas.forEach(m -> lines.add(finish(m, lineLength)));
+    worst.stream().skip(1).forEach(f -> lines.add(finish(line(f, heroes), lineLength)));
+    String hidden = hiddenNote(choice.hidden());
+    int room = Math.max(0, maxFindings - (hidden == null ? 0 : 1));
+    List<String> bullets = new ArrayList<>(lines.stream().limit(room).toList());
+    if (hidden != null) {
+      bullets.add(hidden);
+    }
     ChartSpec spec =
         new ChartSpec("Hero income", end, panels, List.of(), List.of(), legend(found, allPins));
-    return Optional.of(
-        new IncomeChart(spec, LineText.cut(verdict(worst, heroes), lineLength), bullets));
+    return Optional.of(new IncomeChart(spec, finish(verdict(worst, heroes), lineLength), bullets));
   }
 
   private static List<Dip> biggest(List<Dip> dips) {
@@ -143,15 +145,30 @@ public class IncomeChartBuilder {
 
   private static String verdict(List<Found> worst, Map<Long, String> heroes) {
     if (worst.isEmpty()) {
-      return "No hero's income fell sharply.";
+      return "No hero's income fell sharply";
     }
-    Found f = worst.getFirst();
-    return "Biggest income drop: " + sentence(f, heroes) + ".";
+    return "Biggest income drop: " + sentence(worst.getFirst(), heroes);
   }
 
   private static String line(Found f, Map<Long, String> heroes) {
-    return sentence(f, heroes) + ".";
+    return sentence(f, heroes);
   }
+
+  /** A sentence cut to the line length with room for its full stop. */
+  private static String finish(String sentence, int lineLength) {
+    String cut = LineText.cut(sentence, lineLength - 1);
+    return cut.endsWith(LineText.ELLIPSIS) ? cut : cut + ".";
+  }
+
+  private static String hiddenNote(int hidden) {
+    return hidden <= 0
+        ? null
+        : hidden == 1
+            ? "1 more tracked hero is not shown."
+            : hidden + " more tracked heroes are not shown.";
+  }
+
+  private record Choice(List<Long> slots, int hidden) {}
 
   private static String sentence(Found f, Map<Long, String> heroes) {
     Dip d = f.dip();
@@ -190,14 +207,15 @@ public class IncomeChartBuilder {
   }
 
   /** The tracked heroes with enough data, else the richest heroes; the richest first. */
-  private static List<Long> chosen(
-      Map<Long, TreeMap<Integer, Long>> gold, Set<Long> focus, int max) {
+  private static Choice chosen(Map<Long, TreeMap<Integer, Long>> gold, Set<Long> focus, int max) {
     Comparator<Long> richest =
         Comparator.comparingLong((Long s) -> gold.get(s).lastEntry().getValue()).reversed();
     List<Long> drawable =
         gold.keySet().stream().filter(s -> gold.get(s).size() > MIN_POINTS).toList();
     List<Long> tracked = drawable.stream().filter(focus::contains).sorted(richest).toList();
-    return (tracked.isEmpty() ? drawable.stream().sorted(richest).toList() : tracked)
-        .stream().limit(Math.max(1, max)).toList();
+    boolean followTracked = !tracked.isEmpty();
+    List<Long> pool = followTracked ? tracked : drawable.stream().sorted(richest).toList();
+    int shown = Math.min(pool.size(), Math.max(1, max));
+    return new Choice(pool.subList(0, shown), followTracked ? pool.size() - shown : 0);
   }
 }

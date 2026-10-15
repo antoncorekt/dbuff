@@ -17,11 +17,13 @@ import com.ako.dbuff.service.replay.report.chart.ChartSpec.Pin;
 import com.ako.dbuff.service.replay.report.chart.ChartSpec.PinShape;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -40,6 +42,7 @@ public class IncomePins {
   private static final long BIG_PURCHASE_COST = 2000;
   private static final double SAME_PURCHASE_SECONDS = 5;
   private static final int MAX_LABEL = 22;
+  private static final String RECIPE_PREFIX = "recipe_";
 
   private final DeathEventRepo deathRepo;
   private final BuybackEventRepo buybackRepo;
@@ -132,17 +135,32 @@ public class IncomePins {
         }
       }
       pins.addAll(biggest(slot, his));
-      return pins;
+      return distinct(pins);
+    }
+
+    /** One pin per shape, label and second: a repeated event is drawn once. */
+    private static List<Pin> distinct(List<Pin> pins) {
+      Set<String> seen = new HashSet<>();
+      return pins.stream()
+          .filter(p -> seen.add(p.shape() + "|" + p.label() + "|" + Math.round(p.seconds())))
+          .toList();
     }
 
     private List<Pin> biggest(long slot, List<ItemEfficiency> whitelisted) {
-      return purchases.stream()
-          .filter(p -> p.getPlayerSlot() != null && p.getPlayerSlot() == slot)
-          .filter(
-              p ->
-                  p.getItemKey() != null && p.getPurchaseTime() != null && p.getPurchaseTime() >= 0)
-          .filter(p -> cost(p.getItemKey()) >= BIG_PURCHASE_COST)
-          .filter(p -> whitelisted.stream().noneMatch(w -> sameBuy(w, p)))
+      List<ItemPurchaseEventDomain> his =
+          purchases.stream()
+              .filter(p -> p.getPlayerSlot() != null && p.getPlayerSlot() == slot)
+              .filter(
+                  p ->
+                      p.getItemKey() != null
+                          && p.getPurchaseTime() != null
+                          && p.getPurchaseTime() >= 0)
+              .filter(p -> !p.getItemKey().startsWith(RECIPE_PREFIX))
+              .filter(p -> cost(p.getItemKey()) >= BIG_PURCHASE_COST)
+              .filter(p -> whitelisted.stream().noneMatch(w -> sameBuy(w, p)))
+              .sorted(Comparator.comparingLong(ItemPurchaseEventDomain::getPurchaseTime))
+              .toList();
+      return unique(his).stream()
           .sorted(
               Comparator.comparingLong((ItemPurchaseEventDomain p) -> cost(p.getItemKey()))
                   .reversed())
@@ -157,8 +175,29 @@ public class IncomePins {
           .toList();
     }
 
+    private static List<ItemPurchaseEventDomain> unique(List<ItemPurchaseEventDomain> inTime) {
+      List<ItemPurchaseEventDomain> kept = new ArrayList<>();
+      inTime.forEach(p -> addUnlessRepeated(kept, p));
+      return kept;
+    }
+
+    private static void addUnlessRepeated(
+        List<ItemPurchaseEventDomain> kept, ItemPurchaseEventDomain next) {
+      boolean repeated =
+          kept.stream()
+              .anyMatch(
+                  k ->
+                      k.getItemKey().equals(next.getItemKey())
+                          && Math.abs(k.getPurchaseTime() - next.getPurchaseTime())
+                              <= SAME_PURCHASE_SECONDS);
+      if (!repeated) {
+        kept.add(next);
+      }
+    }
+
     private boolean sameBuy(ItemEfficiency item, ItemPurchaseEventDomain purchase) {
-      return Math.abs(item.purchaseSeconds() - purchase.getPurchaseTime()) <= SAME_PURCHASE_SECONDS;
+      return Objects.equals(item.itemKey(), purchase.getItemKey())
+          && Math.abs(item.purchaseSeconds() - purchase.getPurchaseTime()) <= SAME_PURCHASE_SECONDS;
     }
 
     private long cost(String key) {

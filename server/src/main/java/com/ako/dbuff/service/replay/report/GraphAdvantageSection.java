@@ -29,6 +29,11 @@ public class GraphAdvantageSection extends GraphSection {
   }
 
   @Override
+  protected String title() {
+    return "Team advantage";
+  }
+
+  @Override
   public int order() {
     return 90;
   }

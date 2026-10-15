@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 import javax.imageio.ImageIO;
 import org.springframework.stereotype.Component;
 
@@ -129,18 +130,8 @@ public class ChartRenderer {
       String text = ChartFormat.value(panel.format(), tick);
       g.drawString(text, LEFT - 8 - fm.stringWidth(text), y + fm.getAscent() / 2 - 1);
     }
-    for (ChartSpec.Band band : spec.bands()) {
-      int x1 = time.at(Math.max(0, band.startSeconds()));
-      int x2 = Math.max(x1 + 2, time.at(Math.min(spec.endSeconds(), band.endSeconds())));
-      g.setColor(band.color());
-      g.fillRect(x1, top, x2 - x1, bottom - top);
-    }
-    for (ChartSpec.Band band : panel.bands()) {
-      int x1 = time.at(Math.max(0, band.startSeconds()));
-      int x2 = Math.max(x1 + 2, time.at(Math.min(spec.endSeconds(), band.endSeconds())));
-      g.setColor(band.color());
-      g.fillRect(x1, top, x2 - x1, bottom - top);
-    }
+    Stream.concat(spec.bands().stream(), panel.bands().stream())
+        .forEach(band -> drawBand(g, band, time, plot));
     for (ChartSpec.Marker marker : markers) {
       drawMarkerLine(g, marker, time.at(marker.seconds()), top, bottom);
     }
@@ -214,17 +205,20 @@ public class ChartRenderer {
     }
   }
 
-  /** The series' value at a time, held at its first or last known value outside its range. */
-  private static double valueAt(ChartSpec.Series s, double seconds) {
+  /**
+   * The series' value at a time, held at the latest known value before it, or the first known value
+   * when it lies before them all.
+   */
+  static double valueAt(ChartSpec.Series s, double seconds) {
     int n = Math.min(s.seconds().length, s.values().length);
-    double first = Double.NaN;
-    double last = Double.NaN;
+    int first = -1;
+    int last = -1;
     for (int i = 0; i < n; i++) {
       if (Double.isNaN(s.values()[i])) {
         continue;
       }
-      first = Double.isNaN(first) ? s.values()[i] : first;
-      last = s.values()[i];
+      first = first < 0 ? i : first;
+      last = s.seconds()[i] <= seconds ? i : last;
       boolean next = i + 1 < n && !Double.isNaN(s.values()[i + 1]);
       if (next && seconds >= s.seconds()[i] && seconds <= s.seconds()[i + 1]) {
         double span = s.seconds()[i + 1] - s.seconds()[i];
@@ -234,10 +228,10 @@ public class ChartRenderer {
                 + (s.values()[i + 1] - s.values()[i]) * (seconds - s.seconds()[i]) / span;
       }
     }
-    if (Double.isNaN(first)) {
+    if (first < 0) {
       return 0;
     }
-    return seconds < s.seconds()[0] ? first : last;
+    return s.values()[last < 0 ? first : last];
   }
 
   static void drawShape(Graphics2D g, ChartSpec.PinShape shape, int x, int y, Color color) {
@@ -278,6 +272,17 @@ public class ChartRenderer {
     g.fillPolygon(p);
     g.setColor(BACKGROUND);
     g.drawPolygon(p);
+  }
+
+  /** A shaded stretch, at least two pixels wide and never outside the plot. */
+  private static void drawBand(Graphics2D g, ChartSpec.Band band, Scale time, Rectangle plot) {
+    int x1 = time.at(Math.max(0, band.startSeconds()));
+    int x2 = Math.max(x1 + 2, time.at(Math.max(0, band.endSeconds())));
+    Rectangle fill = new Rectangle(x1, plot.y, x2 - x1, plot.height).intersection(plot);
+    if (!fill.isEmpty()) {
+      g.setColor(band.color());
+      g.fill(fill);
+    }
   }
 
   private void drawCaptions(Graphics2D g, ChartSpec.Panel panel, Rectangle plot) {

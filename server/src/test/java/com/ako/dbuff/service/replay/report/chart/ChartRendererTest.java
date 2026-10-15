@@ -178,4 +178,20 @@ class ChartRendererTest {
                 java.util.List.of(
                     new ChartSpec.Pin(30, ChartSpec.PinShape.CROSS, ChartPalette.DEATH, null))));
   }
+
+  @Test
+  void aPinBeforeTheFirstKnownPointTakesTheFirstValueNotTheLast() {
+    ChartSpec.Series series =
+        new ChartSpec.Series(
+            new double[] {0, 60, 120, 180},
+            new double[] {Double.NaN, 500, 800, 300},
+            ChartPalette.RADIANT,
+            null,
+            ChartPalette.RADIANT,
+            null);
+
+    assertThat(ChartRenderer.valueAt(series, 10)).isEqualTo(500);
+    assertThat(ChartRenderer.valueAt(series, 90)).isEqualTo(650);
+    assertThat(ChartRenderer.valueAt(series, 9999)).isEqualTo(300);
+  }
 }

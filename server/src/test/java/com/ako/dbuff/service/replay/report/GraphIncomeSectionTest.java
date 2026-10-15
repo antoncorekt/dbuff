@@ -106,11 +106,20 @@ class GraphIncomeSectionTest {
   }
 
   @Test
-  void aBuilderThatFailsOnABadRowDoesNotFailTheReport() {
+  void aBuilderThatFailsGivesTheApologyForThatDeliveryAndIsRetriedForTheNext() {
     when(builder.build(anyLong(), any(), anyInt(), anyInt(), anyInt()))
         .thenThrow(new IllegalStateException("bad row"));
 
-    assertThat(section.view(input)).isEmpty();
-    assertThat(section.lines(input)).isEmpty();
+    assertThat(section.lines(input)).containsExactly("**Hero income**", GraphSection.NOT_DRAWN);
+    assertThat(section.image(input)).isEmpty();
+    verify(builder, times(1)).build(anyLong(), any(), anyInt(), anyInt(), anyInt());
+
+    org.mockito.Mockito.doReturn(Optional.of(chart(60)))
+        .when(builder)
+        .build(anyLong(), any(), anyInt(), anyInt(), anyInt());
+    when(charts.png(anyString(), any())).thenReturn(Optional.of(new byte[] {9}));
+    ReplayReportInput next = new ReplayReportInput(7L, null, Set.of(0L), Map.of(), 3);
+
+    assertThat(section.view(next).orElseThrow().verdict()).isEqualTo("Biggest income drop: Axe.");
   }
 }

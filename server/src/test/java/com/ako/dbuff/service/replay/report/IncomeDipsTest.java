@@ -57,9 +57,9 @@ class IncomeDipsTest {
     Dip dip = dips.getFirst();
     assertThat(dip.fromMinute()).isEqualTo(6);
     assertThat(dip.toMinute()).isEqualTo(8);
-    assertThat(dip.before()).isEqualTo(820);
+    assertThat(dip.before()).isEqualTo(800);
     assertThat(dip.lowest()).isEqualTo(300);
-    assertThat(dip.drop()).isEqualTo(520);
+    assertThat(dip.drop()).isEqualTo(500);
     assertThat(dip.causeFromSeconds()).isEqualTo(180);
     assertThat(dip.toSeconds()).isEqualTo(480);
   }
@@ -72,9 +72,73 @@ class IncomeDipsTest {
   }
 
   @Test
-  void aGapSplitsTwoStretchesWithoutThrowing() {
+  void aGapInTheSeriesDoesNotBreakTheSearch() {
     double[] gpm = {Double.NaN, Double.NaN, Double.NaN, 900, 900, 300, Double.NaN, 300};
 
-    assertThat(IncomeDips.find(gpm)).hasSize(2);
+    assertThat(IncomeDips.find(gpm)).extracting(Dip::fromMinute).containsExactly(7);
+  }
+
+  @Test
+  void aDipThenARecoveryThenAnotherDipAreTwoDipsEachAgainstItsOwnPeak() {
+    double[] gpm = {
+      Double.NaN,
+      Double.NaN,
+      Double.NaN,
+      900,
+      900,
+      900,
+      400,
+      900,
+      900,
+      900,
+      900,
+      1000,
+      300,
+      300,
+      1000
+    };
+
+    List<Dip> dips = IncomeDips.find(gpm);
+
+    assertThat(dips).extracting(Dip::fromMinute).containsExactly(6, 12);
+    assertThat(dips.get(0).before()).isEqualTo(900);
+    assertThat(dips.get(1).before()).isEqualTo(900);
+    assertThat(dips.get(1).toMinute()).isEqualTo(13);
+  }
+
+  @Test
+  void aPeakFromBeforeARecoveredDipIsNotReusedRightAfterIt() {
+    double[] gpm = {Double.NaN, Double.NaN, Double.NaN, 1000, 1000, 1000, 300, 900, 800, 600, 580};
+
+    List<Dip> dips = IncomeDips.find(gpm);
+
+    assertThat(dips).hasSize(1);
+    assertThat(dips.getFirst().toMinute()).isEqualTo(6);
+  }
+
+  @Test
+  void consecutiveLowMinutesMergeIntoOneDip() {
+    double[] gpm = {Double.NaN, Double.NaN, Double.NaN, 900, 900, 900, 500, 350, 600, 650, 900};
+
+    List<Dip> dips = IncomeDips.find(gpm);
+
+    assertThat(dips).hasSize(1);
+    assertThat(dips.getFirst().fromMinute()).isEqualTo(6);
+    assertThat(dips.getFirst().toMinute()).isEqualTo(9);
+    assertThat(dips.getFirst().lowest()).isEqualTo(350);
+  }
+
+  @Test
+  void spendingGoldOnAnItemIsNotADipBecauseStoredGoldIsCumulativeEarnings() {
+    Map<Integer, Long> earned = gold(600, 600, 600, 600, 600, 600, 600, 600);
+    double[] steady = IncomeDips.rolling(earned);
+    assertThat(IncomeDips.find(steady)).isEmpty();
+
+    Map<Integer, Long> spentFrom = new TreeMap<>(earned);
+    spentFrom.put(6, earned.get(6) - 2200);
+    double[] notCumulative = IncomeDips.rolling(spentFrom);
+
+    assertThat(notCumulative[6]).isNaN();
+    assertThat(IncomeDips.find(notCumulative)).isEmpty();
   }
 }

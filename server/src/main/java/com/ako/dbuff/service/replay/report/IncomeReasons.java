@@ -115,12 +115,7 @@ public class IncomeReasons {
           "rotation at %s%s"
               .formatted(
                   GameTime.clock(r.getStartSeconds()), bad ? " did not pay off" : " cost him farm");
-      return farmCut
-          ? trip
-              + ": "
-              + BehaviourWording.rotationSentence(RotationReason.INCOME_DROP, hero, r, false)
-                  .replaceAll(" \\(experience.*\\)$", "")
-          : hero + "'s " + trip;
+      return farmCut ? trip + ": " + BehaviourWording.farmDropped(hero, r) : hero + "'s " + trip;
     }
 
     private static String killedBy(DeathAnalysisDomain d) {

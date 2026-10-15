@@ -56,16 +56,24 @@ final class IncomeDips {
     for (int m = 0; m < gpm.length; m++) {
       Long now = gold.get(m);
       Long then = gold.get(m - WINDOW_MINUTES);
-      gpm[m] = now == null || then == null ? Double.NaN : (now - then) / (double) WINDOW_MINUTES;
+      boolean known = now != null && then != null && now >= then;
+      gpm[m] = known ? (now - then) / (double) WINDOW_MINUTES : Double.NaN;
     }
     return gpm;
   }
 
+  /**
+   * The stretches of low income, in time order. A fall is measured against the best rolling value
+   * from windows that end before the window of the low minute begins, and only from minutes after
+   * the previous dip ended, so a dip never compares with samples it overlaps or with a peak from
+   * before a recovered dip.
+   */
   static List<Dip> find(double[] gpm) {
     List<Dip> dips = new ArrayList<>();
+    int floor = 0;
     int m = 1;
     while (m < gpm.length) {
-      double peak = peak(gpm, m);
+      double peak = peak(gpm, floor, m - WINDOW_MINUTES);
       if (Double.isNaN(gpm[m]) || Double.isNaN(peak) || !fallen(gpm[m], peak)) {
         m++;
         continue;
@@ -79,6 +87,7 @@ final class IncomeDips {
         k++;
       }
       dips.add(new Dip(m, to, peak, lowest));
+      floor = to + 1;
       m = to + 1;
     }
     return dips;
@@ -88,10 +97,10 @@ final class IncomeDips {
     return value <= peak * FALL && peak - value >= MIN_DROP;
   }
 
-  private static double peak(double[] gpm, int minute) {
+  private static double peak(double[] gpm, int floor, int last) {
     double peak = Double.NaN;
-    for (int i = Math.max(0, minute - LOOKBACK_MINUTES); i < minute; i++) {
-      if (!Double.isNaN(gpm[i]) && (Double.isNaN(peak) || gpm[i] > peak)) {
+    for (int i = Math.max(floor, last - LOOKBACK_MINUTES + 1); i <= last; i++) {
+      if (i >= 0 && !Double.isNaN(gpm[i]) && (Double.isNaN(peak) || gpm[i] > peak)) {
         peak = gpm[i];
       }
     }

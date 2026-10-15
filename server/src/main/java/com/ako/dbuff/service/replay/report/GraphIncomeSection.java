@@ -5,7 +5,6 @@ import com.ako.dbuff.service.replay.report.chart.ChartService;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.Optional;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
@@ -13,7 +12,6 @@ import org.springframework.stereotype.Component;
  * deaths, buybacks and the items bought, with a Hand of Midas paying for itself. Off unless
  * switched on, or asked for with the section name.
  */
-@Slf4j
 @Component
 public class GraphIncomeSection extends GraphSection {
   private final IncomeChartBuilder builder;
@@ -35,25 +33,25 @@ public class GraphIncomeSection extends GraphSection {
   }
 
   @Override
+  protected String title() {
+    return "Hero income";
+  }
+
+  @Override
   public int order() {
     return 91;
   }
 
   @Override
   protected Optional<SectionView> build(ReplayReportInput input) {
-    try {
-      return builder
-          .build(
-              input.matchId(),
-              input.focusSlots(),
-              properties.getGraphIncomeMaxHeroes(),
-              input.maxFindings(),
-              properties.getMaxBehaviourLineLength())
-          .map(chart -> view(input.matchId(), chart));
-    } catch (RuntimeException e) {
-      log.warn("Income graph of match {} skipped: {}", input.matchId(), e.toString());
-      return Optional.empty();
-    }
+    return builder
+        .build(
+            input.matchId(),
+            input.focusSlots(),
+            properties.getGraphIncomeMaxHeroes(),
+            input.maxFindings(),
+            properties.getMaxBehaviourLineLength())
+        .map(chart -> view(input.matchId(), chart));
   }
 
   private SectionView view(long matchId, IncomeChart chart) {

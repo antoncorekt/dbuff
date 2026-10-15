@@ -146,6 +146,7 @@ class IncomeChartBuilderTest {
         .startsWith("Puck");
     assertThat(nobody.spec().panels()).hasSize(2);
     assertThat(tracked.verdict()).isEqualTo("No hero's income fell sharply.");
+    assertThat(tracked.bullets()).containsExactly("1 more tracked hero is not shown.");
   }
 
   @Test
@@ -279,6 +280,7 @@ class IncomeChartBuilderTest {
         .extracting(ChartSpec.Pin::label)
         .containsExactlyInAnyOrder("hand of midas", "hand of midas paid back", "blink");
     assertThat(chart.bullets()).anyMatch(b -> b.contains("paid for itself at 10:00"));
+    assertThat(builder.build(MATCH, Set.of(0L), 2, 0, LINE).orElseThrow().bullets()).isEmpty();
   }
 
   @Test
@@ -337,5 +339,83 @@ class IncomeChartBuilderTest {
 
     assertThat(again).isEqualTo(first);
     assertThat(changed).isNotEqualTo(first);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void aPurchaseNeverMakesADipAndRepeatedEventsAreDrawnOnce() {
+    timeline(gold(0, steady(14, 800)));
+    when(purchases.findByMatchId(MATCH))
+        .thenReturn(
+            List.of(
+                ItemPurchaseEventDomain.builder()
+                    .playerSlot(0L)
+                    .purchaseTime(400L)
+                    .itemKey("blink")
+                    .build(),
+                ItemPurchaseEventDomain.builder()
+                    .playerSlot(0L)
+                    .purchaseTime(402L)
+                    .itemKey("blink")
+                    .build(),
+                ItemPurchaseEventDomain.builder()
+                    .playerSlot(0L)
+                    .purchaseTime(400L)
+                    .itemKey("recipe_blink")
+                    .build()));
+    when(kits.cost("blink")).thenReturn(OptionalLong.of(2250));
+    when(kits.cost("recipe_blink")).thenReturn(OptionalLong.of(2250));
+    when(deathEvents.findByMatchId(MATCH))
+        .thenReturn(
+            List.of(
+                DeathEventDomain.builder().playerSlot(0L).deathTime(300L).build(),
+                DeathEventDomain.builder().playerSlot(0L).deathTime(300L).build()));
+
+    IncomeChart chart = builder.build(MATCH, Set.of(0L), 2, 3, LINE).orElseThrow();
+
+    assertThat(chart.verdict()).isEqualTo("No hero's income fell sharply.");
+    assertThat(chart.spec().panels().getFirst().pins())
+        .extracting(ChartSpec.Pin::shape)
+        .containsExactlyInAnyOrder(PinShape.CROSS, PinShape.TRIANGLE);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void midasLinesCountAgainstTheFindingCapAndStayWithinTheLineLength() {
+    timeline(gold(0, withFall()));
+    ItemEfficiency midas =
+        new ItemEfficiency(
+            0,
+            "hand_of_midas",
+            "hand_of_midas",
+            IncomePins.MIDAS_KIND,
+            200.0,
+            5,
+            2000,
+            2200L,
+            0.9,
+            600.0,
+            Map.of(
+                "gold",
+                2000.0,
+                "xp",
+                500.0,
+                "idleSeconds",
+                60.0,
+                "farmingSeconds",
+                300.0,
+                "heroGold",
+                8000.0),
+            List.of(),
+            List.of());
+    when(efficiency.findByMatchId(MATCH))
+        .thenReturn(List.of(ItemEfficiencyJson.toRow(MATCH, midas, 1)));
+
+    IncomeChart one = builder.build(MATCH, Set.of(0L), 2, 1, LINE).orElseThrow();
+    IncomeChart tight = builder.build(MATCH, Set.of(0L), 2, 3, 50).orElseThrow();
+
+    assertThat(one.bullets()).hasSize(1);
+    assertThat(tight.bullets()).allMatch(b -> b.length() <= 50 && (b.endsWith(".")));
+    assertThat(tight.bullets().getFirst()).doesNotContain("....");
   }
 }
