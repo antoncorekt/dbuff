@@ -1024,41 +1024,14 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     StringBuilder text = new StringBuilder("## Match " + id + "\n\n");
     lines.forEach(l -> text.append("- ").append(l).append("\n"));
     text.append("\nNumbers behind it:\n\n");
+    String format =
+        "- %s mid (slot %d): level 6 at %s, next step %s; mid game %s to %s; kills %d,"
+            + " assists %d; fights %d of %d (team median %s); rotations %d (%d good);"
+            + " gold per minute %d (enemy mid %d, team %d); experience per minute %d"
+            + " (enemy mid %d, team %d); verdict %s%n";
     rows.stream()
         .sorted(java.util.Comparator.comparing(r -> r.getPlayerSlot()))
-        .forEach(
-            r ->
-                text.append(
-                    ("- %s mid (slot %d): level 6 at %s, next step %s; mid game %s to %s; kills %d,"
-                         + " assists %d; fights %d of %d (team median %s); rotations %d (%d good);"
-                         + " gold per minute %d (enemy mid %d, team %d); experience per minute %d"
-                         + " (enemy mid %d, team %d); verdict %s%n")
-                        .formatted(
-                            r.getTeam(),
-                            r.getPlayerSlot(),
-                            r.getLevel6Seconds() == null
-                                ? "never"
-                                : com.ako.dbuff.service.replay.report.GameTime.clock(
-                                    r.getLevel6Seconds()),
-                            r.getNextAction(),
-                            com.ako.dbuff.service.replay.report.GameTime.clock(
-                                r.getWindowStartSeconds()),
-                            com.ako.dbuff.service.replay.report.GameTime.clock(
-                                r.getWindowEndSeconds()),
-                            r.getKills(),
-                            r.getAssists(),
-                            r.getFightsJoined(),
-                            r.getFightsTotal(),
-                            r.getTeamMedianFights(),
-                            r.getRotations(),
-                            r.getRotationsGood(),
-                            r.getGoldPerMinute(),
-                            r.getEnemyGoldPerMinute(),
-                            r.getTeamGoldPerMinute(),
-                            r.getXpPerMinute(),
-                            r.getEnemyXpPerMinute(),
-                            r.getTeamXpPerMinute(),
-                            r.getVerdict())));
+        .forEach(r -> text.append(format.formatted(numbers(r))));
     MID_ACTIVITY_DOC.put(id, text.toString());
     System.out.println("MID ACTIVITY " + id + "\n" + text);
     try {
@@ -1070,6 +1043,33 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  private static Object[] numbers(com.ako.dbuff.dao.model.MidActivityDomain r) {
+    return new Object[] {
+      r.getTeam(),
+      r.getPlayerSlot(),
+      r.getLevel6Seconds() == null
+          ? "never"
+          : com.ako.dbuff.service.replay.report.GameTime.clock(r.getLevel6Seconds()),
+      r.getNextAction(),
+      com.ako.dbuff.service.replay.report.GameTime.clock(r.getWindowStartSeconds()),
+      com.ako.dbuff.service.replay.report.GameTime.clock(r.getWindowEndSeconds()),
+      r.getKills(),
+      r.getAssists(),
+      r.getFightsJoined(),
+      r.getFightsTotal(),
+      r.getTeamMedianFights(),
+      r.getRotations(),
+      r.getRotationsGood(),
+      r.getGoldPerMinute(),
+      r.getEnemyGoldPerMinute(),
+      r.getTeamGoldPerMinute(),
+      r.getXpPerMinute(),
+      r.getEnemyXpPerMinute(),
+      r.getTeamXpPerMinute(),
+      r.getVerdict()
+    };
   }
 
   private void saveSection(String name, List<String> lines, String id, int maxLines) {
