@@ -84,9 +84,8 @@ public class ChartRenderer {
     List<PlacedLabel> labels = new ArrayList<>();
     g.setFont(ChartFonts.plain(LABEL_SIZE));
     if (!spec.markers().isEmpty()) {
-      labels = placeLabels(g, spec, plotRight);
-      int lanes = labels.stream().mapToInt(l -> l.lane + 1).max().orElse(0);
-      markerStrip = lanes * LABEL_LANE + 4;
+      labels = placeLabels(g, spec.markers(), spec.endSeconds(), plotRight);
+      markerStrip = stripHeight(labels);
     }
     int plotTop = TOP + markerStrip;
     int plotBottom = MAX_HEIGHT - AXIS_HEIGHT - (spec.legend().isEmpty() ? 0 : LEGEND_HEIGHT);
@@ -111,9 +110,15 @@ public class ChartRenderer {
       ChartSpec spec,
       ChartSpec.Panel panel,
       Scale time,
-      int top,
+      int panelTop,
       int bottom,
       List<ChartSpec.Marker> markers) {
+    g.setFont(ChartFonts.plain(LABEL_SIZE));
+    List<PlacedLabel> own =
+        panel.markers().isEmpty()
+            ? List.of()
+            : placeLabels(g, panel.markers(), spec.endSeconds(), MAX_WIDTH - RIGHT);
+    int top = panelTop + stripHeight(own);
     Scale value = valueScale(panel, top, bottom);
     Rectangle plot = new Rectangle(LEFT, top, MAX_WIDTH - RIGHT - LEFT, bottom - top);
     g.setFont(ChartFonts.plain(LABEL_SIZE));
@@ -132,10 +137,17 @@ public class ChartRenderer {
       g.setColor(band.color());
       g.fillRect(x1, top, x2 - x1, bottom - top);
     }
+    Rectangle clip = g.getClipBounds();
+    g.setClip(plot);
+    drawBars(g, panel.bars(), time, value);
+    g.setClip(clip);
     for (ChartSpec.Marker marker : markers) {
       drawMarkerLine(g, marker, time.at(marker.seconds()), top, bottom);
     }
-    Rectangle clip = g.getClipBounds();
+    for (PlacedLabel label : own) {
+      drawMarkerLine(g, label.marker, time.at(label.marker.seconds()), top, bottom);
+      drawMarkerLabel(g, label, panelTop);
+    }
     g.setClip(plot);
     panel.series().forEach(s -> drawSeries(g, s, time, value, plot));
     g.setClip(clip);
@@ -143,6 +155,37 @@ public class ChartRenderer {
     g.setFont(ChartFonts.bold(LABEL_SIZE));
     g.drawString(panel.label(), LEFT + 8, top + g.getFontMetrics().getAscent() + 2);
     drawCaptions(g, panel, plot);
+  }
+
+  private static int stripHeight(List<PlacedLabel> labels) {
+    int lanes = labels.stream().mapToInt(l -> l.lane + 1).max().orElse(0);
+    return lanes == 0 ? 0 : lanes * LABEL_LANE + 4;
+  }
+
+  private static int barCount(List<ChartSpec.BarSeries> bars) {
+    return bars.stream()
+        .mapToInt(b -> Math.min(b.seconds().length, b.values().length))
+        .min()
+        .orElse(0);
+  }
+
+  private void drawBars(Graphics2D g, List<ChartSpec.BarSeries> bars, Scale time, Scale value) {
+    int count = barCount(bars);
+    for (int i = 0; i < count; i++) {
+      double base = 0;
+      for (ChartSpec.BarSeries bar : bars) {
+        double v = bar.values()[i];
+        if (Double.isNaN(v) || v <= 0) {
+          continue;
+        }
+        int left = time.at(bar.seconds()[i]);
+        int right = time.at(bar.seconds()[i] + bar.widthSeconds());
+        int top = value.at(base + v);
+        g.setColor(bar.color());
+        g.fillRect(left, top, Math.max(1, right - left - 1), value.at(base) - top);
+        base += v;
+      }
+    }
   }
 
   private void drawCaptions(Graphics2D g, ChartSpec.Panel panel, Rectangle plot) {
@@ -234,14 +277,13 @@ public class ChartRenderer {
 
   private record PlacedLabel(ChartSpec.Marker marker, int x, int width, int lane) {}
 
-  private List<PlacedLabel> placeLabels(Graphics2D g, ChartSpec spec, int plotRight) {
+  private List<PlacedLabel> placeLabels(
+      Graphics2D g, List<ChartSpec.Marker> markers, double endSeconds, int plotRight) {
     FontMetrics fm = g.getFontMetrics();
-    Scale time = new Scale(0, Math.max(1, spec.endSeconds()), LEFT, plotRight);
+    Scale time = new Scale(0, Math.max(1, endSeconds), LEFT, plotRight);
     List<PlacedLabel> placed = new ArrayList<>();
     List<ChartSpec.Marker> ordered =
-        spec.markers().stream()
-            .sorted(Comparator.comparingDouble(ChartSpec.Marker::seconds))
-            .toList();
+        markers.stream().sorted(Comparator.comparingDouble(ChartSpec.Marker::seconds)).toList();
     for (ChartSpec.Marker marker : ordered) {
       marker = fitted(marker, fm, plotRight - LEFT);
       int width = fm.stringWidth(marker.label()) + 8;
@@ -323,6 +365,16 @@ public class ChartRenderer {
           low = Math.min(low, v);
         }
       }
+    }
+    int count = barCount(panel.bars());
+    for (int i = 0; i < count; i++) {
+      double stack = 0;
+      for (ChartSpec.BarSeries bar : panel.bars()) {
+        if (!Double.isNaN(bar.values()[i]) && bar.values()[i] > 0) {
+          stack += bar.values()[i];
+        }
+      }
+      high = Math.max(high, stack);
     }
     double span = Math.max(1, Math.max(high, -low));
     double upper = high > 0 ? niceCeil(high * 1.1) : MIN_MARGIN * span;

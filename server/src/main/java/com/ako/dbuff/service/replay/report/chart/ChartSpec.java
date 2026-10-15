@@ -35,6 +35,15 @@ public record ChartSpec(
     panels.forEach(
         p -> {
           all.append('|').append(p.label()).append(p.format());
+          p.bars()
+              .forEach(
+                  b ->
+                      all.append(Arrays.hashCode(b.seconds()))
+                          .append(',')
+                          .append(Arrays.hashCode(b.values()))
+                          .append(b.widthSeconds())
+                          .append(b.color()));
+          all.append(p.markers());
           p.series()
               .forEach(
                   s ->
@@ -57,12 +66,33 @@ public record ChartSpec(
     }
   }
 
-  /** One plot; {@code label} is written in its corner. */
-  public record Panel(String label, ValueFormat format, List<Series> series) {
+  /**
+   * One plot; {@code label} is written in its corner. The {@code bars} are stacked from zero in
+   * list order; the {@code markers} are labelled lines of this panel alone, with their labels above
+   * its plot.
+   */
+  public record Panel(
+      String label,
+      ValueFormat format,
+      List<Series> series,
+      List<BarSeries> bars,
+      List<Marker> markers) {
     public Panel {
       series = List.copyOf(series);
+      bars = List.copyOf(bars);
+      markers = List.copyOf(markers);
+    }
+
+    public Panel(String label, ValueFormat format, List<Series> series) {
+      this(label, format, series, List.of(), List.of());
     }
   }
+
+  /**
+   * One layer of stacked bars: {@code values[i]} fills {@code [seconds[i], seconds[i] +
+   * widthSeconds)}; NaN and non-positive values draw nothing.
+   */
+  public record BarSeries(double[] seconds, double[] values, double widthSeconds, Color color) {}
 
   /**
    * Values at game seconds; NaN leaves a gap. The area between the line and zero is filled in

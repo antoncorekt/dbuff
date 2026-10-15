@@ -101,4 +101,36 @@ class ChartRendererTest {
 
     assertThat(decode(renderer.render(spec)).getWidth()).isEqualTo(ChartRenderer.MAX_WIDTH);
   }
+
+  @Test
+  void barsAndPanelMarkersDrawAndChangeTheFingerprint() throws IOException {
+    java.util.function.Function<Double, ChartSpec> farm =
+        gold ->
+            new ChartSpec(
+                "Farm",
+                300,
+                java.util.List.of(
+                    new ChartSpec.Panel(
+                        "Pudge",
+                        ChartSpec.ValueFormat.COMPACT,
+                        java.util.List.of(),
+                        java.util.List.of(
+                            new ChartSpec.BarSeries(
+                                new double[] {0, 60, 120, Double.NaN},
+                                new double[] {gold, Double.NaN, -5, 80},
+                                60,
+                                ChartPalette.RADIANT)),
+                        java.util.List.of(
+                            new ChartSpec.Marker(
+                                90, "Battle Fury (1:30), paid back at 5:00", ChartPalette.DIRE)))),
+                java.util.List.of(),
+                java.util.List.of(),
+                java.util.List.of());
+
+    byte[] png = renderer.render(farm.apply(120.0));
+
+    assertThat(decode(png).getHeight()).isEqualTo(ChartRenderer.MAX_HEIGHT);
+    assertThat(png.length).isGreaterThan(2000);
+    assertThat(farm.apply(120.0).fingerprint()).isNotEqualTo(farm.apply(121.0).fingerprint());
+  }
 }
