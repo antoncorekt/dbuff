@@ -128,7 +128,7 @@ public class AbilityDraftBoard implements DraftBoard {
                               s.getTurnNumber(),
                               s.getPickTick(),
                               false,
-                              s.getPickOrder())));
+                              s.getPickOrder() == null ? 0 : s.getPickOrder())));
       heroes.stream()
           .filter(h -> h.getPlayerSlot() != null)
           .forEach(

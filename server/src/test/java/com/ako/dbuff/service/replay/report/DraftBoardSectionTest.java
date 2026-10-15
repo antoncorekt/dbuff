@@ -153,6 +153,27 @@ class DraftBoardSectionTest {
   }
 
   @Test
+  void view_putsASkillBeforeAHeroPickedOnTheSameTick() {
+    draft();
+    when(heroRepo.findByMatchId(1L))
+        .thenReturn(List.of(hero(SNIPER, 0L, null, -400.0), hero(MEEPO, null, null, null)));
+    when(skillRepo.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                AbilityDraftPickDomain.builder()
+                    .pickOrder(1)
+                    .playerSlot(0L)
+                    .pickTick(-12000)
+                    .abilityName("sniper_take_aim")
+                    .build()));
+
+    SectionView view = section.view(input(Set.of(), Map.of())).orElseThrow();
+
+    assertThat(view.bullets().getFirst().lines().toList())
+        .contains("Sniper: Sniper Take Aim, hero Sniper");
+  }
+
+  @Test
   void view_putsRadiantFirstWhenNobodyIsTracked() {
     draft();
 
