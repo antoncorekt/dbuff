@@ -86,7 +86,7 @@ public class BehaviourSplitAnalyzer implements ReplayAnalyzer {
   }
 
   /** The end of the latest lane pair, or the fallback when no lane result has an end. */
-  static int startSeconds(List<LaneResultDomain> results, BehaviourProperties properties) {
+  public static int startSeconds(List<LaneResultDomain> results, BehaviourProperties properties) {
     return results.stream()
         .map(LaneResultDomain::getEndSeconds)
         .filter(Objects::nonNull)
