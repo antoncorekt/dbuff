@@ -34,7 +34,7 @@ public record ChartSpec(
     StringBuilder all = new StringBuilder(title).append('|').append(endSeconds);
     panels.forEach(
         p -> {
-          all.append('|').append(p.label()).append(p.format());
+          all.append('|').append(p.label()).append(p.format()).append(p.bands()).append(p.pins());
           p.series()
               .forEach(
                   s ->
@@ -57,12 +57,36 @@ public record ChartSpec(
     }
   }
 
-  /** One plot; {@code label} is written in its corner. */
-  public record Panel(String label, ValueFormat format, List<Series> series) {
+  /**
+   * One plot; {@code label} is written in its corner. {@code bands} shade stretches of this panel
+   * only and {@code pins} sit on its first series, so a panel can tell its own story.
+   */
+  public record Panel(
+      String label, ValueFormat format, List<Series> series, List<Band> bands, List<Pin> pins) {
     public Panel {
       series = List.copyOf(series);
+      bands = List.copyOf(bands);
+      pins = List.copyOf(pins);
+    }
+
+    public Panel(String label, ValueFormat format, List<Series> series) {
+      this(label, format, series, List.of(), List.of());
     }
   }
+
+  /** The look of a pin: a cross, a diamond, a triangle or a star. */
+  public enum PinShape {
+    CROSS,
+    DIAMOND,
+    TRIANGLE,
+    STAR
+  }
+
+  /**
+   * A mark on a panel's first series at a game time; {@code label}, when not blank, is written near
+   * the top of the panel with a thin line down to the mark.
+   */
+  public record Pin(double seconds, PinShape shape, Color color, String label) {}
 
   /**
    * Values at game seconds; NaN leaves a gap. The area between the line and zero is filled in
@@ -83,7 +107,12 @@ public record ChartSpec(
   /** A labelled vertical line at a game time. */
   public record Marker(double seconds, String label, Color color) {}
 
-  public record LegendEntry(Color color, String text) {}
+  /** A legend swatch; a null {@code shape} is a plain square. */
+  public record LegendEntry(Color color, String text, PinShape shape) {
+    public LegendEntry(Color color, String text) {
+      this(color, text, null);
+    }
+  }
 
   /** How the numbers on a panel's value axis read. */
   public enum ValueFormat {

@@ -101,4 +101,81 @@ class ChartRendererTest {
 
     assertThat(decode(renderer.render(spec)).getWidth()).isEqualTo(ChartRenderer.MAX_WIDTH);
   }
+
+  @Test
+  void panelBandsPinsAndLegendShapesDrawEvenOutsideTheSeries() throws IOException {
+    ChartSpec.Series series =
+        new ChartSpec.Series(
+            new double[] {180, 240, 300},
+            new double[] {500, Double.NaN, 700},
+            ChartPalette.RADIANT,
+            null,
+            ChartPalette.RADIANT,
+            null);
+    java.util.List<ChartSpec.Pin> pins = new java.util.ArrayList<>();
+    for (ChartSpec.PinShape shape : ChartSpec.PinShape.values()) {
+      pins.add(new ChartSpec.Pin(0, shape, ChartPalette.DEATH, "A label that is long " + shape));
+      pins.add(new ChartSpec.Pin(250, shape, ChartPalette.PURCHASE, "Item " + shape));
+      pins.add(new ChartSpec.Pin(9999, shape, ChartPalette.PAYBACK, null));
+    }
+    pins.add(
+        new ChartSpec.Pin(100, ChartSpec.PinShape.CROSS, ChartPalette.DEATH, "x".repeat(2000)));
+    ChartSpec spec =
+        new ChartSpec(
+            "Pins",
+            300,
+            java.util.List.of(
+                new ChartSpec.Panel(
+                    "Hero",
+                    ChartSpec.ValueFormat.COMPACT,
+                    java.util.List.of(series),
+                    java.util.List.of(new ChartSpec.Band(200, 260, ChartPalette.DIP_BAND)),
+                    pins),
+                new ChartSpec.Panel(
+                    "No data",
+                    ChartSpec.ValueFormat.COMPACT,
+                    java.util.List.of(),
+                    java.util.List.of(),
+                    pins)),
+            java.util.List.of(),
+            java.util.List.of(),
+            java.util.List.of(
+                new ChartSpec.LegendEntry(ChartPalette.DEATH, "Died", ChartSpec.PinShape.CROSS)));
+
+    assertThat(decode(renderer.render(spec)).getHeight()).isEqualTo(ChartRenderer.MAX_HEIGHT);
+  }
+
+  @Test
+  void pinsAndPanelBandsChangeTheFingerprint() {
+    ChartSpec.Series series =
+        new ChartSpec.Series(
+            new double[] {0, 60},
+            new double[] {1, 2},
+            ChartPalette.RADIANT,
+            "a",
+            ChartPalette.DIRE,
+            "b");
+    java.util.function.Function<java.util.List<ChartSpec.Pin>, String> print =
+        pins ->
+            new ChartSpec(
+                    "t",
+                    60,
+                    java.util.List.of(
+                        new ChartSpec.Panel(
+                            "p",
+                            ChartSpec.ValueFormat.COMPACT,
+                            java.util.List.of(series),
+                            java.util.List.of(),
+                            pins)),
+                    java.util.List.of(),
+                    java.util.List.of(),
+                    java.util.List.of())
+                .fingerprint();
+
+    assertThat(print.apply(java.util.List.of()))
+        .isNotEqualTo(
+            print.apply(
+                java.util.List.of(
+                    new ChartSpec.Pin(30, ChartSpec.PinShape.CROSS, ChartPalette.DEATH, null))));
+  }
 }
