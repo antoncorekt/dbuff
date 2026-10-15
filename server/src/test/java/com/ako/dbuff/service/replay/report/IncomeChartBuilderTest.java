@@ -166,6 +166,17 @@ class IncomeChartBuilderTest {
 
   @Test
   @SuppressWarnings("unchecked")
+  void aSmallLineLengthCutsTheVerdictButNeverTheFallbackNote() {
+    timeline(gold(0, 500, 500), gold(128, steady(10, 2000)));
+
+    IncomeChart chart = builder.build(MATCH, Set.of(0L), 2, 3, 12).orElseThrow();
+
+    assertThat(chart.verdict())
+        .isEqualTo("None of your players have income data; showing the richest heroes. No...");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
   void aFallIsShadedAndExplainedByTheDeathInsideIt() {
     timeline(gold(0, withFall()));
     when(deathAnalysis.findByMatchId(MATCH))

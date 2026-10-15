@@ -167,7 +167,7 @@ class ReportIconsTest {
     assertThat(IconText.safeEnd(text, 0)).isZero();
     assertThat(IconText.safeEnd(text, 99)).isEqualTo(text.length());
     assertThat(IconText.safeEnd("no tag < here", 8)).isEqualTo(8);
-    assertThat(IconText.splitIndex("<:h_antimage:11>" + "x".repeat(10), 5)).isEqualTo(5);
+    assertThat(IconText.splitIndex("<:h_antimage:11>" + "x".repeat(10), 5)).isEqualTo(16);
   }
 
   @Test
@@ -187,7 +187,10 @@ class ReportIconsTest {
     String itemText = "x" + item + "y";
     assertThat(IconText.safeEnd(itemText, 2)).isEqualTo(1);
     assertThat(IconText.safeEnd(itemText, 1 + item.length())).isEqualTo(1 + item.length());
-    assertThat(IconText.splitIndex(hero + "x".repeat(10), 1)).isEqualTo(1);
+    assertThat(IconText.splitIndex(hero + "x".repeat(10), 1)).isEqualTo(hero.length());
+    assertThat(IconText.splitIndex(item + "x", 1)).isEqualTo(item.length());
+    assertThat(IconText.splitIndex("\uD83D\uDC68\u200D\uD83D\uDC69x", 1)).isEqualTo(5);
+    assertThat(IconText.splitIndex("<:h_antimage:11>x", 3)).isEqualTo(16);
   }
 
   @Test

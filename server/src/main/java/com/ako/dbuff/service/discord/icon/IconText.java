@@ -40,10 +40,25 @@ public final class IconText {
     return at;
   }
 
-  /** Where to hard-split text at {@code max}: before a tag the split would break, never at 0. */
+  /**
+   * Where to hard-split text at {@code max}: before a tag or sequence the split would break. When
+   * the first unit alone is wider than {@code max} it is split after that whole unit, so the split
+   * always makes progress and never leaves a lone surrogate.
+   */
   public static int splitIndex(String text, int max) {
     int at = safeEnd(text, max);
-    return at == 0 ? Math.min(max, text.length()) : at;
+    return at == 0 ? firstUnitEnd(text) : at;
+  }
+
+  private static int firstUnitEnd(String text) {
+    if (text.isEmpty()) {
+      return 0;
+    }
+    int end = isTagStart(text, 0) && text.indexOf('>') > 0 ? text.indexOf('>') + 1 : 1;
+    while (end < text.length() && continuesSequence(text, end)) {
+      end++;
+    }
+    return end;
   }
 
   private static int beforeTag(String text, int at) {

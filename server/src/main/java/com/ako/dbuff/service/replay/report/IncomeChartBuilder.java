@@ -88,7 +88,7 @@ public class IncomeChartBuilder {
     ChartSpec spec =
         new ChartSpec("Hero income", end, panels, List.of(), List.of(), legend(found, allPins));
     return Optional.of(
-        new IncomeChart(spec, finish(choice.note() + verdict(worst, heroes), lineLength), bullets));
+        new IncomeChart(spec, choice.note() + finish(verdict(worst, heroes), lineLength), bullets));
   }
 
   private static List<Dip> biggest(List<Dip> dips) {
