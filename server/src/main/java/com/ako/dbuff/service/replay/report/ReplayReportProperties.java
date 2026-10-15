@@ -20,6 +20,7 @@ public class ReplayReportProperties {
   private static final int MAX_OPENING_RUNE_MINUTES = 30;
   private static final int MAX_BEHAVIOUR_LINES = 10;
   private static final int MAX_GRAPH_FARM_HEROES = 5;
+  private static final int MAX_GRAPH_HEROES = 3;
   private static final double MAX_OBJECTIVE_DISTANCE = 20000;
 
   /** The server-wide switch; nothing is posted until it is turned on. */
@@ -69,6 +70,9 @@ public class ReplayReportProperties {
 
   /** The most heroes the farm graph draws, one panel each. */
   private int graphFarmMaxHeroes = 2;
+
+  /** The most heroes the income graph draws, tracked heroes first. */
+  private int graphIncomeMaxHeroes = 2;
 
   /** The most lines the outliers section lists. */
   private int maxOutlierLines = 4;
@@ -139,6 +143,7 @@ public class ReplayReportProperties {
     requireRange("max-item-lines", maxItemLines, 1, MAX_BEHAVIOUR_LINES);
     requireRange("graph-farm-max-heroes", graphFarmMaxHeroes, 1, MAX_GRAPH_FARM_HEROES);
     requireRange("max-outlier-lines", maxOutlierLines, 1, MAX_BEHAVIOUR_LINES);
+    requireRange("graph-income-max-heroes", graphIncomeMaxHeroes, 1, MAX_GRAPH_HEROES);
     requireRange("max-vision-lines", maxVisionLines, 1, MAX_BEHAVIOUR_LINES);
     if (!(objectiveCloseDistance > 0
         && objectiveCloseDistance < objectiveFarDistance

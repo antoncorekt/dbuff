@@ -89,6 +89,12 @@ public final class BehaviourWording {
         .toList();
   }
 
+  /** The farm of a hero on a rotation as a sentence, gold only. */
+  public static String farmDropped(String hero, TeamRotationDomain r) {
+    return "%s's farm dropped from %s to %s gold per minute"
+        .formatted(hero, gold(r.getIncomeBefore()), gold(r.getIncomeDuring()));
+  }
+
   /**
    * One reason of a rotation as a sentence. {@code detailed} adds what "did nothing" was checked
    * against.
@@ -104,13 +110,8 @@ public final class BehaviourWording {
                   .formatted(hero)
               : "%s did nothing there".formatted(hero);
       case INCOME_DROP ->
-          "%s's farm dropped from %s to %s gold per minute (experience from %s to %s per minute)"
-              .formatted(
-                  hero,
-                  gold(r.getIncomeBefore()),
-                  gold(r.getIncomeDuring()),
-                  gold(r.getXpBefore()),
-                  gold(r.getXpDuring()));
+          "%s (experience from %s to %s per minute)"
+              .formatted(farmDropped(hero, r), gold(r.getXpBefore()), gold(r.getXpDuring()));
       case ARRIVED_AFTER_FIGHT_ENDED ->
           "%s arrived after the fight in that lane was over".formatted(hero);
       case LEFT_LANE_UNDEFENDED ->

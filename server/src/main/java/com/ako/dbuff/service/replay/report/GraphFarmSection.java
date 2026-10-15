@@ -1,18 +1,12 @@
 package com.ako.dbuff.service.replay.report;
 
-import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.service.replay.report.FarmChartBuilder.FarmChart;
 import com.ako.dbuff.service.replay.report.chart.ChartService;
 import com.ako.dbuff.service.replay.report.view.Accent;
-import com.ako.dbuff.service.replay.report.view.ImageAttachment;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,22 +15,31 @@ import org.springframework.stereotype.Component;
  * switched on, or asked for with the section name.
  */
 @Component
-@RequiredArgsConstructor
-public class GraphFarmSection implements ReplayReportSection {
-  static final String NOT_DRAWN = "The graph could not be drawn this time.";
+public class GraphFarmSection extends GraphSection {
+  private static final String TITLE = "Farm effectiveness";
   private static final int MAX_LINE_LENGTH = 300;
 
   private final FarmChartBuilder builder;
-  private final ChartService charts;
-  private final PlainViewRenderer plain;
   private final ReplayReportProperties properties;
 
-  private final Cache<ReplayReportInput, Optional<SectionView>> deliveries =
-      Caffeine.newBuilder().weakKeys().build();
+  public GraphFarmSection(
+      FarmChartBuilder builder,
+      ChartService charts,
+      PlainViewRenderer plain,
+      ReplayReportProperties properties) {
+    super(charts, plain);
+    this.builder = builder;
+    this.properties = properties;
+  }
 
   @Override
   public String name() {
     return "graph-farm";
+  }
+
+  @Override
+  protected String title() {
+    return TITLE;
   }
 
   @Override
@@ -45,48 +48,18 @@ public class GraphFarmSection implements ReplayReportSection {
   }
 
   @Override
-  public ReportDetail minimumDetail() {
-    return ReportDetail.STANDARD;
-  }
-
-  @Override
-  public List<String> lines(ReplayReportInput input) {
-    return view(input).map(v -> plain.lines(v, true)).orElse(List.of());
-  }
-
-  @Override
-  public Optional<ImageAttachment> image(ReplayReportInput input) {
-    return view(input).map(SectionView::image);
-  }
-
-  @Override
-  public Optional<SectionView> view(ReplayReportInput input) {
-    return deliveries.get(
-        input,
-        in ->
-            builder
-                .build(in.matchId(), in.focusSlots(), properties.getGraphFarmMaxHeroes())
-                .map(chart -> view(in.matchId(), chart)));
+  protected Optional<SectionView> build(ReplayReportInput input) {
+    return builder
+        .build(input.matchId(), input.focusSlots(), properties.getGraphFarmMaxHeroes())
+        .map(chart -> view(input.matchId(), chart));
   }
 
   private SectionView view(long matchId, FarmChart chart) {
-    Optional<ImageAttachment> image =
-        chart.spec() == null
-            ? Optional.empty()
-            : charts
-                .png("farm:" + matchId + ":" + chart.spec().fingerprint(), chart::spec)
-                .map(png -> new ImageAttachment("farm-" + matchId + ".png", png));
-    List<String> lines =
-        new ArrayList<>(chart.lines().stream().map(l -> LineText.cut(l, MAX_LINE_LENGTH)).toList());
-    if (chart.spec() != null && image.isEmpty()) {
-      lines.add(NOT_DRAWN);
+    String verdict = LineText.cut(chart.verdict(), MAX_LINE_LENGTH);
+    List<String> lines = chart.lines().stream().map(l -> LineText.cut(l, MAX_LINE_LENGTH)).toList();
+    if (chart.spec() == null) {
+      return new SectionView(TITLE, verdict, Accent.NEUTRAL, lines, null, null);
     }
-    return new SectionView(
-        "Farm effectiveness",
-        LineText.cut(chart.verdict(), MAX_LINE_LENGTH),
-        Accent.NEUTRAL,
-        lines,
-        null,
-        image.orElse(null));
+    return view(TITLE, verdict, lines, "farm:" + matchId, "farm-" + matchId + ".png", chart.spec());
   }
 }

@@ -65,7 +65,7 @@ class GraphFarmSectionTest {
 
     assertThat(section.image(input)).isEmpty();
     assertThat(section.lines(input))
-        .containsExactly("**Farm effectiveness**", "Pudge farmed.", GraphFarmSection.NOT_DRAWN);
+        .containsExactly("**Farm effectiveness**", "Pudge farmed.", GraphSection.NOT_DRAWN);
   }
 
   @Test

@@ -235,6 +235,8 @@ public class FarmChartBuilder {
         name,
         ChartSpec.ValueFormat.COMPACT,
         List.of(),
+        List.of(),
+        List.of(),
         List.of(
             new ChartSpec.BarSeries(seconds, lane, MINUTE, LANE),
             new ChartSpec.BarSeries(seconds, neutral, MINUTE, JUNGLE)),
