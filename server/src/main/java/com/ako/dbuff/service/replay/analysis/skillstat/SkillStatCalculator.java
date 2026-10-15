@@ -66,20 +66,38 @@ public class SkillStatCalculator {
     for (long first : skills) {
       for (long second : skills.tailSet(first, false)) {
         SkillCounts together = pairs.getOrDefault(new SkillPair(first, second), SkillCounts.NONE);
-        SkillCounts firstWithout = single.getOrDefault(first, SkillCounts.NONE).minus(together);
-        SkillCounts secondWithout = single.getOrDefault(second, SkillCounts.NONE).minus(together);
-        SkillPickStatDomain pair = row(template, SkillStatKind.SKILL_PAIR, first, second, together);
-        pair.setFirstGamesWithout(firstWithout.games());
-        pair.setFirstWinsWithout(firstWithout.wins());
-        pair.setSecondGamesWithout(secondWithout.games());
-        pair.setSecondWinsWithout(secondWithout.wins());
+        SkillPickStatDomain pair =
+            pairRow(
+                template,
+                first,
+                second,
+                together,
+                single.getOrDefault(first, SkillCounts.NONE),
+                single.getOrDefault(second, SkillCounts.NONE));
         rows.add(pair);
       }
     }
     return rows;
   }
 
-  private static SkillPickStatDomain row(
+  static SkillPickStatDomain pairRow(
+      SkillPickStatDomain template,
+      long first,
+      long second,
+      SkillCounts together,
+      SkillCounts firstAll,
+      SkillCounts secondAll) {
+    SkillCounts firstWithout = firstAll.minus(together);
+    SkillCounts secondWithout = secondAll.minus(together);
+    SkillPickStatDomain pair = row(template, SkillStatKind.SKILL_PAIR, first, second, together);
+    pair.setFirstGamesWithout(firstWithout.games());
+    pair.setFirstWinsWithout(firstWithout.wins());
+    pair.setSecondGamesWithout(secondWithout.games());
+    pair.setSecondWinsWithout(secondWithout.wins());
+    return pair;
+  }
+
+  static SkillPickStatDomain row(
       SkillPickStatDomain template,
       SkillStatKind kind,
       long firstId,

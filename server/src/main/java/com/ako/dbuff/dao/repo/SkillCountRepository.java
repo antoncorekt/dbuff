@@ -64,6 +64,27 @@ public class SkillCountRepository {
     return perSkill(heroId, skillIds, window);
   }
 
+  public Map<Long, SkillCounts> heroesWithSkill(long skillId, SkillWindow window) {
+    Query query =
+        bound(
+            entityManager.createNativeQuery(
+                "select p.hero_id, count(*), coalesce("
+                    + WON
+                    + ", 0) from ability_domain a"
+                    + PLAYER_GAME_JOIN
+                    + " and a.ability_id = :skill and p.hero_id is not null and "
+                    + REAL_SKILL
+                    + " group by p.hero_id"),
+            window);
+    query.setParameter("skill", skillId);
+    Map<Long, SkillCounts> result = new HashMap<>();
+    for (Object row : (List<?>) query.getResultList()) {
+      Object[] cols = (Object[]) row;
+      result.put(((Number) cols[0]).longValue(), counts(cols[1], cols[2]));
+    }
+    return result;
+  }
+
   public Map<SkillPair, SkillCounts> pairs(Collection<Long> skillIds, SkillWindow window) {
     Map<SkillPair, SkillCounts> result = new HashMap<>();
     if (skillIds.size() < 2) {
