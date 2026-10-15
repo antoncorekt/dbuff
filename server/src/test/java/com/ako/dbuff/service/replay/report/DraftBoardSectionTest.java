@@ -34,19 +34,21 @@ class DraftBoardSectionTest {
   private final PlainViewRenderer plain = new PlainViewRenderer();
   private final DraftBoardSection section =
       new DraftBoardSection(
-          heroRepo,
-          skillRepo,
-          poolRepo,
-          new AbilityDraftProfile(),
-          Prettify::ability,
-          heroNames,
+          List.of(
+              new AbilityDraftBoard(
+                  heroRepo,
+                  skillRepo,
+                  poolRepo,
+                  new AbilityDraftProfile(),
+                  Prettify::ability,
+                  heroNames)),
           plain);
 
   private ReplayReportInput input(Set<Long> focus, Map<Long, String> names) {
     when(heroNames.heroName(SVEN)).thenReturn("Sven");
     when(heroNames.heroName(SNIPER)).thenReturn("Sniper");
     when(heroNames.heroName(MEEPO)).thenReturn("Meepo");
-    return new ReplayReportInput(1L, null, focus, names, 3);
+    return new ReplayReportInput(1L, abilityDraftMatch(), focus, names, 3);
   }
 
   private static HeroDraftPickDomain hero(long id, Long slot, Integer turn, Double clock) {
@@ -259,5 +261,11 @@ class DraftBoardSectionTest {
     assertThat(section.defaultEnabled()).isFalse();
     assertThat(section.name()).isEqualTo("draft-board");
     assertThat(section.order()).isEqualTo(11);
+  }
+
+  private static com.ako.dbuff.dao.model.MatchDomain abilityDraftMatch() {
+    com.ako.dbuff.dao.model.MatchDomain match = new com.ako.dbuff.dao.model.MatchDomain();
+    match.setGameModeId(18L);
+    return match;
   }
 }

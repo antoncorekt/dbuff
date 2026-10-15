@@ -261,15 +261,19 @@ class ReportIconsTest {
     PlainViewRenderer plain = new PlainViewRenderer();
     DraftBoardSection section =
         new DraftBoardSection(
-            heroRepo,
-            skillRepo,
-            poolRepo,
-            new AbilityDraftProfile(),
-            labels(icons),
-            heroNames(icons),
+            List.of(
+                new AbilityDraftBoard(
+                    heroRepo,
+                    skillRepo,
+                    poolRepo,
+                    new AbilityDraftProfile(),
+                    labels(icons),
+                    heroNames(icons))),
             plain);
     SectionView view =
-        section.view(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3)).orElseThrow();
+        section
+            .view(new ReplayReportInput(1L, abilityDraftMatch(), Set.of(), Map.of(), 3))
+            .orElseThrow();
 
     List<String> lines = plain.lines(view).stream().flatMap(l -> l.lines()).toList();
     List<ReportMessage> cards = new ComponentsViewRenderer(plain).render(view);
@@ -313,13 +317,23 @@ class ReportIconsTest {
     when(poolRepo.findByMatchId(1L)).thenReturn(List.of());
     DraftBoardSection section =
         new DraftBoardSection(
-            heroRepo,
-            skillRepo,
-            poolRepo,
-            new AbilityDraftProfile(),
-            labels(icons),
-            heroNames(icons),
+            List.of(
+                new AbilityDraftBoard(
+                    heroRepo,
+                    skillRepo,
+                    poolRepo,
+                    new AbilityDraftProfile(),
+                    labels(icons),
+                    heroNames(icons))),
             new PlainViewRenderer());
-    return section.view(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3)).orElseThrow();
+    return section
+        .view(new ReplayReportInput(1L, abilityDraftMatch(), Set.of(), Map.of(), 3))
+        .orElseThrow();
+  }
+
+  private static com.ako.dbuff.dao.model.MatchDomain abilityDraftMatch() {
+    com.ako.dbuff.dao.model.MatchDomain match = new com.ako.dbuff.dao.model.MatchDomain();
+    match.setGameModeId(18L);
+    return match;
   }
 }
