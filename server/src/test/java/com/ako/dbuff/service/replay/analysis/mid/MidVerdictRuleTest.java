@@ -22,7 +22,7 @@ class MidVerdictRuleTest {
 
   @Test
   void killsAfterAFightOrJungleTripDoNotMakeARotation() {
-    assertThat(rule.verdict(new Facts(MidNext.FIGHT, 3, 0, 2, null, null)))
+    assertThat(rule.verdict(new Facts(MidNext.FIGHT, 3, 0, 2, 500.0, 600.0)))
         .isEqualTo(MidVerdict.PASSIVE);
   }
 
@@ -45,8 +45,16 @@ class MidVerdictRuleTest {
   }
 
   @Test
-  void anUnknownExperienceComparisonIsNotALead() {
+  void anUnknownExperienceComparisonIsNotALeadAndIsNotEnoughData() {
     assertThat(rule.verdict(new Facts(MidNext.STAYED_MID, null, 5, 1, 700.0, null)))
-        .isEqualTo(MidVerdict.PASSIVE);
+        .isEqualTo(MidVerdict.UNKNOWN);
+    assertThat(rule.verdict(new Facts(MidNext.STAYED_MID, null, 5, 1, null, 600.0)))
+        .isEqualTo(MidVerdict.UNKNOWN);
+  }
+
+  @Test
+  void rotatingAndKillingIsActiveEvenWithoutAnEnemyMid() {
+    assertThat(rule.verdict(new Facts(MidNext.ROTATED, 2, 0, 0, null, null)))
+        .isEqualTo(MidVerdict.ACTIVE);
   }
 }

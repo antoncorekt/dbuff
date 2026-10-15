@@ -42,6 +42,9 @@ public class MidActivityDomain {
   /** When the track first shows level 6; null when he never reached it or the track is missing. */
   private Integer level6Seconds;
 
+  /** The highest level the track shows; null when the hero has no track. */
+  private Integer maxLevel;
+
   /** One of the MidNext values; null without a level 6 time. */
   private String nextAction;
 

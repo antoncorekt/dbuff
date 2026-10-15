@@ -8,11 +8,13 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
 /**
  * Finds the first thing the mid hero did after level 6: a rotation, a stretch in another lane or
  * the jungle, or a fight he took part in. The earliest wins; with none he stayed mid.
  */
+@Component
 @RequiredArgsConstructor
 class MidMoveFinder {
   static final String JUNGLE = "JUNGLE";
@@ -32,7 +34,10 @@ class MidMoveFinder {
     int until = level6Seconds + properties.getNextWindowSeconds();
     List<MidMove> moves = new ArrayList<>();
     for (TeamRotationDomain r : rotations) {
-      if (r.getStartSeconds() != null && within(r.getStartSeconds(), level6Seconds, until)) {
+      if (r.getStartSeconds() != null
+          && within(r.getStartSeconds(), level6Seconds, until)
+          && toAnotherLane(r)
+          && awayLongEnough(r)) {
         moves.add(new MidMove(MidNext.ROTATED, r.getStartSeconds(), r.getToLane()));
       }
     }
@@ -54,6 +59,16 @@ class MidMoveFinder {
     return moves.stream()
         .min(Comparator.comparingInt(MidMove::seconds).thenComparing(m -> m.next().ordinal()))
         .orElse(MidMove.STAYED);
+  }
+
+  private static boolean toAnotherLane(TeamRotationDomain r) {
+    return r.getToLane() != null && !Zone.Lane.MID.name().equals(r.getToLane());
+  }
+
+  /** A trip with no end stored is kept; there is nothing to measure. */
+  private boolean awayLongEnough(TeamRotationDomain r) {
+    return r.getEndSeconds() == null
+        || r.getEndSeconds() - r.getStartSeconds() >= properties.getMinAwaySeconds();
   }
 
   private static boolean within(double time, int from, int until) {

@@ -1,8 +1,10 @@
 package com.ako.dbuff.service.replay.analysis.mid;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
 /** The ACTIVE or PASSIVE rule of {@link MidActivityProperties}; a hypothesis, not a finding. */
+@Component
 @RequiredArgsConstructor
 class MidVerdictRule {
   private final MidActivityProperties properties;
@@ -31,6 +33,10 @@ class MidVerdictRule {
             && f.xpPerMinute() != null
             && f.enemyXpPerMinute() != null
             && f.xpPerMinute() > f.enemyXpPerMinute();
-    return rotatedAndKilled || joinedAndLed ? MidVerdict.ACTIVE : MidVerdict.PASSIVE;
+    if (rotatedAndKilled || joinedAndLed) {
+      return MidVerdict.ACTIVE;
+    }
+    boolean cannotCompare = f.xpPerMinute() == null || f.enemyXpPerMinute() == null;
+    return cannotCompare ? MidVerdict.UNKNOWN : MidVerdict.PASSIVE;
   }
 }

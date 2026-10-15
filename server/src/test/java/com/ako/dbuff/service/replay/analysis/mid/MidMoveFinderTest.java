@@ -79,4 +79,20 @@ class MidMoveFinderTest {
 
     assertThat(move).isEqualTo(MidMove.STAYED);
   }
+
+  @Test
+  void aRotationToTheMidLaneOrToNoLaneIsNotAMove() {
+    TeamRotationDomain toMid = TeamRotationDomain.builder().startSeconds(450).toLane("MID").build();
+    TeamRotationDomain toNowhere = TeamRotationDomain.builder().startSeconds(450).build();
+
+    assertThat(find(List.of(toMid, toNowhere), List.of(), List.of())).isEqualTo(MidMove.STAYED);
+  }
+
+  @Test
+  void aRotationShorterThanTheMinimumAwayIsNotAMove() {
+    TeamRotationDomain brief =
+        TeamRotationDomain.builder().startSeconds(450).endSeconds(460).toLane("TOP").build();
+
+    assertThat(find(List.of(brief), List.of(), List.of())).isEqualTo(MidMove.STAYED);
+  }
 }

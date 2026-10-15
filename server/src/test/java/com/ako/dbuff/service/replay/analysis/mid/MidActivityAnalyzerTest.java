@@ -44,6 +44,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import({
   MidActivityAnalyzer.class,
   MidInputsLoader.class,
+  MidMoveFinder.class,
+  MidVerdictRule.class,
   MidActivityProperties.class,
   BehaviourProperties.class,
   StoredActivity.class,
@@ -83,6 +85,7 @@ class MidActivityAnalyzerTest {
     MidActivityDomain puck = row(PUCK);
     assertThat(puck.getTeam()).isEqualTo("RADIANT");
     assertThat(puck.getLevel6Seconds()).isEqualTo(400);
+    assertThat(puck.getMaxLevel()).isEqualTo(6);
     assertThat(puck.getNextAction()).isEqualTo("ROTATED");
     assertThat(puck.getLeaveSeconds()).isEqualTo(450);
     assertThat(puck.getNextPlace()).isEqualTo("TOP");
@@ -113,6 +116,7 @@ class MidActivityAnalyzerTest {
 
     MidActivityDomain lina = row(LINA);
     assertThat(lina.getLevel6Seconds()).isNull();
+    assertThat(lina.getMaxLevel()).isNull();
     assertThat(lina.getNextAction()).isNull();
     assertThat(lina.getKillsAfterLeaving()).isNull();
     assertThat(lina.getFightsJoined()).isZero();

@@ -14,6 +14,7 @@ import com.ako.dbuff.service.replay.PlayerSlots;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.fight.FightAssessor.Trace;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +46,8 @@ public class MidActivityAnalyzer implements ReplayAnalyzer {
   private final CombatLogReader combatLog;
   private final MidInputsLoader inputsLoader;
   private final MidActivityProperties properties;
+  private final MidMoveFinder moveFinder;
+  private final MidVerdictRule verdictRule;
   private final MidActivityRepo midRepo;
 
   @Override
@@ -118,12 +121,11 @@ public class MidActivityAnalyzer implements ReplayAnalyzer {
     MidMove move =
         level6 == null
             ? null
-            : new MidMoveFinder(properties)
-                .find(
-                    level6,
-                    rotations,
-                    in.activity().getOrDefault(slot, List.of()),
-                    joinedFights.stream().map(FightDomain::getStartSeconds).toList());
+            : moveFinder.find(
+                level6,
+                rotations,
+                in.activity().getOrDefault(slot, List.of()),
+                joinedFights.stream().map(FightDomain::getStartSeconds).toList());
     Integer killsAfter =
         move == null || move.seconds() == null
             ? null
@@ -152,20 +154,15 @@ public class MidActivityAnalyzer implements ReplayAnalyzer {
             ? null
             : in.income().goldPerMinute(enemySlot, in.windowStart(), in.windowEnd());
     MidVerdict verdict =
-        new MidVerdictRule(properties)
-            .verdict(
-                new MidVerdictRule.Facts(
-                    move == null ? null : move.next(),
-                    killsAfter,
-                    joined,
-                    median,
-                    xpPm,
-                    enemyXpPm));
+        verdictRule.verdict(
+            new MidVerdictRule.Facts(
+                move == null ? null : move.next(), killsAfter, joined, median, xpPm, enemyXpPm));
     return MidActivityDomain.builder()
         .matchId(matchId)
         .playerSlot(slot)
         .team(team.name())
         .level6Seconds(level6)
+        .maxLevel(maxLevel(in.traces().get(index)))
         .nextAction(move == null ? null : move.next().name())
         .leaveSeconds(move == null ? null : move.seconds())
         .nextPlace(move == null ? null : move.place())
@@ -191,6 +188,10 @@ public class MidActivityAnalyzer implements ReplayAnalyzer {
         .verdict(verdict.name())
         .analysisVersion(version())
         .build();
+  }
+
+  private static Integer maxLevel(Trace trace) {
+    return trace == null ? null : Arrays.stream(trace.level()).max().orElse(0);
   }
 
   private static Integer level6Seconds(Trace trace) {

@@ -17,7 +17,7 @@ final class MidActivityWording {
    */
   static String sentence(MidActivityDomain row, String hero) {
     MidVerdict verdict = Enums.find(MidVerdict.class, row.getVerdict());
-    String head = hero + (verdict == null ? "" : " was " + verdict.name().toLowerCase(Locale.ROOT));
+    String head = hero + verdictWords(verdict);
     List<String> parts = new ArrayList<>();
     parts.add(move(row));
     if (row.getFightsTotal() != null && row.getFightsTotal() > 0 && row.getFightsJoined() != null) {
@@ -30,9 +30,18 @@ final class MidActivityWording {
     return head + ": " + String.join("; ", parts);
   }
 
+  private static String verdictWords(MidVerdict verdict) {
+    if (verdict == null) {
+      return "";
+    }
+    return verdict == MidVerdict.UNKNOWN
+        ? " (not enough data for a verdict)"
+        : " was " + verdict.name().toLowerCase(Locale.ROOT);
+  }
+
   private static String move(MidActivityDomain row) {
     if (row.getLevel6Seconds() == null) {
-      return "did not reach level 6";
+      return row.getMaxLevel() == null ? "level 6 time unknown" : "did not reach level 6";
     }
     String level = "reached level 6 at " + GameTime.clock(row.getLevel6Seconds());
     MidNext next = Enums.find(MidNext.class, row.getNextAction());
@@ -59,26 +68,44 @@ final class MidActivityWording {
     return kills == 0 ? " and made no kills" : " and made " + SectionViews.count(kills, "kill");
   }
 
+  private static final String ENEMY_MID = "the enemy mid";
+  private static final String TEAM_AVERAGE = "his team's average";
+
+  /** Each figure is held against the enemy mid, or against the team average where he lacks it. */
   private static String income(MidActivityDomain row) {
-    boolean enemy = row.getEnemyGoldPerMinute() != null || row.getEnemyXpPerMinute() != null;
-    String against = enemy ? "the enemy mid" : "his team's average";
-    String gold =
-        difference(
-            row.getGoldPerMinute(),
-            enemy ? row.getEnemyGoldPerMinute() : row.getTeamGoldPerMinute());
-    String xp =
-        difference(
-            row.getXpPerMinute(), enemy ? row.getEnemyXpPerMinute() : row.getTeamXpPerMinute());
+    Comparison gold =
+        comparison(row.getGoldPerMinute(), row.getEnemyGoldPerMinute(), row.getTeamGoldPerMinute());
+    Comparison xp =
+        comparison(row.getXpPerMinute(), row.getEnemyXpPerMinute(), row.getTeamXpPerMinute());
     if (gold == null && xp == null) {
       return "";
     }
-    if (gold == null) {
-      return "his experience per minute was %s %s".formatted(xp, against);
+    if (xp == null) {
+      return "his gold per minute was %s".formatted(gold.text());
     }
-    return xp == null
-        ? "his gold per minute was %s %s".formatted(gold, against)
-        : "his gold per minute was %s %s and his experience per minute %s it"
-            .formatted(gold, against, xp);
+    if (gold == null) {
+      return "his experience per minute was %s".formatted(xp.text());
+    }
+    return gold.baseline().equals(xp.baseline())
+        ? "his gold per minute was %s and his experience per minute %s it"
+            .formatted(gold.text(), xp.difference())
+        : "his gold per minute was %s and his experience per minute %s"
+            .formatted(gold.text(), xp.text());
+  }
+
+  private record Comparison(String difference, String baseline) {
+    String text() {
+      return difference + " " + baseline;
+    }
+  }
+
+  private static Comparison comparison(Integer own, Integer enemy, Integer team) {
+    String vsEnemy = difference(own, enemy);
+    if (vsEnemy != null) {
+      return new Comparison(vsEnemy, ENEMY_MID);
+    }
+    String vsTeam = difference(own, team);
+    return vsTeam == null ? null : new Comparison(vsTeam, TEAM_AVERAGE);
   }
 
   /** {@code 18% above}, {@code 5% below} or {@code level with}; null when it cannot be told. */

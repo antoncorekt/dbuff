@@ -51,4 +51,20 @@ class MidTallyTest {
     assertThat(MidTally.count(times, 10, 30)).isEqualTo(2);
     assertThat(MidTally.count(null, 0, 100)).isZero();
   }
+
+  @Test
+  void aKillOnHimselfOrOnATeammateIsNotAKill() {
+    Map<String, Integer> players = Map.of("puck", 0, "lina", 5, "sniper", 1);
+
+    MidTally tally =
+        MidTally.of(
+            List.of(
+                death(100, "puck", "puck", HERO_KILL, 0b10),
+                death(110, "puck", "sniper", HERO_KILL, 0b10),
+                death(120, "puck", "lina", HERO_KILL, 0)),
+            players);
+
+    assertThat(tally.kills().get(0)).containsExactly(120.0);
+    assertThat(tally.assists()).isEmpty();
+  }
 }

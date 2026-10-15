@@ -115,7 +115,13 @@ class MidActivitySectionTest {
   void aHeroWhoNeverReachedLevelSixSaysSo() {
     when(repo.findByMatchId(1L))
         .thenReturn(
-            List.of(lina().level6Seconds(null).nextAction(null).goldPerMinute(null).build()));
+            List.of(
+                lina()
+                    .level6Seconds(null)
+                    .maxLevel(5)
+                    .nextAction(null)
+                    .goldPerMinute(null)
+                    .build()));
     when(heroNames.iconBySlot(1L)).thenReturn(HEROES);
 
     assertThat(section.lines(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3)).getFirst())
@@ -150,5 +156,37 @@ class MidActivitySectionTest {
 
     assertThat(section.lines(input)).isEmpty();
     assertThat(section.view(input)).isEmpty();
+  }
+
+  @Test
+  void aHeroWithNoTrackHasAnUnknownLevelSixTime() {
+    when(repo.findByMatchId(1L))
+        .thenReturn(List.of(lina().level6Seconds(null).maxLevel(null).nextAction(null).build()));
+    when(heroNames.iconBySlot(1L)).thenReturn(HEROES);
+
+    assertThat(section.lines(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3)).getFirst())
+        .contains("level 6 time unknown")
+        .doesNotContain("did not reach");
+  }
+
+  @Test
+  void anUnknownVerdictSaysThereIsNotEnoughData() {
+    when(repo.findByMatchId(1L)).thenReturn(List.of(lina().verdict("UNKNOWN").build()));
+    when(heroNames.iconBySlot(1L)).thenReturn(HEROES);
+
+    assertThat(section.lines(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3)).getFirst())
+        .startsWith("Lina (Dire) (not enough data for a verdict): ");
+  }
+
+  @Test
+  void eachFigureFallsBackToTheTeamAverageOnItsOwnAndSaysSo() {
+    when(repo.findByMatchId(1L))
+        .thenReturn(List.of(puck().enemyXpPerMinute(null).teamXpPerMinute(800).build()));
+    when(heroNames.iconBySlot(1L)).thenReturn(HEROES);
+
+    assertThat(section.lines(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3)).getFirst())
+        .contains(
+            "his gold per minute was 18% above the enemy mid and his experience per minute"
+                + " 20% below his team's average");
   }
 }
