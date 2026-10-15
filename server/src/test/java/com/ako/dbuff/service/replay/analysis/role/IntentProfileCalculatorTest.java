@@ -150,6 +150,13 @@ class IntentProfileCalculatorTest {
   }
 
   @Test
+  void aBlinkIsAnEscapeAndAKitWithoutOneHasNone() {
+    assertThat(antiMage().escape()).isEqualTo(0.7);
+    assertThat(crystalMaiden().escape()).isZero();
+    assertThat(axe().escape()).isZero();
+  }
+
+  @Test
   void theJunglerTagGivesTheJungleFunction() {
     HeroConstant jungler = HeroConstant.builder().roles(List.of("Jungler")).build();
 

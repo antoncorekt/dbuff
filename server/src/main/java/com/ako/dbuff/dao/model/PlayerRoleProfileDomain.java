@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * What a player was meant to do (stage INTENT, from the draft) or did (stage FINAL, from the
- * match), as nine functions and the role that fits them. A FINAL row repeats the role of {@link
+ * match), as ten functions and the role that fits them. A FINAL row repeats the role of {@link
  * PlayerRoleDomain} so that a report reads one table. A function is null when nothing known tells
  * it.
  */
@@ -68,6 +68,10 @@ public class PlayerRoleProfileDomain {
   private Double saveHeal;
   private Double damage;
   private Double durability;
+
+  /** Only the intent stage knows it; null in the final stage. */
+  @Column(name = "escape_function")
+  private Double escape;
 
   /** The score of the profile in roles 1 to 5, comma separated. */
   private String roleScores;

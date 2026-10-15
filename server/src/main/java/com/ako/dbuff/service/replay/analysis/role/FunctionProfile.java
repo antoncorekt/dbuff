@@ -19,9 +19,36 @@ public record FunctionProfile(
     Double disable,
     Double saveHeal,
     Double damage,
-    Double durability) {
+    Double durability,
+    Double escape) {
   public static final FunctionProfile UNKNOWN =
-      new FunctionProfile(null, null, null, null, null, null, null, null, null, null);
+      new FunctionProfile(null, null, null, null, null, null, null, null, null, null, null);
+
+  /** A profile without an escape value, which only the intent stage knows. */
+  public FunctionProfile(
+      LanePosition lane,
+      Double farmPriority,
+      Double jungle,
+      Double roaming,
+      Double visionDuty,
+      Double initiation,
+      Double disable,
+      Double saveHeal,
+      Double damage,
+      Double durability) {
+    this(
+        lane,
+        farmPriority,
+        jungle,
+        roaming,
+        visionDuty,
+        initiation,
+        disable,
+        saveHeal,
+        damage,
+        durability,
+        null);
+  }
 
   /** The functions of a stored profile; the lane is not read. */
   public static FunctionProfile stored(PlayerRoleProfileDomain stored) {
@@ -35,7 +62,8 @@ public record FunctionProfile(
         stored.getDisable(),
         stored.getSaveHeal(),
         stored.getDamage(),
-        stored.getDurability());
+        stored.getDurability(),
+        stored.getEscape());
   }
 
   /** The value of a function, null when unknown. */

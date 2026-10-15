@@ -7,6 +7,7 @@ import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.discord.icon.IconText;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionStage;
+import com.ako.dbuff.service.replay.analysis.role.RoleNames;
 import com.ako.dbuff.service.replay.analysis.role.RoleStage;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
@@ -17,6 +18,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -31,13 +33,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class CompositionSection implements ReplayReportSection {
   private static final String ELLIPSIS = "...";
-  private static final Map<Integer, String> ROLES =
-      Map.of(
-          1, "carry",
-          2, "mid",
-          3, "offlane",
-          4, "roaming support",
-          5, "hard support");
   private static final Map<CompositionStage, String> STAGE_LABELS =
       Map.of(CompositionStage.PICK, "at the draft", CompositionStage.FINAL, "in the game");
 
@@ -170,8 +165,8 @@ public class CompositionSection implements ReplayReportSection {
     return profiles.stream()
         .filter(p -> p.getPlayerSlot() == slot && stage.name().equals(p.getStage()))
         .map(PlayerRoleProfileDomain::getRole)
-        .filter(ROLES::containsKey)
-        .map(ROLES::get)
+        .map(RoleNames::words)
+        .filter(Objects::nonNull)
         .findFirst()
         .orElse(null);
   }

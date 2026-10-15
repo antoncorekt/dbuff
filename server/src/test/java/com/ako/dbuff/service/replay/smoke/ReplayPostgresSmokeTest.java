@@ -19,6 +19,7 @@ import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.model.RunePickupDomain;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.dao.repo.AbilityDraftPoolRepo;
+import com.ako.dbuff.dao.repo.BuildFitRepo;
 import com.ako.dbuff.dao.repo.BuybackEventRepo;
 import com.ako.dbuff.dao.repo.CreepKillRepo;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
@@ -205,6 +206,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private HeroKits heroKits;
   @Autowired private FightPlayerRepo fightPlayerRepo;
   @Autowired private IntentProfileCalculator intentCalculator;
+  @Autowired private BuildFitRepo buildFitRepo;
 
   @Test
   @Commit
@@ -256,6 +258,10 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .extracting(c -> c.getTeam())
           .containsExactlyInAnyOrder("RADIANT", "DIRE");
       assertAllPickReasons(id, match.getId());
+      assertThat(buildFitRepo.findByMatchId(match.getId()))
+          .as("%s: build fit is Ability Draft only", id)
+          .isEmpty();
+      buildFitReport().write(id, match.getId(), "All Pick");
       assertCreepKills(id, match.getId());
       assertRunes(id, match.getId());
       assertItemEfficiency(id, match.getId());
@@ -324,6 +330,10 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .extracting(c -> c.getTeam() + " " + c.getStage())
           .containsExactlyInAnyOrder("RADIANT PICK", "RADIANT FINAL", "DIRE PICK", "DIRE FINAL");
       assertRoleAwareReasons(id, match.getId());
+      assertThat(buildFitRepo.findByMatchId(match.getId()))
+          .as("%s: a build verdict for each player, two when the roles differ", id)
+          .hasSizeBetween(10, 20);
+      buildFitReport().write(id, match.getId(), "Ability Draft");
       assertCreepKills(id, match.getId());
       assertRunes(id, match.getId());
       assertItemEfficiency(id, match.getId());
@@ -1277,6 +1287,11 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                         "  %s %s: [%s] %s%n",
                         c.getTeam(), c.getStage(), c.getTokens(), c.getSummary())));
     System.out.println(out);
+  }
+
+  private BuildFitFixtureReport buildFitReport() {
+    return new BuildFitFixtureReport(
+        buildFitRepo, roleProfileRepo, playerStatRepo, deathRepo, heroKits);
   }
 
   private static PlayerRoleProfileDomain stageRow(

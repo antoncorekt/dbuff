@@ -33,7 +33,7 @@ public class RoleFitter {
     double[] scores = new double[ROLES];
     for (int role = 1; role <= ROLES; role++) {
       double sum = 0;
-      for (RoleFunction function : RoleFunction.values()) {
+      for (RoleFunction function : RoleFunction.scoredFunctions()) {
         Double value = profile.of(function);
         sum += fit.getWeights().get(role).get(function) * (value == null ? unknown : value);
       }
@@ -81,10 +81,8 @@ public class RoleFitter {
   }
 
   private static double knownShare(FunctionProfile profile) {
-    long known = 0;
-    for (RoleFunction function : RoleFunction.values()) {
-      known += profile.of(function) == null ? 0 : 1;
-    }
-    return known / (double) RoleFunction.values().length;
+    List<RoleFunction> scored = RoleFunction.scoredFunctions();
+    long known = scored.stream().filter(f -> profile.of(f) != null).count();
+    return known / (double) scored.size();
   }
 }
