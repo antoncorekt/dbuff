@@ -67,7 +67,7 @@ public class OpeningSection implements ReplayReportSection {
     }
     List<RunePickupDomain> pickups =
         present(pickupRepo.findByMatchId(input.matchId())).stream().sorted(CHRONOLOGICAL).toList();
-    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     List<String> body = new ArrayList<>();
     result(summaries, yours).ifPresent(body::add);

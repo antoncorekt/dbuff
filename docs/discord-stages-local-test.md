@@ -167,7 +167,7 @@ Everything here works without turning anything else on: `/match report` posts fr
 
 ## 13. Sync hero, ability and item icons (optional)
 
-Off by default, and nothing in the reports uses the icons yet (the core is here, the sections come in a later change), so this step only prepares the emoji and shows their state. The test bot has its own quota of 2000 application emoji, separate from the production bot: syncing here never touches production emoji.
+Off by default. With `DISCORD_ICONS_ENABLED=true` the report sections, the draft board and the match card show hero, ability and item icons before the names; run the sync below first, since an icon that is not synced shows a Unicode placeholder (a sword, a book or a bag) instead. The test bot has its own quota of 2000 application emoji, separate from the production bot: syncing here never touches production emoji.
 
 1. Add to the start-up lines of step 3, with the test bot's token, and start the app:
    ```

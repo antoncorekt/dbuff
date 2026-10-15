@@ -22,6 +22,7 @@ import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.constant.data.ItemConstant;
+import com.ako.dbuff.service.discord.icon.TestIcons;
 import com.ako.dbuff.service.match.data.RuneEventMapper;
 import com.ako.dbuff.service.match.data.WardEventMapper;
 import com.ako.dbuff.service.replay.AbilityNames;
@@ -191,7 +192,7 @@ public abstract class ReplayPipelineFixture {
       ConstantsManagers constants = mock(ConstantsManagers.class);
       when(constants.getAllAbilityConstants()).thenReturn(abilities);
       when(constants.getHeroConstantMap()).thenReturn(heroes);
-      return new ConstantAbilityLabels(constants);
+      return new ConstantAbilityLabels(constants, TestIcons.off());
     }
 
     private static JsonNode constants(String file) throws IOException {

@@ -76,7 +76,7 @@ public class OutliersSection implements ReplayReportSection {
     if (rows == null || rows.stream().noneMatch(OutliersSection::usable)) {
       return List.of();
     }
-    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     LazyRotations rotations = new LazyRotations(input.matchId());
     Comparator<PlayerOutlierDomain> byWorth =

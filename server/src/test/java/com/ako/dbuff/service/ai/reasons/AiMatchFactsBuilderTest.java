@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.ai.reasons;
 
 import com.ako.dbuff.dao.model.MatchDomain;
+import com.ako.dbuff.service.discord.icon.TestIcons;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,24 @@ class AiMatchFactsBuilderTest {
             "F2: 8:10 Dire (your team) won the fight, 4.1k net worth swing",
             "F3: 22:40 Dire (your team) won the fight, took the lead",
             "LANE_1: Bottom lane: Dire won clearly");
+  }
+
+  @Test
+  void sectionTextWithIconsReachesTheModelWithoutThem() {
+    List<Fact> facts =
+        ReasonsFixtures.builder(
+                ReasonsFixtures.section(
+                    "important-fights",
+                    TestIcons.heroMention()
+                        + "Axe had "
+                        + TestIcons.abilityMention()
+                        + "Blink ready",
+                    "⚔️ Axe bought " + TestIcons.itemMention() + "Blink Dagger"))
+            .build(ReasonsFixtures.input());
+
+    assertThat(lines(facts))
+        .contains("F1: Axe had Blink ready", "F2: Axe bought Blink Dagger")
+        .noneMatch(line -> line.contains("<:") || line.contains("⚔️"));
   }
 
   @Test

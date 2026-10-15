@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import com.ako.dbuff.service.discord.icon.TestIcons;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +38,7 @@ class ReportHeroNamesTest {
         .thenReturn(
             Optional.of(new HeroConstant("53", "npc_dota_hero_furion", "Nature's Prophet")));
 
-    Map<Long, String> names = new ReportHeroNames(stats, replay, kits).bySlot(1L);
+    Map<Long, String> names = new ReportHeroNames(stats, replay, kits, TestIcons.off()).bySlot(1L);
 
     assertThat(names).containsEntry(0L, "Nature's Prophet").containsEntry(1L, "Phantom Assassin");
   }

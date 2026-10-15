@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.model.TeamCompositionDomain;
 import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
+import com.ako.dbuff.service.discord.icon.IconText;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionStage;
 import com.ako.dbuff.service.replay.analysis.role.RoleStage;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
@@ -104,7 +105,9 @@ public class CompositionSection implements ReplayReportSection {
 
   private String capped(String line) {
     int max = Math.max(ELLIPSIS.length() + 1, properties.getMaxCompositionLineLength());
-    return line.length() <= max ? line : line.substring(0, max - ELLIPSIS.length()) + ELLIPSIS;
+    return line.length() <= max
+        ? line
+        : line.substring(0, IconText.safeEnd(line, max - ELLIPSIS.length())) + ELLIPSIS;
   }
 
   private static String roles(List<PlayerRoleProfileDomain> profiles, long slot) {

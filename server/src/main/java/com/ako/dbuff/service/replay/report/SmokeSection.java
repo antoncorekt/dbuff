@@ -59,7 +59,7 @@ public class SmokeSection implements ReplayReportSection {
     if (rows == null || rows.stream().allMatch(Objects::isNull)) {
       return List.of();
     }
-    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     return BehaviourLines.render(
         "**Smoke**",

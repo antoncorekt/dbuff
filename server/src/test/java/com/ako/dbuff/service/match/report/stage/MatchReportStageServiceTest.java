@@ -12,6 +12,7 @@ import com.ako.dbuff.dao.repo.MatchReportThreadRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.discord.DiscordMessageService;
+import com.ako.dbuff.service.discord.icon.TestIcons;
 import com.ako.dbuff.service.match.DotaApiLastMatchesService.PlayerLine;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator.PartialReportResult;
 import com.ako.dbuff.service.replay.ReplayForecast;
@@ -70,7 +71,7 @@ class MatchReportStageServiceTest {
             new MatchFactsFactory(constants, statRepo, mock(DbufInstanceConfigRepository.class)),
             new HeaderRenderer(),
             new ReportHeaderPublisher(discord),
-            new StageOneCardBuilder(constants),
+            new StageOneCardBuilder(constants, TestIcons.off()),
             new ComponentsViewRenderer(new PlainViewRenderer()),
             discord,
             new MatchThreadRecorder(threadRepo),

@@ -14,6 +14,7 @@ import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.discord.DiscordMessageService;
+import com.ako.dbuff.service.discord.icon.TestIcons;
 import com.ako.dbuff.service.replay.ReplayForecast;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.report.view.ComponentsViewRenderer;
@@ -70,7 +71,7 @@ class MatchReportStageReplayTest {
                 mock(ConstantsManagers.class), statRepo, mock(DbufInstanceConfigRepository.class)),
             new HeaderRenderer(),
             new ReportHeaderPublisher(discord),
-            new StageOneCardBuilder(mock(ConstantsManagers.class)),
+            new StageOneCardBuilder(mock(ConstantsManagers.class), TestIcons.off()),
             new ComponentsViewRenderer(new PlainViewRenderer()),
             discord,
             new MatchThreadRecorder(threadRepo),

@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.FightReasonDomain;
+import com.ako.dbuff.service.discord.icon.IconText;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.RankedReason;
 import com.ako.dbuff.service.replay.analysis.rune.RuneEvidence;
@@ -85,7 +86,10 @@ public class ReasonWording {
     if (evidence.isEmpty()) {
       return hero + " " + code.toLowerCase(Locale.ROOT).replace('_', ' ');
     }
-    return evidence.startsWith(hero) ? evidence : hero + ": " + evidence;
+    String plainHero = IconText.strip(hero);
+    return evidence.startsWith(plainHero)
+        ? hero + evidence.substring(plainHero.length())
+        : hero + ": " + evidence;
   }
 
   /**

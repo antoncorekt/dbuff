@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.ai.reasons;
 
+import com.ako.dbuff.service.discord.icon.IconText;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.ReplayReportSection;
 import com.ako.dbuff.service.replay.report.view.SectionView;
@@ -80,6 +81,10 @@ class SectionFacts {
   private static String plain(String text) {
     return text == null
         ? ""
-        : text.replace("**", "").replace("`", "").replaceAll("\\s*\\R\\s*", " ").strip();
+        : IconText.strip(text)
+            .replace("**", "")
+            .replace("`", "")
+            .replaceAll("\\s*\\R\\s*", " ")
+            .strip();
   }
 }

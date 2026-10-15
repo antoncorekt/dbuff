@@ -40,7 +40,7 @@ class ImportantFightsSectionTest {
           new PlainViewRenderer());
 
   ImportantFightsSectionTest() {
-    when(heroNames.bySlot(1L)).thenReturn(Map.of(2L, "Terrorblade", 130L, "Venomancer"));
+    when(heroNames.iconBySlot(1L)).thenReturn(Map.of(2L, "Terrorblade", 130L, "Venomancer"));
   }
 
   private static RankedReason reason(String code, long slot) {

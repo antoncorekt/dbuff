@@ -2,6 +2,7 @@ package com.ako.dbuff.service.match.report.stage;
 
 import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import com.ako.dbuff.service.discord.icon.IconService;
 import com.ako.dbuff.service.match.DotaApiLastMatchesService.PlayerLine;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
@@ -23,6 +24,7 @@ public class StageOneCardBuilder {
   private static final String UNKNOWN_PLAYER = "Player";
 
   private final ConstantsManagers constants;
+  private final IconService icons;
 
   /** The card, or null when no tracked player's line is known. */
   public SectionView build(MatchFacts facts, List<PlayerLine> lines, Map<Long, String> names) {
@@ -35,7 +37,7 @@ public class StageOneCardBuilder {
         "Players", null, facts.accent(), bullets, "kills/deaths/assists · gold/xp per minute");
   }
 
-  private static String bullet(
+  private String bullet(
       PlayerLine line, Map<Long, String> names, Map<String, HeroConstant> heroes) {
     String name = names.getOrDefault(line.accountId(), UNKNOWN_PLAYER);
     return String.join(
@@ -47,11 +49,11 @@ public class StageOneCardBuilder {
         result(line.won()));
   }
 
-  private static String heroName(Long heroId, Map<String, HeroConstant> heroes) {
+  private String heroName(Long heroId, Map<String, HeroConstant> heroes) {
     HeroConstant hero = heroId == null ? null : heroes.get(String.valueOf(heroId));
     return hero == null || hero.getLocalized_name() == null
         ? UNKNOWN_HERO
-        : hero.getLocalized_name();
+        : icons.hero(heroId) + hero.getLocalized_name();
   }
 
   private static String number(Long value) {

@@ -164,7 +164,7 @@ class ReplayReportServiceTest {
 
   @Test
   void deliver_namesATrackedPlayerWithHisHero() {
-    when(heroNames.bySlot(1L)).thenReturn(Map.of(0L, "Nature's Prophet"));
+    when(heroNames.iconBySlot(1L)).thenReturn(Map.of(0L, "Nature's Prophet"));
 
     service.deliver(1L);
 
@@ -173,7 +173,7 @@ class ReplayReportServiceTest {
 
   @Test
   void deliver_namesATrackedPlayerAloneWhenHisHeroIsUnknown() {
-    when(heroNames.bySlot(1L)).thenReturn(Map.of(128L, "Axe"));
+    when(heroNames.iconBySlot(1L)).thenReturn(Map.of(128L, "Axe"));
 
     service.deliver(1L);
 

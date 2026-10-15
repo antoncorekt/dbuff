@@ -23,7 +23,7 @@ class RotationsSectionTest {
 
   RotationsSectionTest() {
     when(repo.findByMatchId(1L)).thenReturn(rows);
-    when(heroNames.bySlot(1L)).thenReturn(Map.of(0L, "Axe", 1L, "Lion", 128L, "Pudge"));
+    when(heroNames.iconBySlot(1L)).thenReturn(Map.of(0L, "Axe", 1L, "Lion", 128L, "Pudge"));
   }
 
   private TeamRotationDomain row(long slot, int start, String verdict, String reasons) {

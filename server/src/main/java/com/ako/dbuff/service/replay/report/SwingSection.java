@@ -77,7 +77,7 @@ public class SwingSection implements ReplayReportSection {
         factorRepo.findByMatchId(input.matchId()).stream()
             .collect(Collectors.groupingBy(GameSpikeFactorDomain::getSpikeIndex));
     Map<Integer, SwingExplanation> lostBySwing = lostFights(input.matchId());
-    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
     List<String> lines = new ArrayList<>();
     lines.add("**Swings**");
     for (GameSpikeDomain spike : spikes) {

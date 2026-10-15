@@ -61,7 +61,7 @@ public class RotationsSection implements ReplayReportSection {
     if (rows == null || rows.stream().noneMatch(r -> r != null && verdict(r) != null)) {
       return List.of();
     }
-    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     return BehaviourLines.render(
         "**Team rotations**",

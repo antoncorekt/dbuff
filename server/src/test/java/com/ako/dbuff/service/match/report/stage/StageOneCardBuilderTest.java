@@ -2,6 +2,7 @@ package com.ako.dbuff.service.match.report.stage;
 
 import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import com.ako.dbuff.service.discord.icon.TestIcons;
 import com.ako.dbuff.service.match.DotaApiLastMatchesService.PlayerLine;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.SectionView;
@@ -15,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StageOneCardBuilderTest {
 
   private final ConstantsManagers constants = Mockito.mock(ConstantsManagers.class);
-  private final StageOneCardBuilder builder = new StageOneCardBuilder(constants);
+  private final StageOneCardBuilder builder = new StageOneCardBuilder(constants, TestIcons.off());
 
   private void heroes() {
     Mockito.when(constants.getHeroConstantMap())
@@ -37,6 +38,19 @@ class StageOneCardBuilderTest {
         .containsExactly(
             "Tigress · Pudge · 10/2/5 · 512/640 · Win", "Rex · Pudge · 1/9/3 · 300/400 · Loss");
     assertThat(card.accent()).isEqualTo(Accent.NEUTRAL);
+  }
+
+  @Test
+  void heroIconGoesBeforeTheHeroNameOnlyWhileTheSwitchIsOn() {
+    Mockito.when(constants.getHeroConstantMap())
+        .thenReturn(Map.of("1", new HeroConstant("1", "npc_dota_hero_antimage", "Anti-Mage")));
+    PlayerLine line = new PlayerLine(1, 0L, 1L, 1L, 1L, 1L, 1L, 1L, true);
+    StageOneCardBuilder withIcons = new StageOneCardBuilder(constants, TestIcons.on());
+
+    assertThat(withIcons.build(facts(), List.of(line), Map.of(1L, "Ann")).bullets())
+        .containsExactly("Ann · " + TestIcons.heroMention() + "Anti-Mage · 1/1/1 · 1/1 · Win");
+    assertThat(builder.build(facts(), List.of(line), Map.of(1L, "Ann")).bullets())
+        .containsExactly("Ann · Anti-Mage · 1/1/1 · 1/1 · Win");
   }
 
   @Test

@@ -34,7 +34,7 @@ class ObjectivesSectionTest {
     when(repo.findByMatchId(1L)).thenReturn(rows);
     when(fightRepo.findByMatchId(1L)).thenReturn(fights);
     when(importanceRepo.findByMatchId(1L)).thenReturn(importance);
-    when(heroNames.bySlot(1L)).thenReturn(Map.of(0L, "Axe", 1L, "Lion", 128L, "Sven"));
+    when(heroNames.iconBySlot(1L)).thenReturn(Map.of(0L, "Axe", 1L, "Lion", 128L, "Sven"));
   }
 
   private ObjectiveConversionDomain fight(int index, int start, String winner, String result) {

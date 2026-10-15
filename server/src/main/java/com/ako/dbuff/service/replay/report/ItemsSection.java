@@ -69,7 +69,7 @@ public class ItemsSection implements ReplayReportSection {
     if (rows.isEmpty()) {
       return List.of();
     }
-    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
     Set<Long> focus = input.focusSlots() == null ? Set.of() : input.focusSlots();
     Comparator<Entry> byWorth =
         Comparator.comparingInt((Entry e) -> focus.contains(e.row().slot()) ? 0 : 1)

@@ -20,6 +20,8 @@ import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import com.ako.dbuff.service.discord.icon.IconService;
+import com.ako.dbuff.service.discord.icon.TestIcons;
 import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
 import com.ako.dbuff.service.replay.analysis.creep.CreepValues;
@@ -270,6 +272,11 @@ class ReplayLaneAnalyzerTest {
     @Bean
     ObjectMapper objectMapper() {
       return new ObjectMapper();
+    }
+
+    @Bean
+    IconService iconService() {
+      return TestIcons.off();
     }
 
     @Bean

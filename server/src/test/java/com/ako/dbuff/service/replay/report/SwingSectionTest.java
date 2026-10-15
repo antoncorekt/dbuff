@@ -83,7 +83,7 @@ class SwingSectionTest {
   }
 
   private void heroes() {
-    when(heroNames.bySlot(1L)).thenReturn(Map.of(2L, "Terrorblade", 3L, "Venomancer"));
+    when(heroNames.iconBySlot(1L)).thenReturn(Map.of(2L, "Terrorblade", 3L, "Venomancer"));
   }
 
   private ReplayReportInput input() {
