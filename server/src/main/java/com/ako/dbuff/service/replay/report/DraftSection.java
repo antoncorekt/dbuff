@@ -50,8 +50,14 @@ public class DraftSection implements ReplayReportSection {
     return ReportDetail.STANDARD;
   }
 
+  private record Found(List<String> lines, int players) {}
+
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return found(input).lines();
+  }
+
+  private Found found(ReplayReportInput input) {
     List<AbilityDraftPickDomain> picks = pickRepo.findByMatchId(input.matchId());
     List<String> lines = new ArrayList<>();
     for (Map.Entry<Long, String> player : input.namesBySlot().entrySet()) {
@@ -69,20 +75,21 @@ public class DraftSection implements ReplayReportSection {
       }
     }
     if (lines.isEmpty()) {
-      return List.of();
+      return new Found(List.of(), 0);
     }
+    int players = lines.size();
     lines.addFirst("**Draft**");
-    return lines;
+    return new Found(lines, players);
   }
 
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
-    List<String> lines = lines(input);
-    long players = Math.max(0, lines.size() - 1);
+    Found found = found(input);
     return SectionViews.titled(
-        lines,
+        found.lines(),
         new Verdict(
-            "Ability picks of " + SectionViews.count(players, "tracked player"), Accent.NEUTRAL));
+            "Ability picks of " + SectionViews.count(found.players(), "tracked player"),
+            Accent.NEUTRAL));
   }
 
   private static String position(AbilityDraftPickDomain pick) {

@@ -60,56 +60,63 @@ public class OpeningSection implements ReplayReportSection {
     return ReportDetail.STANDARD;
   }
 
-  private record Opening(Optional<Result> result, List<String> lines) {}
+  private static final String TITLE = "Opening and runes";
+
+  /** The result and the rune lines, each already cut to the line length. */
+  private record Opening(Optional<Result> result, List<String> runes, int maxLength) {}
 
   private record Result(String text, TeamSide winner) {}
 
   @Override
   public List<String> lines(ReplayReportInput input) {
-    return opening(input).lines();
+    return opening(input)
+        .map(
+            o -> {
+              List<String> lines = new ArrayList<>();
+              lines.add(LineText.cut("**" + TITLE + "**", o.maxLength()));
+              o.result().map(Result::text).ifPresent(lines::add);
+              lines.addAll(o.runes());
+              return List.copyOf(lines);
+            })
+        .orElse(List.of());
   }
 
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
-    Opening opening = opening(input);
-    if (opening.lines().isEmpty()) {
-      return Optional.empty();
-    }
-    List<String> lines = opening.lines();
-    int first = opening.result().isPresent() ? 2 : 1;
-    String verdict = opening.result().isPresent() ? lines.get(1) : "Runes taken in the opening";
-    TeamSide winner = opening.result().map(Result::winner).orElse(null);
-    return Optional.of(
-        new SectionView(
-            SectionView.ofLines(lines).title(),
-            verdict,
-            SectionViews.forTeam(winner, TeamSide.commonSide(input.focusSlots())),
-            lines.subList(first, lines.size()),
-            null));
+    return opening(input)
+        .map(
+            o ->
+                new SectionView(
+                    TITLE,
+                    o.result().map(Result::text).orElse("Runes taken in the opening"),
+                    SectionViews.forTeam(
+                        o.result().map(Result::winner).orElse(null),
+                        TeamSide.commonSide(input.focusSlots())),
+                    o.runes(),
+                    null));
   }
 
-  private Opening opening(ReplayReportInput input) {
+  private Optional<Opening> opening(ReplayReportInput input) {
     List<OpeningSummaryDomain> summaries = present(summaryRepo.findByMatchId(input.matchId()));
     if (summaries.isEmpty()) {
-      return new Opening(Optional.empty(), List.of());
+      return Optional.empty();
     }
     List<RunePickupDomain> pickups =
         present(pickupRepo.findByMatchId(input.matchId())).stream().sorted(CHRONOLOGICAL).toList();
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
-    List<String> body = new ArrayList<>();
-    Optional<Result> result = result(summaries, yours);
-    result.map(Result::text).ifPresent(body::add);
-    bounty(pickups, heroes, yours).ifPresent(body::add);
-    midLane(pickups, heroes, properties.getOpeningRuneMinutes()).ifPresent(body::add);
-    if (body.isEmpty()) {
-      return new Opening(Optional.empty(), List.of());
-    }
-    List<String> lines = new ArrayList<>();
-    lines.add("**Opening and runes**");
-    lines.addAll(body);
     int max = Math.max(LineText.ELLIPSIS.length() + 1, properties.getMaxOpeningLineLength());
-    return new Opening(result, lines.stream().map(line -> LineText.cut(line, max)).toList());
+    Optional<Result> result =
+        result(summaries, yours).map(r -> new Result(LineText.cut(r.text(), max), r.winner()));
+    List<String> runes = new ArrayList<>();
+    bounty(pickups, heroes, yours).map(l -> LineText.cut(l, max)).ifPresent(runes::add);
+    midLane(pickups, heroes, properties.getOpeningRuneMinutes())
+        .map(l -> LineText.cut(l, max))
+        .ifPresent(runes::add);
+    if (result.isEmpty() && runes.isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(new Opening(result, runes, max));
   }
 
   private static <T> List<T> present(List<T> rows) {

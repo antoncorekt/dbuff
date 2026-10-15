@@ -142,7 +142,7 @@ class FightSectionTest {
     assertThat(view.title()).isEqualTo("Fights");
     assertThat(view.verdict())
         .isEqualTo(
-            "Tracked players missed 1 big fight; 1 player left a ready ability unused in several"
+            "Anton missed 1 big fight (1 lost) and left a ready ability unused in several"
                 + " fights");
     assertThat(view.accent()).isEqualTo(Accent.LOSS);
     assertThat(view.bullets())
@@ -167,5 +167,77 @@ class FightSectionTest {
     when(abilityRepo.findByMatchId(1L)).thenReturn(List.of());
 
     assertThat(section.view(input())).isEmpty();
+  }
+
+  @Test
+  void view_countsEveryMissedFightNotOnlyTheListedOnesAndStaysGreyWhenTheyWereWon() {
+    List<FightDomain> fights = new ArrayList<>();
+    List<FightPlayerDomain> parts = new ArrayList<>();
+    for (int i = 0; i < 4; i++) {
+      fights.add(
+          FightDomain.builder()
+              .fightIndex(i)
+              .type("TEAMFIGHT")
+              .startSeconds(100.0 * (i + 1))
+              .radiantDeaths(1)
+              .direDeaths(2)
+              .winner("RADIANT")
+              .build());
+      for (long slot : new long[] {0L, 129L}) {
+        parts.add(
+            FightPlayerDomain.builder()
+                .fightIndex(i)
+                .playerSlot(slot)
+                .presence("ABSENT_FAR")
+                .absenceReason("NO_TP")
+                .build());
+      }
+    }
+    when(fightRepo.findByMatchId(1L)).thenReturn(fights);
+    when(partRepo.findByMatchId(1L)).thenReturn(parts);
+    when(abilityRepo.findByMatchId(1L)).thenReturn(List.of());
+    ReplayReportInput both =
+        new ReplayReportInput(
+            1L,
+            null,
+            Set.of(0L, 129L),
+            new java.util.LinkedHashMap<>(Map.of(0L, "A", 129L, "B")),
+            2);
+
+    SectionView view = section.view(both).orElseThrow();
+
+    assertThat(view.bullets()).hasSize(4);
+    assertThat(view.verdict()).isEqualTo("Tracked players missed 8 big fights (4 lost)");
+    assertThat(view.accent()).isEqualTo(Accent.LOSS);
+  }
+
+  @Test
+  void view_staysGreyWhenTheMissedFightsWereWon() {
+    when(fightRepo.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                FightDomain.builder()
+                    .fightIndex(0)
+                    .type("TEAMFIGHT")
+                    .startSeconds(100.0)
+                    .radiantDeaths(2)
+                    .direDeaths(1)
+                    .winner("DIRE")
+                    .build()));
+    when(partRepo.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                FightPlayerDomain.builder()
+                    .fightIndex(0)
+                    .playerSlot(128L)
+                    .presence("ABSENT_FAR")
+                    .absenceReason("NO_TP")
+                    .build()));
+    when(abilityRepo.findByMatchId(1L)).thenReturn(List.of());
+
+    SectionView view = section.view(input()).orElseThrow();
+
+    assertThat(view.verdict()).isEqualTo("Anton missed 1 big fight");
+    assertThat(view.accent()).isEqualTo(Accent.NEUTRAL);
   }
 }

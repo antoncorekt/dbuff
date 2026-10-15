@@ -30,6 +30,7 @@ public class FightSection implements ReplayReportSection {
   private static final long FIRST_DIRE_SLOT = 128;
   private static final int BIG_FIGHT_DEATHS = 3;
   private static final int MIN_FIGHTS_FOR_ABILITY_LINE = 2;
+  private static final String TRACKED = "Tracked players";
 
   private final FightRepo fightRepo;
   private final FightPlayerRepo fightPlayerRepo;
@@ -56,7 +57,9 @@ public class FightSection implements ReplayReportSection {
     return ReportDetail.FULL;
   }
 
-  private record Found(List<String> lines, int missed, int unused) {}
+  /** Counts cover every missed fight, the lines only those within the cap. */
+  private record Found(
+      List<String> lines, int missed, int missedInLost, int unused, String subject) {}
 
   @Override
   public List<String> lines(ReplayReportInput input) {
@@ -69,17 +72,27 @@ public class FightSection implements ReplayReportSection {
     if (found.lines().isEmpty()) {
       return Optional.empty();
     }
+    boolean several = found.subject().equals(TRACKED);
     List<String> parts = new ArrayList<>();
     if (found.missed() > 0) {
       parts.add(
-          "Tracked players missed %s".formatted(SectionViews.count(found.missed(), "big fight")));
+          "%smissed %s%s"
+              .formatted(
+                  several ? TRACKED + " " : "",
+                  SectionViews.count(found.missed(), "big fight"),
+                  found.missedInLost() > 0 ? " (%d lost)".formatted(found.missedInLost()) : ""));
     }
     if (found.unused() > 0) {
       parts.add(
-          "%s left a ready ability unused in several fights"
-              .formatted(SectionViews.count(found.unused(), "player")));
+          "%sleft a ready ability unused in several fights"
+              .formatted(several ? SectionViews.count(found.unused(), "player") + " " : ""));
     }
-    return SectionViews.titled(found.lines(), new Verdict(String.join("; ", parts), Accent.LOSS));
+    String text = String.join(several ? "; " : " and ", parts);
+    boolean problem = found.missedInLost() > 0 || found.unused() > 0;
+    return SectionViews.titled(
+        found.lines(),
+        new Verdict(
+            several ? text : found.subject() + " " + text, problem ? Accent.LOSS : Accent.NEUTRAL));
   }
 
   private Found found(ReplayReportInput input) {
@@ -91,29 +104,38 @@ public class FightSection implements ReplayReportSection {
     List<FightAbilityUseDomain> uses = abilityRepo.findByMatchId(input.matchId());
     List<String> lines = new ArrayList<>();
     int missed = 0;
+    int missedInLost = 0;
     int unused = 0;
     for (Map.Entry<Long, String> player : input.namesBySlot().entrySet()) {
       long slot = player.getKey();
-      List<String> absences =
+      List<FightPlayerDomain> absent =
           parts.stream()
               .filter(p -> p.getPlayerSlot() == slot && p.getAbsenceReason() != null)
               .filter(
                   p -> fights.containsKey(p.getFightIndex()) && big(fights.get(p.getFightIndex())))
               .sorted(Comparator.comparing(p -> fights.get(p.getFightIndex()).getStartSeconds()))
-              .limit(input.maxFindings())
-              .map(p -> absenceLine(player.getValue(), slot, p, fights.get(p.getFightIndex())))
               .toList();
-      lines.addAll(absences);
-      missed += absences.size();
+      absent.stream()
+          .limit(input.maxFindings())
+          .map(p -> absenceLine(player.getValue(), slot, p, fights.get(p.getFightIndex())))
+          .forEach(lines::add);
+      missed += absent.size();
+      missedInLost +=
+          (int)
+              absent.stream()
+                  .filter(p -> "lost".equals(result(fights.get(p.getFightIndex()), slot)))
+                  .count();
       Optional<String> ability = unusedAbilityLine(player.getValue(), slot, uses);
       ability.ifPresent(lines::add);
       unused += ability.isPresent() ? 1 : 0;
     }
     if (lines.isEmpty()) {
-      return new Found(List.of(), 0, 0);
+      return new Found(List.of(), 0, 0, 0, TRACKED);
     }
     lines.addFirst("**Fights**");
-    return new Found(lines, missed, unused);
+    String subject =
+        input.namesBySlot().size() == 1 ? input.namesBySlot().values().iterator().next() : TRACKED;
+    return new Found(lines, missed, missedInLost, unused, subject);
   }
 
   private static boolean big(FightDomain fight) {
@@ -126,10 +148,7 @@ public class FightSection implements ReplayReportSection {
     boolean dire = slot >= FIRST_DIRE_SLOT;
     int own = dire ? fight.getDireDeaths() : fight.getRadiantDeaths();
     int other = dire ? fight.getRadiantDeaths() : fight.getDireDeaths();
-    String result =
-        fight.getWinner() == null || fight.getWinner().equals("DRAW")
-            ? "drawn"
-            : fight.getWinner().equals(dire ? "DIRE" : "RADIANT") ? "won" : "lost";
+    String result = result(fight, slot);
     return "%s %s (%s, deaths %d to %d): %s was %s, %s."
         .formatted(
             GameTime.clock(fight.getStartSeconds()),
@@ -140,6 +159,12 @@ public class FightSection implements ReplayReportSection {
             name,
             where(part.getPresence()),
             why(part));
+  }
+
+  private static String result(FightDomain fight, long slot) {
+    return fight.getWinner() == null || fight.getWinner().equals("DRAW")
+        ? "drawn"
+        : fight.getWinner().equals(slot >= FIRST_DIRE_SLOT ? "DIRE" : "RADIANT") ? "won" : "lost";
   }
 
   private static String where(String presence) {

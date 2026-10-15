@@ -390,7 +390,7 @@ class ItemsSectionTest {
 
     ViewRendering.assertWithinLimits(view);
     assertThat(view.title()).isEqualTo("Items");
-    assertThat(view.verdict()).isEqualTo("Items: 2 of 3 paid back their cost");
+    assertThat(view.verdict()).isEqualTo("Items shown: 2 of 3 paid back their cost");
     assertThat(view.accent()).isEqualTo(Accent.WIN);
     assertThat(String.join("\n", section.lines(input())))
         .isEqualTo(
@@ -411,12 +411,25 @@ class ItemsSectionTest {
 
     SectionView view = section.view(input(2L)).orElseThrow();
 
-    assertThat(view.verdict()).isEqualTo("Your players' items: 0 of 1 paid back their cost");
+    assertThat(view.verdict()).isEqualTo("Your players' items shown: 0 of 1 paid back their cost");
     assertThat(view.accent()).isEqualTo(Accent.LOSS);
   }
 
   @Test
   void view_isEmptyWithoutUsableRows() {
     assertThat(section.view(input())).isEmpty();
+  }
+
+  @Test
+  void view_countsOnlyTheItemsTheCardShows() {
+    properties.setMaxItemLines(1);
+    add(farming(1, 1500));
+    add(midas(2, 600, 0.9));
+    add(stick(0, 200, 1.5, 2));
+
+    SectionView view = section.view(input()).orElseThrow();
+
+    assertThat(view.bullets()).hasSize(1);
+    assertThat(view.verdict()).matches("Items shown: [01] of 1 paid back their cost");
   }
 }

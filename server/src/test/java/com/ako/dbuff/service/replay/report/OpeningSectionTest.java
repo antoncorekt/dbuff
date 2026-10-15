@@ -318,4 +318,29 @@ class OpeningSectionTest {
   void view_isEmptyWithoutASummary() {
     assertThat(section.view(input())).isEmpty();
   }
+
+  @Test
+  void view_withOnlyTheResultHasNoBullets() {
+    summary("RADIANT", "WON", 1200, 3);
+    summary("DIRE", "LOST", -1200, 1);
+
+    SectionView view = section.view(input()).orElseThrow();
+
+    assertThat(section.lines(input())).hasSize(2);
+    assertThat(view.verdict()).isEqualTo(section.lines(input()).get(1));
+    assertThat(view.bullets()).isEmpty();
+  }
+
+  @Test
+  void view_withOnlyRunesUsesAGenericVerdictAndKeepsEveryRuneLine() {
+    summary("RADIANT", "NOTHING", 0, 0);
+    rune(0, "BOUNTY", 0, 100, false);
+
+    SectionView view = section.view(input()).orElseThrow();
+
+    assertThat(view.verdict()).isEqualTo("Runes taken in the opening");
+    assertThat(view.accent()).isEqualTo(Accent.NEUTRAL);
+    assertThat(view.bullets()).hasSize(1);
+    assertThat(section.lines(input())).hasSize(2);
+  }
 }

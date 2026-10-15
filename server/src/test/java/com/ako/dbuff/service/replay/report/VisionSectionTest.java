@@ -514,4 +514,15 @@ class VisionSectionTest {
 
     assertThat(section.view(input())).isEmpty();
   }
+
+  @Test
+  void view_countsEveryProblemEvenWhenTheCapLeavesSomeOut() {
+    threeProblemFights();
+    properties.setMaxVisionLines(1);
+
+    SectionView view = section.view(input()).orElseThrow();
+
+    assertThat(view.verdict()).isEqualTo("3 vision problems in important fights");
+    assertThat(view.bullets()).anyMatch(b -> b.startsWith("and 2 more vision problems"));
+  }
 }

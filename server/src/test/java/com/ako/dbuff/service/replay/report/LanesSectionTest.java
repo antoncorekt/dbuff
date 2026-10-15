@@ -374,9 +374,10 @@ class LanesSectionTest {
 
     ViewRendering.assertWithinLimits(both);
     assertThat(both.title()).isEqualTo("Laning stage");
-    assertThat(both.verdict()).isEqualTo("Radiant and Dire won 1 each");
+    assertThat(both.verdict()).isEqualTo("Radiant and Dire won 1 each; 1 lane even");
     assertThat(both.accent()).isEqualTo(Accent.NEUTRAL);
-    assertThat(dire.verdict()).isEqualTo("Dire (your team) split 1 to 1 in lanes");
+    assertThat(dire.verdict())
+        .isEqualTo("Dire (your team) split 1 to 1 in decided lanes; 1 lane even");
     assertThat(both.bullets()).hasSize(3);
     assertThat(String.join("\n", section.lines(input(0L, 128L))))
         .isEqualTo(
@@ -400,7 +401,8 @@ class LanesSectionTest {
 
     SectionView view = section.view(input(0L)).orElseThrow();
 
-    assertThat(view.verdict()).isEqualTo("Radiant (your team) won 1 of 2 lanes");
+    assertThat(view.verdict())
+        .isEqualTo("Radiant (your team) won 1 of 1 decided lanes; 1 lane even");
     assertThat(view.accent()).isEqualTo(Accent.WIN);
   }
 

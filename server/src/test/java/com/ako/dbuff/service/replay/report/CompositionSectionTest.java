@@ -191,4 +191,15 @@ class CompositionSectionTest {
 
     assertThat(section.view(input(Map.of(0L, "Anton"), 3))).isEmpty();
   }
+
+  @Test
+  void view_readsTheProfilesOnlyOnce() {
+    when(profileRepo.findByMatchId(1L))
+        .thenReturn(List.of(profile(0, "INTENT", 1), profile(0, "FINAL", 5)));
+    when(compositionRepo.findByMatchId(1L)).thenReturn(List.of());
+
+    section.view(input(Map.of(0L, "Anton"), 3));
+
+    org.mockito.Mockito.verify(profileRepo, org.mockito.Mockito.times(1)).findByMatchId(1L);
+  }
 }

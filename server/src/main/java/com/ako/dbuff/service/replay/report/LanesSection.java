@@ -85,8 +85,18 @@ public class LanesSection implements ReplayReportSection {
     if (radiant + dire == 0) {
       return new Verdict("No lane had a clear winner", Accent.NEUTRAL);
     }
-    return SectionViews.contest(
-        TeamSide.commonSide(input.focusSlots()), radiant, dire, pairs.size(), "lanes");
+    Verdict decided =
+        SectionViews.contest(
+            TeamSide.commonSide(input.focusSlots()),
+            radiant,
+            dire,
+            radiant + dire,
+            "decided lanes");
+    long even = pairs.size() - radiant - dire;
+    return even == 0
+        ? decided
+        : new Verdict(
+            decided.text() + "; " + SectionViews.count(even, "lane") + " even", decided.accent());
   }
 
   private static long wins(List<Pair> pairs, TeamSide side) {

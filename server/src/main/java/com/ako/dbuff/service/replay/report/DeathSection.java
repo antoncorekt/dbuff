@@ -54,8 +54,14 @@ public class DeathSection implements ReplayReportSection {
     return ReportDetail.STANDARD;
   }
 
+  private record Found(List<String> lines, int deaths) {}
+
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return found(input).lines();
+  }
+
+  private Found found(ReplayReportInput input) {
     List<String> lines = new ArrayList<>();
     List<DeathAnalysisDomain> deaths = deathRepo.findByMatchId(input.matchId());
     for (Map.Entry<Long, String> player : input.namesBySlot().entrySet()) {
@@ -71,18 +77,19 @@ public class DeathSection implements ReplayReportSection {
           .forEach(lines::add);
     }
     if (lines.isEmpty()) {
-      return List.of();
+      return new Found(List.of(), 0);
     }
+    int count = lines.size();
     lines.addFirst("**Deaths**");
-    return lines;
+    return new Found(lines, count);
   }
 
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
-    List<String> lines = lines(input);
-    long deaths = Math.max(0, lines.size() - 1);
+    Found found = found(input);
     return SectionViews.titled(
-        lines, new Verdict(SectionViews.count(deaths, "death") + " worth a look", Accent.LOSS));
+        found.lines(),
+        new Verdict(SectionViews.count(found.deaths(), "death") + " worth a look", Accent.LOSS));
   }
 
   private static String line(String name, DeathAnalysisDomain d) {

@@ -61,15 +61,18 @@ public class ItemsSection implements ReplayReportSection {
     return ReportDetail.STANDARD;
   }
 
+  /** The rows the cap kept and their lines, so the verdict counts what the card lists. */
+  private record Rendered(List<Entry> shown, List<String> lines) {}
+
   @Override
   public List<String> lines(ReplayReportInput input) {
-    return render(input, entries(input));
+    return render(input, entries(input)).lines();
   }
 
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
-    List<Entry> rows = entries(input);
-    return SectionViews.titled(render(input, rows), paidBack(input, rows));
+    Rendered rendered = render(input, entries(input));
+    return SectionViews.titled(rendered.lines(), paidBack(input, rendered.shown()));
   }
 
   private List<Entry> entries(ReplayReportInput input) {
@@ -89,7 +92,7 @@ public class ItemsSection implements ReplayReportSection {
     List<Entry> scope = own.isEmpty() ? rows : own;
     long known = scope.stream().filter(e -> e.row().ratio() != null).count();
     long paid = scope.stream().filter(e -> e.row().ratio() != null && e.row().ratio() >= 1).count();
-    String whose = own.isEmpty() ? "Items" : "Your players' items";
+    String whose = own.isEmpty() ? "Items shown" : "Your players' items shown";
     if (known == 0) {
       return new Verdict(
           "%s: %s checked".formatted(whose, SectionViews.count(scope.size(), "purchase")),
@@ -100,9 +103,9 @@ public class ItemsSection implements ReplayReportSection {
         SectionViews.balance(paid, known - paid));
   }
 
-  private List<String> render(ReplayReportInput input, List<Entry> rows) {
+  private Rendered render(ReplayReportInput input, List<Entry> rows) {
     if (rows.isEmpty()) {
-      return List.of();
+      return new Rendered(List.of(), List.of());
     }
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     Set<Long> focus = input.focusSlots() == null ? Set.of() : input.focusSlots();
@@ -110,14 +113,15 @@ public class ItemsSection implements ReplayReportSection {
         Comparator.comparingInt((Entry e) -> focus.contains(e.row().slot()) ? 0 : 1)
             .thenComparing(ItemsSection::distanceFromCost, Comparator.reverseOrder())
             .thenComparing(CHRONOLOGICAL);
-    return BehaviourLines.render(
-        "**Items**",
-        rows,
-        byWorth,
-        CHRONOLOGICAL,
-        properties.getMaxItemLines(),
-        properties.getMaxBehaviourLineLength(),
-        entry -> entry.wording().shortVerdict(entry.row(), subject(entry.row(), heroes)));
+    List<Entry> shown =
+        BehaviourLines.pick(rows, byWorth, CHRONOLOGICAL, properties.getMaxItemLines()).listed();
+    return new Rendered(
+        shown,
+        BehaviourLines.lines(
+            "**Items**",
+            shown,
+            properties.getMaxBehaviourLineLength(),
+            entry -> entry.wording().shortVerdict(entry.row(), subject(entry.row(), heroes))));
   }
 
   private Optional<Entry> usable(long matchId, ItemEfficiencyDomain stored) {

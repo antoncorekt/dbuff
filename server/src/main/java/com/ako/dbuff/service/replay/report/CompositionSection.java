@@ -66,7 +66,10 @@ public class CompositionSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
-    List<PlayerRoleProfileDomain> profiles = profileRepo.findByMatchId(input.matchId());
+    return render(input, profileRepo.findByMatchId(input.matchId()));
+  }
+
+  private List<String> render(ReplayReportInput input, List<PlayerRoleProfileDomain> profiles) {
     List<String> lines = new ArrayList<>();
     int listed = 0;
     for (Map.Entry<Long, String> player : input.namesBySlot().entrySet()) {
@@ -108,15 +111,11 @@ public class CompositionSection implements ReplayReportSection {
 
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
-    List<String> lines = lines(input);
-    if (lines.isEmpty()) {
-      return Optional.empty();
-    }
-    return SectionViews.titled(lines, rolesVerdict(input));
+    List<PlayerRoleProfileDomain> profiles = profileRepo.findByMatchId(input.matchId());
+    return SectionViews.titled(render(input, profiles), rolesVerdict(input, profiles));
   }
 
-  private Verdict rolesVerdict(ReplayReportInput input) {
-    List<PlayerRoleProfileDomain> profiles = profileRepo.findByMatchId(input.matchId());
+  private Verdict rolesVerdict(ReplayReportInput input, List<PlayerRoleProfileDomain> profiles) {
     long kept = 0;
     long changed = 0;
     for (Long slot : input.namesBySlot().keySet()) {
