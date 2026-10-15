@@ -211,7 +211,7 @@ public abstract class ReplayPipelineFixture {
 
   @Autowired private PlayerGameStatisticRepo playerStatRepo;
   @Autowired private PlayerTimelineRepo timelineRepo;
-  @Autowired private MatchRepo matchRepo;
+  @Autowired protected MatchRepo matchRepo;
   @Autowired private DeathEventRepo deathEventRepo;
   @Autowired private TeamfightRepo teamfightRepo;
   @Autowired private TeamfightPlayerRepo teamfightPlayerRepo;

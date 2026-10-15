@@ -46,6 +46,10 @@ public class DraftBoardSection implements ReplayReportSection {
 
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
-    return boards.stream().flatMap(b -> b.view(input).stream()).findFirst();
+    Long mode = input.gameModeId();
+    return boards.stream()
+        .filter(b -> mode != null && b.gameModeId() == mode)
+        .findFirst()
+        .flatMap(b -> b.view(input));
   }
 }

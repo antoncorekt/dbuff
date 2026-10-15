@@ -365,6 +365,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     for (String id : MATCHES) {
       Assumptions.assumeTrue(hasFixture(id), id + " fixture missing");
       MatchDomain match = seedMatch(id);
+      assertThat(match.getGameModeId()).as("%s is an All Pick fixture", id).isEqualTo(22L);
       ReplayReportInput input =
           new ReplayReportInput(match.getId(), match, Set.of(0L), Map.of(0L, "P0"), 3);
 
@@ -1031,11 +1032,18 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                 .toList())
         .as("%s: skill and hero turns are 1 to 50", id)
         .isEqualTo(IntStream.rangeClosed(1, 50).boxed().toList());
+    assertThat(matchRepo.findById(matchId).orElseThrow().getGameModeId())
+        .as("%s is an Ability Draft fixture", id)
+        .isEqualTo(18L);
     assertThat(
             draftBoardSection
                 .view(
                     new ReplayReportInput(
-                        matchId, null, java.util.Set.of(0L), java.util.Map.of(0L, "P0"), 3))
+                        matchId,
+                        matchRepo.findById(matchId).orElseThrow(),
+                        java.util.Set.of(0L),
+                        java.util.Map.of(0L, "P0"),
+                        3))
                 .orElseThrow()
                 .bullets())
         .as("%s: draft board cards", id)

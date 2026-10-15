@@ -16,6 +16,18 @@ public interface PlayerGameStatisticRepo
 
   List<PlayerMatchStatisticDomain> findAllByMatchId(long matchId);
 
+  /** The hero and slot of each stored player of a match, without the rest of the row. */
+  interface HeroSlot {
+    Long getHeroId();
+
+    Long getPlayerSlot();
+  }
+
+  @Query(
+      "SELECT p.heroId AS heroId, p.playerSlot AS playerSlot FROM PlayerMatchStatisticDomain p"
+          + " WHERE p.matchId = :matchId")
+  List<HeroSlot> findHeroSlots(@Param("matchId") long matchId);
+
   Optional<PlayerMatchStatisticDomain> findByMatchIdAndPlayerId(Long matchId, Long playerId);
 
   @Modifying

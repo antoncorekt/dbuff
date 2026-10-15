@@ -1,9 +1,9 @@
 package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.DraftEventDomain;
-import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.repo.DraftEventRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
+import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.mode.AllPickProfile;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.SectionView;
@@ -41,20 +41,29 @@ public class AllPickDraftBoard implements DraftBoard {
     if (events.isEmpty()) {
       return Optional.empty();
     }
+    List<PlayerGameStatisticRepo.HeroSlot> players = statRepo.findHeroSlots(input.matchId());
     Map<Long, Long> slotByHero = new HashMap<>();
-    for (PlayerMatchStatisticDomain s : statRepo.findAllByMatchId(input.matchId())) {
-      if (s.getHeroId() != null && s.getPlayerSlot() != null) {
-        slotByHero.put(s.getHeroId(), s.getPlayerSlot());
-      }
-    }
+    players.stream()
+        .filter(p -> p.getHeroId() != null && p.getPlayerSlot() != null)
+        .forEach(p -> slotByHero.put(p.getHeroId(), p.getPlayerSlot()));
+    boolean heroesKnown =
+        !players.isEmpty()
+            && players.stream().allMatch(p -> p.getHeroId() != null && p.getPlayerSlot() != null);
     List<String> picks = new ArrayList<>();
     List<String> bans = new ArrayList<>();
     for (DraftEventDomain e : events) {
-      if (Boolean.TRUE.equals(e.getPick())) {
-        picks.add(pickRow(e, slotByHero.get(e.getHeroId()), input.namesBySlot()));
+      if (e.getPick() == null || e.getHeroId() == null) {
+        continue;
+      }
+      if (e.getPick()) {
+        Long slot = slotByHero.get(e.getHeroId());
+        picks.add(pickRow(e, slot, input.namesBySlot(), heroesKnown && slot == null));
       } else {
         bans.add(number(e) + heroNames.heroName(e.getHeroId()));
       }
+    }
+    if (picks.isEmpty() && bans.isEmpty()) {
+      return Optional.empty();
     }
     List<String> cards = new ArrayList<>();
     cards.addAll(BoardRows.bullets("**Hero picks**", picks));
@@ -62,15 +71,23 @@ public class AllPickDraftBoard implements DraftBoard {
     return Optional.of(new SectionView("Draft board", null, Accent.INFO, cards, FOOTNOTE));
   }
 
-  private String pickRow(DraftEventDomain pick, Long slot, Map<Long, String> names) {
-    String team = pick.getTeam() != null && pick.getTeam() == 1 ? "Dire" : "Radiant";
+  private String pickRow(
+      DraftEventDomain pick, Long slot, Map<Long, String> names, boolean notPlayed) {
+    String team =
+        slot != null ? Prettify.team(TeamSide.ofSlot(slot).name()) : eventSide(pick.getTeam());
     String picker = slot == null ? null : names.get(slot);
     return String.format(
         "%s%s, picked by %s%s",
         number(pick),
         heroNames.heroName(pick.getHeroId()),
         picker == null ? team : picker + " (" + team + ")",
-        slot == null ? ", not played" : "");
+        notPlayed ? ", not played" : "");
+  }
+
+  private static String eventSide(Integer team) {
+    return Integer.valueOf(0).equals(team)
+        ? "Radiant"
+        : Integer.valueOf(1).equals(team) ? "Dire" : "an unknown side";
   }
 
   private static String number(DraftEventDomain event) {

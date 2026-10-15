@@ -53,6 +53,11 @@ public record ReplayReportInput(
         matchId, match, focusSlots, namesBySlot, maxFindings, modelOverride, channel);
   }
 
+  /** The game mode of the match; null when the match or its mode is not known. */
+  public Long gameModeId() {
+    return match == null ? null : match.getGameModeId();
+  }
+
   /** The language the channel chose for AI text; null when it follows the server's. */
   public String channelLanguage() {
     return instance == null ? null : instance.effectiveSettings().getLanguage();

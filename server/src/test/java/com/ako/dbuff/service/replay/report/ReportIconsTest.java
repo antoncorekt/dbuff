@@ -271,7 +271,9 @@ class ReportIconsTest {
                     heroNames(icons))),
             plain);
     SectionView view =
-        section.view(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3)).orElseThrow();
+        section
+            .view(new ReplayReportInput(1L, abilityDraftMatch(), Set.of(), Map.of(), 3))
+            .orElseThrow();
 
     List<String> lines = plain.lines(view).stream().flatMap(l -> l.lines()).toList();
     List<ReportMessage> cards = new ComponentsViewRenderer(plain).render(view);
@@ -324,6 +326,14 @@ class ReportIconsTest {
                     labels(icons),
                     heroNames(icons))),
             new PlainViewRenderer());
-    return section.view(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3)).orElseThrow();
+    return section
+        .view(new ReplayReportInput(1L, abilityDraftMatch(), Set.of(), Map.of(), 3))
+        .orElseThrow();
+  }
+
+  private static com.ako.dbuff.dao.model.MatchDomain abilityDraftMatch() {
+    com.ako.dbuff.dao.model.MatchDomain match = new com.ako.dbuff.dao.model.MatchDomain();
+    match.setGameModeId(18L);
+    return match;
   }
 }
