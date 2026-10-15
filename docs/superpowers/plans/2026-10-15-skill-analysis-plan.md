@@ -22,10 +22,10 @@ Sources: bo3.gg Ability Draft guide (May 2026), DOTAFire and dota2.ru guides (ol
 - Per fight ability use (`fight_ability_use`: damage per skill per fight), `fight_explanation` (won or lost), `death_analysis` (killed alone or not), important fights.
 
 ## Part A: statistics (12 months)
-- A nightly job (not at report time; the host has 2 GiB) fills `skill_stat`: per skill, per hero, per (hero, skill), per pair of skills held by the same player. Rows hold picks, wins and the raw win rate; the Wilson lower bound is used only to rank, never to compute a lift. The job is incremental: it keeps counts per week, adds the new week and drops the weeks that left the 12 months, so a night never re-reads every match.
+- No nightly job and no statistics tables. A late analyzer (after the parse has released its memory, so it never holds the parse permit) runs the counts for the match's own skills at analysis time: the hero, each skill, hero with each skill, and every pair of skills the player held. About 15 counts, each one SQL aggregate over `ability` and the match results that returns only games and wins (no rows in memory), reusing the combo queries of `AbilityRankingRepository`. The window is the 12 months before the match date, and the match itself is left out. The result is stored per match (`skill_pick_stat`: subject, games, wins) so a later `/match report` shows the same numbers and runs no query. The raw win rate is shown; the Wilson lower bound only ranks.
 - Window: the last 12 months of Ability Draft (mode 18), a property. A pair counts only above a minimum sample (default 30 games). Lift of a pair = the pair's raw win rate against the expected rate from the two skills alone (average of their win rates in games where they were NOT held together, so the pair's own games do not feed the baseline). A pair is called a synergy only when the 95% interval of the lift excludes zero and at least 30 games exist; with thousands of pairs this keeps chance results out, and the report shows at most the top few.
 - The pairs asked for: hero with each of its four skills; skill 1 with skills 2 to 4; skill 2 with skills 3 and 4; skill 3 with skill 4 (the slots as the hero holds them after the draft, so any order the player took them in).
-- Check first: how many matches in the production database have ability data and how far back it goes. If the 12 months are thin, the report says "not enough games" instead of guessing.
+- First task of S1, before any code depends on it: count the Ability Draft matches with ability data in the production database per month, and time the pair query on a copy of it (EXPLAIN, seconds, heap). Our database holds the games of tracked players, not all of Dota, so most pairs may never reach 30 games. If pairs are too thin, Part A is skill and hero statistics only, and pairs need another source (a separate decision). If the pair query takes more than about 2 seconds, add stored weekly counts then, not before.
 - Output per focus player: his hero, each skill and each pair with games, win rate and lift in words ("Storm Bolt with Thunder Clap: 58% in 140 games, 6 points above what each gives alone").
 
 ## Part B: does the build fit the role
@@ -47,7 +47,7 @@ This needs the replay data (turns). A focus match without `ability_draft_pick` r
 - Stats are also a REST read for checking (`/api/v1/skills/...`, API key), built in S1 with the tables.
 
 ## PR order (each with tests, code-review, a first round for the owner)
-1. S1: `skill_stat` tables, the nightly job and its measure on the real DB (rows, time, heap).
+1. S1: the row count and query timing on a copy of the real DB, then the analyzer, `skill_pick_stat` and the REST read.
 2. S2: `ESCAPE`, `role-needs.json`, the build evaluator, loop topic `skills` (round 1 for the owner).
 3. S3: the missed-pick analyzer on stored data, loop round.
 4. S4: the section, wording, AI facts, docs.
