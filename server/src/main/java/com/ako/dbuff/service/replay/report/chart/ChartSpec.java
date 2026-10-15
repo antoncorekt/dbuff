@@ -1,10 +1,13 @@
 package com.ako.dbuff.service.replay.report.chart;
 
 import java.awt.Color;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 
@@ -29,50 +32,134 @@ public record ChartSpec(
     legend = List.copyOf(legend);
   }
 
-  /** A short digest of everything drawn, so a cache key can tell two different pictures apart. */
+  /**
+   * A digest of everything drawn (SHA-256 over a canonical encoding, every number written in full),
+   * so a cache key can tell two different pictures apart.
+   */
   public String fingerprint() {
-    StringBuilder all = new StringBuilder(title).append('|').append(endSeconds);
-    panels.forEach(
-        p -> {
-          all.append('|').append(p.label()).append(p.format()).append(p.bands()).append(p.pins());
-          p.series()
-              .forEach(
-                  s ->
-                      all.append(Arrays.hashCode(s.seconds()))
-                          .append(',')
-                          .append(Arrays.hashCode(s.values()))
-                          .append(s.positive())
-                          .append(s.positiveCaption())
-                          .append(s.negative())
-                          .append(s.negativeCaption()));
-        });
-    all.append(bands).append(markers).append(legend);
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    try (DataOutputStream out = new DataOutputStream(bytes)) {
+      text(out, title);
+      out.writeDouble(endSeconds);
+      out.writeInt(panels.size());
+      for (Panel p : panels) {
+        text(out, p.label());
+        text(out, p.format().name());
+        out.writeInt(p.series().size());
+        for (Series s : p.series()) {
+          doubles(out, s.seconds());
+          doubles(out, s.values());
+          out.writeInt(s.positive().getRGB());
+          text(out, s.positiveCaption());
+          out.writeInt(s.negative().getRGB());
+          text(out, s.negativeCaption());
+        }
+        out.writeInt(p.bars().size());
+        for (BarSeries b : p.bars()) {
+          doubles(out, b.seconds());
+          doubles(out, b.values());
+          out.writeDouble(b.widthSeconds());
+          out.writeInt(b.color().getRGB());
+        }
+        markers(out, p.markers());
+        bands(out, p.bands());
+        out.writeInt(p.pins().size());
+        for (Pin pin : p.pins()) {
+          out.writeDouble(pin.seconds());
+          text(out, pin.shape().name());
+          out.writeInt(pin.color().getRGB());
+          text(out, pin.label());
+        }
+      }
+      bands(out, bands);
+      markers(out, markers);
+      out.writeInt(legend.size());
+      for (LegendEntry l : legend) {
+        out.writeInt(l.color().getRGB());
+        text(out, l.text());
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
     try {
-      byte[] digest =
-          MessageDigest.getInstance("SHA-256")
-              .digest(all.toString().getBytes(StandardCharsets.UTF_8));
-      return HexFormat.of().formatHex(digest, 0, 8);
+      return HexFormat.of()
+          .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException(e);
     }
   }
 
+  private static void text(DataOutputStream out, String value) throws IOException {
+    out.writeBoolean(value != null);
+    if (value != null) {
+      byte[] utf8 = value.getBytes(StandardCharsets.UTF_8);
+      out.writeInt(utf8.length);
+      out.write(utf8);
+    }
+  }
+
+  private static void doubles(DataOutputStream out, double[] values) throws IOException {
+    out.writeInt(values.length);
+    for (double v : values) {
+      out.writeDouble(v);
+    }
+  }
+
+  private static void bands(DataOutputStream out, List<Band> bands) throws IOException {
+    out.writeInt(bands.size());
+    for (Band b : bands) {
+      out.writeDouble(b.startSeconds());
+      out.writeDouble(b.endSeconds());
+      out.writeInt(b.color().getRGB());
+    }
+  }
+
+  private static void markers(DataOutputStream out, List<Marker> markers) throws IOException {
+    out.writeInt(markers.size());
+    for (Marker m : markers) {
+      out.writeDouble(m.seconds());
+      text(out, m.label());
+      out.writeInt(m.color().getRGB());
+    }
+  }
+
   /**
    * One plot; {@code label} is written in its corner. {@code bands} shade stretches of this panel
-   * only and {@code pins} sit on its first series, so a panel can tell its own story.
+   * only and {@code pins} sit on its first series, so a panel can tell its own story. The {@code
+   * bars} are stacked from zero in list order; the {@code markers} are labelled lines of this panel
+   * alone, with their labels above its plot.
    */
   public record Panel(
-      String label, ValueFormat format, List<Series> series, List<Band> bands, List<Pin> pins) {
+      String label,
+      ValueFormat format,
+      List<Series> series,
+      List<Band> bands,
+      List<Pin> pins,
+      List<BarSeries> bars,
+      List<Marker> markers) {
     public Panel {
       series = List.copyOf(series);
       bands = List.copyOf(bands);
       pins = List.copyOf(pins);
+      bars = List.copyOf(bars);
+      markers = List.copyOf(markers);
+    }
+
+    public Panel(
+        String label, ValueFormat format, List<Series> series, List<Band> bands, List<Pin> pins) {
+      this(label, format, series, bands, pins, List.of(), List.of());
     }
 
     public Panel(String label, ValueFormat format, List<Series> series) {
       this(label, format, series, List.of(), List.of());
     }
   }
+
+  /**
+   * One layer of stacked bars: {@code values[i]} fills {@code [seconds[i], seconds[i] +
+   * widthSeconds)}; NaN and non-positive values draw nothing.
+   */
+  public record BarSeries(double[] seconds, double[] values, double widthSeconds, Color color) {}
 
   /** The look of a pin: a cross, a diamond, a triangle or a star. */
   public enum PinShape {

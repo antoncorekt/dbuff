@@ -42,6 +42,7 @@ public class ChartRenderer {
   private static final int PANEL_GAP = 22;
   private static final int LABEL_LANE = 20;
   private static final int MAX_LANES = 4;
+  private static final int MAX_STRIP_SHARE = 2;
   private static final int TICK_PIXELS = 36;
   private static final int PIN_RADIUS = 5;
   private static final int PIN_LANES = 3;
@@ -88,20 +89,18 @@ public class ChartRenderer {
     List<PlacedLabel> labels = new ArrayList<>();
     g.setFont(ChartFonts.plain(LABEL_SIZE));
     if (!spec.markers().isEmpty()) {
-      labels = placeLabels(g, spec, plotRight);
-      int lanes = labels.stream().mapToInt(l -> l.lane + 1).max().orElse(0);
-      markerStrip = lanes * LABEL_LANE + 4;
+      labels = placeLabels(g, spec.markers(), spec.endSeconds(), plotRight, MAX_LANES);
+      markerStrip = stripHeight(labels);
     }
     int plotTop = TOP + markerStrip;
     int plotBottom = MAX_HEIGHT - AXIS_HEIGHT - (spec.legend().isEmpty() ? 0 : LEGEND_HEIGHT);
-    List<ChartSpec.Marker> shown = labels.stream().map(l -> l.marker).toList();
     int panels = Math.max(1, spec.panels().size());
     int panelHeight = (plotBottom - plotTop - PANEL_GAP * (panels - 1)) / panels;
     Scale time = new Scale(0, Math.max(1, spec.endSeconds()), LEFT, plotRight);
 
     for (int i = 0; i < spec.panels().size(); i++) {
       int top = plotTop + i * (panelHeight + PANEL_GAP);
-      drawPanel(g, spec, spec.panels().get(i), time, top, top + panelHeight, shown);
+      drawPanel(g, spec, spec.panels().get(i), time, top, top + panelHeight);
     }
     drawTimeAxis(g, time, plotBottom);
     for (PlacedLabel label : labels) {
@@ -111,13 +110,15 @@ public class ChartRenderer {
   }
 
   private void drawPanel(
-      Graphics2D g,
-      ChartSpec spec,
-      ChartSpec.Panel panel,
-      Scale time,
-      int top,
-      int bottom,
-      List<ChartSpec.Marker> markers) {
+      Graphics2D g, ChartSpec spec, ChartSpec.Panel panel, Scale time, int panelTop, int bottom) {
+    g.setFont(ChartFonts.plain(LABEL_SIZE));
+    int ownLanes =
+        Math.min(MAX_LANES, Math.max(0, ((bottom - panelTop) / MAX_STRIP_SHARE - 4) / LABEL_LANE));
+    List<PlacedLabel> own =
+        panel.markers().isEmpty() || ownLanes == 0
+            ? List.of()
+            : placeLabels(g, panel.markers(), spec.endSeconds(), MAX_WIDTH - RIGHT, ownLanes);
+    int top = panelTop + stripHeight(own);
     Scale value = valueScale(panel, top, bottom);
     Rectangle plot = new Rectangle(LEFT, top, MAX_WIDTH - RIGHT - LEFT, bottom - top);
     g.setFont(ChartFonts.plain(LABEL_SIZE));
@@ -132,10 +133,19 @@ public class ChartRenderer {
     }
     Stream.concat(spec.bands().stream(), panel.bands().stream())
         .forEach(band -> drawBand(g, band, time, plot));
-    for (ChartSpec.Marker marker : markers) {
+    Rectangle clip = g.getClipBounds();
+    g.setClip(plot);
+    drawBars(g, panel.bars(), time, value);
+    g.setClip(clip);
+    for (ChartSpec.Marker marker : spec.markers()) {
       drawMarkerLine(g, marker, time.at(marker.seconds()), top, bottom);
     }
-    Rectangle clip = g.getClipBounds();
+    for (ChartSpec.Marker marker : panel.markers()) {
+      drawMarkerLine(g, marker, time.at(marker.seconds()), top, bottom);
+    }
+    for (PlacedLabel label : own) {
+      drawMarkerLabel(g, label, panelTop);
+    }
     g.setClip(plot);
     panel.series().forEach(s -> drawSeries(g, s, time, value, plot));
     drawPins(g, panel, time, value, plot);
@@ -144,6 +154,37 @@ public class ChartRenderer {
     g.setFont(ChartFonts.bold(LABEL_SIZE));
     g.drawString(panel.label(), LEFT + 8, top + g.getFontMetrics().getAscent() + 2);
     drawCaptions(g, panel, plot);
+  }
+
+  private static int stripHeight(List<PlacedLabel> labels) {
+    int lanes = labels.stream().mapToInt(l -> l.lane + 1).max().orElse(0);
+    return lanes == 0 ? 0 : lanes * LABEL_LANE + 4;
+  }
+
+  private static int barCount(List<ChartSpec.BarSeries> bars) {
+    return bars.stream()
+        .mapToInt(b -> Math.min(b.seconds().length, b.values().length))
+        .min()
+        .orElse(0);
+  }
+
+  private void drawBars(Graphics2D g, List<ChartSpec.BarSeries> bars, Scale time, Scale value) {
+    int count = barCount(bars);
+    for (int i = 0; i < count; i++) {
+      double base = 0;
+      for (ChartSpec.BarSeries bar : bars) {
+        double v = bar.values()[i];
+        if (Double.isNaN(v) || v <= 0) {
+          continue;
+        }
+        int left = time.at(bar.seconds()[i]);
+        int right = time.at(bar.seconds()[i] + bar.widthSeconds());
+        int top = value.at(base + v);
+        g.setColor(bar.color());
+        g.fillRect(left, top, Math.max(1, right - left - 1), value.at(base) - top);
+        base += v;
+      }
+    }
   }
 
   private void drawPins(
@@ -374,24 +415,27 @@ public class ChartRenderer {
 
   private record PlacedLabel(ChartSpec.Marker marker, int x, int width, int lane) {}
 
-  private List<PlacedLabel> placeLabels(Graphics2D g, ChartSpec spec, int plotRight) {
+  private List<PlacedLabel> placeLabels(
+      Graphics2D g,
+      List<ChartSpec.Marker> markers,
+      double endSeconds,
+      int plotRight,
+      int maxLanes) {
     FontMetrics fm = g.getFontMetrics();
-    Scale time = new Scale(0, Math.max(1, spec.endSeconds()), LEFT, plotRight);
+    Scale time = new Scale(0, Math.max(1, endSeconds), LEFT, plotRight);
     List<PlacedLabel> placed = new ArrayList<>();
     List<ChartSpec.Marker> ordered =
-        spec.markers().stream()
-            .sorted(Comparator.comparingDouble(ChartSpec.Marker::seconds))
-            .toList();
+        markers.stream().sorted(Comparator.comparingDouble(ChartSpec.Marker::seconds)).toList();
     for (ChartSpec.Marker marker : ordered) {
       marker = fitted(marker, fm, plotRight - LEFT);
       int width = fm.stringWidth(marker.label()) + 8;
       int anchor = time.at(marker.seconds());
       int x = Math.max(LEFT, Math.min(anchor - 4, plotRight - width));
       int lane = 0;
-      while (lane < MAX_LANES && overlaps(placed, x, width, lane)) {
+      while (lane < maxLanes && overlaps(placed, x, width, lane)) {
         lane++;
       }
-      if (lane < MAX_LANES) {
+      if (lane < maxLanes) {
         placed.add(new PlacedLabel(marker, x, width, lane));
       }
     }
@@ -467,6 +511,16 @@ public class ChartRenderer {
           low = Math.min(low, v);
         }
       }
+    }
+    int count = barCount(panel.bars());
+    for (int i = 0; i < count; i++) {
+      double stack = 0;
+      for (ChartSpec.BarSeries bar : panel.bars()) {
+        if (!Double.isNaN(bar.values()[i]) && bar.values()[i] > 0) {
+          stack += bar.values()[i];
+        }
+      }
+      high = Math.max(high, stack);
     }
     double span = Math.max(1, Math.max(high, -low));
     double upper = high > 0 ? niceCeil(high * 1.1) : MIN_MARGIN * span;

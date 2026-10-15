@@ -19,6 +19,7 @@ public class ReplayReportProperties {
   private static final double MAX_LANE_MARGIN = 2;
   private static final int MAX_OPENING_RUNE_MINUTES = 30;
   private static final int MAX_BEHAVIOUR_LINES = 10;
+  private static final int MAX_GRAPH_FARM_HEROES = 5;
   private static final int MAX_GRAPH_HEROES = 3;
   private static final double MAX_OBJECTIVE_DISTANCE = 20000;
 
@@ -66,6 +67,9 @@ public class ReplayReportProperties {
 
   /** The most lines the items section lists. */
   private int maxItemLines = 4;
+
+  /** The most heroes the farm graph draws, one panel each. */
+  private int graphFarmMaxHeroes = 2;
 
   /** The most heroes the income graph draws, tracked heroes first. */
   private int graphIncomeMaxHeroes = 2;
@@ -137,6 +141,7 @@ public class ReplayReportProperties {
     requireRange("max-smoke-lines", maxSmokeLines, 1, MAX_BEHAVIOUR_LINES);
     requireRange("max-objective-lines", maxObjectiveLines, 1, MAX_BEHAVIOUR_LINES);
     requireRange("max-item-lines", maxItemLines, 1, MAX_BEHAVIOUR_LINES);
+    requireRange("graph-farm-max-heroes", graphFarmMaxHeroes, 1, MAX_GRAPH_FARM_HEROES);
     requireRange("max-outlier-lines", maxOutlierLines, 1, MAX_BEHAVIOUR_LINES);
     requireRange("graph-income-max-heroes", graphIncomeMaxHeroes, 1, MAX_GRAPH_HEROES);
     requireRange("max-vision-lines", maxVisionLines, 1, MAX_BEHAVIOUR_LINES);

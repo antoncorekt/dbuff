@@ -103,6 +103,159 @@ class ChartRendererTest {
   }
 
   @Test
+  void barsAndPanelMarkersDrawAndChangeTheFingerprint() throws IOException {
+    java.util.function.Function<Double, ChartSpec> farm =
+        gold ->
+            new ChartSpec(
+                "Farm",
+                300,
+                java.util.List.of(
+                    new ChartSpec.Panel(
+                        "Pudge",
+                        ChartSpec.ValueFormat.COMPACT,
+                        java.util.List.of(),
+                        java.util.List.of(),
+                        java.util.List.of(),
+                        java.util.List.of(
+                            new ChartSpec.BarSeries(
+                                new double[] {0, 60, 120, Double.NaN},
+                                new double[] {gold, Double.NaN, -5, 80},
+                                60,
+                                ChartPalette.RADIANT)),
+                        java.util.List.of(
+                            new ChartSpec.Marker(
+                                90, "Battle Fury (1:30), paid back at 5:00", ChartPalette.DIRE)))),
+                java.util.List.of(),
+                java.util.List.of(),
+                java.util.List.of());
+
+    byte[] png = renderer.render(farm.apply(120.0));
+
+    assertThat(decode(png).getHeight()).isEqualTo(ChartRenderer.MAX_HEIGHT);
+    assertThat(png.length).isGreaterThan(2000);
+    assertThat(farm.apply(120.0).fingerprint()).isNotEqualTo(farm.apply(121.0).fingerprint());
+  }
+
+  private static ChartSpec.Panel barPanel(String label, int labels) {
+    java.util.List<ChartSpec.Marker> markers = new java.util.ArrayList<>();
+    for (int i = 0; i < labels; i++) {
+      markers.add(
+          new ChartSpec.Marker(
+              100 + i * 20,
+              "Battle Fury and a very long item name (14:40), paid back at 31:40",
+              ChartPalette.DIRE));
+    }
+    return new ChartSpec.Panel(
+        label,
+        ChartSpec.ValueFormat.COMPACT,
+        java.util.List.of(),
+        java.util.List.of(),
+        java.util.List.of(),
+        java.util.List.of(
+            new ChartSpec.BarSeries(
+                new double[] {0, 60, 120}, new double[] {300, 400, 500}, 60, ChartPalette.RADIANT)),
+        markers);
+  }
+
+  @Test
+  void fiveCrowdedPanelsKeepTheirPlotsAndTheirMarkerLines() throws IOException {
+    java.util.List<ChartSpec.Panel> panels = new java.util.ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      panels.add(barPanel("Hero " + i, 4));
+    }
+    ChartSpec spec =
+        new ChartSpec(
+            "Crowded", 600, panels, java.util.List.of(), java.util.List.of(), java.util.List.of());
+
+    BufferedImage image = decode(renderer.render(spec));
+
+    int markerLine = ChartPalette.DIRE.getRGB();
+    int barPixels = 0;
+    int lineColumns = 0;
+    for (int x = 64; x < 980; x++) {
+      boolean line = false;
+      for (int y = 40; y < 470; y++) {
+        int rgb = image.getRGB(x, y);
+        line |= rgb == markerLine;
+        if (rgb != 0xFFFFFFFF && (rgb & 0xFF) < 0x80 && ((rgb >> 8) & 0xFF) > 0x90) {
+          barPixels++;
+        }
+      }
+      lineColumns += line ? 1 : 0;
+    }
+    assertThat(barPixels).as("bars are still drawn in every panel").isGreaterThan(500);
+    assertThat(lineColumns).as("marker lines are kept even without labels").isGreaterThan(0);
+  }
+
+  @Test
+  void globalAndPanelMarkersLineUpOnTheSameTimeAxis() throws IOException {
+    ChartSpec.Panel panel = barPanel("Hero", 0);
+    ChartSpec.Panel withOwn =
+        new ChartSpec.Panel(
+            panel.label(),
+            panel.format(),
+            panel.series(),
+            java.util.List.of(),
+            java.util.List.of(),
+            panel.bars(),
+            java.util.List.of(new ChartSpec.Marker(300, "Own", new java.awt.Color(0x0000FF))));
+    ChartSpec spec =
+        new ChartSpec(
+            "Mixed",
+            600,
+            java.util.List.of(withOwn, panel),
+            java.util.List.of(),
+            java.util.List.of(new ChartSpec.Marker(300, "Global", new java.awt.Color(0xFF00FF))),
+            java.util.List.of());
+
+    BufferedImage image = decode(renderer.render(spec));
+
+    int x = 64 + (int) Math.round(300 / 600.0 * (1000 - 20 - 64));
+    assertThat(columnHas(image, x, 0xFF00FF, 300, 470))
+        .as("global line in the lower panel")
+        .isTrue();
+    assertThat(columnHas(image, x, 0x0000FF, 60, 250)).as("own line in the first panel").isTrue();
+    assertThat(columnHas(image, x, 0x0000FF, 300, 470)).as("own line stays in its panel").isFalse();
+  }
+
+  private static boolean columnHas(BufferedImage image, int x, int rgb, int fromY, int toY) {
+    for (int y = fromY; y < toY; y++) {
+      for (int dx = -1; dx <= 1; dx++) {
+        if ((image.getRGB(x + dx, y) & 0xFFFFFF) == rgb) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  @Test
+  void theFingerprintSeesEveryDigitOfEveryNumber() {
+    java.util.function.DoubleFunction<ChartSpec> spec =
+        v ->
+            new ChartSpec(
+                "T",
+                600,
+                java.util.List.of(
+                    new ChartSpec.Panel(
+                        "P",
+                        ChartSpec.ValueFormat.COMPACT,
+                        java.util.List.of(),
+                        java.util.List.of(),
+                        java.util.List.of(),
+                        java.util.List.of(
+                            new ChartSpec.BarSeries(
+                                new double[] {0}, new double[] {v}, 60, ChartPalette.RADIANT)),
+                        java.util.List.of())),
+                java.util.List.of(),
+                java.util.List.of(),
+                java.util.List.of());
+
+    assertThat(spec.apply(1.0).fingerprint()).hasSize(64).isEqualTo(spec.apply(1.0).fingerprint());
+    assertThat(spec.apply(1.0).fingerprint()).isNotEqualTo(spec.apply(1.0000000001).fingerprint());
+  }
+
+  @Test
   void panelBandsPinsAndLegendShapesDrawEvenOutsideTheSeries() throws IOException {
     ChartSpec.Series series =
         new ChartSpec.Series(
