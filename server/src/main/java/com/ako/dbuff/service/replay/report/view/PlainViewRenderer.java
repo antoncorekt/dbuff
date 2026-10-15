@@ -35,6 +35,9 @@ public class PlainViewRenderer implements ViewRenderer {
   @Override
   public List<ReportMessage> render(SectionView view) {
     List<String> lines = lines(view);
-    return lines.isEmpty() ? List.of() : List.of(new ReportMessage.Plain(String.join("\n", lines)));
+    if (lines.isEmpty() && view.image() == null) {
+      return List.of();
+    }
+    return List.of(new ReportMessage.Plain(String.join("\n", lines), view.image()));
   }
 }

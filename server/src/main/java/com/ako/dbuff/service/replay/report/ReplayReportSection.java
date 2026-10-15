@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
+import com.ako.dbuff.service.replay.report.view.ImageAttachment;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
 import java.util.Optional;
@@ -47,6 +48,14 @@ public interface ReplayReportSection {
 
   /** The text of the section, empty when there is nothing worth saying. */
   List<String> lines(ReplayReportInput input);
+
+  /**
+   * An image posted with the section's text when the report is plain text; the section's view
+   * carries the same image for Components V2. None unless a section draws one.
+   */
+  default Optional<ImageAttachment> image(ReplayReportInput input) {
+    return Optional.empty();
+  }
 
   /**
    * The section as a view for the renderers. A section that has not moved to views shows its lines

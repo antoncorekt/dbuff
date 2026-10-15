@@ -73,6 +73,7 @@ import com.ako.dbuff.service.replay.report.DraftBoardSection;
 import com.ako.dbuff.service.replay.report.DraftSection;
 import com.ako.dbuff.service.replay.report.EndGameSection;
 import com.ako.dbuff.service.replay.report.FightSection;
+import com.ako.dbuff.service.replay.report.GraphAdvantageSection;
 import com.ako.dbuff.service.replay.report.ImportantFightsSection;
 import com.ako.dbuff.service.replay.report.ItemsSection;
 import com.ako.dbuff.service.replay.report.LanesSection;
@@ -85,6 +86,7 @@ import com.ako.dbuff.service.replay.report.RotationsSection;
 import com.ako.dbuff.service.replay.report.SmokeSection;
 import com.ako.dbuff.service.replay.report.SwingSection;
 import com.ako.dbuff.service.replay.report.VisionSection;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -132,6 +134,7 @@ import static org.assertj.core.api.Assertions.within;
 class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
 
   private static final String[] MATCHES = {"9040889566", "9040892342"};
+  private static final String GRAPH_MATCH = "9044252857";
   private static final String[] ABILITY_DRAFT_MATCHES = {"9038725154", "9037038717"};
 
   @Autowired private AbilityDraftPickRepo draftPickRepo;
@@ -187,6 +190,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private MovementSection movementSection;
   @Autowired private DraftSection draftSection;
   @Autowired private DraftBoardSection draftBoardSection;
+  @Autowired private GraphAdvantageSection graphAdvantageSection;
   @Autowired private CompositionSection compositionSection;
   @Autowired private PlayerGameStatisticRepo playerStatRepo;
   @Autowired private HeroKits heroKits;
@@ -342,6 +346,25 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                   .map(d -> d.getAbilityName())
                   .toList());
     }
+  }
+
+  @Test
+  @Commit
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void theAdvantageGraphOfARealMatchIsDrawnFromWhatWasStored() throws Exception {
+    Assumptions.assumeTrue(hasFixture(GRAPH_MATCH), GRAPH_MATCH + " fixture missing");
+    MatchDomain match = seedMatch(GRAPH_MATCH);
+    assertThat(runService.process(match)).isEqualTo(ReplayStatus.DONE);
+    ReplayReportInput input =
+        new ReplayReportInput(match.getId(), match, Set.of(0L, 1L, 2L, 3L, 4L), Map.of(), 4);
+
+    SectionView view = graphAdvantageSection.view(input).orElseThrow();
+
+    assertThat(view.image()).as("the graph was drawn").isNotNull();
+    System.out.println("GRAPH ADVANTAGE " + String.join(" | ", graphAdvantageSection.lines(input)));
+    Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
+    Files.createDirectories(dir);
+    Files.write(dir.resolve("graph-advantage.png"), view.image().bytes());
   }
 
   private void assertReplayMeters() {

@@ -29,6 +29,9 @@ public final class MessageLimits {
   /** The header text block of a card and the divider under it. */
   public static final int HEADER_COMPONENTS = 2;
 
+  /** The media gallery of a card with an image and the one item it holds. */
+  public static final int IMAGE_COMPONENTS = 2;
+
   /** The longest page marker, kept free in the header of a card that may be split. */
   public static final String PAGE_MARKER_RESERVE = " (99/99)";
 

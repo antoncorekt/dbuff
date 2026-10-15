@@ -7,10 +7,20 @@ import java.util.regex.Pattern;
 
 /**
  * What a report section says, independent of how it is shown. {@code title} may be blank when the
- * bullets carry their own header; {@code verdict} and {@code footnote} may be null.
+ * bullets carry their own header; {@code verdict}, {@code footnote} and {@code image} may be null.
  */
 public record SectionView(
-    String title, String verdict, Accent accent, List<String> bullets, String footnote) {
+    String title,
+    String verdict,
+    Accent accent,
+    List<String> bullets,
+    String footnote,
+    ImageAttachment image) {
+
+  public SectionView(
+      String title, String verdict, Accent accent, List<String> bullets, String footnote) {
+    this(title, verdict, accent, bullets, footnote, null);
+  }
 
   public SectionView {
     Objects.requireNonNull(accent, "accent");
