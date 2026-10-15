@@ -11,6 +11,10 @@ public interface AbilityDraftPickRepo extends JpaRepository<AbilityDraftPickDoma
 
   java.util.List<AbilityDraftPickDomain> findByMatchId(Long matchId);
 
+  @Query(
+      "select distinct d.abilityName from AbilityDraftPickDomain d where d.abilityName is not null")
+  java.util.List<String> findDistinctAbilityNames();
+
   @Transactional
   @Modifying
   @Query("delete from AbilityDraftPickDomain d where d.matchId = :matchId")
