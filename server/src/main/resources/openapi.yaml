@@ -41,6 +41,8 @@ tags:
     description: Match parsing, processing, reports and AI analysis
   - name: Replay
     description: Replay run status, the stored replay analysis and re-running the analyzers
+  - name: Skills
+    description: Stored skill statistics of Ability Draft matches (last months of games, no minimum count)
   - name: Discord
     description: Owner operations on the bot's Discord assets (application emoji)
   - name: Register
@@ -1051,6 +1053,60 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/v1/skills/match/{matchId}:
+    get:
+      tags: [Skills]
+      summary: Stored skill statistics of a match
+      description: |
+        Per player of an Ability Draft match: the hero, each skill held, the hero with each skill
+        and each pair of skills held, as games and wins in the Ability Draft games of the window
+        before the match (the match itself left out). Each list is ordered by the Wilson lower
+        bound (rankScore), which only ranks; winRate is the raw rate. liftPoints is set for pairs.
+      operationId: getSkillStatsOfMatch
+      parameters:
+        - $ref: '#/components/parameters/ReplayMatchIdParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillStatMatchResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Nothing is stored for the match (not an Ability Draft match, not analysed yet or no abilities)
+  /api/v1/skills/hero/{heroId}:
+    get:
+      tags: [Skills]
+      summary: Stored skill statistics of a hero from its latest match
+      description: |
+        The figures of the hero and of the hero with each skill from ONE match: the latest (by
+        match start time) in which that hero played and has stored rows, so all of them share
+        one window (matchId and windowMonths on each entry).
+      operationId: getSkillStatsOfHero
+      parameters:
+        - name: heroId
+          in: path
+          required: true
+          description: OpenDota hero id
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SkillStat'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Nothing is stored for the hero
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -1183,6 +1239,68 @@ components:
         type: string
 
   schemas:
+    SkillStatMatchResponse:
+      type: object
+      properties:
+        matchId:
+          type: integer
+          format: int64
+        players:
+          type: array
+          items:
+            type: object
+            properties:
+              playerSlot:
+                type: integer
+                format: int64
+              heroId:
+                type: integer
+                format: int64
+              stats:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SkillStat'
+    SkillStat:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [HERO, SKILL, HERO_SKILL, SKILL_PAIR]
+        firstId:
+          type: integer
+          format: int64
+          description: The hero (HERO, HERO_SKILL), the skill (SKILL) or the lower skill id of a pair
+        secondId:
+          type: integer
+          format: int64
+          nullable: true
+          description: The skill of HERO_SKILL or the higher skill id of a pair
+        matchId:
+          type: integer
+          format: int64
+          description: The match the row was stored for
+        games:
+          type: integer
+          format: int64
+        wins:
+          type: integer
+          format: int64
+        winRate:
+          type: number
+          nullable: true
+          description: wins / games, null with no games
+        liftPoints:
+          type: number
+          nullable: true
+          description: For pairs, percentage points above the average of the two skills' rates in games without the pair
+        rankScore:
+          type: number
+          description: Wilson lower bound of the win rate; only for ranking
+        windowMonths:
+          type: integer
+        text:
+          type: string
+          description: The figure in plain words
     ErrorResponse:
       type: object
       description: "Error body of the register endpoints."
