@@ -1,10 +1,13 @@
 package com.ako.dbuff.service.replay.report.chart;
 
 import java.awt.Color;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 
@@ -29,40 +32,82 @@ public record ChartSpec(
     legend = List.copyOf(legend);
   }
 
-  /** A short digest of everything drawn, so a cache key can tell two different pictures apart. */
+  /**
+   * A digest of everything drawn (SHA-256 over a canonical encoding, every number written in full),
+   * so a cache key can tell two different pictures apart.
+   */
   public String fingerprint() {
-    StringBuilder all = new StringBuilder(title).append('|').append(endSeconds);
-    panels.forEach(
-        p -> {
-          all.append('|').append(p.label()).append(p.format());
-          p.bars()
-              .forEach(
-                  b ->
-                      all.append(Arrays.hashCode(b.seconds()))
-                          .append(',')
-                          .append(Arrays.hashCode(b.values()))
-                          .append(b.widthSeconds())
-                          .append(b.color()));
-          all.append(p.markers());
-          p.series()
-              .forEach(
-                  s ->
-                      all.append(Arrays.hashCode(s.seconds()))
-                          .append(',')
-                          .append(Arrays.hashCode(s.values()))
-                          .append(s.positive())
-                          .append(s.positiveCaption())
-                          .append(s.negative())
-                          .append(s.negativeCaption()));
-        });
-    all.append(bands).append(markers).append(legend);
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    try (DataOutputStream out = new DataOutputStream(bytes)) {
+      text(out, title);
+      out.writeDouble(endSeconds);
+      out.writeInt(panels.size());
+      for (Panel p : panels) {
+        text(out, p.label());
+        text(out, p.format().name());
+        out.writeInt(p.series().size());
+        for (Series s : p.series()) {
+          doubles(out, s.seconds());
+          doubles(out, s.values());
+          out.writeInt(s.positive().getRGB());
+          text(out, s.positiveCaption());
+          out.writeInt(s.negative().getRGB());
+          text(out, s.negativeCaption());
+        }
+        out.writeInt(p.bars().size());
+        for (BarSeries b : p.bars()) {
+          doubles(out, b.seconds());
+          doubles(out, b.values());
+          out.writeDouble(b.widthSeconds());
+          out.writeInt(b.color().getRGB());
+        }
+        markers(out, p.markers());
+      }
+      out.writeInt(bands.size());
+      for (Band b : bands) {
+        out.writeDouble(b.startSeconds());
+        out.writeDouble(b.endSeconds());
+        out.writeInt(b.color().getRGB());
+      }
+      markers(out, markers);
+      out.writeInt(legend.size());
+      for (LegendEntry l : legend) {
+        out.writeInt(l.color().getRGB());
+        text(out, l.text());
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
     try {
-      byte[] digest =
-          MessageDigest.getInstance("SHA-256")
-              .digest(all.toString().getBytes(StandardCharsets.UTF_8));
-      return HexFormat.of().formatHex(digest, 0, 8);
+      return HexFormat.of()
+          .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException(e);
+    }
+  }
+
+  private static void text(DataOutputStream out, String value) throws IOException {
+    out.writeBoolean(value != null);
+    if (value != null) {
+      byte[] utf8 = value.getBytes(StandardCharsets.UTF_8);
+      out.writeInt(utf8.length);
+      out.write(utf8);
+    }
+  }
+
+  private static void doubles(DataOutputStream out, double[] values) throws IOException {
+    out.writeInt(values.length);
+    for (double v : values) {
+      out.writeDouble(v);
+    }
+  }
+
+  private static void markers(DataOutputStream out, List<Marker> markers) throws IOException {
+    out.writeInt(markers.size());
+    for (Marker m : markers) {
+      out.writeDouble(m.seconds());
+      text(out, m.label());
+      out.writeInt(m.color().getRGB());
     }
   }
 

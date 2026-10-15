@@ -13,6 +13,8 @@ import com.ako.dbuff.service.replay.report.chart.ChartSpec;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -21,6 +23,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -62,39 +65,50 @@ public class FarmChartBuilder {
     Map<Long, String> names = heroNames.bySlot(matchId);
     Map<Long, List<ItemEfficiency>> items = farmingItems(matchId);
     Map<Long, HeroFarm> farms = farms(matchId);
-    List<HeroFarm> shown = choose(farms, focusSlots, maxHeroes);
-    if (shown.isEmpty()) {
+    if (farms.isEmpty()) {
       return noCreepKills(items, focusSlots, names, maxHeroes);
     }
     Map<Long, List<PlayerActivitySegmentDomain>> segments = segments(matchId);
+    Chosen chosen = choose(farms, items, focusSlots, maxHeroes);
     List<String> sentences = new ArrayList<>();
     List<ChartSpec.Panel> panels = new ArrayList<>();
-    int minutes = Math.max(1, shown.stream().mapToInt(f -> f.lane().length).max().orElse(1));
-    boolean paid = false;
-    boolean unpaid = false;
-    for (HeroFarm farm : shown) {
+    Map<Long, List<ChartSpec.Marker>> markers = new HashMap<>();
+    int minutes = 1;
+    for (HeroFarm farm : chosen.heroes()) {
+      List<ChartSpec.Marker> own = markers(items.getOrDefault(farm.slot(), List.of()));
+      markers.put(farm.slot(), own);
+      minutes = Math.max(minutes, farm.lane().length);
+      for (ChartSpec.Marker marker : own) {
+        minutes = Math.max(minutes, (int) (marker.seconds() / MINUTE) + 1);
+      }
+    }
+    minutes = Math.min(minutes, HeroFarm.MAX_MINUTES);
+    Set<Color> used = new HashSet<>();
+    for (HeroFarm farm : chosen.heroes()) {
       List<ItemEfficiency> heroItems = items.getOrDefault(farm.slot(), List.of());
       String name = name(names, farm.slot());
       sentences.add(sentence(name, farm, segments.getOrDefault(farm.slot(), List.of()), heroItems));
-      List<ChartSpec.Marker> markers = markers(heroItems);
-      paid |= markers.stream().anyMatch(m -> m.color() == PAID_BACK);
-      unpaid |= markers.stream().anyMatch(m -> m.color() == NOT_PAID_BACK);
-      panels.add(panel(name, farm, minutes, markers));
+      markers.get(farm.slot()).forEach(m -> used.add(m.color()));
+      panels.add(panel(name, farm, minutes, markers.get(farm.slot())));
     }
     List<ChartSpec.LegendEntry> legend = new ArrayList<>();
     legend.add(new ChartSpec.LegendEntry(LANE, "Lane creeps"));
     legend.add(new ChartSpec.LegendEntry(JUNGLE, "Camps"));
-    if (paid) {
+    if (used.contains(PAID_BACK)) {
       legend.add(new ChartSpec.LegendEntry(PAID_BACK, "Item paid back"));
     }
-    if (unpaid) {
+    if (used.contains(NOT_PAID_BACK)) {
       legend.add(new ChartSpec.LegendEntry(NOT_PAID_BACK, "Item not paid back"));
+    }
+    if (used.contains(UNKNOWN)) {
+      legend.add(new ChartSpec.LegendEntry(UNKNOWN, "Payback unknown"));
     }
     ChartSpec spec =
         new ChartSpec(
             "Farm gold per minute", minutes * MINUTE, panels, List.of(), List.of(), legend);
     return Optional.of(
-        new FarmChart(spec, sentences.get(0), sentences.subList(1, sentences.size())));
+        new FarmChart(
+            spec, chosen.note() + sentences.get(0), sentences.subList(1, sentences.size())));
   }
 
   private Optional<FarmChart> noCreepKills(
@@ -102,18 +116,22 @@ public class FarmChartBuilder {
       Set<Long> focusSlots,
       Map<Long, String> names,
       int maxHeroes) {
-    List<Long> slots =
-        items.keySet().stream()
-            .filter(s -> focusSlots == null || focusSlots.isEmpty() || focusSlots.contains(s))
-            .sorted()
-            .limit(maxHeroes)
-            .toList();
     if (items.isEmpty()) {
       return Optional.empty();
     }
+    List<Long> tracked = items.keySet().stream().filter(s -> isTracked(focusSlots, s)).toList();
     List<String> lines =
-        slots.stream().map(s -> itemSentence(name(names, s), items.get(s))).toList();
+        (tracked.isEmpty() ? items.keySet().stream().toList() : tracked)
+            .stream()
+                .sorted()
+                .limit(Math.max(1, maxHeroes))
+                .map(s -> itemSentence(name(names, s), items.get(s)))
+                .toList();
     return Optional.of(new FarmChart(null, NO_CREEP_KILLS, lines));
+  }
+
+  private static boolean isTracked(Set<Long> focusSlots, long slot) {
+    return focusSlots != null && focusSlots.contains(slot);
   }
 
   private static String name(Map<Long, String> names, long slot) {
@@ -135,23 +153,39 @@ public class FarmChartBuilder {
         .collect(Collectors.toMap(HeroFarm::slot, f -> f));
   }
 
-  private static List<HeroFarm> choose(
-      Map<Long, HeroFarm> farms, Set<Long> focusSlots, int maxHeroes) {
+  /** The heroes to draw, and the words to put before the verdict when they are not the tracked. */
+  private record Chosen(List<HeroFarm> heroes, String note) {}
+
+  private static Chosen choose(
+      Map<Long, HeroFarm> farms,
+      Map<Long, List<ItemEfficiency>> items,
+      Set<Long> focusSlots,
+      int maxHeroes) {
+    int cap = Math.max(1, maxHeroes);
     List<HeroFarm> tracked =
-        farms.values().stream()
-            .filter(f -> focusSlots != null && focusSlots.contains(f.slot()))
-            .sorted(Comparator.comparingLong(HeroFarm::slot))
+        Stream.concat(farms.keySet().stream(), items.keySet().stream())
+            .distinct()
+            .filter(s -> isTracked(focusSlots, s))
+            .sorted()
+            .map(s -> farms.getOrDefault(s, HeroFarm.none(s)))
+            .limit(cap)
             .toList();
-    List<HeroFarm> pool =
-        tracked.isEmpty()
-            ? farms.values().stream()
-                .sorted(
-                    Comparator.comparingDouble(HeroFarm::totalGold)
-                        .reversed()
-                        .thenComparingLong(HeroFarm::slot))
-                .toList()
-            : tracked;
-    return pool.stream().limit(Math.max(1, maxHeroes)).toList();
+    if (!tracked.isEmpty()) {
+      return new Chosen(tracked, "");
+    }
+    List<HeroFarm> top =
+        farms.values().stream()
+            .sorted(
+                Comparator.comparingDouble(HeroFarm::totalGold)
+                    .reversed()
+                    .thenComparingLong(HeroFarm::slot))
+            .limit(cap)
+            .toList();
+    return new Chosen(
+        top,
+        focusSlots == null || focusSlots.isEmpty()
+            ? "No players are tracked; showing the top farmers. "
+            : "None of your players farmed; showing the top farmers. ");
   }
 
   private Map<Long, List<PlayerActivitySegmentDomain>> segments(long matchId) {
@@ -243,6 +277,9 @@ public class FarmChartBuilder {
       HeroFarm farm,
       List<PlayerActivitySegmentDomain> segments,
       List<ItemEfficiency> items) {
+    if (farm.totalGold() <= 0) {
+      return itemSentence(name, items);
+    }
     String where =
         switch (farm.mix()) {
           case JUNGLE -> {

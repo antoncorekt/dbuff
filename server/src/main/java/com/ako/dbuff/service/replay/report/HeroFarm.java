@@ -17,6 +17,11 @@ record HeroFarm(long slot, double[] lane, double[] neutral) {
   private static final int WINDOW_MINUTES = 3;
   private static final double MOSTLY = 0.6;
 
+  /** A hero with no farm gold at all. */
+  static HeroFarm none(long slot) {
+    return new HeroFarm(slot, new double[0], new double[0]);
+  }
+
   static HeroFarm of(long slot, List<CreepKillDomain> kills) {
     int minutes = 0;
     for (CreepKillDomain k : kills) {
@@ -86,24 +91,23 @@ record HeroFarm(long slot, double[] lane, double[] neutral) {
 
   /**
    * The game second from which the hero lived in the jungle: the first minute from which camps
-   * outearned lanes both over the next few minutes and over the rest of the game, moved back to the
-   * start of the jungle stretch that was under way then.
+   * outearned lanes both over the next few minutes and over the rest of the game, or the start of
+   * the first jungle stretch that reaches into that minute, whichever is later.
    */
   OptionalInt jungleFrom(List<PlayerActivitySegmentDomain> segments) {
     for (int m = 0; m < neutral.length; m++) {
       if (sum(neutral, m, m + WINDOW_MINUTES) > sum(lane, m, m + WINDOW_MINUTES)
           && sum(neutral, m) > sum(lane, m)) {
         int minuteStart = (int) (m * SECONDS_PER_MINUTE);
-        int earliest = (int) (minuteStart - SECONDS_PER_MINUTE);
         int from =
             segments.stream()
                 .filter(s -> Activity.JUNGLE_FARM.name().equals(s.getActivity()))
                 .filter(s -> s.getStartSeconds() != null && s.getEndSeconds() != null)
-                .filter(s -> s.getEndSeconds() > earliest)
+                .filter(s -> s.getEndSeconds() > minuteStart)
                 .mapToInt(PlayerActivitySegmentDomain::getStartSeconds)
                 .min()
                 .orElse(minuteStart);
-        return OptionalInt.of(Math.max(from, Math.max(0, earliest)));
+        return OptionalInt.of(Math.max(from, minuteStart));
       }
     }
     return OptionalInt.empty();

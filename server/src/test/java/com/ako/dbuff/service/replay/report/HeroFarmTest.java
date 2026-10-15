@@ -77,4 +77,21 @@ class HeroFarmTest {
     assertThat(farm.jungleFrom(List.of(jungle(0, 100)))).isEmpty();
     assertThat(farm.mix()).isEqualTo(HeroFarm.Mix.LANE);
   }
+
+  @Test
+  void anEarlyUnrelatedOrVeryLongSegmentDoesNotMoveTheStartBackBeforeTheJungleMinute() {
+    java.util.ArrayList<CreepKillDomain> kills = new java.util.ArrayList<>();
+    for (int m = 0; m < 12; m++) {
+      kills.add(kill("LANE_MELEE", m * 60.0, 100, false));
+    }
+    for (int m = 12; m < 20; m++) {
+      kills.add(kill("NEUTRAL", m * 60.0, 300, false));
+    }
+    HeroFarm farm = HeroFarm.of(1, kills);
+
+    assertThat(farm.jungleFrom(List.of(jungle(60, 120), jungle(100, 5000))).getAsInt())
+        .isEqualTo(600);
+    assertThat(farm.jungleFrom(List.of(jungle(60, 120), jungle(760, 800))).getAsInt())
+        .isEqualTo(760);
+  }
 }

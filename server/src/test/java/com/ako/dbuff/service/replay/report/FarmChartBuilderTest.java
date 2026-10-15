@@ -7,6 +7,7 @@ import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
 import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
 import com.ako.dbuff.service.replay.report.FarmChartBuilder.FarmChart;
 import com.ako.dbuff.service.replay.report.chart.ChartRenderer;
+import com.ako.dbuff.service.replay.report.chart.ChartSpec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -162,5 +163,54 @@ class FarmChartBuilderTest {
 
     assertThat(chart.verdict()).startsWith("Player 0 farmed mostly in the jungle");
     assertThat(chart.spec().panels().get(0).markers()).isEmpty();
+  }
+
+  @Test
+  void theAxisReachesAnItemBoughtAfterTheLastFarmMinuteAndTheLegendNamesUnknownPayback() {
+    when(creeps.findByMatchId(1L)).thenReturn(jungleHero(0));
+    when(segments.findByMatchId(1L)).thenReturn(List.of());
+    when(names.bySlot(1L)).thenReturn(Map.of(0L, "Pudge"));
+    when(items.findByMatchId(1L)).thenReturn(List.of(item(0, 3000.0, null, null)));
+
+    ChartSpec spec = builder.build(1L, Set.of(0L), 2).orElseThrow().spec();
+
+    assertThat(spec.endSeconds()).isGreaterThan(3000);
+    assertThat(spec.legend()).extracting(l -> l.text()).contains("Payback unknown");
+  }
+
+  @Test
+  void aTrackedHeroWithoutFarmGoldButWithItemsStillAppears() {
+    when(creeps.findByMatchId(1L)).thenReturn(jungleHero(1));
+    when(segments.findByMatchId(1L)).thenReturn(List.of());
+    when(names.bySlot(1L)).thenReturn(Map.of(0L, "Pudge", 1L, "Lina"));
+    when(items.findByMatchId(1L)).thenReturn(List.of(item(0, 840.0, 1900.0, 1.4)));
+
+    FarmChart chart = builder.build(1L, Set.of(0L), 2).orElseThrow();
+
+    assertThat(chart.verdict()).isEqualTo("Pudge: Battle Fury paid back at 31:40.");
+    assertThat(chart.spec().panels()).extracting(p -> p.label()).containsExactly("Pudge");
+  }
+
+  @Test
+  void saysSoWhenNoneOfTheTrackedPlayersFarmed() {
+    when(creeps.findByMatchId(1L)).thenReturn(jungleHero(1));
+    when(segments.findByMatchId(1L)).thenReturn(List.of());
+    when(names.bySlot(1L)).thenReturn(Map.of(1L, "Lina"));
+    when(items.findByMatchId(1L)).thenReturn(List.of());
+
+    assertThat(builder.build(1L, Set.of(0L), 2).orElseThrow().verdict())
+        .startsWith("None of your players farmed; showing the top farmers. Lina farmed");
+  }
+
+  @Test
+  void withoutCreepKillsItemVerdictsFallBackToAllHeroesWhenTheTrackedHaveNone() {
+    when(creeps.findByMatchId(1L)).thenReturn(List.of());
+    when(segments.findByMatchId(1L)).thenReturn(List.of());
+    when(names.bySlot(1L)).thenReturn(Map.of(1L, "Lina"));
+    when(items.findByMatchId(1L)).thenReturn(List.of(item(1, 840.0, 1900.0, 1.4)));
+
+    FarmChart chart = builder.build(1L, Set.of(0L), 0).orElseThrow();
+
+    assertThat(chart.lines()).containsExactly("Lina: Battle Fury paid back at 31:40.");
   }
 }

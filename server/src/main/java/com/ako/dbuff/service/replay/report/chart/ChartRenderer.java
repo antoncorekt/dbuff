@@ -41,6 +41,7 @@ public class ChartRenderer {
   private static final int PANEL_GAP = 22;
   private static final int LABEL_LANE = 20;
   private static final int MAX_LANES = 4;
+  private static final int MAX_STRIP_SHARE = 2;
   private static final int TICK_PIXELS = 36;
   private static final double MIN_MARGIN = 0.12;
 
@@ -84,19 +85,18 @@ public class ChartRenderer {
     List<PlacedLabel> labels = new ArrayList<>();
     g.setFont(ChartFonts.plain(LABEL_SIZE));
     if (!spec.markers().isEmpty()) {
-      labels = placeLabels(g, spec.markers(), spec.endSeconds(), plotRight);
+      labels = placeLabels(g, spec.markers(), spec.endSeconds(), plotRight, MAX_LANES);
       markerStrip = stripHeight(labels);
     }
     int plotTop = TOP + markerStrip;
     int plotBottom = MAX_HEIGHT - AXIS_HEIGHT - (spec.legend().isEmpty() ? 0 : LEGEND_HEIGHT);
-    List<ChartSpec.Marker> shown = labels.stream().map(l -> l.marker).toList();
     int panels = Math.max(1, spec.panels().size());
     int panelHeight = (plotBottom - plotTop - PANEL_GAP * (panels - 1)) / panels;
     Scale time = new Scale(0, Math.max(1, spec.endSeconds()), LEFT, plotRight);
 
     for (int i = 0; i < spec.panels().size(); i++) {
       int top = plotTop + i * (panelHeight + PANEL_GAP);
-      drawPanel(g, spec, spec.panels().get(i), time, top, top + panelHeight, shown);
+      drawPanel(g, spec, spec.panels().get(i), time, top, top + panelHeight);
     }
     drawTimeAxis(g, time, plotBottom);
     for (PlacedLabel label : labels) {
@@ -106,18 +106,14 @@ public class ChartRenderer {
   }
 
   private void drawPanel(
-      Graphics2D g,
-      ChartSpec spec,
-      ChartSpec.Panel panel,
-      Scale time,
-      int panelTop,
-      int bottom,
-      List<ChartSpec.Marker> markers) {
+      Graphics2D g, ChartSpec spec, ChartSpec.Panel panel, Scale time, int panelTop, int bottom) {
     g.setFont(ChartFonts.plain(LABEL_SIZE));
+    int ownLanes =
+        Math.min(MAX_LANES, Math.max(0, ((bottom - panelTop) / MAX_STRIP_SHARE - 4) / LABEL_LANE));
     List<PlacedLabel> own =
-        panel.markers().isEmpty()
+        panel.markers().isEmpty() || ownLanes == 0
             ? List.of()
-            : placeLabels(g, panel.markers(), spec.endSeconds(), MAX_WIDTH - RIGHT);
+            : placeLabels(g, panel.markers(), spec.endSeconds(), MAX_WIDTH - RIGHT, ownLanes);
     int top = panelTop + stripHeight(own);
     Scale value = valueScale(panel, top, bottom);
     Rectangle plot = new Rectangle(LEFT, top, MAX_WIDTH - RIGHT - LEFT, bottom - top);
@@ -141,11 +137,13 @@ public class ChartRenderer {
     g.setClip(plot);
     drawBars(g, panel.bars(), time, value);
     g.setClip(clip);
-    for (ChartSpec.Marker marker : markers) {
+    for (ChartSpec.Marker marker : spec.markers()) {
+      drawMarkerLine(g, marker, time.at(marker.seconds()), top, bottom);
+    }
+    for (ChartSpec.Marker marker : panel.markers()) {
       drawMarkerLine(g, marker, time.at(marker.seconds()), top, bottom);
     }
     for (PlacedLabel label : own) {
-      drawMarkerLine(g, label.marker, time.at(label.marker.seconds()), top, bottom);
       drawMarkerLabel(g, label, panelTop);
     }
     g.setClip(plot);
@@ -278,7 +276,11 @@ public class ChartRenderer {
   private record PlacedLabel(ChartSpec.Marker marker, int x, int width, int lane) {}
 
   private List<PlacedLabel> placeLabels(
-      Graphics2D g, List<ChartSpec.Marker> markers, double endSeconds, int plotRight) {
+      Graphics2D g,
+      List<ChartSpec.Marker> markers,
+      double endSeconds,
+      int plotRight,
+      int maxLanes) {
     FontMetrics fm = g.getFontMetrics();
     Scale time = new Scale(0, Math.max(1, endSeconds), LEFT, plotRight);
     List<PlacedLabel> placed = new ArrayList<>();
@@ -290,10 +292,10 @@ public class ChartRenderer {
       int anchor = time.at(marker.seconds());
       int x = Math.max(LEFT, Math.min(anchor - 4, plotRight - width));
       int lane = 0;
-      while (lane < MAX_LANES && overlaps(placed, x, width, lane)) {
+      while (lane < maxLanes && overlaps(placed, x, width, lane)) {
         lane++;
       }
-      if (lane < MAX_LANES) {
+      if (lane < maxLanes) {
         placed.add(new PlacedLabel(marker, x, width, lane));
       }
     }

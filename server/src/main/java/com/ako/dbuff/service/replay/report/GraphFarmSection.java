@@ -7,9 +7,11 @@ import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.ImageAttachment;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -29,9 +31,8 @@ public class GraphFarmSection implements ReplayReportSection {
   private final PlainViewRenderer plain;
   private final ReplayReportProperties properties;
 
-  private record Built(ReplayReportInput input, Optional<SectionView> view) {}
-
-  private volatile Built built;
+  private final Cache<ReplayReportInput, Optional<SectionView>> deliveries =
+      Caffeine.newBuilder().weakKeys().build();
 
   @Override
   public String name() {
@@ -58,19 +59,14 @@ public class GraphFarmSection implements ReplayReportSection {
     return view(input).map(SectionView::image);
   }
 
-  /** Built once per delivery: the plain path asks for lines and image separately. */
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
-    Built last = built;
-    if (last != null && last.input == input) {
-      return last.view;
-    }
-    Optional<SectionView> view =
-        builder
-            .build(input.matchId(), input.focusSlots(), properties.getGraphFarmMaxHeroes())
-            .map(chart -> view(input.matchId(), chart));
-    built = new Built(input, view);
-    return view;
+    return deliveries.get(
+        input,
+        in ->
+            builder
+                .build(in.matchId(), in.focusSlots(), properties.getGraphFarmMaxHeroes())
+                .map(chart -> view(in.matchId(), chart)));
   }
 
   private SectionView view(long matchId, FarmChart chart) {
@@ -80,9 +76,10 @@ public class GraphFarmSection implements ReplayReportSection {
             : charts
                 .png("farm:" + matchId + ":" + chart.spec().fingerprint(), chart::spec)
                 .map(png -> new ImageAttachment("farm-" + matchId + ".png", png));
-    List<String> lines = chart.lines().stream().map(l -> LineText.cut(l, MAX_LINE_LENGTH)).toList();
+    List<String> lines =
+        new ArrayList<>(chart.lines().stream().map(l -> LineText.cut(l, MAX_LINE_LENGTH)).toList());
     if (chart.spec() != null && image.isEmpty()) {
-      lines = Stream.concat(lines.stream(), Stream.of(NOT_DRAWN)).toList();
+      lines.add(NOT_DRAWN);
     }
     return new SectionView(
         "Farm effectiveness",
