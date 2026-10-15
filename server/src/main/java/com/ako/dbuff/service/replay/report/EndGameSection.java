@@ -9,6 +9,7 @@ import com.ako.dbuff.service.replay.analysis.endgame.EndGameTurningPoint;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.team.TeamNetWorth;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -43,8 +44,27 @@ public class EndGameSection implements ReplayReportSection {
     return ReportDetail.STANDARD;
   }
 
+  private record Ended(List<String> lines, TeamSide winner, TeamSide yours) {}
+
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return ended(input).map(Ended::lines).orElse(List.of());
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    return ended(input)
+        .map(
+            e ->
+                new SectionView(
+                    "How the game ended",
+                    e.lines().get(0),
+                    SectionViews.forTeam(e.winner(), e.yours()),
+                    e.lines().subList(1, e.lines().size()),
+                    null));
+  }
+
+  private Optional<Ended> ended(ReplayReportInput input) {
     List<EndGameSummaryDomain> stored = summaryRepo.findByMatchId(input.matchId());
     EndGameSummaryDomain row =
         stored == null
@@ -58,14 +78,14 @@ public class EndGameSection implements ReplayReportSection {
                 .orElse(null);
     TeamSide winner = row == null ? null : Enums.find(TeamSide.class, row.getWinnerTeam());
     if (winner == null) {
-      return List.of();
+      return Optional.empty();
     }
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     int max = Math.max(LineText.ELLIPSIS.length() + 1, properties.getMaxEndGameLineLength());
     List<String> lines = new ArrayList<>();
     lines.add(LineText.cut(verdict(row, winner, yours), max));
     buybacks(row, winner, yours).ifPresent(l -> lines.add(LineText.cut(l, max)));
-    return lines;
+    return Optional.of(new Ended(lines, winner, yours));
   }
 
   private static String verdict(EndGameSummaryDomain r, TeamSide winner, TeamSide yours) {

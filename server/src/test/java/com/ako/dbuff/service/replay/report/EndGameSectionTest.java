@@ -3,6 +3,8 @@ package com.ako.dbuff.service.replay.report;
 import com.ako.dbuff.dao.model.EndGameSummaryDomain;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.EndGameSummaryRepo;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -150,5 +152,51 @@ class EndGameSectionTest {
     }
     properties.setMaxEndGameLineLength(400);
     properties.validate();
+  }
+
+  private SectionView view(EndGameSummaryDomain row, Long... focus) {
+    when(repo.findByMatchId(1L)).thenReturn(row == null ? List.of() : List.of(row));
+    return section.view(new ReplayReportInput(1L, null, Set.of(focus), Map.of(), 3)).orElseThrow();
+  }
+
+  @Test
+  void view_putsTheVerdictFirstAndColoursByTheTrackedTeamsResult() {
+    SectionView lost = view(won().build(), 128L);
+    SectionView win = view(won().build(), 0L);
+    SectionView nobody = view(won().build());
+
+    ViewRendering.assertWithinLimits(lost);
+    assertThat(lost.title()).isEqualTo("How the game ended");
+    assertThat(lost.verdict())
+        .isEqualTo(
+            "Radiant won at 41:20 after Dire (your team) led by 8.3k at 24:10; the turning point"
+                + " was the won fight at 33:19, which Radiant turned into the top lane tier 3"
+                + " tower.");
+    assertThat(lost.bullets())
+        .containsExactly("Dire (your team) used 3 buybacks in the last 10 minutes, Radiant 0.");
+    assertThat(lost.accent()).isEqualTo(Accent.LOSS);
+    assertThat(win.accent()).isEqualTo(Accent.WIN);
+    assertThat(nobody.accent()).isEqualTo(Accent.NEUTRAL);
+  }
+
+  @Test
+  void view_keepsPlainTextAsItWas() {
+    List<String> lines = lines(won().build());
+    SectionView view = view(won().build());
+
+    assertThat(String.join("\n", lines))
+        .isEqualTo(
+            "Radiant won at 41:20 after Dire led by 8.3k at 24:10; the turning point was the won"
+                + " fight at 33:19, which Radiant turned into the top lane tier 3 tower.\n"
+                + "Dire used 3 buybacks in the last 10 minutes, Radiant 0.");
+    assertThat(view.verdict()).isEqualTo(lines.get(0));
+    assertThat(view.bullets()).containsExactly(lines.get(1));
+  }
+
+  @Test
+  void view_isEmptyWithoutASummary() {
+    when(repo.findByMatchId(1L)).thenReturn(List.of());
+
+    assertThat(section.view(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3))).isEmpty();
   }
 }

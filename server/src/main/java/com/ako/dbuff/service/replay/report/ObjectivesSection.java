@@ -11,6 +11,8 @@ import com.ako.dbuff.service.replay.analysis.behaviour.ObjectiveKind;
 import com.ako.dbuff.service.replay.analysis.behaviour.ObjectiveResult;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -18,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -79,18 +82,68 @@ public class ObjectivesSection implements ReplayReportSection {
     return ReportDetail.STANDARD;
   }
 
+  private static final String TITLE = "Objectives";
+
+  /** The summary and the lines under it, apart, so the view never indexes into a line list. */
+  private record Rendered(String summary, List<String> details) {}
+
   @Override
   public List<String> lines(ReplayReportInput input) {
-    List<ObjectiveConversionDomain> stored = objectiveRepo.findByMatchId(input.matchId());
-    List<Entry> entries = entries(input.matchId(), stored);
+    return render(input, entries(input))
+        .map(
+            r -> {
+              List<String> lines = new ArrayList<>();
+              lines.add("**" + TITLE + "**");
+              lines.add(r.summary());
+              lines.addAll(r.details());
+              return List.copyOf(lines);
+            })
+        .orElse(List.of());
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    List<Entry> entries = entries(input);
+    return render(input, entries)
+        .map(
+            r -> {
+              TeamSide yours = TeamSide.commonSide(input.focusSlots());
+              List<Entry> own =
+                  entries.stream()
+                      .filter(e -> Enums.find(TeamSide.class, e.row().getWinnerTeam()) == yours)
+                      .toList();
+              List<String> bullets = new ArrayList<>();
+              Accent accent = Accent.NEUTRAL;
+              if (yours != null && !own.isEmpty()) {
+                long converted = converted(own);
+                bullets.add(
+                    "%s turned %d of %s into objectives"
+                        .formatted(
+                            Prettify.teamOf(yours.name(), yours),
+                            converted,
+                            SectionViews.count(own.size(), "won fight")));
+                accent = SectionViews.balance(converted, own.size() - converted);
+              }
+              bullets.addAll(r.details());
+              return new SectionView(TITLE, r.summary(), accent, bullets, null);
+            });
+  }
+
+  private List<Entry> entries(ReplayReportInput input) {
+    return entries(input.matchId(), objectiveRepo.findByMatchId(input.matchId()));
+  }
+
+  private static long converted(List<Entry> entries) {
+    return entries.stream().filter(e -> result(e) == ObjectiveResult.CONVERTED).count();
+  }
+
+  private Optional<Rendered> render(ReplayReportInput input, List<Entry> entries) {
     if (entries.isEmpty()) {
-      return List.of();
+      return Optional.empty();
     }
     Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     List<String> lines = new ArrayList<>();
-    lines.add("**Objectives**");
-    lines.add(summary(entries));
     int max = Math.max(LineText.ELLIPSIS.length() + 1, properties.getMaxBehaviourLineLength());
     BehaviourLines.Picked<Entry> picked =
         BehaviourLines.pick(
@@ -109,7 +162,7 @@ public class ObjectivesSection implements ReplayReportSection {
         .filter(e -> e.start() != null)
         .max(CHRONOLOGICAL)
         .ifPresent(e -> lines.add(LineText.cut(roshan(e, heroes, yours), max)));
-    return lines;
+    return Optional.of(new Rendered(summary(entries), lines));
   }
 
   private List<Entry> entries(long matchId, List<ObjectiveConversionDomain> stored) {
@@ -166,8 +219,8 @@ public class ObjectivesSection implements ReplayReportSection {
   }
 
   private static String summary(List<Entry> entries) {
-    long converted = entries.stream().filter(e -> result(e) == ObjectiveResult.CONVERTED).count();
-    return "Won fights turned into objectives: %d of %d".formatted(converted, entries.size());
+    return "Won fights turned into objectives: %d of %d"
+        .formatted(converted(entries), entries.size());
   }
 
   private String missed(Entry e, Map<Long, String> heroes, TeamSide yours) {

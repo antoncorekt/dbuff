@@ -3,11 +3,15 @@ package com.ako.dbuff.service.replay.report;
 import com.ako.dbuff.dao.model.DeathAnalysisDomain;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
+import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -50,8 +54,14 @@ public class DeathSection implements ReplayReportSection {
     return ReportDetail.STANDARD;
   }
 
+  private record Found(List<String> lines, int deaths) {}
+
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return found(input).lines();
+  }
+
+  private Found found(ReplayReportInput input) {
     List<String> lines = new ArrayList<>();
     List<DeathAnalysisDomain> deaths = deathRepo.findByMatchId(input.matchId());
     for (Map.Entry<Long, String> player : input.namesBySlot().entrySet()) {
@@ -67,10 +77,19 @@ public class DeathSection implements ReplayReportSection {
           .forEach(lines::add);
     }
     if (lines.isEmpty()) {
-      return List.of();
+      return new Found(List.of(), 0);
     }
+    int count = lines.size();
     lines.addFirst("**Deaths**");
-    return lines;
+    return new Found(lines, count);
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    Found found = found(input);
+    return SectionViews.titled(
+        found.lines(),
+        new Verdict(SectionViews.count(found.deaths(), "death") + " worth a look", Accent.LOSS));
   }
 
   private static String line(String name, DeathAnalysisDomain d) {

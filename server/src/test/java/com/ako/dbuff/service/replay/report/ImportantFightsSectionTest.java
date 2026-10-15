@@ -308,4 +308,18 @@ class ImportantFightsSectionTest {
     toggle.setEnabled(on);
     return toggle;
   }
+
+  @Test
+  void viewTalliesOnlyFightsWithAKnownWinnerLikeTheTextAlwaysDid() {
+    stored(
+        fight(1, 600, "RADIANT", 1200L, false),
+        fight(2, 900, "DIRE", 1200L, false),
+        fight(3, 1200, null, 1200L, false),
+        fight(4, 1500, "UNKNOWN", 1200L, false));
+
+    SectionView view = section.view(input(0L)).orElseThrow();
+
+    assertThat(view.verdict()).isEqualTo("Radiant (your team) split 1 to 1 in important fights");
+    assertThat(view.bullets()).hasSize(2);
+  }
 }
