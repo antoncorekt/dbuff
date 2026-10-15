@@ -19,6 +19,7 @@ public enum ReportDelivery {
           + " model failed, see the log)"),
   SECTION_HIDDEN(
       "the section is switched off on the server (replay.report.sections.<name>.enabled=false)"),
+  SECTION_NOT_FOR_MODE("this section is not available for this game mode"),
   THREAD_NOT_FOUND("Discord could not find the thread"),
   FAILED("something went wrong, see the log");
 

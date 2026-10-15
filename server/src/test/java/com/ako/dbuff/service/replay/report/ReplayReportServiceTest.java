@@ -1011,6 +1011,18 @@ class ReplayReportServiceTest {
   }
 
   @Test
+  void deliverSection_refusesASectionThatDoesNotSupportTheGameMode() {
+    storedRun(ReplayStatus.DONE);
+    service = serviceWith(new AbilityDraftOnlySection());
+    when(matchRepo.findById(1L))
+        .thenReturn(Optional.of(MatchDomain.builder().id(1L).gameModeId(22L).build()));
+
+    assertThat(service.deliverSection(1L, "i1", "replay"))
+        .isEqualTo(ReportDelivery.SECTION_NOT_FOR_MODE);
+    verify(discord, never()).sendThreadMessageBlocking(any(), any());
+  }
+
+  @Test
   void deliverSection_refusesASectionHiddenByTheKillSwitch() {
     storedRun(ReplayStatus.DONE);
     ReplayReportProperties.SectionToggle toggle = new ReplayReportProperties.SectionToggle();

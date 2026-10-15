@@ -167,7 +167,46 @@ class ReportIconsTest {
     assertThat(IconText.safeEnd(text, 0)).isZero();
     assertThat(IconText.safeEnd(text, 99)).isEqualTo(text.length());
     assertThat(IconText.safeEnd("no tag < here", 8)).isEqualTo(8);
-    assertThat(IconText.splitIndex("<:h_antimage:11>" + "x".repeat(10), 5)).isEqualTo(5);
+    assertThat(IconText.splitIndex("<:h_antimage:11>" + "x".repeat(10), 5)).isEqualTo(16);
+  }
+
+  @Test
+  void iconText_neverCutsAUnicodePlaceholderOrItsVariationSelector() {
+    String hero = IconKind.HERO.getPlaceholder();
+    String item = IconKind.ITEM.getPlaceholder();
+    String text = "ab " + hero + " cd " + item + " ef";
+    int heroStart = 3;
+    int heroEnd = heroStart + hero.length();
+
+    for (int cut = heroStart + 1; cut < heroEnd; cut++) {
+      assertThat(IconText.safeEnd(text, cut))
+          .as("cut %s inside the hero", cut)
+          .isEqualTo(heroStart);
+    }
+    assertThat(IconText.safeEnd(text, heroEnd)).isEqualTo(heroEnd);
+    String itemText = "x" + item + "y";
+    assertThat(IconText.safeEnd(itemText, 2)).isEqualTo(1);
+    assertThat(IconText.safeEnd(itemText, 1 + item.length())).isEqualTo(1 + item.length());
+    assertThat(IconText.splitIndex(hero + "x".repeat(10), 1)).isEqualTo(hero.length());
+    assertThat(IconText.splitIndex(item + "x", 1)).isEqualTo(item.length());
+    assertThat(IconText.splitIndex("\uD83D\uDC68\u200D\uD83D\uDC69x", 1)).isEqualTo(5);
+    assertThat(IconText.splitIndex("<:h_antimage:11>x", 3)).isEqualTo(16);
+  }
+
+  @Test
+  void iconText_neverSplitsASurrogatePairOrAJoinerSequence() {
+    String pair = "a\uD83D\uDE00b";
+    assertThat(IconText.safeEnd(pair, 2)).isEqualTo(1);
+    assertThat(IconText.safeEnd(pair, 3)).isEqualTo(3);
+
+    String variation = "a\u2694\uFE0Fb";
+    assertThat(IconText.safeEnd(variation, 2)).isEqualTo(1);
+
+    String family = "a\uD83D\uDC68\u200D\uD83D\uDC69b";
+    assertThat(IconText.safeEnd(family, 3)).isEqualTo(1);
+    assertThat(IconText.safeEnd(family, 4)).isEqualTo(1);
+    assertThat(IconText.safeEnd(family, 5)).isEqualTo(1);
+    assertThat(IconText.safeEnd(family, family.length() - 1)).isEqualTo(family.length() - 1);
   }
 
   @Test

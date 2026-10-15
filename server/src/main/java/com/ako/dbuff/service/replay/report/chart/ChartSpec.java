@@ -77,6 +77,7 @@ public record ChartSpec(
       for (LegendEntry l : legend) {
         out.writeInt(l.color().getRGB());
         text(out, l.text());
+        text(out, l.shape() == null ? null : l.shape().name());
       }
     } catch (IOException e) {
       throw new UncheckedIOException(e);

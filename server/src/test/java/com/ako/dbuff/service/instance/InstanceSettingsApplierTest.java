@@ -292,6 +292,22 @@ class InstanceSettingsApplierTest {
   }
 
   @Test
+  void sections_aNameHiddenByTheServerKillSwitch_isRejectedAndChangesNothing() {
+    knowSections();
+    apply(UpdateInstanceRequest.builder().sections("lanes"));
+    ReplayReportSection hidden = TestSections.named("important-fights", 65, false);
+    Mockito.when(sectionSwitch.find("important_fights")).thenReturn(Optional.of(hidden));
+    Mockito.when(sectionSwitch.isHidden(hidden)).thenReturn(true);
+
+    assertThatThrownBy(
+            () -> apply(UpdateInstanceRequest.builder().sections("lanes, important_fights")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("`important-fights` is switched off on the server")
+        .hasMessageContaining("lanes, important-fights");
+    assertThat(settings.getSections()).isEqualTo("lanes");
+  }
+
+  @Test
   void sections_noneStoresAnEmptyListAndDefaultClearsIt() {
     knowSections();
 

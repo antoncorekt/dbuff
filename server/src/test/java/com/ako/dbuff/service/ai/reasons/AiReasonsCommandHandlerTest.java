@@ -3,6 +3,7 @@ package com.ako.dbuff.service.ai.reasons;
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.service.discord.command.FakeCommandContext;
 import com.ako.dbuff.service.replay.report.OnDemandCooldown;
+import com.ako.dbuff.service.replay.report.ReplayReportProperties;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
 import com.ako.dbuff.service.replay.report.ReportDelivery;
 import java.util.List;
@@ -10,9 +11,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -21,7 +25,7 @@ class AiReasonsCommandHandlerTest {
 
   private final AiReasonsService service = mock(AiReasonsService.class);
   private final ReplayReportService reports = mock(ReplayReportService.class);
-  private final OnDemandCooldown cooldown = mock(OnDemandCooldown.class);
+  private final OnDemandCooldown cooldown = new OnDemandCooldown(new ReplayReportProperties());
   private final AiReasonsCommandHandler handler =
       new AiReasonsCommandHandler(service, reports, cooldown);
   private final DbufInstanceConfigDomain config = new DbufInstanceConfigDomain();
@@ -152,13 +156,13 @@ class AiReasonsCommandHandlerTest {
 
   @Test
   void cooldownRunning_refusesInOneLineBeforeAcknowledging() {
-    when(cooldown.acquire("thread-1")).thenReturn(12L);
+    cooldown.acquire("thread-1");
     FakeCommandContext context =
         FakeCommandContext.builder().threadName("Match " + MATCH).channelId("thread-1").build();
 
     handler.handle(context, MATCH, config);
 
-    assertThat(context.getEphemeralReplies()).singleElement().asString().contains("12 s");
+    assertThat(context.getEphemeralReplies()).singleElement().asString().contains("30 s");
     assertThat(context.getAcknowledgeSummary()).isNull();
     verify(reports, never()).deliverSection(MATCH, "i1", "ai-reasons", null);
   }
@@ -172,7 +176,7 @@ class AiReasonsCommandHandlerTest {
 
     handler.handle(context, MATCH, config);
 
-    verify(cooldown).release("thread-1");
+    assertThat(cooldown.acquire("thread-1").granted()).isTrue();
   }
 
   @Test
@@ -184,7 +188,23 @@ class AiReasonsCommandHandlerTest {
 
     handler.handle(context, MATCH, config);
 
-    verify(cooldown).release("thread-1");
+    assertThat(cooldown.acquire("thread-1").granted()).isTrue();
+  }
+
+  @Test
+  void anAcknowledgementThatFails_releasesTheWait() {
+    FakeCommandContext context =
+        spy(
+            FakeCommandContext.builder()
+                .threadName("Match " + MATCH)
+                .channelId("thread-1")
+                .build());
+    doThrow(new IllegalStateException("discord down")).when(context).acknowledge(any(), any());
+
+    assertThatThrownBy(() -> handler.handle(context, MATCH, config))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(cooldown.acquire("thread-1").granted()).isTrue();
   }
 
   @Test
@@ -195,6 +215,6 @@ class AiReasonsCommandHandlerTest {
 
     handler.handle(context, MATCH, config);
 
-    verify(cooldown, never()).release(any());
+    assertThat(cooldown.acquire("thread-1").granted()).isFalse();
   }
 }

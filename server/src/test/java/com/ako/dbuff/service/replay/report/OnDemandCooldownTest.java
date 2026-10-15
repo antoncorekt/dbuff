@@ -38,11 +38,11 @@ class OnDemandCooldownTest {
 
   @Test
   void secondRequestInTheSameThreadWaitsAndAnotherThreadDoesNot() {
-    assertThat(cooldown.acquire("t1")).isZero();
+    assertThat(cooldown.acquire("t1").waitSeconds()).isZero();
     clock.millis += 10_500;
 
-    assertThat(cooldown.acquire("t1")).isEqualTo(20);
-    assertThat(cooldown.acquire("t2")).isZero();
+    assertThat(cooldown.acquire("t1").waitSeconds()).isEqualTo(20);
+    assertThat(cooldown.acquire("t2").waitSeconds()).isZero();
   }
 
   @Test
@@ -50,32 +50,59 @@ class OnDemandCooldownTest {
     cooldown.acquire("t1");
     clock.millis += 30_000;
 
-    assertThat(cooldown.acquire("t1")).isZero();
+    assertThat(cooldown.acquire("t1").waitSeconds()).isZero();
   }
 
   @Test
   void aRefusedRequestDoesNotExtendTheWait() {
     cooldown.acquire("t1");
     clock.millis += 20_000;
-    assertThat(cooldown.acquire("t1")).isEqualTo(10);
+    assertThat(cooldown.acquire("t1").waitSeconds()).isEqualTo(10);
     clock.millis += 10_000;
 
-    assertThat(cooldown.acquire("t1")).isZero();
+    assertThat(cooldown.acquire("t1").waitSeconds()).isZero();
   }
 
   @Test
   void zeroTurnsItOff() {
     properties.setOnDemandCooldownSeconds(0);
 
-    assertThat(cooldown.acquire("t1")).isZero();
-    assertThat(cooldown.acquire("t1")).isZero();
+    assertThat(cooldown.acquire("t1").waitSeconds()).isZero();
+    assertThat(cooldown.acquire("t1").waitSeconds()).isZero();
   }
 
   @Test
   void release_letsTheThreadAskAgainAtOnce() {
-    cooldown.acquire("t1");
-    cooldown.release("t1");
+    OnDemandCooldown.Permit permit = cooldown.acquire("t1");
+    cooldown.release(permit);
 
-    assertThat(cooldown.acquire("t1")).isZero();
+    assertThat(cooldown.acquire("t1").granted()).isTrue();
+  }
+
+  @Test
+  void aSlowRequestCannotCancelTheWaitOfANewerOne() {
+    OnDemandCooldown.Permit slow = cooldown.acquire("t1");
+    clock.millis += 31_000;
+    OnDemandCooldown.Permit newer = cooldown.acquire("t1");
+    assertThat(newer.granted()).isTrue();
+
+    cooldown.release(slow);
+
+    assertThat(cooldown.acquire("t1").waitSeconds()).isEqualTo(30);
+    cooldown.release(newer);
+    assertThat(cooldown.acquire("t1").granted()).isTrue();
+  }
+
+  @Test
+  void aRefusedPermitOrNullReleasesNothing() {
+    OnDemandCooldown.Permit first = cooldown.acquire("t1");
+    OnDemandCooldown.Permit refused = cooldown.acquire("t1");
+
+    cooldown.release(refused);
+    cooldown.release(null);
+
+    assertThat(cooldown.acquire("t1").waitSeconds()).isPositive();
+    cooldown.release(first);
+    assertThat(cooldown.acquire("t1").granted()).isTrue();
   }
 }
