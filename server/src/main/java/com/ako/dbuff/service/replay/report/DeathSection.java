@@ -102,7 +102,7 @@ public class DeathSection implements ReplayReportSection {
             reason(d));
   }
 
-  private static String reason(DeathAnalysisDomain d) {
+  static String reason(DeathAnalysisDomain d) {
     return switch (d.getReason()) {
       case "BKB_READY_UNUSED" -> "had Black King Bar ready and did not use it";
       case "BKB_ON_COOLDOWN" -> "Black King Bar was on cooldown";

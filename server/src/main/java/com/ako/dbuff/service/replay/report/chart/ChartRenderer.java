@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 import javax.imageio.ImageIO;
 import org.springframework.stereotype.Component;
 
@@ -42,6 +43,9 @@ public class ChartRenderer {
   private static final int LABEL_LANE = 20;
   private static final int MAX_LANES = 4;
   private static final int TICK_PIXELS = 36;
+  private static final int PIN_RADIUS = 5;
+  private static final int PIN_LANES = 3;
+  private static final int PIN_LANE_HEIGHT = 15;
   private static final double MIN_MARGIN = 0.12;
 
   static {
@@ -126,23 +130,159 @@ public class ChartRenderer {
       String text = ChartFormat.value(panel.format(), tick);
       g.drawString(text, LEFT - 8 - fm.stringWidth(text), y + fm.getAscent() / 2 - 1);
     }
-    for (ChartSpec.Band band : spec.bands()) {
-      int x1 = time.at(Math.max(0, band.startSeconds()));
-      int x2 = Math.max(x1 + 2, time.at(Math.min(spec.endSeconds(), band.endSeconds())));
-      g.setColor(band.color());
-      g.fillRect(x1, top, x2 - x1, bottom - top);
-    }
+    Stream.concat(spec.bands().stream(), panel.bands().stream())
+        .forEach(band -> drawBand(g, band, time, plot));
     for (ChartSpec.Marker marker : markers) {
       drawMarkerLine(g, marker, time.at(marker.seconds()), top, bottom);
     }
     Rectangle clip = g.getClipBounds();
     g.setClip(plot);
     panel.series().forEach(s -> drawSeries(g, s, time, value, plot));
+    drawPins(g, panel, time, value, plot);
     g.setClip(clip);
     g.setColor(TEXT);
     g.setFont(ChartFonts.bold(LABEL_SIZE));
     g.drawString(panel.label(), LEFT + 8, top + g.getFontMetrics().getAscent() + 2);
     drawCaptions(g, panel, plot);
+  }
+
+  private void drawPins(
+      Graphics2D g, ChartSpec.Panel panel, Scale time, Scale value, Rectangle plot) {
+    if (panel.pins().isEmpty()) {
+      return;
+    }
+    g.setFont(ChartFonts.plain(LABEL_SIZE));
+    FontMetrics fm = g.getFontMetrics();
+    ChartSpec.Series line = panel.series().isEmpty() ? null : panel.series().get(0);
+    List<int[]> taken = new ArrayList<>();
+    int firstBaseline = plot.y + 2 * fm.getAscent() + 8;
+    List<ChartSpec.Pin> ordered =
+        panel.pins().stream().sorted(Comparator.comparingDouble(ChartSpec.Pin::seconds)).toList();
+    for (ChartSpec.Pin pin : ordered) {
+      int x = time.at(pin.seconds());
+      int y = value.at(line == null ? 0 : valueAt(line, pin.seconds()));
+      if (pin.label() != null && !pin.label().isBlank()) {
+        pinLabel(g, fm, pin, x, y, plot, firstBaseline, taken);
+      }
+      drawShape(g, pin.shape(), x, y, pin.color());
+    }
+  }
+
+  private void pinLabel(
+      Graphics2D g,
+      FontMetrics fm,
+      ChartSpec.Pin pin,
+      int x,
+      int y,
+      Rectangle plot,
+      int firstBaseline,
+      List<int[]> taken) {
+    int width = fm.stringWidth(pin.label()) + 6;
+    if (width > plot.width) {
+      return;
+    }
+    int left = Math.max(plot.x, Math.min(x - 3, plot.x + plot.width - width));
+    for (int lane = 0; lane < PIN_LANES; lane++) {
+      int baseline = firstBaseline + lane * PIN_LANE_HEIGHT;
+      if (baseline > plot.y + plot.height - 4) {
+        return;
+      }
+      int at = lane;
+      if (taken.stream().anyMatch(t -> t[0] == at && left < t[2] + 4 && t[1] < left + width + 4)) {
+        continue;
+      }
+      taken.add(new int[] {lane, left, left + width});
+      Stroke old = g.getStroke();
+      g.setStroke(new BasicStroke(1f));
+      g.setColor(withAlpha(pin.color(), 140));
+      g.drawLine(x, baseline + 3, x, y);
+      g.setStroke(old);
+      g.setColor(withAlpha(BACKGROUND, 220));
+      g.fillRect(left, baseline - fm.getAscent(), width, fm.getHeight() - 2);
+      g.setColor(pin.color());
+      g.drawString(pin.label(), left + 3, baseline);
+      return;
+    }
+  }
+
+  /**
+   * The series' value at a time, held at the latest known value before it, or the first known value
+   * when it lies before them all.
+   */
+  static double valueAt(ChartSpec.Series s, double seconds) {
+    int n = Math.min(s.seconds().length, s.values().length);
+    int first = -1;
+    int last = -1;
+    for (int i = 0; i < n; i++) {
+      if (Double.isNaN(s.values()[i])) {
+        continue;
+      }
+      first = first < 0 ? i : first;
+      last = s.seconds()[i] <= seconds ? i : last;
+      boolean next = i + 1 < n && !Double.isNaN(s.values()[i + 1]);
+      if (next && seconds >= s.seconds()[i] && seconds <= s.seconds()[i + 1]) {
+        double span = s.seconds()[i + 1] - s.seconds()[i];
+        return span == 0
+            ? s.values()[i]
+            : s.values()[i]
+                + (s.values()[i + 1] - s.values()[i]) * (seconds - s.seconds()[i]) / span;
+      }
+    }
+    if (first < 0) {
+      return 0;
+    }
+    return s.values()[last < 0 ? first : last];
+  }
+
+  static void drawShape(Graphics2D g, ChartSpec.PinShape shape, int x, int y, Color color) {
+    int r = PIN_RADIUS;
+    Polygon p = new Polygon();
+    switch (shape) {
+      case CROSS -> {
+        Stroke old = g.getStroke();
+        g.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.setColor(color);
+        g.drawLine(x - r, y - r, x + r, y + r);
+        g.drawLine(x - r, y + r, x + r, y - r);
+        g.setStroke(old);
+        return;
+      }
+      case DIAMOND -> {
+        p.addPoint(x, y - r - 1);
+        p.addPoint(x + r + 1, y);
+        p.addPoint(x, y + r + 1);
+        p.addPoint(x - r - 1, y);
+      }
+      case TRIANGLE -> {
+        p.addPoint(x, y - r - 1);
+        p.addPoint(x + r + 1, y + r);
+        p.addPoint(x - r - 1, y + r);
+      }
+      case STAR -> {
+        for (int i = 0; i < 10; i++) {
+          double angle = -Math.PI / 2 + i * Math.PI / 5;
+          double radius = (i % 2 == 0 ? r + 3 : (r + 3) * 0.45);
+          p.addPoint(
+              (int) Math.round(x + radius * Math.cos(angle)),
+              (int) Math.round(y + radius * Math.sin(angle)));
+        }
+      }
+    }
+    g.setColor(color);
+    g.fillPolygon(p);
+    g.setColor(BACKGROUND);
+    g.drawPolygon(p);
+  }
+
+  /** A shaded stretch, at least two pixels wide and never outside the plot. */
+  private static void drawBand(Graphics2D g, ChartSpec.Band band, Scale time, Rectangle plot) {
+    int x1 = time.at(Math.max(0, band.startSeconds()));
+    int x2 = Math.max(x1 + 2, time.at(Math.max(0, band.endSeconds())));
+    Rectangle fill = new Rectangle(x1, plot.y, x2 - x1, plot.height).intersection(plot);
+    if (!fill.isEmpty()) {
+      g.setColor(band.color());
+      g.fill(fill);
+    }
   }
 
   private void drawCaptions(Graphics2D g, ChartSpec.Panel panel, Rectangle plot) {
@@ -304,8 +444,12 @@ public class ChartRenderer {
     int x = LEFT;
     int y = MAX_HEIGHT - 10;
     for (ChartSpec.LegendEntry entry : legend) {
-      g.setColor(entry.color());
-      g.fillRect(x, y - 11, 14, 12);
+      if (entry.shape() == null) {
+        g.setColor(entry.color());
+        g.fillRect(x, y - 11, 14, 12);
+      } else {
+        drawShape(g, entry.shape(), x + 7, y - 5, entry.color());
+      }
       g.setColor(TEXT);
       g.drawString(entry.text(), x + 20, y);
       x += 20 + fm.stringWidth(entry.text()) + 24;

@@ -74,6 +74,7 @@ import com.ako.dbuff.service.replay.report.DraftSection;
 import com.ako.dbuff.service.replay.report.EndGameSection;
 import com.ako.dbuff.service.replay.report.FightSection;
 import com.ako.dbuff.service.replay.report.GraphAdvantageSection;
+import com.ako.dbuff.service.replay.report.GraphIncomeSection;
 import com.ako.dbuff.service.replay.report.ImportantFightsSection;
 import com.ako.dbuff.service.replay.report.ItemsSection;
 import com.ako.dbuff.service.replay.report.LanesSection;
@@ -135,6 +136,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
 
   private static final String[] MATCHES = {"9040889566", "9040892342"};
   private static final String GRAPH_MATCH = "9044252857";
+  private static final String[] INCOME_MATCHES = {GRAPH_MATCH, "9044256304"};
   private static final String[] ABILITY_DRAFT_MATCHES = {"9038725154", "9037038717"};
 
   @Autowired private AbilityDraftPickRepo draftPickRepo;
@@ -191,6 +193,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private DraftSection draftSection;
   @Autowired private DraftBoardSection draftBoardSection;
   @Autowired private GraphAdvantageSection graphAdvantageSection;
+  @Autowired private GraphIncomeSection graphIncomeSection;
   @Autowired private CompositionSection compositionSection;
   @Autowired private PlayerGameStatisticRepo playerStatRepo;
   @Autowired private HeroKits heroKits;
@@ -365,6 +368,28 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
     Files.createDirectories(dir);
     Files.write(dir.resolve("graph-advantage.png"), view.image().bytes());
+  }
+
+  @Test
+  @Commit
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void theIncomeGraphsOfRealMatchesAreDrawnFromWhatWasStored() throws Exception {
+    Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
+    Files.createDirectories(dir);
+    for (String id : INCOME_MATCHES) {
+      Assumptions.assumeTrue(hasFixture(id), id + " fixture missing");
+      MatchDomain match = seedMatch(id);
+      assertThat(runService.process(match)).isEqualTo(ReplayStatus.DONE);
+      ReplayReportInput input =
+          new ReplayReportInput(match.getId(), match, Set.of(0L, 1L, 2L, 3L, 4L), Map.of(), 4);
+
+      SectionView view = graphIncomeSection.view(input).orElseThrow();
+
+      assertThat(view.image()).as("%s: the graph was drawn", id).isNotNull();
+      System.out.println(
+          "GRAPH INCOME " + id + " " + String.join(" | ", graphIncomeSection.lines(input)));
+      Files.write(dir.resolve("graph-income-" + id + ".png"), view.image().bytes());
+    }
   }
 
   private void assertReplayMeters() {
