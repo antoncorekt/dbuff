@@ -115,7 +115,7 @@ class ReportIconsTest {
 
     assertThat(withIcons.bullets().getFirst().lines())
         .anyMatch(line -> line.contains(TestIcons.heroMention() + "Anti-Mage"));
-    assertThat(withIcons.bullets().get(1).lines())
+    assertThat(withIcons.bullets().getFirst().lines())
         .anyMatch(line -> line.contains(TestIcons.abilityMention() + "Blink"));
     assertThat(without.bullets().stream().flatMap(b -> b.lines()).toList())
         .noneMatch(line -> line.contains("<:"));

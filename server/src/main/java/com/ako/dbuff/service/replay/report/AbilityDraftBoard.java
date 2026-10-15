@@ -13,12 +13,9 @@ import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -33,7 +30,8 @@ public class AbilityDraftBoard implements DraftBoard {
   private static final int ROW_LIMIT = 1500;
 
   private static final String FOOTNOTE =
-      "Turns count skill and hero picks together; times are on the game clock, before the horn.";
+      "Each player's skills and hero in the order they were picked; the number is the turn of the"
+          + " whole draft, skills and heroes counted together.";
   private static final String ORDER_UNKNOWN = " Where no turn is shown, the order is not known.";
 
   private final HeroDraftPickRepo heroRepo;
@@ -58,10 +56,7 @@ public class AbilityDraftBoard implements DraftBoard {
     List<AbilityDraftPoolDomain> pool = poolRepo.findByMatchId(input.matchId());
     Board board = new Board(input, heroes);
     List<String> cards = new ArrayList<>();
-    cards.addAll(BoardRows.bullets("**Hero picks**", board.heroPicks()));
-    if (!skills.isEmpty()) {
-      cards.addAll(BoardRows.bullets("**Skill picks**", board.skillPicks(skills)));
-    }
+    cards.addAll(BoardRows.bullets("**Picks in draft order**", board.picks(skills)));
     cards.addAll(BoardRows.bullets("**Left over**", board.leftOver(pool)));
     boolean numbersMissing =
         heroes.stream().anyMatch(h -> h.getPlayerSlot() != null && h.getTurnNumber() == null)
@@ -95,6 +90,17 @@ public class AbilityDraftBoard implements DraftBoard {
     return lines;
   }
 
+  /** One pick of a player, a skill or the hero, with what orders it in the draft. */
+  private record Pick(String label, Integer turn, Integer tick, boolean hero, int order) {
+    /** Turn numbers first; picks without one follow by tick, a skill before a hero on a tie. */
+    static final Comparator<Pick> DRAFT_ORDER =
+        Comparator.comparing((Pick p) -> p.turn == null)
+            .thenComparing(Pick::turn, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(Pick::tick, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(Pick::hero)
+            .thenComparingInt(Pick::order);
+  }
+
   private final class Board {
     private final ReplayReportInput input;
     private final List<HeroDraftPickDomain> heroes;
@@ -108,36 +114,34 @@ public class AbilityDraftBoard implements DraftBoard {
           .forEach(h -> heroBySlot.put(h.getPlayerSlot(), heroNames.heroName(h.getHeroId())));
     }
 
-    List<String> heroPicks() {
-      Stream<String> rows =
-          heroes.stream()
-              .filter(h -> h.getPlayerSlot() != null)
-              .sorted(
-                  Comparator.comparing(
-                      HeroDraftPickDomain::getPickTick,
-                      Comparator.nullsLast(Comparator.naturalOrder())))
-              .map(this::heroRow);
-      return rows.toList();
-    }
-
-    private String heroRow(HeroDraftPickDomain pick) {
-      long slot = pick.getPlayerSlot();
-      String picker = input.namesBySlot().get(slot);
-      String team = team(slot);
-      return String.format(
-          Locale.ROOT,
-          "%s%s, picked by %s at %s",
-          pick.getTurnNumber() == null ? "" : pick.getTurnNumber() + ". ",
-          heroNames.heroName(pick.getHeroId()),
-          picker == null ? team : picker + " (" + team + ")",
-          pick.getClockSeconds() == null ? "?" : GameTime.clock(pick.getClockSeconds()));
-    }
-
-    List<String> skillPicks(List<AbilityDraftPickDomain> skills) {
-      Map<Long, List<AbilityDraftPickDomain>> bySlot =
-          skills.stream()
-              .filter(s -> s.getPlayerSlot() != null)
-              .collect(Collectors.groupingBy(AbilityDraftPickDomain::getPlayerSlot));
+    List<String> picks(List<AbilityDraftPickDomain> skills) {
+      Map<Long, List<Pick>> bySlot = new TreeMap<>();
+      skills.stream()
+          .filter(s -> s.getPlayerSlot() != null)
+          .forEach(
+              s ->
+                  bySlot
+                      .computeIfAbsent(s.getPlayerSlot(), k -> new ArrayList<>())
+                      .add(
+                          new Pick(
+                              skillName(s.getAbilityName(), s.getAbilityId()),
+                              s.getTurnNumber(),
+                              s.getPickTick(),
+                              false,
+                              s.getPickOrder() == null ? 0 : s.getPickOrder())));
+      heroes.stream()
+          .filter(h -> h.getPlayerSlot() != null)
+          .forEach(
+              h ->
+                  bySlot
+                      .computeIfAbsent(h.getPlayerSlot(), k -> new ArrayList<>())
+                      .add(
+                          new Pick(
+                              "hero " + heroNames.heroName(h.getHeroId()),
+                              h.getTurnNumber(),
+                              h.getPickTick(),
+                              true,
+                              0)));
       TeamSide yours = TeamSide.commonSide(input.focusSlots());
       Comparator<Long> order =
           Comparator.<Long, Boolean>comparing(
@@ -145,11 +149,11 @@ public class AbilityDraftBoard implements DraftBoard {
               .thenComparing(Comparator.naturalOrder());
       return bySlot.keySet().stream()
           .sorted(order)
-          .flatMap(slot -> skillRow(slot, bySlot.get(slot)).stream())
+          .flatMap(slot -> row(slot, bySlot.get(slot)).stream())
           .toList();
     }
 
-    private List<String> skillRow(long slot, List<AbilityDraftPickDomain> picks) {
+    private List<String> row(long slot, List<Pick> picks) {
       String picker = input.namesBySlot().get(slot);
       String hero = heroBySlot.get(slot);
       String who =
@@ -158,11 +162,8 @@ public class AbilityDraftBoard implements DraftBoard {
               : hero == null ? team(slot) + " player" : hero;
       List<String> chosen =
           picks.stream()
-              .sorted(Comparator.comparingInt(AbilityDraftPickDomain::getPickOrder))
-              .map(
-                  p ->
-                      skillName(p.getAbilityName(), p.getAbilityId())
-                          + (p.getTurnNumber() == null ? "" : " (" + p.getTurnNumber() + ")"))
+              .sorted(Pick.DRAFT_ORDER)
+              .map(p -> p.label() + (p.turn() == null ? "" : " (" + p.turn() + ")"))
               .toList();
       return wrapped(who + ": ", chosen);
     }
