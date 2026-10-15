@@ -54,6 +54,9 @@ public class DiscordIconDomain {
   @Column(length = 32)
   private String emojiName;
 
+  /** An emoji replaced by a newer one whose deletion failed; a later sync deletes it. */
+  private Long staleEmojiId;
+
   /** SHA-256 of the 128 px PNG that was uploaded. */
   @Column(length = 64)
   private String imageHash;

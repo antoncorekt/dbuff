@@ -34,11 +34,13 @@ public class DiscordIconResource {
     if (kinds == null) {
       return error(HttpStatus.BAD_REQUEST, "kind must be HERO, ITEM, ABILITY or ALL");
     }
+    if (all && !kinds.equals(Set.of(IconKind.ABILITY))) {
+      return error(HttpStatus.BAD_REQUEST, "all applies to kind ABILITY only");
+    }
     if (!properties.isEnabled()) {
       return error(HttpStatus.CONFLICT, "Icons are switched off (discord.icons.enabled)");
     }
-    boolean allAbilities = all && kinds.contains(IconKind.ABILITY) && kinds.size() == 1;
-    if (!sync.start(kinds, allAbilities)) {
+    if (!sync.start(kinds, all)) {
       return error(HttpStatus.CONFLICT, "An icon sync is already running");
     }
     return ResponseEntity.accepted().body(Map.of("status", "started"));

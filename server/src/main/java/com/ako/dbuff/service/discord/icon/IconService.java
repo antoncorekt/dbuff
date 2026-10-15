@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,9 +31,15 @@ public class IconService {
   private final MeterRegistry registry;
 
   private volatile Snapshot snapshot;
+  private volatile long lastIncompleteLoadNanos;
+
+  /** How long an incomplete snapshot is used before the next try to build a full one. */
+  long retryIntervalNanos = TimeUnit.SECONDS.toNanos(30);
 
   private record Snapshot(
-      Map<IconKind, Map<String, String>> mentions, Map<Long, String> heroKeysById) {}
+      Map<IconKind, Map<String, String>> mentions,
+      Map<Long, String> heroKeysById,
+      boolean complete) {}
 
   public String hero(long heroId) {
     if (!properties.isEnabled()) {
@@ -59,7 +66,9 @@ public class IconService {
 
   /** Reads the table again; called after a sync or a check changed it. */
   public void refresh() {
-    snapshot = load();
+    Snapshot fresh = load();
+    snapshot = fresh;
+    lastIncompleteLoadNanos = fresh.complete() ? 0 : System.nanoTime();
   }
 
   private String prefix(IconKind kind, String key) {
@@ -73,11 +82,16 @@ public class IconService {
 
   private Snapshot current() {
     Snapshot known = snapshot;
-    if (known == null) {
+    if (known == null || (!known.complete() && retryDue())) {
       known = load();
       snapshot = known;
+      lastIncompleteLoadNanos = known.complete() ? 0 : System.nanoTime();
     }
     return known;
+  }
+
+  private boolean retryDue() {
+    return System.nanoTime() - lastIncompleteLoadNanos >= retryIntervalNanos;
   }
 
   private Snapshot load() {
@@ -92,21 +106,30 @@ public class IconService {
             .put(row.getIconKey(), "<:" + row.getEmojiName() + ":" + row.getEmojiId() + ">");
       }
     }
-    return new Snapshot(mentions, heroKeys());
+    Map<Long, String> heroKeys = new HashMap<>();
+    boolean complete = loadHeroKeys(heroKeys);
+    return new Snapshot(mentions, heroKeys, complete);
   }
 
-  private Map<Long, String> heroKeys() {
-    Map<Long, String> keys = new HashMap<>();
+  /** Fills the keys; false when the constants could not be read, so the snapshot is not final. */
+  private boolean loadHeroKeys(Map<Long, String> keys) {
+    Map<String, HeroConstant> heroes;
     try {
-      for (HeroConstant hero : constants.getHeroConstantMap().values()) {
+      heroes = constants.getHeroConstantMap();
+    } catch (RuntimeException e) {
+      log.warn("Hero constants unavailable for icons: {}", e.toString());
+      return false;
+    }
+    for (HeroConstant hero : heroes.values()) {
+      try {
         String key = IconCandidates.heroKey(hero);
         if (key != null && hero.getId() != null) {
           keys.put(Long.parseLong(hero.getId()), key);
         }
+      } catch (RuntimeException e) {
+        log.warn("Hero {} skipped for icons: {}", hero.getId(), e.toString());
       }
-    } catch (RuntimeException e) {
-      log.warn("Hero constants unavailable for icons: {}", e.toString());
     }
-    return keys;
+    return true;
   }
 }

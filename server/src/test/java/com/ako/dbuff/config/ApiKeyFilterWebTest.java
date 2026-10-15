@@ -116,6 +116,11 @@ class ApiKeyFilterWebTest {
   }
 
   @Test
+  void theIconSyncEndpointNeedsTheKey() throws Exception {
+    assertThat(status("/api/v1/discord/icons/sync", null)).isEqualTo(401);
+  }
+
+  @Test
   void theHealthCheckNeedsNoKey() throws Exception {
     assertThat(status("/actuator/health", null)).isNotEqualTo(401);
   }

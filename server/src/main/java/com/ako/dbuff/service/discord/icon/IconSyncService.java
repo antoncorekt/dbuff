@@ -6,7 +6,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -33,6 +35,7 @@ public class IconSyncService {
   private final IconImageSource images;
   private final EmojiGateway gateway;
   private final IconService iconService;
+  private final IconRunLock runLock;
 
   private final AtomicBoolean running = new AtomicBoolean();
   private final ExecutorService executor =
@@ -49,13 +52,15 @@ public class IconSyncService {
       IconCandidates candidates,
       IconImageSource images,
       EmojiGateway gateway,
-      IconService iconService) {
+      IconService iconService,
+      IconRunLock runLock) {
     this.properties = properties;
     this.repo = repo;
     this.candidates = candidates;
     this.images = images;
     this.gateway = gateway;
     this.iconService = iconService;
+    this.runLock = runLock;
   }
 
   public record Report(int created, int replaced, int unchanged, int failed, int overLimit) {}
@@ -65,23 +70,33 @@ public class IconSyncService {
     if (!running.compareAndSet(false, true)) {
       return false;
     }
-    executor.execute(
-        () -> {
-          try {
-            Report report = run(kinds, allAbilities);
-            log.info("Icon sync {} finished: {}", kinds, report);
-          } catch (RuntimeException e) {
-            log.warn("Icon sync {} aborted", kinds, e);
-          } finally {
-            running.set(false);
-          }
-        });
+    try {
+      executor.execute(
+          () -> {
+            try {
+              Report report = run(kinds, allAbilities);
+              log.info("Icon sync {} finished: {}", kinds, report);
+            } catch (RuntimeException e) {
+              log.warn("Icon sync {} aborted", kinds, e);
+            } finally {
+              running.set(false);
+            }
+          });
+    } catch (RuntimeException e) {
+      running.set(false);
+      throw e;
+    }
     return true;
   }
 
   public Report run(Set<IconKind> kinds, boolean allAbilities) {
-    Run run = new Run();
+    return runLock.exclusively(() -> runLocked(kinds, allAbilities));
+  }
+
+  private Report runLocked(Set<IconKind> kinds, boolean allAbilities) {
+    Run run = new Run(gateway.list());
     try {
+      deleteStale();
       for (IconKind kind : IconKind.values()) {
         if (!kinds.contains(kind)) {
           continue;
@@ -97,6 +112,23 @@ public class IconSyncService {
       iconService.refresh();
     }
     return run.report();
+  }
+
+  private void deleteStale() {
+    for (DiscordIconDomain row : repo.findByStaleEmojiIdNotNull()) {
+      try {
+        gateway.delete(row.getStaleEmojiId());
+        row.setStaleEmojiId(null);
+        repo.save(row);
+      } catch (RuntimeException e) {
+        log.warn(
+            "Stale emoji {} of {} {} not deleted: {}",
+            row.getStaleEmojiId(),
+            row.getKind(),
+            row.getIconKey(),
+            e.toString());
+      }
+    }
   }
 
   private void syncOne(IconCandidate candidate, Run run) {
@@ -115,7 +147,6 @@ public class IconSyncService {
       run.unchanged++;
       return;
     }
-    boolean touchedDiscord = false;
     try {
       byte[] png =
           IconImages.toSquarePng(
@@ -128,76 +159,97 @@ public class IconSyncService {
         run.unchanged++;
         return;
       }
-      if (!wasSynced && run.inUse >= properties.getMaxEmoji()) {
-        save(row, IconStatus.FAILED, "Emoji limit " + properties.getMaxEmoji() + " reached");
+      if (run.remote.size() >= properties.getMaxEmoji()) {
+        recordOverLimit(row, wasSynced);
         run.overLimit++;
         return;
       }
       store(file, png);
-      boolean replacing = wasSynced;
-      if (row.getEmojiId() != null) {
-        if (replacing) {
-          touchedDiscord = true;
-          deleteOld(row);
-        }
-        row.setEmojiId(null);
-        row.setEmojiName(null);
-        run.used.values().remove(candidate.kind() + ":" + candidate.key());
-      }
-      touchedDiscord = true;
-      String name = freeName(candidate, run);
+      Long oldId = row.getEmojiId();
+      String name = freeName(candidate, row.getEmojiName(), run);
+      removeOrphan(name, run);
       EmojiGateway.RemoteEmoji emoji = gateway.create(name, png);
-      run.used.put(name, candidate.kind() + ":" + candidate.key());
+      run.remote.put(emoji.id(), emoji.name());
+      run.ownedIds.add(emoji.id());
+      run.used.put(name, owner(candidate));
+      if (oldId != null && wasSynced) {
+        row.setStaleEmojiId(deleteOld(row, oldId, run) ? row.getStaleEmojiId() : oldId);
+      }
       row.setEmojiId(emoji.id());
       row.setEmojiName(emoji.name());
       row.setImageHash(hash);
       row.setSourcePath(candidate.imgPath());
       save(row, IconStatus.SYNCED, null);
-      if (!wasSynced) {
-        run.inUse++;
-      }
-      if (replacing) {
+      if (wasSynced) {
         run.replaced++;
       } else {
         run.created++;
       }
       pause();
     } catch (IOException | RuntimeException e) {
-      recordFailure(row, e, wasSynced && !touchedDiscord);
+      recordFailure(row, e, wasSynced);
       run.failed++;
     }
   }
 
+  private void recordOverLimit(DiscordIconDomain row, boolean wasSynced) {
+    String error = "Emoji limit " + properties.getMaxEmoji() + " reached";
+    save(row, wasSynced ? IconStatus.SYNCED : IconStatus.FAILED, error);
+  }
+
   private void recordFailure(DiscordIconDomain row, Exception e, boolean oldStillWorks) {
     log.warn("Icon {} {} not synced: {}", row.getKind(), row.getIconKey(), e.toString());
-    IconStatus status = oldStillWorks ? IconStatus.SYNCED : IconStatus.FAILED;
     if (!oldStillWorks) {
       row.setEmojiId(null);
       row.setEmojiName(null);
     }
-    save(row, status, e.toString());
+    save(row, oldStillWorks ? IconStatus.SYNCED : IconStatus.FAILED, e.toString());
   }
 
-  private String freeName(IconCandidate candidate, Run run) {
+  /** The name for the new emoji; a replacement never reuses the name of the emoji it replaces. */
+  private String freeName(IconCandidate candidate, String oldName, Run run) {
     String name = EmojiNames.of(candidate.kind(), candidate.key());
-    String owner = candidate.kind() + ":" + candidate.key();
+    String hashed = EmojiNames.withHash(candidate.kind(), candidate.key());
+    if (name.equals(oldName)) {
+      return hashed;
+    }
+    if (hashed.equals(oldName)) {
+      return name;
+    }
     String holder = run.used.get(name);
-    return holder == null || holder.equals(owner)
-        ? name
-        : EmojiNames.withHash(candidate.kind(), candidate.key());
+    return holder == null || holder.equals(owner(candidate)) ? name : hashed;
   }
 
-  private void deleteOld(DiscordIconDomain row) {
+  /** An emoji of that name that no table row owns is a leftover; it is deleted to free the name. */
+  private void removeOrphan(String name, Run run) {
+    for (Map.Entry<Long, String> remote : new ArrayList<>(run.remote.entrySet())) {
+      if (remote.getValue().equals(name) && !run.ownedIds.contains(remote.getKey())) {
+        gateway.delete(remote.getKey());
+        run.remote.remove(remote.getKey());
+      }
+    }
+  }
+
+  /** Returns true when the old emoji is gone. */
+  private boolean deleteOld(DiscordIconDomain row, long oldId, Run run) {
     try {
-      gateway.delete(row.getEmojiId());
+      gateway.delete(oldId);
+      run.remote.remove(oldId);
+      run.ownedIds.remove(oldId);
+      return true;
     } catch (RuntimeException e) {
       log.warn(
-          "Old emoji {} of {} {} not deleted: {}",
-          row.getEmojiId(),
+          "Old emoji {} of {} {} not deleted, kept to retry: {}",
+          oldId,
           row.getKind(),
           row.getIconKey(),
           e.toString());
+      return false;
     }
+  }
+
+  private static String owner(IconCandidate candidate) {
+    return candidate.kind() + ":" + candidate.key();
   }
 
   private void save(DiscordIconDomain row, IconStatus status, String error) {
@@ -230,28 +282,34 @@ public class IconSyncService {
     }
   }
 
+  /** What one run knows: the emoji that exist on Discord, which of them the table owns, names. */
   private final class Run {
     int created;
     int replaced;
     int unchanged;
     int failed;
     int overLimit;
-    long inUse = repo.countByStatus(IconStatus.SYNCED);
-    final Map<String, String> used = usedNames();
+    final Map<Long, String> remote = new HashMap<>();
+    final Set<Long> ownedIds = new HashSet<>();
+    final Map<String, String> used = new HashMap<>();
+
+    Run(List<EmojiGateway.RemoteEmoji> existing) {
+      existing.forEach(e -> remote.put(e.id(), e.name()));
+      for (DiscordIconDomain row : repo.findAll()) {
+        if (row.getEmojiId() != null && row.getStatus() == IconStatus.SYNCED) {
+          ownedIds.add(row.getEmojiId());
+        }
+        if (row.getStaleEmojiId() != null) {
+          ownedIds.add(row.getStaleEmojiId());
+        }
+        if (row.getEmojiName() != null) {
+          used.put(row.getEmojiName(), row.getKind() + ":" + row.getIconKey());
+        }
+      }
+    }
 
     Report report() {
       return new Report(created, replaced, unchanged, failed, overLimit);
     }
-  }
-
-  private Map<String, String> usedNames() {
-    Map<String, String> used = new HashMap<>();
-    List<DiscordIconDomain> rows = repo.findAll();
-    for (DiscordIconDomain row : rows) {
-      if (row.getEmojiName() != null) {
-        used.put(row.getEmojiName(), row.getKind() + ":" + row.getIconKey());
-      }
-    }
-    return used;
   }
 }

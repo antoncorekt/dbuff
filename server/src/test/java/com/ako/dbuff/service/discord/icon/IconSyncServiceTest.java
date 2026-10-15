@@ -88,7 +88,8 @@ class IconSyncServiceTest {
         new IconCandidates(constants, draftRepo, useRepo),
         images,
         gateway,
-        iconService);
+        iconService,
+        new IconRunLock());
   }
 
   @Test
@@ -132,6 +133,72 @@ class IconSyncServiceTest {
     DiscordIconDomain row = repo.findByKindAndIconKey(IconKind.HERO, "antimage").orElseThrow();
     assertThat(row.getEmojiId()).isNotEqualTo(oldId);
     assertThat(gateway.live).containsOnlyKeys(row.getEmojiId());
+    assertThat(row.getEmojiName()).isNotEqualTo("h_antimage");
+    assertThat(row.getStaleEmojiId()).isNull();
+  }
+
+  @Test
+  void replacement_createsFirstAndKeepsTheOldEmojiWhenCreateFails() {
+    sync.run(EnumSet.of(IconKind.HERO), false);
+    long oldId = repo.findByKindAndIconKey(IconKind.HERO, "antimage").orElseThrow().getEmojiId();
+    when(constants.getHeroConstantMap())
+        .thenReturn(Map.of("1", hero("1", "antimage", "/heroes/antimage.png?t=2")));
+    images.put("/heroes/antimage.png?t=2", 9);
+    gateway.failAll = true;
+
+    IconSyncService.Report report = sync.run(EnumSet.of(IconKind.HERO), false);
+
+    assertThat(report.failed()).isEqualTo(1);
+    DiscordIconDomain row = repo.findByKindAndIconKey(IconKind.HERO, "antimage").orElseThrow();
+    assertThat(row.getStatus()).isEqualTo(IconStatus.SYNCED);
+    assertThat(row.getEmojiId()).isEqualTo(oldId);
+    assertThat(gateway.deleted).isEmpty();
+  }
+
+  @Test
+  void failedDeleteOfTheOldEmoji_isRememberedAndRetriedNextRun() {
+    sync.run(EnumSet.of(IconKind.HERO), false);
+    long oldId = repo.findByKindAndIconKey(IconKind.HERO, "antimage").orElseThrow().getEmojiId();
+    when(constants.getHeroConstantMap())
+        .thenReturn(Map.of("1", hero("1", "antimage", "/heroes/antimage.png?t=2")));
+    images.put("/heroes/antimage.png?t=2", 9);
+    gateway.failDelete = true;
+
+    sync.run(EnumSet.of(IconKind.HERO), false);
+
+    DiscordIconDomain row = repo.findByKindAndIconKey(IconKind.HERO, "antimage").orElseThrow();
+    assertThat(row.getStatus()).isEqualTo(IconStatus.SYNCED);
+    assertThat(row.getStaleEmojiId()).isEqualTo(oldId);
+
+    gateway.failDelete = false;
+    sync.run(EnumSet.of(IconKind.HERO), false);
+
+    assertThat(repo.findByKindAndIconKey(IconKind.HERO, "antimage").orElseThrow().getStaleEmojiId())
+        .isNull();
+    assertThat(gateway.live).doesNotContainKey(oldId);
+  }
+
+  @Test
+  void orphanEmojiWithTheTargetName_isReplacedInsteadOfDuplicated() {
+    gateway.live.put(77L, "h_antimage");
+
+    IconSyncService.Report report = sync.run(EnumSet.of(IconKind.HERO), false);
+
+    assertThat(report.created()).isEqualTo(1);
+    assertThat(gateway.deleted).containsExactly(77L);
+    assertThat(gateway.live.values()).containsExactly("h_antimage");
+  }
+
+  @Test
+  void limitCountsEmojiThatExistOnDiscord() {
+    properties.setMaxEmoji(2);
+    gateway.live.put(1L, "other_a");
+    gateway.live.put(2L, "other_b");
+
+    IconSyncService.Report report = sync.run(EnumSet.of(IconKind.HERO), false);
+
+    assertThat(report.overLimit()).isEqualTo(1);
+    assertThat(gateway.created).isEmpty();
   }
 
   @Test
@@ -258,7 +325,7 @@ class IconSyncServiceTest {
     long heroId = repo.findByKindAndIconKey(IconKind.HERO, "antimage").orElseThrow().getEmojiId();
     gateway.live.remove(heroId);
 
-    int missing = new IconRegistryCheck(repo, gateway, iconService).verify();
+    int missing = new IconRegistryCheck(repo, gateway, iconService, new IconRunLock()).verify();
 
     assertThat(missing).isEqualTo(1);
     assertThat(repo.findByKindAndIconKey(IconKind.HERO, "antimage").orElseThrow().getStatus())
@@ -273,7 +340,8 @@ class IconSyncServiceTest {
   void startupCheck_withEverythingPresent_changesNothing() {
     sync.run(EnumSet.of(IconKind.HERO), false);
 
-    assertThat(new IconRegistryCheck(repo, gateway, iconService).verify()).isZero();
+    assertThat(new IconRegistryCheck(repo, gateway, iconService, new IconRunLock()).verify())
+        .isZero();
     assertThat(repo.countByStatus(IconStatus.SYNCED)).isEqualTo(1);
   }
 
@@ -342,6 +410,8 @@ class IconSyncServiceTest {
     final List<Long> deleted = new ArrayList<>();
     final Set<String> failNames = new java.util.HashSet<>();
     long next = 1000;
+    boolean failAll;
+    boolean failDelete;
 
     @Override
     public List<RemoteEmoji> list() {
@@ -350,7 +420,7 @@ class IconSyncServiceTest {
 
     @Override
     public RemoteEmoji create(String name, byte[] png) {
-      if (failNames.contains(name)) {
+      if (failAll || failNames.contains(name)) {
         throw new IllegalStateException("quota");
       }
       long id = next++;
@@ -361,6 +431,9 @@ class IconSyncServiceTest {
 
     @Override
     public void delete(long emojiId) {
+      if (failDelete) {
+        throw new IllegalStateException("no");
+      }
       live.remove(emojiId);
       deleted.add(emojiId);
     }

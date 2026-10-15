@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -101,6 +103,41 @@ class IconServiceTest {
     service.refresh();
 
     assertThat(service.item("blink")).isEqualTo(IconKind.ITEM.getPlaceholder() + " ");
+  }
+
+  @Test
+  void heroKeysThatFailedToLoad_areNotCachedAndAreRetried() {
+    properties.setEnabled(true);
+    service.retryIntervalNanos = 0;
+    when(constants.getHeroConstantMap())
+        .thenThrow(new IllegalStateException("down"))
+        .thenReturn(Map.of("1", new HeroConstant("1", "npc_dota_hero_antimage", "Anti-Mage")));
+
+    assertThat(service.hero(1)).isEqualTo(IconKind.HERO.getPlaceholder() + " ");
+    assertThat(service.hero(1)).isEqualTo("<:h_antimage:11> ");
+  }
+
+  @Test
+  void incompleteSnapshot_isNotRebuiltBeforeTheRetryInterval() {
+    properties.setEnabled(true);
+    when(constants.getHeroConstantMap()).thenThrow(new IllegalStateException("down"));
+
+    service.hero(1);
+    service.hero(1);
+
+    verify(constants, times(1)).getHeroConstantMap();
+  }
+
+  @Test
+  void oneBadHeroId_doesNotEmptyTheMap() {
+    properties.setEnabled(true);
+    when(constants.getHeroConstantMap())
+        .thenReturn(
+            Map.of(
+                "x", new HeroConstant("abc", "npc_dota_hero_bad", "Bad"),
+                "1", new HeroConstant("1", "npc_dota_hero_antimage", "Anti-Mage")));
+
+    assertThat(service.hero(1)).isEqualTo("<:h_antimage:11> ");
   }
 
   private static DiscordIconDomain row(IconKind kind, String key, long id, String name) {

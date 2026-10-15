@@ -13,5 +13,7 @@ public interface DiscordIconRepo extends JpaRepository<DiscordIconDomain, Long> 
 
   List<DiscordIconDomain> findByStatus(IconStatus status);
 
+  List<DiscordIconDomain> findByStaleEmojiIdNotNull();
+
   long countByStatus(IconStatus status);
 }

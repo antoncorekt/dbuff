@@ -45,8 +45,15 @@ class DiscordIconResourceTest {
   void all_startsEveryKindWithSeenAbilitiesOnly() {
     when(sync.start(any(), anyBoolean())).thenReturn(true);
 
-    assertThat(resource.sync("all", true).getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+    assertThat(resource.sync("all", false).getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
     verify(sync).start(EnumSet.allOf(IconKind.class), false);
+  }
+
+  @Test
+  void allFlagWithAnotherKind_isBadRequest() {
+    assertThat(resource.sync("HERO", true).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(resource.sync("ALL", true).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    verifyNoInteractions(sync);
   }
 
   @Test
