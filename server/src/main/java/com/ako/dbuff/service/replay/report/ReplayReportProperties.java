@@ -100,6 +100,9 @@ public class ReplayReportProperties {
   /** The longest a line of the end game section may be; a longer one ends in an ellipsis. */
   private int maxEndGameLineLength = 400;
 
+  /** The longest a line of the skill picks section may be; a longer one ends in an ellipsis. */
+  private int maxSkillPickLineLength = 400;
+
   /** The mid lane runes of the opening section are those taken in this many first minutes. */
   private int openingRuneMinutes = 10;
 
@@ -162,6 +165,7 @@ public class ReplayReportProperties {
     requireLineLength("max-opening-line-length", maxOpeningLineLength);
     requireLineLength("max-lane-line-length", maxLaneLineLength);
     requireLineLength("max-end-game-line-length", maxEndGameLineLength);
+    requireLineLength("max-skill-pick-line-length", maxSkillPickLineLength);
     if (!(laneClearMargin > 0
         && laneClearMargin < laneBigMargin
         && laneBigMargin <= MAX_LANE_MARGIN)) {

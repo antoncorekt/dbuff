@@ -8,9 +8,12 @@ import com.ako.dbuff.service.discord.icon.IconKind;
 import com.ako.dbuff.service.discord.icon.IconService;
 import com.ako.dbuff.service.discord.icon.TestIcons;
 import com.ako.dbuff.service.replay.report.ConstantAbilityLabels;
+import com.ako.dbuff.service.replay.report.Finding;
+import com.ako.dbuff.service.replay.report.FindingKind;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.ReplayReportSection;
 import com.ako.dbuff.service.replay.report.ReportHeroNames;
+import com.ako.dbuff.service.replay.report.SkillPicksSection;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.Arrays;
@@ -61,6 +64,36 @@ class AiMatchFactsBuilderTest {
             "F2: 8:10 Dire (your team) won the fight, 4.1k net worth swing",
             "F3: 22:40 Dire (your team) won the fight, took the lead",
             "LANE_1: Bottom lane: Dire won clearly");
+  }
+
+  @Test
+  void skillPickFindingsAndTheMidVerdictBecomeFactsOfTheirOwnKinds() {
+    ReplayReportSection picks =
+        new SkillPicksSection(null) {
+          @Override
+          public List<Finding> findings(ReplayReportInput input) {
+            return List.of(
+                new Finding(FindingKind.PICK, "Anton (Pudge): Pudge: 75% in 40 games"),
+                new Finding(FindingKind.MISSED, "Anton (Pudge): The enemy took Chain Frost."),
+                new Finding(FindingKind.PICK, "Anton (Pudge): Rot: 40% in only 5 games"),
+                new Finding(FindingKind.BUILD, "Anton (Pudge): Pudge had no escape."));
+          }
+        };
+
+    List<Fact> facts =
+        ReasonsFixtures.builder(
+                picks,
+                ReasonsFixtures.section(
+                    "mid-activity", null, "Puck (Radiant) was active: reached level 6 at 7:10."))
+            .build(ReasonsFixtures.input());
+
+    assertThat(lines(facts))
+        .contains(
+            "PICK_1: Anton (Pudge): Pudge: 75% in 40 games",
+            "MISSED_1: Anton (Pudge): The enemy took Chain Frost.",
+            "PICK_2: Anton (Pudge): Rot: 40% in only 5 games",
+            "BUILD_1: Anton (Pudge): Pudge had no escape.",
+            "MID_1: Puck (Radiant) was active: reached level 6 at 7:10.");
   }
 
   @Test

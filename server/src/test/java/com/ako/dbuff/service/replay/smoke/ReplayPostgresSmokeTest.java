@@ -70,6 +70,7 @@ import com.ako.dbuff.service.replay.analysis.role.HeroKits;
 import com.ako.dbuff.service.replay.analysis.role.IntentProfileCalculator;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.rune.RuneType;
+import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.read.AnalysisAssembler;
 import com.ako.dbuff.service.replay.report.CompositionSection;
 import com.ako.dbuff.service.replay.report.DeathSection;
@@ -92,6 +93,7 @@ import com.ako.dbuff.service.replay.report.OpeningSection;
 import com.ako.dbuff.service.replay.report.OutliersSection;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.RotationsSection;
+import com.ako.dbuff.service.replay.report.SkillPicksSection;
 import com.ako.dbuff.service.replay.report.SmokeSection;
 import com.ako.dbuff.service.replay.report.SwingSection;
 import com.ako.dbuff.service.replay.report.VisionSection;
@@ -194,6 +196,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private EndGameSection endGameSection;
   @Autowired private EndGameSummaryRepo endGameRepo;
   @Autowired private MidActivitySection midActivitySection;
+  @Autowired private SkillPicksSection skillPicksSection;
   @Autowired private MidActivityRepo midActivityRepo;
   @Autowired private ItemsSection itemsSection;
   @Autowired private OutliersSection outliersSection;
@@ -352,6 +355,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertItemEfficiency(id, match.getId());
       assertLanes(id, match.getId());
       saveMidActivity(id, match);
+      saveSkillPicks(id, match);
       assertAbilityDraftReasons(id, match.getId());
       assertFightExplanations(id, match.getId());
       saveSwingKeyItems(id, match.getId());
@@ -1040,6 +1044,35 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       Files.writeString(
           dir.resolve("mid-activity.md"),
           "# Mid hero activity\n\n" + String.join("\n", MID_ACTIVITY_DOC.values()));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  private static final java.util.Map<String, String> SKILL_PICKS_DOC =
+      new java.util.concurrent.ConcurrentSkipListMap<>();
+
+  /** The skill-picks section for every player of an Ability Draft match, in plain words. */
+  private void saveSkillPicks(String id, MatchDomain match) {
+    long matchId = match.getId();
+    Set<Long> everyone = Set.of(0L, 1L, 2L, 3L, 4L, 128L, 129L, 130L, 131L, 132L);
+    ReplayReportInput input = new ReplayReportInput(matchId, match, everyone, Map.of(), 3);
+    assertThat(skillPicksSection.supports(new AbilityDraftProfile())).isTrue();
+    assertThat(skillPicksSection.defaultEnabled()).isFalse();
+    List<String> lines = skillPicksSection.lines(input);
+    assertThat(lines).as("%s: skill picks lines", id).isNotEmpty();
+    assertThat(lines).allSatisfy(l -> assertThat(l).doesNotContain("null", "NaN"));
+    assertThat(skillPicksSection.view(input)).isPresent();
+    StringBuilder text = new StringBuilder("## Match " + id + "\n\n");
+    lines.forEach(l -> text.append("- ").append(l).append("\n"));
+    SKILL_PICKS_DOC.put(id, text.toString());
+    System.out.println("SKILL PICKS " + id + "\n" + text);
+    try {
+      Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
+      Files.createDirectories(dir);
+      Files.writeString(
+          dir.resolve("skill-picks.md"),
+          "# Skill picks section\n\n" + String.join("\n", SKILL_PICKS_DOC.values()));
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }

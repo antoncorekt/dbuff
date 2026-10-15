@@ -34,4 +34,16 @@ class FactKindTest {
     assertThat(FactKind.OBJECTIVE.weight()).isGreaterThan(FactKind.ENDGAME.weight());
     assertThat(FactKind.ENDGAME.weight()).isGreaterThan(FactKind.VISION.weight());
   }
+
+  @Test
+  void pickFactsAreTheFirstDroppedAfterEveryOtherKind() {
+    for (FactKind kind :
+        new FactKind[] {FactKind.PICK, FactKind.BUILD, FactKind.MISSED, FactKind.MID}) {
+      assertThat(kind.weight()).isLessThan(FactKind.SMOKE.weight());
+      assertThat(FactKind.ofId(kind.id(2))).contains(kind);
+    }
+    assertThat(FactKind.PICK.id(1)).isEqualTo("PICK_1");
+    assertThat(FactKind.MID.id(1)).isEqualTo("MID_1");
+    assertThat(FactKind.ofId("PICKS_1")).isEmpty();
+  }
 }
