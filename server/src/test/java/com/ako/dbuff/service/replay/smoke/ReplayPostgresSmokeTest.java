@@ -10,6 +10,7 @@ import com.ako.dbuff.dao.model.HeroDraftPickDomain;
 import com.ako.dbuff.dao.model.LaneAssignmentDomain;
 import com.ako.dbuff.dao.model.LaneResultDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
+import com.ako.dbuff.dao.model.MissedPickDomain;
 import com.ako.dbuff.dao.model.OpeningSummaryDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
@@ -35,6 +36,7 @@ import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
 import com.ako.dbuff.dao.repo.LaneAssignmentRepo;
 import com.ako.dbuff.dao.repo.LaneReasonRepo;
 import com.ako.dbuff.dao.repo.LaneResultRepo;
+import com.ako.dbuff.dao.repo.MissedPickRepo;
 import com.ako.dbuff.dao.repo.OpeningSummaryRepo;
 import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
@@ -81,6 +83,7 @@ import com.ako.dbuff.service.replay.report.GraphIncomeSection;
 import com.ako.dbuff.service.replay.report.ImportantFightsSection;
 import com.ako.dbuff.service.replay.report.ItemsSection;
 import com.ako.dbuff.service.replay.report.LanesSection;
+import com.ako.dbuff.service.replay.report.MissedPickWording;
 import com.ako.dbuff.service.replay.report.MovementSection;
 import com.ako.dbuff.service.replay.report.ObjectivesSection;
 import com.ako.dbuff.service.replay.report.OpeningSection;
@@ -144,6 +147,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   private static final String[] ABILITY_DRAFT_MATCHES = {"9038725154", "9037038717"};
 
   @Autowired private AbilityDraftPickRepo draftPickRepo;
+  @Autowired private MissedPickRepo missedPickRepo;
   @Autowired private AbilityDraftPoolRepo draftPoolRepo;
   @Autowired private HeroDraftPickRepo heroDraftRepo;
   @Autowired private ReplayRunService runService;
@@ -222,6 +226,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertThat(status).as("%s: %s", id, run.getError()).isEqualTo(ReplayStatus.DONE);
       assertThat(playerRepo.findByMatchId(match.getId())).hasSize(10);
       assertThat(draftPickRepo.findByMatchId(match.getId())).as("%s has no draft", id).isEmpty();
+      assertThat(missedPickRepo.findByMatchId(match.getId()))
+          .as("%s: missed picks are for Ability Draft only", id)
+          .isEmpty();
       assertThat(draftPoolRepo.findAll().stream().filter(d -> d.getMatchId().equals(match.getId())))
           .isEmpty();
       assertThat(heroDraftRepo.findByMatchId(match.getId()))
@@ -306,6 +313,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Commit
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   void anAbilityDraftReplayGetsIntentAndFinalRolesAndAPickAndAFinalVerdict() throws Exception {
+    List<String> missedPickDocument = new ArrayList<>(List.of("# Missed picks", ""));
     for (String id : ABILITY_DRAFT_MATCHES) {
       Assumptions.assumeTrue(hasFixture(id), id + " is not in the fixture directory");
       MatchDomain match = seedMatch(id);
@@ -342,6 +350,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertFightExplanations(id, match.getId());
       saveSwingKeyItems(id, match.getId());
       assertAnalysisDocument(id, match.getId());
+      missedPickDocument.addAll(renderMissedPicks(id, match.getId()));
       printAbilityDraft(id, match.getId(), profiles);
       System.out.println(
           "DRAFT LINES "
@@ -365,6 +374,72 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                   .map(d -> d.getAbilityName())
                   .toList());
     }
+    Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
+    Files.createDirectories(dir);
+    Files.writeString(dir.resolve("missed-pick.md"), String.join("\n", missedPickDocument) + "\n");
+  }
+
+  private static final int MISSED_PICK_LINES_PER_PLAYER = 3;
+
+  /** Damage gaps by ratio, then gaps against a skill with no damage, then fight-only pairs. */
+  private static final Comparator<MissedPickDomain> MISSED_PICK_STRENGTH =
+      Comparator.comparing(
+              (MissedPickDomain r) ->
+                  "FIGHTS".equals(r.getBasis()) ? 2 : r.getRatio() == null ? 1 : 0)
+          .thenComparing(r -> r.getRatio() == null ? 0.0 : -r.getRatio())
+          .thenComparing(r -> -r.getCandidateDamage());
+
+  private String missedLine(MissedPickDomain r, Map<Long, String> heroes) {
+    return "- %s: %s (%s did %s, %s's %s did %s)"
+        .formatted(
+            heroes.getOrDefault(r.getPlayerSlot(), "slot " + r.getPlayerSlot()),
+            MissedPickWording.line(r, abilityLabels),
+            abilityLabels.label(r.getTakenAbility()),
+            MissedPickWording.damage(r.getTakenDamage()),
+            heroes.getOrDefault(r.getCandidateOwnerSlot(), "slot " + r.getCandidateOwnerSlot()),
+            abilityLabels.label(r.getCandidateAbility()),
+            MissedPickWording.damage(r.getCandidateDamage()));
+  }
+
+  /**
+   * The strongest missed picks of each player of a match in words, with the wording the report will
+   * use.
+   */
+  private List<String> renderMissedPicks(String id, long matchId) {
+    Map<Long, String> heroes = reportHeroNames.bySlot(matchId);
+    List<MissedPickDomain> rows = missedPickRepo.findByMatchId(matchId);
+    List<String> out = new ArrayList<>();
+    out.add("## Match " + id);
+    out.add("");
+    out.add(
+        rows.size()
+            + " flagged pairs (a skill a player took, a later enemy skill of the same slot kind"
+            + " that did more than 10% more total damage and was cast in an important fight its"
+            + " team won; for skills with no damage on both sides, more won fights). Three per"
+            + " player are shown, damage gaps first. The candidate's own 12-month average is left"
+            + " out: it is not stored yet.");
+    out.add("");
+    Map<Long, List<MissedPickDomain>> byPlayer =
+        rows.stream()
+            .sorted(MISSED_PICK_STRENGTH)
+            .collect(
+                Collectors.groupingBy(
+                    MissedPickDomain::getPlayerSlot, TreeMap::new, Collectors.toList()));
+    byPlayer.forEach(
+        (slot, list) -> {
+          list.stream()
+              .limit(MISSED_PICK_LINES_PER_PLAYER)
+              .forEach(r -> out.add(missedLine(r, heroes)));
+          if (list.size() > MISSED_PICK_LINES_PER_PLAYER) {
+            out.add(
+                "  - and %d more for %s"
+                    .formatted(
+                        list.size() - MISSED_PICK_LINES_PER_PLAYER,
+                        heroes.getOrDefault(slot, "slot " + slot)));
+          }
+        });
+    out.add("");
+    return out;
   }
 
   @Test
