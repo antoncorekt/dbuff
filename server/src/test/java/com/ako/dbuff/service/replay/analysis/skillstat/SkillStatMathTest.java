@@ -33,22 +33,17 @@ class SkillStatMathTest {
   }
 
   @Test
-  void liftIsThePairRateMinusTheAverageOfTheMembersRatesWithoutThePair() {
+  void liftIsThePairRateMinusTheGamesWeightedRateWithoutThePair() {
     SkillPickStatDomain row = pair(14, 8, new long[] {20, 8, 10, 6});
 
     assertThat(SkillStatMath.liftPoints(row).getAsDouble())
-        .isCloseTo(100 * (8 / 14.0 - (0.4 + 0.6) / 2), within(1e-9));
+        .isCloseTo(100 * (8 / 14.0 - 14 / 30.0), within(1e-9));
   }
 
   @Test
-  void aMemberWithNoGamesWithoutThePairLeavesTheOtherAsTheBaseline() {
-    SkillPickStatDomain row = pair(10, 6, new long[] {0, 0, 10, 5});
-
-    assertThat(SkillStatMath.liftPoints(row).getAsDouble()).isCloseTo(10.0, within(1e-9));
-  }
-
-  @Test
-  void noBaselineMeansNoLift() {
+  void aSkillWithNoGamesWithoutThePairMeansNoBaselineAndNoLift() {
+    assertThat(SkillStatMath.liftPoints(pair(10, 6, new long[] {0, 0, 10, 5}))).isEmpty();
+    assertThat(SkillStatMath.liftPoints(pair(10, 6, new long[] {10, 5, 0, 0}))).isEmpty();
     assertThat(SkillStatMath.liftPoints(pair(10, 6, new long[] {0, 0, 0, 0}))).isEmpty();
   }
 

@@ -1079,10 +1079,11 @@ paths:
   /api/v1/skills/hero/{heroId}:
     get:
       tags: [Skills]
-      summary: Newest stored skill statistics of a hero
+      summary: Stored skill statistics of a hero from its latest match
       description: |
-        The newest stored figure of the hero and of the hero with each skill, each from the latest
-        match it was stored for (matchId on each entry).
+        The figures of the hero and of the hero with each skill from ONE match: the latest (by
+        match start time) in which that hero played and has stored rows, so all of them share
+        one window (matchId and windowMonths on each entry).
       operationId: getSkillStatsOfHero
       parameters:
         - name: heroId

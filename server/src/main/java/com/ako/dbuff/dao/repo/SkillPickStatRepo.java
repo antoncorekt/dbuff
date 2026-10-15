@@ -1,7 +1,10 @@
 package com.ako.dbuff.dao.repo;
 
 import com.ako.dbuff.dao.model.SkillPickStatDomain;
+import com.ako.dbuff.service.replay.analysis.skillstat.SkillStatKind;
+import java.util.Collection;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,19 +15,19 @@ public interface SkillPickStatRepo extends JpaRepository<SkillPickStatDomain, Lo
 
   List<SkillPickStatDomain> findByMatchId(Long matchId);
 
-  /**
-   * The newest stored figures of the hero and of each of its skills, whatever match they came from.
-   */
+  /** Matches with a stored row for the hero, the one that started last first. */
   @Query(
       """
-select d from SkillPickStatDomain d
-where d.firstId = :heroId and d.kind in (com.ako.dbuff.service.replay.analysis.skillstat.SkillStatKind.HERO,
-      com.ako.dbuff.service.replay.analysis.skillstat.SkillStatKind.HERO_SKILL)
-  and d.matchId = (select max(d2.matchId) from SkillPickStatDomain d2
-      where d2.kind = d.kind and d2.firstId = d.firstId
-        and coalesce(d2.secondId, -1) = coalesce(d.secondId, -1))
-""")
-  List<SkillPickStatDomain> findLatestForHero(@Param("heroId") Long heroId);
+      select d.matchId from SkillPickStatDomain d, MatchDomain m
+      where m.id = d.matchId
+        and d.kind = com.ako.dbuff.service.replay.analysis.skillstat.SkillStatKind.HERO
+        and d.firstId = :heroId
+      order by m.startTime desc, d.matchId desc
+      """)
+  List<Long> latestMatchesOfHero(@Param("heroId") Long heroId, Pageable page);
+
+  List<SkillPickStatDomain> findByMatchIdAndFirstIdAndKindIn(
+      Long matchId, Long firstId, Collection<SkillStatKind> kinds);
 
   @Transactional
   @Modifying

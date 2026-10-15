@@ -67,7 +67,7 @@ class SkillStatWordingTest {
   @Test
   void aPairWithoutBaselineHasNoLiftWords() {
     assertThat(wording.describe(row(SkillStatKind.SKILL_PAIR, 20, 10, 0, 0, 0, 0)))
-        .isEqualTo("Storm Bolt with Thunder Clap: 50% in 20 games");
+        .isEqualTo("Storm Bolt with Thunder Clap: 50% in 20 games, no baseline to compare with");
   }
 
   @Test
@@ -80,5 +80,16 @@ class SkillStatWordingTest {
   void aHeroWithASkillNamesBoth() {
     assertThat(wording.describe(row(SkillStatKind.HERO_SKILL, 30, 15)))
         .isEqualTo("Pudge with Thunder Clap: 50% in 30 games");
+  }
+
+  @Test
+  void theWindowIsWordedForOneMonthAndForAnUnknownWindow() {
+    SkillPickStatDomain one = row(SkillStatKind.HERO, 0, 0);
+    one.setWindowMonths(1);
+    SkillPickStatDomain unknown = row(SkillStatKind.HERO, 0, 0);
+    unknown.setWindowMonths(null);
+
+    assertThat(wording.describe(one)).isEqualTo("Pudge: no games in the last month");
+    assertThat(wording.describe(unknown)).isEqualTo("Pudge: no games in the window");
   }
 }

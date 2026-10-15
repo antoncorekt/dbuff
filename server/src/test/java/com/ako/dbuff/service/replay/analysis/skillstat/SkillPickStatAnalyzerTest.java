@@ -7,7 +7,6 @@ import com.ako.dbuff.dao.model.SkillPickStatDomain;
 import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
-import com.ako.dbuff.dao.repo.SkillPickStatRepo;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.AllPickProfile;
 import java.time.Instant;
@@ -23,7 +22,6 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyIterable;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,11 +35,10 @@ class SkillPickStatAnalyzerTest {
   private final PlayerGameStatisticRepo playerRepo = mock(PlayerGameStatisticRepo.class);
   private final AbilityRepo abilityRepo = mock(AbilityRepo.class);
   private final SkillStatCalculator calculator = mock(SkillStatCalculator.class);
-  private final SkillPickStatRepo statRepo = mock(SkillPickStatRepo.class);
+  private final SkillPickStatStore store = mock(SkillPickStatStore.class);
   private final SkillStatProperties properties = new SkillStatProperties();
   private final SkillPickStatAnalyzer analyzer =
-      new SkillPickStatAnalyzer(
-          matchRepo, playerRepo, abilityRepo, calculator, statRepo, properties);
+      new SkillPickStatAnalyzer(matchRepo, playerRepo, abilityRepo, calculator, store, properties);
 
   private static AbilityDomain ability(long slot, long id) {
     return AbilityDomain.builder().matchId(MATCH).playerSlot(slot).abilityId(id).build();
@@ -75,8 +72,6 @@ class SkillPickStatAnalyzerTest {
 
     analyzer.analyze(MATCH);
 
-    var order = inOrder(statRepo);
-    order.verify(statRepo).deleteByMatchId(MATCH);
     ArgumentCaptor<SkillWindow> window = ArgumentCaptor.forClass(SkillWindow.class);
     verify(calculator)
         .forPlayer(eq(MATCH), eq(0L), eq(10L), eq(List.of(1L, 2L)), window.capture(), eq(1));
@@ -86,7 +81,7 @@ class SkillPickStatAnalyzerTest {
     assertThat(window.getValue().fromEpoch())
         .isEqualTo(
             Instant.ofEpochSecond(START).atZone(ZoneOffset.UTC).minusMonths(6).toEpochSecond());
-    order.verify(statRepo).saveAll(List.of(row, row));
+    verify(store).replace(MATCH, List.of(row, row));
   }
 
   @Test
@@ -102,7 +97,8 @@ class SkillPickStatAnalyzerTest {
 
     analyzer.analyze(MATCH);
 
-    verify(statRepo, never()).saveAll(any());
+    verify(store, never())
+        .replace(eq(MATCH), org.mockito.ArgumentMatchers.argThat(l -> !l.isEmpty()));
     verify(calculator, never())
         .forPlayer(anyLong(), anyLong(), any(), anyIterable(), any(), anyInt());
   }
@@ -113,6 +109,31 @@ class SkillPickStatAnalyzerTest {
 
     analyzer.analyze(MATCH);
 
-    verify(statRepo, never()).saveAll(any());
+    verify(store, never())
+        .replace(eq(MATCH), org.mockito.ArgumentMatchers.argThat(l -> !l.isEmpty()));
+  }
+
+  @Test
+  void rowsWithoutSlotOrIdAndTalentsAreLeftOut() {
+    when(matchRepo.findById(MATCH))
+        .thenReturn(Optional.of(MatchDomain.builder().id(MATCH).startTime(START).build()));
+    AbilityDomain talent = ability(0, 9);
+    talent.setName("special_bonus_unique_sniper_5");
+    when(abilityRepo.findAllByMatchId(MATCH))
+        .thenReturn(List.of(ability(0, 1), talent, ability(0, 2), ability(5, 3), nullId()));
+    PlayerMatchStatisticDomain noSlot = player(0, 10);
+    noSlot.setPlayerSlot(null);
+    when(playerRepo.findAllByMatchId(MATCH)).thenReturn(List.of(player(0, 10), noSlot));
+    when(calculator.forPlayer(anyLong(), anyLong(), any(), anyIterable(), any(), anyInt()))
+        .thenReturn(List.of());
+
+    analyzer.analyze(MATCH);
+
+    verify(calculator).forPlayer(eq(MATCH), eq(0L), eq(10L), eq(List.of(1L, 2L)), any(), eq(1));
+    verify(calculator, never()).forPlayer(eq(MATCH), eq(5L), any(), anyIterable(), any(), anyInt());
+  }
+
+  private static AbilityDomain nullId() {
+    return AbilityDomain.builder().matchId(MATCH).playerSlot(0L).build();
   }
 }

@@ -2,7 +2,6 @@ package com.ako.dbuff.service.replay.analysis.skillstat;
 
 import com.ako.dbuff.dao.model.SkillPickStatDomain;
 import java.util.OptionalDouble;
-import java.util.stream.DoubleStream;
 
 /** The two figures derived from stored counts; neither is stored. */
 public final class SkillStatMath {
@@ -24,28 +23,27 @@ public final class SkillStatMath {
   }
 
   /**
-   * Percentage points the pair's win rate is above the average of its two skills' win rates in the
-   * games where they were not held together; empty for a pair never seen, or when neither skill has
-   * a game without the other.
+   * Percentage points the pair's win rate is above the win rate of its two skills in the games
+   * where they were not held together: (wins without) over (games without) of both skills added up.
+   * Empty for a pair never seen, or when either skill has no game without the other, since the
+   * baseline would then rest on one skill only.
    */
   public static OptionalDouble liftPoints(SkillPickStatDomain pair) {
     if (pair.getKind() != SkillStatKind.SKILL_PAIR || pair.getGames() == 0) {
       return OptionalDouble.empty();
     }
-    OptionalDouble baseline =
-        DoubleStream.of(
-                rate(pair.getFirstGamesWithout(), pair.getFirstWinsWithout()),
-                rate(pair.getSecondGamesWithout(), pair.getSecondWinsWithout()))
-            .filter(r -> !Double.isNaN(r))
-            .average();
-    if (baseline.isEmpty()) {
+    long firstGames = orZero(pair.getFirstGamesWithout());
+    long secondGames = orZero(pair.getSecondGamesWithout());
+    if (firstGames <= 0 || secondGames <= 0) {
       return OptionalDouble.empty();
     }
-    return OptionalDouble.of(
-        100.0 * (rate(pair.getGames(), pair.getWins()) - baseline.getAsDouble()));
+    double baseline =
+        (double) (orZero(pair.getFirstWinsWithout()) + orZero(pair.getSecondWinsWithout()))
+            / (firstGames + secondGames);
+    return OptionalDouble.of(100.0 * ((double) pair.getWins() / pair.getGames() - baseline));
   }
 
-  private static double rate(Long games, Long wins) {
-    return games == null || games <= 0 || wins == null ? Double.NaN : (double) wins / games;
+  private static long orZero(Long value) {
+    return value == null ? 0 : value;
   }
 }

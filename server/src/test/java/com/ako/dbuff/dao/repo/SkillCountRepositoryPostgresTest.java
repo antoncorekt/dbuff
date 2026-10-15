@@ -63,6 +63,7 @@ class SkillCountRepositoryPostgresTest {
   @Autowired private EntityManager em;
   @Autowired private SkillCountRepository counts;
   @Autowired private SkillStatCalculator calculator;
+  @Autowired private SkillPickStatRepo statRepo;
 
   @BeforeEach
   void history() {
@@ -168,6 +169,53 @@ class SkillCountRepositoryPostgresTest {
     assertThat(ab.getFirstGamesWithout()).isEqualTo(2);
     assertThat(ab.getFirstWinsWithout()).isEqualTo(1);
     assertThat(ab.getSecondGamesWithout()).isZero();
-    assertThat(SkillStatMath.liftPoints(ab).getAsDouble()).isZero();
+    assertThat(SkillStatMath.liftPoints(ab)).as("B has no game without A").isEmpty();
+  }
+
+  @Test
+  void talentsAndGenericBonusesAreNotCountedAsSkills() {
+    match(8, ABILITY_DRAFT, NOW - 5 * DAY);
+    player(8, 0, HERO, 1, A);
+    em.persist(talent(8, 0, 9201, "special_bonus_unique_sniper_5"));
+    em.persist(talent(8, 0, 9202, "ad_special_bonus_gold_lvl20_r"));
+    em.persist(talent(8, 0, 9203, "ability_attribute_bonus"));
+    em.flush();
+
+    assertThat(counts.skills(List.of(A, 9201L, 9202L, 9203L), WINDOW).keySet()).containsExactly(A);
+    assertThat(counts.pairs(List.of(A, B, C, 9201L, 9202L, 9203L), WINDOW).keySet())
+        .containsExactlyInAnyOrder(SkillPair.of(A, B), SkillPair.of(A, C));
+  }
+
+  @Test
+  void aHeroIsReadFromTheMatchThatStartedLastNotTheHighestId() {
+    em.persist(heroRow(1, 3));
+    em.persist(heroRow(2, 5));
+    em.flush();
+
+    assertThat(
+            statRepo.latestMatchesOfHero(
+                HERO, org.springframework.data.domain.PageRequest.of(0, 1)))
+        .containsExactly(BASE + 1);
+  }
+
+  private static AbilityDomain talent(int n, long slot, long id, String name) {
+    return AbilityDomain.builder()
+        .matchId(BASE + n)
+        .playerSlot(slot)
+        .abilityId(id)
+        .playerId(-1L)
+        .name(name)
+        .build();
+  }
+
+  private static SkillPickStatDomain heroRow(int n, long games) {
+    return SkillPickStatDomain.builder()
+        .matchId(BASE + n)
+        .playerSlot(0L)
+        .kind(SkillStatKind.HERO)
+        .firstId(HERO)
+        .games(games)
+        .wins(0L)
+        .build();
   }
 }

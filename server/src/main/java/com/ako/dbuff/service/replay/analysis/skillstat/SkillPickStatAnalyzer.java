@@ -7,7 +7,6 @@ import com.ako.dbuff.dao.model.SkillPickStatDomain;
 import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
-import com.ako.dbuff.dao.repo.SkillPickStatRepo;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
@@ -21,7 +20,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Stores, for each player of an Ability Draft match, how the hero, each skill held, the hero with
@@ -39,7 +37,7 @@ public class SkillPickStatAnalyzer implements ReplayAnalyzer {
   private final PlayerGameStatisticRepo playerRepo;
   private final AbilityRepo abilityRepo;
   private final SkillStatCalculator calculator;
-  private final SkillPickStatRepo statRepo;
+  private final SkillPickStatStore store;
   private final SkillStatProperties properties;
 
   @Override
@@ -57,33 +55,61 @@ public class SkillPickStatAnalyzer implements ReplayAnalyzer {
     return 1;
   }
 
+  /**
+   * The history counts run before and outside the transaction, so no connection is held while they
+   * run; only the replacement of the match's rows is transactional.
+   */
   @Override
-  @Transactional
   public void analyze(long matchId) {
-    deleteByMatchId(matchId);
+    store.replace(matchId, rows(matchId));
+  }
+
+  @Override
+  public void deleteByMatchId(long matchId) {
+    store.replace(matchId, List.of());
+  }
+
+  private List<SkillPickStatDomain> rows(long matchId) {
     MatchDomain match = matchRepo.findById(matchId).orElse(null);
     if (match == null || match.getStartTime() == null) {
       log.info("Match {} has no stored start time, so no skill statistics", matchId);
-      return;
+      return List.of();
+    }
+    List<AbilityDomain> stored = abilityRepo.findAllByMatchId(matchId);
+    List<AbilityDomain> usable =
+        stored.stream()
+            .filter(a -> a.getPlayerSlot() != null && a.getAbilityId() != null)
+            .filter(a -> RealSkills.isSkill(a.getName()))
+            .toList();
+    long unusable =
+        stored.stream().filter(a -> a.getPlayerSlot() == null || a.getAbilityId() == null).count();
+    if (unusable > 0) {
+      log.info("Match {}: {} ability rows have no slot or id and are skipped", matchId, unusable);
+    }
+    if (usable.isEmpty()) {
+      log.info("Match {} has no stored abilities, so no skill statistics", matchId);
+      return List.of();
     }
     Map<Long, List<Long>> skillsBySlot =
-        abilityRepo.findAllByMatchId(matchId).stream()
+        usable.stream()
             .collect(
                 Collectors.groupingBy(
                     AbilityDomain::getPlayerSlot,
                     Collectors.mapping(AbilityDomain::getAbilityId, Collectors.toList())));
-    if (skillsBySlot.isEmpty()) {
-      log.info("Match {} has no stored abilities, so no skill statistics", matchId);
-      return;
-    }
-    Instant start = Instant.ofEpochSecond(match.getStartTime());
     SkillWindow window =
         new SkillWindow(
-            start.atZone(ZoneOffset.UTC).minusMonths(properties.getWindowMonths()).toEpochSecond(),
+            Instant.ofEpochSecond(match.getStartTime())
+                .atZone(ZoneOffset.UTC)
+                .minusMonths(properties.getWindowMonths())
+                .toEpochSecond(),
             match.getStartTime(),
             matchId);
     List<SkillPickStatDomain> rows = new ArrayList<>();
     for (PlayerMatchStatisticDomain player : playerRepo.findAllByMatchId(matchId)) {
+      if (player.getPlayerSlot() == null) {
+        log.info("Match {} has a player row with no slot, skipped", matchId);
+        continue;
+      }
       rows.addAll(
           calculator.forPlayer(
               matchId,
@@ -93,12 +119,6 @@ public class SkillPickStatAnalyzer implements ReplayAnalyzer {
               window,
               version()));
     }
-    statRepo.saveAll(rows);
-  }
-
-  @Override
-  @Transactional
-  public void deleteByMatchId(long matchId) {
-    statRepo.deleteByMatchId(matchId);
+    return rows;
   }
 }

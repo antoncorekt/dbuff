@@ -7,6 +7,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -81,15 +83,17 @@ class SkillStatReaderTest {
   @Test
   void nothingStoredGivesAnEmptyAnswer() {
     when(repo.findByMatchId(9L)).thenReturn(List.of());
-    when(repo.findLatestForHero(9L)).thenReturn(List.of());
+    when(repo.latestMatchesOfHero(eq(9L), any())).thenReturn(List.of());
 
     assertThat(reader.match(9L).players()).isEmpty();
     assertThat(reader.hero(9L)).isEmpty();
   }
 
   @Test
-  void aHeroIsAnsweredFromTheNewestRows() {
-    when(repo.findLatestForHero(10L))
+  void aHeroIsAnsweredFromTheRowsOfOneMatchTheLatestOneItPlayed() {
+    when(repo.latestMatchesOfHero(eq(10L), any())).thenReturn(List.of(5L));
+    when(repo.findByMatchIdAndFirstIdAndKindIn(
+            eq(5L), eq(10L), eq(List.of(SkillStatKind.HERO, SkillStatKind.HERO_SKILL))))
         .thenReturn(
             List.of(
                 row(0, SkillStatKind.HERO_SKILL, 10, 2L, 4, 2),

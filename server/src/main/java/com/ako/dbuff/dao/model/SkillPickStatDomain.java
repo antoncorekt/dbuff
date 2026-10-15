@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,9 +23,13 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(
     name = "skill_pick_stat",
+    uniqueConstraints =
+        @UniqueConstraint(
+            name = "uq_skill_pick_stat_subject",
+            columnNames = {"matchId", "playerSlot", "kind", "firstId", "secondId"}),
     indexes = {
       @Index(name = "idx_skill_pick_stat_match", columnList = "matchId"),
-      @Index(name = "idx_skill_pick_stat_subject", columnList = "kind, firstId")
+      @Index(name = "idx_skill_pick_stat_subject", columnList = "kind, firstId, matchId")
     })
 @Data
 @Builder

@@ -23,13 +23,19 @@ import org.springframework.stereotype.Repository;
 public class SkillCountRepository {
   private static final String WON = "sum(case when p.win = 1 then 1 else 0 end)";
 
-  private static final String PLAYER_GAME_FILTER =
-      """
-join player_match_statistic_domain p on p.match_id = a.match_id and p.player_slot = a.player_slot
-join match_domain m on m.id = a.match_id
-where m.game_mode_id = :mode and m.start_time >= :from and m.start_time < :to
-  and m.id <> :match
-""";
+  /** The games a window covers; every statement uses it, on the match alias {@code m}. */
+  private static final String WINDOW_FILTER =
+      "m.game_mode_id = :mode and m.start_time >= :from and m.start_time < :to and m.id <> :match";
+
+  /** Talents and generic bonuses are not skills; the mapper keeps them out, this is a guard. */
+  private static final String REAL_SKILL =
+      "coalesce(a.name, '') not like '%special\\_bonus\\_%'"
+          + " and coalesce(a.name, '') not like '%attribute\\_bonus%'";
+
+  private static final String PLAYER_GAME_JOIN =
+      " join player_match_statistic_domain p on p.match_id = a.match_id"
+          + " and p.player_slot = a.player_slot join match_domain m on m.id = a.match_id where "
+          + WINDOW_FILTER;
 
   @PersistenceContext private EntityManager entityManager;
 
@@ -41,8 +47,8 @@ where m.game_mode_id = :mode and m.start_time >= :from and m.start_time < :to
                     + WON
                     + ", 0) from player_match_statistic_domain p"
                     + " join match_domain m on m.id = p.match_id"
-                    + " where p.hero_id = :hero and m.game_mode_id = :mode"
-                    + " and m.start_time >= :from and m.start_time < :to and m.id <> :match"),
+                    + " where p.hero_id = :hero and "
+                    + WINDOW_FILTER),
             window);
     query.setParameter("hero", heroId);
     Object[] row = (Object[]) query.getSingleResult();
@@ -70,9 +76,13 @@ where m.game_mode_id = :mode and m.start_time >= :from and m.start_time < :to
                     + WON
                     + ", 0) from ability_domain a"
                     + " join ability_domain b on b.match_id = a.match_id"
-                    + " and b.player_slot = a.player_slot and b.ability_id > a.ability_id "
-                    + PLAYER_GAME_FILTER
+                    + " and b.player_slot = a.player_slot and b.ability_id > a.ability_id"
+                    + PLAYER_GAME_JOIN
                     + " and a.ability_id in (:skills) and b.ability_id in (:skills)"
+                    + " and "
+                    + REAL_SKILL
+                    + " and "
+                    + REAL_SKILL.replace("a.", "b.")
                     + " group by a.ability_id, b.ability_id"),
             window);
     query.setParameter("skills", skillIds);
@@ -96,9 +106,10 @@ where m.game_mode_id = :mode and m.start_time >= :from and m.start_time < :to
             entityManager.createNativeQuery(
                 "select a.ability_id, count(*), coalesce("
                     + WON
-                    + ", 0) from ability_domain a "
-                    + PLAYER_GAME_FILTER
-                    + " and a.ability_id in (:skills)"
+                    + ", 0) from ability_domain a"
+                    + PLAYER_GAME_JOIN
+                    + " and a.ability_id in (:skills) and "
+                    + REAL_SKILL
                     + (heroId == null ? "" : " and p.hero_id = :hero")
                     + " group by a.ability_id"),
             window);

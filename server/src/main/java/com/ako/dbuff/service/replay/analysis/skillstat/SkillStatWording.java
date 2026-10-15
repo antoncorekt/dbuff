@@ -30,7 +30,7 @@ public class SkillStatWording {
   private static String figures(SkillPickStatDomain row) {
     long games = row.getGames();
     if (games == 0) {
-      return "no games in the last " + months(row.getWindowMonths());
+      return "no games in " + window(row.getWindowMonths());
     }
     String count =
         (games < SMALL_SAMPLE ? "only " : "") + games + (games == 1 ? " game" : " games");
@@ -38,9 +38,12 @@ public class SkillStatWording {
   }
 
   private static String lift(SkillPickStatDomain row) {
+    if (row.getKind() != SkillStatKind.SKILL_PAIR || row.getGames() == 0) {
+      return "";
+    }
     OptionalDouble lift = SkillStatMath.liftPoints(row);
     if (lift.isEmpty()) {
-      return "";
+      return ", no baseline to compare with";
     }
     long points = Math.round(lift.getAsDouble());
     if (points == 0) {
@@ -53,8 +56,10 @@ public class SkillStatWording {
         + " what each gives alone";
   }
 
-  private static String months(Integer months) {
-    int m = months == null ? 0 : months;
-    return m == 1 ? "month" : m + " months";
+  private static String window(Integer months) {
+    if (months == null || months < 1) {
+      return "the window";
+    }
+    return months == 1 ? "the last month" : "the last " + months + " months";
   }
 }

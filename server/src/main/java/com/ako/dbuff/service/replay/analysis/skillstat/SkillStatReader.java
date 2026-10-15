@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 /** Reads the stored rows for the REST API; it runs no history query. */
@@ -42,9 +43,18 @@ public class SkillStatReader {
     return new SkillStatResponse(matchId, players);
   }
 
-  /** The newest stored figures of the hero and its skills; empty when none are stored. */
+  /**
+   * The figures of the latest match (by start time) in which the hero played and has stored rows,
+   * so all of them share one window; empty when none are stored.
+   */
   public List<Stat> hero(long heroId) {
-    return stats(repo.findLatestForHero(heroId));
+    List<Long> latest = repo.latestMatchesOfHero(heroId, PageRequest.of(0, 1));
+    if (latest.isEmpty()) {
+      return List.of();
+    }
+    return stats(
+        repo.findByMatchIdAndFirstIdAndKindIn(
+            latest.getFirst(), heroId, List.of(SkillStatKind.HERO, SkillStatKind.HERO_SKILL)));
   }
 
   private static Long heroOf(List<SkillPickStatDomain> rows) {
