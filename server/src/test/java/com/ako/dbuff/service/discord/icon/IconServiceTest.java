@@ -77,6 +77,27 @@ class IconServiceTest {
   }
 
   @Test
+  void aFallbackIsCountedOncePerKey() {
+    properties.setEnabled(true);
+
+    service.item("x");
+    service.item("x");
+    service.item("y");
+
+    assertThat(registry.counter(IconService.FALLBACK_METER, "kind", "ITEM").count()).isEqualTo(2);
+  }
+
+  @Test
+  void withoutIcons_answersNothingOnThatThreadOnlyWhileTheActionRuns() {
+    properties.setEnabled(true);
+
+    String inside = service.withoutIcons(() -> service.hero(1) + service.item("blink"));
+
+    assertThat(inside).isEmpty();
+    assertThat(service.hero(1)).isEqualTo("<:h_antimage:11> ");
+  }
+
+  @Test
   void placeholdersOff_fallsBackToNothing() {
     properties.setEnabled(true);
     properties.setPlaceholders(false);

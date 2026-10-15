@@ -207,7 +207,7 @@ public class FightSection implements ReplayReportSection {
                 "%s had %s ready and did not cast it in %d of %d fights."
                     .formatted(
                         name,
-                        labels.label(e.getKey()),
+                        labels.decorated(e.getKey()),
                         e.getValue(),
                         byAbility.get(e.getKey()).size()));
   }

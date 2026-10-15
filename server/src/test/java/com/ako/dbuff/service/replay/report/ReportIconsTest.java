@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.AbilityDraftPickDomain;
+import com.ako.dbuff.dao.model.AbilityDraftPoolDomain;
 import com.ako.dbuff.dao.model.HeroDraftPickDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
@@ -12,6 +13,7 @@ import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.constant.data.ItemConstant;
+import com.ako.dbuff.service.discord.icon.IconKind;
 import com.ako.dbuff.service.discord.icon.IconService;
 import com.ako.dbuff.service.discord.icon.IconText;
 import com.ako.dbuff.service.discord.icon.TestIcons;
@@ -92,16 +94,18 @@ class ReportIconsTest {
   void labels_putTheIconOfTheAbilityOrItemBeforeTheName() {
     ConstantAbilityLabels labels = labels(TestIcons.on());
 
-    assertThat(labels.label("antimage_blink")).isEqualTo(TestIcons.abilityMention() + "Blink");
-    assertThat(labels.label("item_blink")).isEqualTo(TestIcons.itemMention() + "Blink Dagger");
+    assertThat(labels.label("antimage_blink")).isEqualTo("Blink");
+    assertThat(labels.label("item_blink")).isEqualTo("Blink Dagger");
+    assertThat(labels.decorated("antimage_blink")).isEqualTo(TestIcons.abilityMention() + "Blink");
+    assertThat(labels.decorated("item_blink")).isEqualTo(TestIcons.itemMention() + "Blink Dagger");
   }
 
   @Test
   void labels_areUnchangedWhileTheSwitchIsOff() {
     ConstantAbilityLabels labels = labels(TestIcons.off());
 
-    assertThat(labels.label("antimage_blink")).isEqualTo("Blink");
-    assertThat(labels.label("item_blink")).isEqualTo("Blink Dagger");
+    assertThat(labels.decorated("antimage_blink")).isEqualTo("Blink");
+    assertThat(labels.decorated("item_blink")).isEqualTo("Blink Dagger");
   }
 
   @Test
@@ -115,7 +119,14 @@ class ReportIconsTest {
         .anyMatch(line -> line.contains(TestIcons.abilityMention() + "Blink"));
     assertThat(without.bullets().stream().flatMap(b -> b.lines()).toList())
         .noneMatch(line -> line.contains("<:"));
-    assertThat(withIcons.bullets().stream().flatMap(b -> b.lines()).map(IconText::strip).toList())
+    assertThat(
+            withIcons.bullets().stream()
+                .flatMap(b -> b.lines())
+                .map(
+                    line ->
+                        line.replace(TestIcons.heroMention(), "")
+                            .replace(TestIcons.abilityMention(), ""))
+                .toList())
         .isEqualTo(without.bullets().stream().flatMap(b -> b.lines()).toList());
   }
 
@@ -134,11 +145,15 @@ class ReportIconsTest {
   }
 
   @Test
-  void iconText_stripsEveryIconFormAndNothingElse() {
-    String text =
-        TestIcons.heroMention() + "Anti-Mage and <a:x_y:5> Blink, " + "⚔️ Axe, <b>bold</b> a < b";
+  void iconText_removesOnlyTheIconPrefixAtTheStart() {
+    String hero = TestIcons.heroMention() + "Anti-Mage";
 
-    assertThat(IconText.strip(text)).isEqualTo("Anti-Mage and Blink, Axe, <b>bold</b> a < b");
+    assertThat(IconText.withoutLeadingIcon(hero)).isEqualTo("Anti-Mage");
+    assertThat(IconText.withoutLeadingIcon(IconKind.HERO.getPlaceholder() + " Axe"))
+        .isEqualTo("Axe");
+    String inside = "Anton (" + hero + ") said <:h_x:1> and ⚔️ is a glyph";
+    assertThat(IconText.withoutLeadingIcon(inside)).isEqualTo(inside);
+    assertThat(IconText.withoutLeadingIcon("<:custom:5> Axe")).isEqualTo("<:custom:5> Axe");
   }
 
   @Test
@@ -146,9 +161,13 @@ class ReportIconsTest {
     String text = "ab <:h_antimage:11> cd";
 
     assertThat(IconText.safeEnd(text, 8)).isEqualTo(3);
+    assertThat(IconText.safeEnd(text, 4)).isEqualTo(3);
     assertThat(IconText.safeEnd(text, 19)).isEqualTo(19);
     assertThat(IconText.safeEnd(text, 2)).isEqualTo(2);
+    assertThat(IconText.safeEnd(text, 0)).isZero();
+    assertThat(IconText.safeEnd(text, 99)).isEqualTo(text.length());
     assertThat(IconText.safeEnd("no tag < here", 8)).isEqualTo(8);
+    assertThat(IconText.splitIndex("<:h_antimage:11>" + "x".repeat(10), 5)).isEqualTo(5);
   }
 
   @Test
@@ -196,7 +215,74 @@ class ReportIconsTest {
 
     for (ReportMessage card : cards) {
       var fallback = ((ReportMessage.Components) card).fallback();
-      assertThat(IconText.strip(fallback)).doesNotContain("<:");
+      assertThat(fallback.replace(TestIcons.heroMention(), "")).doesNotContain("<:");
+    }
+  }
+
+  @Test
+  void draftBoard_withFortyIconedAbilitiesStaysWithinEveryLimit() {
+    IconService icons = TestIcons.onWithAbilities(80);
+    HeroDraftPickRepo heroRepo = mock(HeroDraftPickRepo.class);
+    AbilityDraftPickRepo skillRepo = mock(AbilityDraftPickRepo.class);
+    AbilityDraftPoolRepo poolRepo = mock(AbilityDraftPoolRepo.class);
+    when(heroRepo.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                HeroDraftPickDomain.builder()
+                    .matchId(1L)
+                    .heroId(1L)
+                    .playerSlot(0L)
+                    .turnNumber(1)
+                    .pickTick(30)
+                    .clockSeconds(-400.0)
+                    .build()));
+    when(skillRepo.findByMatchId(1L))
+        .thenReturn(
+            IntStream.range(0, 40)
+                .mapToObj(
+                    i ->
+                        AbilityDraftPickDomain.builder()
+                            .pickOrder(i)
+                            .turnNumber(i + 1)
+                            .playerSlot(0L)
+                            .abilityName("antimage_blink_" + i)
+                            .build())
+                .toList());
+    when(poolRepo.findByMatchId(1L))
+        .thenReturn(
+            IntStream.range(40, 80)
+                .mapToObj(
+                    i ->
+                        AbilityDraftPoolDomain.builder()
+                            .poolIndex(i)
+                            .abilityName("antimage_blink_" + i)
+                            .build())
+                .toList());
+    PlainViewRenderer plain = new PlainViewRenderer();
+    DraftBoardSection section =
+        new DraftBoardSection(
+            heroRepo,
+            skillRepo,
+            poolRepo,
+            new AbilityDraftProfile(),
+            labels(icons),
+            heroNames(icons),
+            plain);
+    SectionView view =
+        section.view(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3)).orElseThrow();
+
+    List<String> lines = plain.lines(view).stream().flatMap(l -> l.lines()).toList();
+    List<ReportMessage> cards = new ComponentsViewRenderer(plain).render(view);
+
+    assertThat(lines).allMatch(line -> line.length() < MessageLimits.PLAIN_TEXT);
+    assertThat(String.join("\n", lines).split("<:a_antimage_blink_\\d+:\\d+>", -1).length - 1)
+        .isEqualTo(80);
+    assertThat(view.bullets()).allMatch(b -> b.length() <= 3000);
+    for (ReportMessage card : cards) {
+      var c = (ReportMessage.Components) card;
+      assertThat(c.textLength()).isLessThanOrEqualTo(MessageLimits.CARD_TEXT);
+      assertThat(c.componentCount()).isLessThanOrEqualTo(MessageLimits.CARD_COMPONENTS);
+      assertThat(c.fallback()).doesNotContain("…");
     }
   }
 

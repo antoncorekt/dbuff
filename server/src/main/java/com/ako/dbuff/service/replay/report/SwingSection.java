@@ -190,9 +190,11 @@ public class SwingSection implements ReplayReportSection {
   private String itemName(String key) {
     String replayName = HeroInputs.replayName(key);
     String label = labels.label(replayName);
-    return label == null || label.isBlank() || label.equals(replayName) || label.equals(key)
-        ? Prettify.ability(replayName)
-        : label;
+    String name =
+        label == null || label.isBlank() || label.equals(replayName) || label.equals(key)
+            ? Prettify.ability(replayName)
+            : label;
+    return labels.icon(replayName) + name;
   }
 
   private static Optional<Double> completedAt(String detail) {

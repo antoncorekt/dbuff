@@ -68,7 +68,7 @@ public class DraftSection implements ReplayReportSection {
                   Comparator.comparing(
                       AbilityDraftPickDomain::getPickOrder,
                       Comparator.nullsLast(Comparator.naturalOrder())))
-              .map(p -> labels.label(p.getAbilityName()) + position(p))
+              .map(p -> labels.decorated(p.getAbilityName()) + position(p))
               .collect(Collectors.joining(", "));
       if (!chosen.isEmpty()) {
         lines.add(player.getValue() + " drafted " + chosen);

@@ -7,6 +7,10 @@ import com.ako.dbuff.dao.model.GameSpikeDomain;
 import com.ako.dbuff.dao.model.GameSpikeFactorDomain;
 import com.ako.dbuff.dao.repo.GameSpikeFactorRepo;
 import com.ako.dbuff.dao.repo.GameSpikeRepo;
+import com.ako.dbuff.service.constant.ConstantsManagers;
+import com.ako.dbuff.service.constant.data.ItemConstant;
+import com.ako.dbuff.service.discord.icon.IconKind;
+import com.ako.dbuff.service.discord.icon.TestIcons;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.LostFight;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.MatchExplanation;
@@ -192,6 +196,34 @@ class SwingSectionTest {
 
     assertThat(section.lines(input()).get(1))
         .endsWith("; it came after Dire finished Black King Bar (Terrorblade) at 27:40");
+  }
+
+  @Test
+  void lines_putTheItemIconOnlyBeforeTheItemNameNotIntoItsComparisons() {
+    when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spike(0, 1800, 5000, "FIGHT_WIN", false)));
+    heroes();
+    ConstantsManagers constants = mock(ConstantsManagers.class);
+    when(constants.getItemConstantMap())
+        .thenReturn(Map.of("blink", ItemConstant.builder().dname("Blink Dagger").build()));
+    ConstantAbilityLabels labels = new ConstantAbilityLabels(constants, TestIcons.on());
+    SwingSection withIcons =
+        new SwingSection(
+            spikeRepo,
+            factorRepo,
+            reader,
+            heroNames,
+            new ReasonWording(labels),
+            labels,
+            properties);
+
+    when(factorRepo.findByMatchId(1L)).thenReturn(List.of(itemFactor("blink", 2L, "1660")));
+    assertThat(withIcons.lines(input()).get(1))
+        .endsWith("finished " + TestIcons.itemMention() + "Blink Dagger (Terrorblade) at 27:40");
+
+    when(factorRepo.findByMatchId(1L)).thenReturn(List.of(itemFactor("new_thing", 2L, "600")));
+    assertThat(withIcons.lines(input()).get(1))
+        .endsWith(
+            "finished " + IconKind.ITEM.getPlaceholder() + " New Thing (Terrorblade) at 10:00");
   }
 
   @Test

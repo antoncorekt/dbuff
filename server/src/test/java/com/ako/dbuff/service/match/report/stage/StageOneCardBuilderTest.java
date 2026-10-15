@@ -1,13 +1,18 @@
 package com.ako.dbuff.service.match.report.stage;
 
-import com.ako.dbuff.service.constant.ConstantsManagers;
+import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
+import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import com.ako.dbuff.service.discord.icon.IconService;
 import com.ako.dbuff.service.discord.icon.TestIcons;
 import com.ako.dbuff.service.match.DotaApiLastMatchesService.PlayerLine;
+import com.ako.dbuff.service.replay.analysis.role.HeroKits;
+import com.ako.dbuff.service.replay.report.ReportHeroNames;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -15,12 +20,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class StageOneCardBuilderTest {
 
-  private final ConstantsManagers constants = Mockito.mock(ConstantsManagers.class);
-  private final StageOneCardBuilder builder = new StageOneCardBuilder(constants, TestIcons.off());
+  private final HeroKits kits = Mockito.mock(HeroKits.class);
+  private final StageOneCardBuilder builder = new StageOneCardBuilder(heroNames(TestIcons.off()));
+
+  private ReportHeroNames heroNames(IconService icons) {
+    return new ReportHeroNames(
+        Mockito.mock(PlayerGameStatisticRepo.class),
+        Mockito.mock(ReplayPlayerRepo.class),
+        kits,
+        icons);
+  }
 
   private void heroes() {
-    Mockito.when(constants.getHeroConstantMap())
-        .thenReturn(Map.of("14", new HeroConstant("14", "npc_dota_hero_pudge", "Pudge")));
+    Mockito.when(kits.hero(14L))
+        .thenReturn(Optional.of(new HeroConstant("14", "npc_dota_hero_pudge", "Pudge")));
   }
 
   @Test
@@ -42,10 +55,10 @@ class StageOneCardBuilderTest {
 
   @Test
   void heroIconGoesBeforeTheHeroNameOnlyWhileTheSwitchIsOn() {
-    Mockito.when(constants.getHeroConstantMap())
-        .thenReturn(Map.of("1", new HeroConstant("1", "npc_dota_hero_antimage", "Anti-Mage")));
+    Mockito.when(kits.hero(1L))
+        .thenReturn(Optional.of(new HeroConstant("1", "npc_dota_hero_antimage", "Anti-Mage")));
     PlayerLine line = new PlayerLine(1, 0L, 1L, 1L, 1L, 1L, 1L, 1L, true);
-    StageOneCardBuilder withIcons = new StageOneCardBuilder(constants, TestIcons.on());
+    StageOneCardBuilder withIcons = new StageOneCardBuilder(heroNames(TestIcons.on()));
 
     assertThat(withIcons.build(facts(), List.of(line), Map.of(1L, "Ann")).bullets())
         .containsExactly("Ann · " + TestIcons.heroMention() + "Anti-Mage · 1/1/1 · 1/1 · Win");
@@ -66,7 +79,7 @@ class StageOneCardBuilderTest {
 
   @Test
   void heroNamesThatCannotBeLoadedMeanUnknownHeroes() {
-    Mockito.when(constants.getHeroConstantMap()).thenThrow(new IllegalStateException("down"));
+    Mockito.when(kits.hero(14L)).thenThrow(new IllegalStateException("down"));
     PlayerLine line = new PlayerLine(3, 0L, 14L, 1L, 1L, 1L, 1L, 1L, true);
 
     assertThat(builder.build(facts(), List.of(line), Map.of(3L, "Ann")).bullets())

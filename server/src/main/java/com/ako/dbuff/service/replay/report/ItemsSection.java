@@ -158,7 +158,7 @@ public class ItemsSection implements ReplayReportSection {
     return "%s's %s (%s)"
         .formatted(
             BehaviourWording.hero(heroes, row.slot()),
-            labels.label("item_" + row.itemKey()),
+            labels.decorated("item_" + row.itemKey()),
             bought(row.purchaseSeconds()));
   }
 

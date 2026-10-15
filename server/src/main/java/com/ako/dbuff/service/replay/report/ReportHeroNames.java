@@ -9,6 +9,7 @@ import com.ako.dbuff.service.discord.icon.IconService;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -58,9 +59,14 @@ public class ReportHeroNames {
 
   /** The name of a hero by its OpenDota id, with its icon before it. */
   public String heroName(long heroId) {
+    return known(heroId).orElse("Hero " + heroId);
+  }
+
+  /** {@link #heroName} where the hero is known with a name, empty otherwise. */
+  public Optional<String> known(long heroId) {
     return heroKits
         .hero(heroId)
-        .map(hero -> icons.hero(heroId) + hero.getLocalized_name())
-        .orElse("Hero " + heroId);
+        .filter(hero -> hero.getLocalized_name() != null)
+        .map(hero -> icons.hero(heroId) + hero.getLocalized_name());
   }
 }

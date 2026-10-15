@@ -17,8 +17,8 @@ import org.springframework.stereotype.Component;
  * The display name of an ability or item from the constants. Without one, the prettified internal
  * name minus a leading hero token, since an Ability Draft hero holds abilities of other heroes and
  * the source hero's name would read as part of the ability. It never fails: missing constants give
- * the prettified name. The icon of the ability or item goes before the name, never into the cache,
- * since the synced emoji change.
+ * the prettified name. The icon comes apart from the name ({@link #icon}, {@link #decorated}), so
+ * the cache holds names only.
  */
 @Component
 @RequiredArgsConstructor
@@ -36,8 +36,12 @@ public class ConstantAbilityLabels implements AbilityLabels {
       return "";
     }
     Snapshot current = current();
-    return icons.ability(internalName)
-        + current.labels().computeIfAbsent(internalName, current::compute);
+    return current.labels().computeIfAbsent(internalName, current::compute);
+  }
+
+  @Override
+  public String icon(String internalName) {
+    return icons.ability(internalName);
   }
 
   private Snapshot current() {

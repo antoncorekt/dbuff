@@ -29,6 +29,16 @@ public final class TestIcons {
             row(IconKind.ABILITY, "antimage_blink", 13L, "a_antimage_blink")));
   }
 
+  /** Like {@link #on()} with abilities antimage_blink_0 to antimage_blink_{count-1} synced too. */
+  public static IconService onWithAbilities(int count) {
+    List<DiscordIconDomain> rows = new java.util.ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      rows.add(row(IconKind.ABILITY, "antimage_blink_" + i, 1000L + i, "a_antimage_blink_" + i));
+    }
+    rows.add(row(IconKind.HERO, "antimage", 11L, "h_antimage"));
+    return service(true, rows);
+  }
+
   public static String heroMention() {
     return "<:h_antimage:11> ";
   }

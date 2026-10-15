@@ -86,7 +86,7 @@ public class ReasonWording {
     if (evidence.isEmpty()) {
       return hero + " " + code.toLowerCase(Locale.ROOT).replace('_', ' ');
     }
-    String plainHero = IconText.strip(hero);
+    String plainHero = IconText.withoutLeadingIcon(hero);
     return evidence.startsWith(plainHero)
         ? hero + evidence.substring(plainHero.length())
         : hero + ": " + evidence;
@@ -172,7 +172,7 @@ public class ReasonWording {
     return Arrays.stream(evidence.split(","))
         .map(String::trim)
         .filter(name -> !name.isEmpty())
-        .map(labels::label)
+        .map(labels::decorated)
         .collect(Collectors.joining(" and "));
   }
 
