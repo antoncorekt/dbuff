@@ -4,9 +4,12 @@ import com.ako.dbuff.service.replay.analysis.buildfit.BuildFitJudge.Evidence;
 import com.ako.dbuff.service.replay.analysis.buildfit.BuildFitJudge.Verdict;
 import com.ako.dbuff.service.replay.analysis.role.FunctionProfile;
 import com.ako.dbuff.service.replay.analysis.role.RoleFunction;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BuildFitJudgeTest {
   private final BuildFitJudge judge =
@@ -18,6 +21,25 @@ class BuildFitJudgeTest {
 
   private static Evidence evidence(int lonelyDeaths, double place) {
     return new Evidence(lonelyDeaths, place);
+  }
+
+  @Test
+  void aRoleNeedNamingEscapeStopsStartup() {
+    RoleNeeds conflicting = role -> role == 4 ? Map.of(RoleFunction.ESCAPE, 0.3) : Map.of();
+
+    assertThatThrownBy(new BuildFitJudge(conflicting, new BuildFitProperties())::validate)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("role 4")
+        .hasMessageContaining("escape-bonus-minimum");
+    assertThatCode(judge::validate).doesNotThrowAnyException();
+  }
+
+  @Test
+  void anUnknownEscapeLeavesTheOtherFunctionsJudged() {
+    Verdict verdict = judge.judge(build(0.2, 0.8, null), 1, evidence(9, 5));
+
+    assertThat(verdict.missing()).containsExactly(RoleFunction.FARM_PRIORITY);
+    assertThat(verdict.gaps()).hasSize(1);
   }
 
   @Test

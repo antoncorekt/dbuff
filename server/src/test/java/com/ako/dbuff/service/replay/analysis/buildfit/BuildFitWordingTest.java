@@ -37,6 +37,16 @@ class BuildFitWordingTest {
   }
 
   @Test
+  void aTiedPlaceNamesBothPlaces() {
+    BuildGap farm =
+        new BuildGap(RoleFunction.FARM_PRIORITY, true, BuildGap.Evidence.LOW_NET_WORTH, 4.5);
+
+    assertThat(BuildFitWording.verdict("Anti-Mage", BuildFitStage.BOTH, 1, List.of(farm)))
+        .isEqualTo(
+            "Anti-Mage had no farming skill and finished tied 4th and 5th of 5 in team net worth.");
+  }
+
+  @Test
   void severalGapsAreSeveralSentences() {
     BuildGap farm =
         new BuildGap(RoleFunction.FARM_PRIORITY, true, BuildGap.Evidence.LOW_NET_WORTH, 4);

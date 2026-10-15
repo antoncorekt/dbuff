@@ -39,7 +39,10 @@ class RoleOverrideFileTest {
           "faceless_void_time_walk",
           "storm_spirit_ball_lightning",
           "ember_spirit_fire_remnant",
-          "tinker_keen_teleport"
+          "tinker_keen_teleport",
+          "phantom_assassin_phantom_strike",
+          "riki_blink_strike",
+          "weaver_time_lapse"
         }) {
       assertThat(file.forAbility(skill)).as(skill).containsKey(RoleFunction.ESCAPE);
     }

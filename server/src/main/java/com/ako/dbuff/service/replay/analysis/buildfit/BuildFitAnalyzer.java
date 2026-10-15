@@ -14,11 +14,13 @@ import com.ako.dbuff.service.replay.analysis.role.FunctionProfile;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
 import com.ako.dbuff.service.replay.analysis.role.NetWorthRanks;
 import com.ako.dbuff.service.replay.analysis.role.RoleFunction;
+import com.ako.dbuff.service.replay.analysis.role.RoleNames;
 import com.ako.dbuff.service.replay.analysis.role.RoleStage;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -94,9 +96,8 @@ public class BuildFitAnalyzer implements ReplayAnalyzer {
     for (PlayerRoleProfileDomain drafted : intent.values()) {
       long slot = drafted.getPlayerSlot();
       FunctionProfile build = FunctionProfile.stored(drafted);
-      if (build.of(RoleFunction.ESCAPE) == null) {
-        log.info(
-            "Match {}: slot {} has no escape value stored, no build fit for him", matchId, slot);
+      if (Arrays.stream(RoleFunction.values()).allMatch(f -> build.of(f) == null)) {
+        log.info("Match {}: slot {} has no known function in his intent profile", matchId, slot);
         continue;
       }
       BuildFitJudge.Evidence evidence =
@@ -104,7 +105,10 @@ public class BuildFitAnalyzer implements ReplayAnalyzer {
               lonelyDeaths.getOrDefault(slot, 0), places.getOrDefault(slot, Double.NaN));
       String hero = heroName(heroes.get(slot));
       PlayerRoleProfileDomain actual = played.get(slot);
-      if (actual == null || actual.getRole().equals(drafted.getRole())) {
+      if (actual == null) {
+        rows.add(
+            row(matchId, slot, BuildFitStage.INTENT, drafted.getRole(), hero, build, evidence));
+      } else if (actual.getRole().equals(drafted.getRole())) {
         rows.add(row(matchId, slot, BuildFitStage.BOTH, drafted.getRole(), hero, build, evidence));
       } else {
         rows.add(
@@ -147,10 +151,23 @@ public class BuildFitAnalyzer implements ReplayAnalyzer {
 
   private Map<Long, PlayerRoleProfileDomain> bySlot(long matchId, RoleStage stage) {
     Map<Long, PlayerRoleProfileDomain> bySlot = new HashMap<>();
+    List<Long> badRoles = new ArrayList<>();
     for (PlayerRoleProfileDomain p : profileRepo.findByMatchId(matchId)) {
-      if (stage.name().equals(p.getStage()) && p.getPlayerSlot() != null && p.getRole() != null) {
+      if (!stage.name().equals(p.getStage()) || p.getPlayerSlot() == null || p.getRole() == null) {
+        continue;
+      }
+      if (RoleNames.words(p.getRole()) == null) {
+        badRoles.add(p.getPlayerSlot());
+      } else {
         bySlot.put(p.getPlayerSlot(), p);
       }
+    }
+    if (!badRoles.isEmpty()) {
+      log.info(
+          "Match {}: {} profiles of slots {} have no valid role, left out",
+          matchId,
+          stage,
+          badRoles);
     }
     return bySlot;
   }

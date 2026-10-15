@@ -231,7 +231,7 @@ public class IntentProfileCalculator {
           || (has(a.getBehavior(), NO_TARGET) && hasKey(a, r.getAreaSaveKeys()))) {
         save += weight;
       }
-      escape += hasKey(a, r.getEscapeKeys()) ? weight * r.getEscapeSkill() : 0;
+      escape += hasKey(a, r.getEscapeKeys()) ? r.getEscapeSkill() : 0;
       scaling += hasKey(a, r.getScalingKeys()) ? weight : 0;
       durability += hasKey(a, r.getDurabilityKeys()) ? weight : 0;
     }

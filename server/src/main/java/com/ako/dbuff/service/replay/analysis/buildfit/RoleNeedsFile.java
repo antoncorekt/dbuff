@@ -36,10 +36,17 @@ public class RoleNeedsFile implements RoleNeeds {
   }
 
   RoleNeedsFile(InputStream in, String source) {
+    Map<Integer, String> keyOf = new HashMap<>();
     read(in, source)
         .forEach(
             (key, values) -> {
-              needs.put(role(source, key), FunctionValues.parse(LABEL, source, key, values));
+              int role = role(source, key);
+              String first = keyOf.put(role, key);
+              if (first != null) {
+                throw FunctionValues.invalid(
+                    LABEL, source, "'" + first + "' and '" + key + "' are the same role " + role);
+              }
+              needs.put(role, FunctionValues.parse(LABEL, source, key, values));
             });
   }
 

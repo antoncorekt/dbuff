@@ -172,8 +172,50 @@ class BuildFitAnalyzerTest {
   }
 
   @Test
-  void aBuildWithoutAnEscapeValueOrAnIntentRowGetsNothing() {
-    profile(0, "INTENT", 1, 0.8, null);
+  void anOlderProfileWithoutAnEscapeValueStillGetsItsFarmVerdict() {
+    profile(4, "INTENT", 1, 0.1, null);
+    profile(4, "FINAL", 1, 0.1, null);
+
+    analyzer.analyze(MATCH);
+
+    BuildFitDomain verdict = row(4, "BOTH");
+    assertThat(verdict.getMissing()).isEqualTo("FARM_PRIORITY");
+    assertThat(verdict.getStated()).isEqualTo("FARM_PRIORITY");
+  }
+
+  @Test
+  void aPlayerWithoutAFinalProfileGetsAnIntentVerdictOnly() {
+    profile(0, "INTENT", 1, 0.8, 0.9);
+
+    analyzer.analyze(MATCH);
+
+    assertThat(buildFitRepo.findByMatchId(MATCH))
+        .extracting(BuildFitDomain::getStage)
+        .containsExactly("INTENT");
+  }
+
+  @Test
+  void aProfileWithoutAKnownRoleIsLeftOut() {
+    profile(0, "INTENT", 9, 0.8, 0.9);
+    profile(1, "INTENT", 1, 0.8, 0.9);
+    profile(1, "FINAL", 0, 0.8, null);
+
+    analyzer.analyze(MATCH);
+
+    assertThat(buildFitRepo.findByMatchId(MATCH))
+        .extracting(BuildFitDomain::getPlayerSlot, BuildFitDomain::getStage)
+        .containsExactly(org.assertj.core.groups.Tuple.tuple(1L, "INTENT"));
+  }
+
+  @Test
+  void aBuildWithNothingKnownOrNoIntentRowGetsNothing() {
+    profileRepo.save(
+        PlayerRoleProfileDomain.builder()
+            .matchId(MATCH)
+            .playerSlot(0L)
+            .stage("INTENT")
+            .role(1)
+            .build());
     profile(1, "FINAL", 2, 0.8, null);
 
     analyzer.analyze(MATCH);

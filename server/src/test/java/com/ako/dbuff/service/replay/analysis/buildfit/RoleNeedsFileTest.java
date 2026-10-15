@@ -22,8 +22,7 @@ class RoleNeedsFileTest {
     assertThat(file.forRole(1)).containsKeys(RoleFunction.DAMAGE, RoleFunction.FARM_PRIORITY);
     assertThat(file.forRole(2)).containsKeys(RoleFunction.DAMAGE, RoleFunction.DISABLE);
     assertThat(file.forRole(3)).containsKeys(RoleFunction.DURABILITY, RoleFunction.INITIATION);
-    assertThat(file.forRole(4))
-        .containsKeys(RoleFunction.DISABLE, RoleFunction.DAMAGE, RoleFunction.ESCAPE);
+    assertThat(file.forRole(4)).containsKeys(RoleFunction.DISABLE, RoleFunction.DAMAGE);
     assertThat(file.forRole(5)).containsKeys(RoleFunction.SAVE_HEAL, RoleFunction.DISABLE);
     assertThat(file.forRole(6)).isEmpty();
   }
@@ -41,6 +40,18 @@ class RoleNeedsFileTest {
           .as(role)
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining("'" + role + "'");
+    }
+  }
+
+  @Test
+  void twoKeysOfTheSameRoleAreRejectedWithBothNamed() {
+    for (String other : new String[] {"01", "+1"}) {
+      assertThatThrownBy(
+              () -> parse("{\"1\": {\"DAMAGE\": 0.4}, \"" + other + "\": {\"DISABLE\": 0.4}}"))
+          .as(other)
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("'1'")
+          .hasMessageContaining("'" + other + "'");
     }
   }
 

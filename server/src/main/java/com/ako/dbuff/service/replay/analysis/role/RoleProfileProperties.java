@@ -141,7 +141,8 @@ public class RoleProfileProperties {
     /**
      * Attribute keys of a skill that gets the hero out of a fight: a blink, invisibility, a dash of
      * some length, a self-teleport. Untargetable and the skills the keys cannot tell come from the
-     * overrides.
+     * overrides. Some keys are also in {@code gapCloserKeys} and {@code mobilityKeys}, so a gap
+     * closer or a speed skill can count as an escape; the rule may over-detect.
      */
     private List<String> escapeKeys =
         List.of(
@@ -156,7 +157,7 @@ public class RoleProfileProperties {
             "jump_horizontal_distance",
             "teleport_delay");
 
-    /** An escape skill adds this to the escape function (an ultimate counts more). */
+    /** An escape skill adds this to the escape function; an ultimate counts the same. */
     private double escapeSkill = 0.7;
 
     /** Mobility skills, summed, that make a roaming of 1. */

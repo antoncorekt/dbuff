@@ -1,7 +1,9 @@
 package com.ako.dbuff.service.replay.analysis.buildfit;
 
 import com.ako.dbuff.service.replay.analysis.role.FunctionProfile;
+import com.ako.dbuff.service.replay.analysis.role.RoleFitter;
 import com.ako.dbuff.service.replay.analysis.role.RoleFunction;
+import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -35,6 +37,24 @@ public class BuildFitJudge {
    */
   public record Verdict(List<RoleFunction> missing, List<BuildGap> gaps) {}
 
+  /**
+   * The escape minimum comes from {@link BuildFitProperties#getEscapeBonusMinimum()} for every role
+   * and nowhere else, so a role-needs entry naming ESCAPE would be a second, conflicting source and
+   * stops start-up.
+   */
+  @PostConstruct
+  void validate() {
+    for (int role = 1; role <= RoleFitter.ROLES; role++) {
+      if (needs.forRole(role).containsKey(RoleFunction.ESCAPE)) {
+        throw new IllegalStateException(
+            "Role needs: role "
+                + role
+                + " names ESCAPE; the escape minimum is"
+                + " replay.analysis.build-fit.escape-bonus-minimum");
+      }
+    }
+  }
+
   public Verdict judge(FunctionProfile build, int role, Evidence evidence) {
     Map<RoleFunction, Double> wanted = new EnumMap<>(RoleFunction.class);
     wanted.put(RoleFunction.ESCAPE, properties.getEscapeBonusMinimum());
@@ -62,11 +82,7 @@ public class BuildFitJudge {
     if (function == RoleFunction.FARM_PRIORITY
         && evidence.netWorthPlace() >= properties.getLowNetWorthPlace()) {
       return Optional.of(
-          new BuildGap(
-              function,
-              none,
-              BuildGap.Evidence.LOW_NET_WORTH,
-              (int) Math.round(evidence.netWorthPlace())));
+          new BuildGap(function, none, BuildGap.Evidence.LOW_NET_WORTH, evidence.netWorthPlace()));
     }
     return Optional.empty();
   }

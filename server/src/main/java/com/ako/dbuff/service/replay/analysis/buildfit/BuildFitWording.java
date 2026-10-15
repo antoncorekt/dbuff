@@ -38,9 +38,9 @@ public final class BuildFitWording {
   private static String gap(String hero, BuildGap gap) {
     String lacks = hero + " had " + lack(gap);
     return switch (gap.evidence()) {
-      case DIED_ALONE -> lacks + " and died alone " + times(gap.figure()) + ".";
+      case DIED_ALONE -> lacks + " and died alone " + times((int) gap.figure()) + ".";
       case LOW_NET_WORTH ->
-          lacks + " and finished " + ordinal(gap.figure()) + " of 5 in team net worth.";
+          lacks + " and finished " + place(gap.figure()) + " of 5 in team net worth.";
     };
   }
 
@@ -58,6 +58,13 @@ public final class BuildFitWording {
       case 2 -> "twice";
       default -> count + " times";
     };
+  }
+
+  private static String place(double place) {
+    int whole = (int) Math.floor(place);
+    return place == whole
+        ? ordinal(whole)
+        : "tied " + ordinal(whole) + " and " + ordinal(whole + 1);
   }
 
   private static String ordinal(int place) {
