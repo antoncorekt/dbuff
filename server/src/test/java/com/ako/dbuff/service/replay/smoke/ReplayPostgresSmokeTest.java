@@ -386,8 +386,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       Comparator.comparing(
               (MissedPickDomain r) ->
                   "FIGHTS".equals(r.getBasis()) ? 2 : r.getRatio() == null ? 1 : 0)
-          .thenComparing(
-              r -> r.getRatio() == null ? 0.0 : -r.getRatio())
+          .thenComparing(r -> r.getRatio() == null ? 0.0 : -r.getRatio())
           .thenComparing(r -> -r.getCandidateDamage());
 
   private String missedLine(MissedPickDomain r, Map<Long, String> heroes) {
@@ -403,8 +402,8 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   }
 
   /**
-   * The strongest missed picks of each player of a match in words, with the wording the report
-   * will use.
+   * The strongest missed picks of each player of a match in words, with the wording the report will
+   * use.
    */
   private List<String> renderMissedPicks(String id, long matchId) {
     Map<Long, String> heroes = reportHeroNames.bySlot(matchId);
@@ -428,7 +427,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                     MissedPickDomain::getPlayerSlot, TreeMap::new, Collectors.toList()));
     byPlayer.forEach(
         (slot, list) -> {
-          list.stream().limit(MISSED_PICK_LINES_PER_PLAYER).forEach(r -> out.add(missedLine(r, heroes)));
+          list.stream()
+              .limit(MISSED_PICK_LINES_PER_PLAYER)
+              .forEach(r -> out.add(missedLine(r, heroes)));
           if (list.size() > MISSED_PICK_LINES_PER_PLAYER) {
             out.add(
                 "  - and %d more for %s"
