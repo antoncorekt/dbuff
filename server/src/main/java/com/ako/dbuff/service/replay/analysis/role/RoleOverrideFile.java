@@ -5,7 +5,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -26,6 +25,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class RoleOverrideFile implements RoleOverrides {
+  private static final String LABEL = "Role override file";
   private static final Pattern ABILITY_NAME = Pattern.compile("[a-z][a-z0-9]*(_[a-z0-9]+)+");
   private static final Pattern HERO_ID = Pattern.compile("[1-9][0-9]*");
 
@@ -79,25 +79,7 @@ public class RoleOverrideFile implements RoleOverrides {
 
   private static Map<RoleFunction, Double> functions(
       String source, String entry, Map<String, Double> values) {
-    if (values == null || values.isEmpty()) {
-      throw invalid(source, "'" + entry + "' has no function");
-    }
-    Map<RoleFunction, Double> result = new EnumMap<>(RoleFunction.class);
-    values.forEach(
-        (function, value) -> {
-          RoleFunction parsed;
-          try {
-            parsed = RoleFunction.valueOf(function);
-          } catch (IllegalArgumentException e) {
-            throw invalid(source, "'" + entry + "' names the unknown function '" + function + "'");
-          }
-          if (value == null || value.isNaN() || value <= 0 || value > 1) {
-            throw invalid(
-                source, "'" + entry + "' has " + function + " " + value + ", not in (0, 1]");
-          }
-          result.put(parsed, value);
-        });
-    return result;
+    return FunctionValues.parse(LABEL, source, entry, values);
   }
 
   private static Content read(InputStream in, String source) {
@@ -136,6 +118,6 @@ public class RoleOverrideFile implements RoleOverrides {
   }
 
   private static IllegalStateException invalid(String source, String problem) {
-    return new IllegalStateException("Role override file " + source + ": " + problem);
+    return FunctionValues.invalid(LABEL, source, problem);
   }
 }

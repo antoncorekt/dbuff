@@ -47,7 +47,7 @@ public class RoleProfileProperties {
     }
     for (int role = 1; role <= RoleFitter.ROLES; role++) {
       Map<RoleFunction, Double> weights = fit.getWeights().get(role);
-      for (RoleFunction function : RoleFunction.values()) {
+      for (RoleFunction function : RoleFunction.scoredFunctions()) {
         if (weights == null || weights.get(function) == null) {
           throw new IllegalStateException(
               "replay.analysis.role-profile.fit.weights has no value for role "
@@ -137,6 +137,28 @@ public class RoleProfileProperties {
     /** Attribute keys of other mobility: invisibility and bonus movement speed. */
     private List<String> mobilityKeys =
         List.of("fade_time", "invis_duration", "bonus_movement_speed", "bonus_movespeed");
+
+    /**
+     * Attribute keys of a skill that gets the hero out of a fight: a blink, invisibility, a dash of
+     * some length, a self-teleport. Untargetable and the skills the keys cannot tell come from the
+     * overrides. Some keys are also in {@code gapCloserKeys} and {@code mobilityKeys}, so a gap
+     * closer or a speed skill can count as an escape; the rule may over-detect.
+     */
+    private List<String> escapeKeys =
+        List.of(
+            "blink_range",
+            "min_blink_range",
+            "fade_time",
+            "invis_duration",
+            "dash_length",
+            "dash_range",
+            "leap_distance",
+            "max_travel_distance",
+            "jump_horizontal_distance",
+            "teleport_delay");
+
+    /** An escape skill adds this to the escape function; an ultimate counts the same. */
+    private double escapeSkill = 0.7;
 
     /** Mobility skills, summed, that make a roaming of 1. */
     private double roamingFull = 2.0;
@@ -349,7 +371,7 @@ public class RoleProfileProperties {
       Map<Integer, Map<RoleFunction, Double>> weights = new java.util.HashMap<>();
       for (int role = 0; role < table.length; role++) {
         Map<RoleFunction, Double> row = new EnumMap<>(RoleFunction.class);
-        for (RoleFunction function : RoleFunction.values()) {
+        for (RoleFunction function : RoleFunction.scoredFunctions()) {
           row.put(function, table[role][function.ordinal()]);
         }
         weights.put(role + 1, row);

@@ -30,6 +30,33 @@ class RoleOverrideFileTest {
   }
 
   @Test
+  void theShippedFileNamesTheWellKnownEscapeSkills() {
+    RoleOverrideFile file = new RoleOverrideFile("replay/role-overrides.json");
+
+    for (String skill :
+        new String[] {
+          "puck_phase_shift",
+          "faceless_void_time_walk",
+          "storm_spirit_ball_lightning",
+          "ember_spirit_fire_remnant",
+          "tinker_keen_teleport",
+          "phantom_assassin_phantom_strike",
+          "riki_blink_strike",
+          "weaver_time_lapse"
+        }) {
+      assertThat(file.forAbility(skill)).as(skill).containsKey(RoleFunction.ESCAPE);
+    }
+    assertThat(file.forAbility("furion_teleportation"))
+        .containsKeys(RoleFunction.ROAMING, RoleFunction.ESCAPE);
+  }
+
+  @Test
+  void escapeIsAFunctionTheFileMayName() {
+    assertThat(parse("{\"abilities\": {\"a_b\": {\"ESCAPE\": 0.5}}}").forAbility("a_b"))
+        .containsEntry(RoleFunction.ESCAPE, 0.5);
+  }
+
+  @Test
   void abilitiesAndHeroesAreRead() {
     RoleOverrideFile file =
         parse(

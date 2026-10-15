@@ -86,7 +86,7 @@ class RoleFitterTest {
 
     assertThat(roles(withUnknown)).containsExactlyInAnyOrder(1, 2, 3, 4, 5);
     assertThat(withUnknown.getFirst().confidence())
-        .isLessThanOrEqualTo(1.0 / RoleFunction.values().length);
+        .isLessThanOrEqualTo(1.0 / RoleFunction.scoredFunctions().size());
     assertThat(fitter.fit(known, RoleStage.INTENT).getFirst().confidence())
         .isGreaterThan(withUnknown.getFirst().confidence());
   }

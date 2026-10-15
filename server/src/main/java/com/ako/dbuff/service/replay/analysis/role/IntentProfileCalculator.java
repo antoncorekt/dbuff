@@ -76,7 +76,8 @@ public class IntentProfileCalculator {
         plus(clamp(sums.disable / rules.getDisableFull()), RoleFunction.DISABLE, extra),
         plus(clamp(sums.save / rules.getSaveFull()), RoleFunction.SAVE_HEAL, extra),
         plus(damage(hero, sums, rules), RoleFunction.DAMAGE, extra),
-        plus(durability(hero, sums, rules), RoleFunction.DURABILITY, extra));
+        plus(durability(hero, sums, rules), RoleFunction.DURABILITY, extra),
+        plus(clamp(sums.escape), RoleFunction.ESCAPE, extra));
   }
 
   /** The override values of the hero and of each held skill, a skill counted with its weight. */
@@ -182,6 +183,7 @@ public class IntentProfileCalculator {
     double farmSkills;
     double durability;
     double cheap;
+    double escape;
 
     void add(HeldAbility held, RoleProfileProperties.Intent r) {
       AbilityConstant a = held.constant();
@@ -229,6 +231,7 @@ public class IntentProfileCalculator {
           || (has(a.getBehavior(), NO_TARGET) && hasKey(a, r.getAreaSaveKeys()))) {
         save += weight;
       }
+      escape += hasKey(a, r.getEscapeKeys()) ? r.getEscapeSkill() : 0;
       scaling += hasKey(a, r.getScalingKeys()) ? weight : 0;
       durability += hasKey(a, r.getDurabilityKeys()) ? weight : 0;
     }

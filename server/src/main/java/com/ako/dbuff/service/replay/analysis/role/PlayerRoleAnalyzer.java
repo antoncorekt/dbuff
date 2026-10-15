@@ -65,7 +65,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 4;
+    return 5;
   }
 
   @Override
@@ -213,6 +213,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
               .saveHeal(p.saveHeal())
               .damage(p.damage())
               .durability(p.durability())
+              .escape(p.escape())
               .fitRole(RoleFitter.bestRole(scores))
               .roleScores(scoreText(scores))
               .evidence(assignment.evidence())

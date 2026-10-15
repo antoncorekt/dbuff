@@ -1,0 +1,7 @@
+{
+  "1": {"DAMAGE": 0.4, "FARM_PRIORITY": 0.5},
+  "2": {"DAMAGE": 0.5, "DISABLE": 0.3},
+  "3": {"DURABILITY": 0.5, "INITIATION": 0.4},
+  "4": {"DISABLE": 0.4, "DAMAGE": 0.3},
+  "5": {"SAVE_HEAL": 0.3, "DISABLE": 0.4}
+}
