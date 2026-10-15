@@ -61,7 +61,7 @@ class DiscordCommandWiringTest {
   void everyExpectedCommandIsRegistered() {
     assertThat(registry.getDefinitions())
         .extracting(SlashCommandData::getName)
-        .contains("stats", "scout", "match", "dbuff", "hero");
+        .contains("stats", "scout", "match", "dbuff", "hero", "skills");
   }
 
   /**

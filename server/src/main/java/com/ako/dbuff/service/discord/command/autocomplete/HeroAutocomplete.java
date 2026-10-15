@@ -35,10 +35,10 @@ public class HeroAutocomplete implements AutocompleteProvider {
     return "stats";
   }
 
-  /** {@code /hero hero:} asks the same question, from the same dictionary. */
+  /** {@code /hero hero:} and {@code /skills hero:} ask the same question, from the same names. */
   @Override
   public Set<String> getCommandNames() {
-    return Set.of("stats", "hero");
+    return Set.of("stats", "hero", "skills");
   }
 
   @Override

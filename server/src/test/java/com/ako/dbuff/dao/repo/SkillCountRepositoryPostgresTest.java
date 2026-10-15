@@ -136,6 +136,14 @@ class SkillCountRepositoryPostgresTest {
   }
 
   @Test
+  void aSkillIsCountedPerHeroThatHeldIt() {
+    assertThat(counts.heroesWithSkill(A, WINDOW))
+        .isEqualTo(Map.of(HERO, new SkillCounts(3, 2), OTHER_HERO, new SkillCounts(1, 0)));
+    assertThat(counts.heroesWithSkill(C, WINDOW)).isEqualTo(Map.of(HERO, new SkillCounts(1, 1)));
+    assertThat(counts.heroesWithSkill(9999, WINDOW)).isEmpty();
+  }
+
+  @Test
   void aPairIsCountedWhenOnePlayerHeldBothAndAPairNeverSeenIsAbsent() {
     assertThat(counts.pairs(List.of(A, B, C), WINDOW))
         .isEqualTo(
