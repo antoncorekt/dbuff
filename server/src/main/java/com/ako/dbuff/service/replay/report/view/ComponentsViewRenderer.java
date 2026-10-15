@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import net.dv8tion.jda.api.components.MessageTopLevelComponent;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.container.ContainerChildComponent;
+import net.dv8tion.jda.api.components.mediagallery.MediaGallery;
+import net.dv8tion.jda.api.components.mediagallery.MediaGalleryItem;
 import net.dv8tion.jda.api.components.separator.Separator;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import org.springframework.stereotype.Component;
@@ -39,15 +41,16 @@ public class ComponentsViewRenderer implements ViewRenderer {
     String verdict =
         view.verdict() == null ? "" : cut(view.verdict().strip(), MessageLimits.HEADER_PART);
     boolean hasHeader = !title.isBlank() || !verdict.isEmpty();
-    Budget single = budget(hasHeader ? header(title, verdict) : null);
+    ImageAttachment image = view.image();
+    Budget single = budget(hasHeader ? header(title, verdict) : null, image);
     List<Item> bullets = bullets(view, single.text());
     Item footnote = footnote(view, single.text());
-    if (!hasHeader && bullets.isEmpty() && footnote == null) {
+    if (!hasHeader && bullets.isEmpty() && footnote == null && image == null) {
       return List.of();
     }
     List<Page> pages = paginate(bullets, footnote, single);
     if (pages.size() > 1) {
-      Budget split = budget(header(title + MessageLimits.PAGE_MARKER_RESERVE, verdict));
+      Budget split = budget(header(title + MessageLimits.PAGE_MARKER_RESERVE, verdict), image);
       bullets = bullets(view, split.text());
       footnote = footnote(view, split.text());
       pages = paginate(bullets, footnote, split);
@@ -55,7 +58,12 @@ public class ComponentsViewRenderer implements ViewRenderer {
     List<ReportMessage> messages = new ArrayList<>();
     for (int i = 0; i < pages.size(); i++) {
       messages.add(
-          message(view.accent(), pageTitle(title, i + 1, pages.size()), verdict, pages.get(i)));
+          message(
+              view.accent(),
+              pageTitle(title, i + 1, pages.size()),
+              verdict,
+              pages.get(i),
+              i == 0 ? image : null));
     }
     return messages;
   }
@@ -78,9 +86,11 @@ public class ComponentsViewRenderer implements ViewRenderer {
   }
 
   /** What is left of a card for its bullets once the header, if any, is placed. */
-  private static Budget budget(String header) {
+  private static Budget budget(String header, ImageAttachment image) {
     int frame =
-        MessageLimits.CONTAINER_COMPONENTS + (header == null ? 0 : MessageLimits.HEADER_COMPONENTS);
+        MessageLimits.CONTAINER_COMPONENTS
+            + (header == null ? 0 : MessageLimits.HEADER_COMPONENTS)
+            + (image == null ? 0 : MessageLimits.IMAGE_COMPONENTS);
     return new Budget(
         MessageLimits.CARD_TEXT - (header == null ? 0 : header.length()),
         MessageLimits.CARD_COMPONENTS - frame);
@@ -140,7 +150,8 @@ public class ComponentsViewRenderer implements ViewRenderer {
     return ends ? new Page(items.subList(0, items.size() - 1), footnote) : new Page(items, null);
   }
 
-  private ReportMessage.Components message(Accent accent, String title, String verdict, Page page) {
+  private ReportMessage.Components message(
+      Accent accent, String title, String verdict, Page page, ImageAttachment image) {
     String header = header(title, verdict);
     List<ContainerChildComponent> children = new ArrayList<>();
     int text = 0;
@@ -152,8 +163,11 @@ public class ComponentsViewRenderer implements ViewRenderer {
     if (page.footnote() != null) {
       shown.add(page.footnote());
     }
-    if (!header.isEmpty() && !shown.isEmpty()) {
+    if (!header.isEmpty() && (!shown.isEmpty() || image != null)) {
       children.add(Separator.createDivider(Separator.Spacing.SMALL));
+    }
+    if (image != null) {
+      children.add(MediaGallery.of(MediaGalleryItem.fromUrl(image.attachmentUrl())));
     }
     for (Item item : shown) {
       children.add(TextDisplay.of(item.shown()));
@@ -172,7 +186,13 @@ public class ComponentsViewRenderer implements ViewRenderer {
                     page.bullets().stream().map(Item::raw).toList(),
                     page.footnote() == null ? null : page.footnote().raw()),
                 true));
-    return new ReportMessage.Components(top, text, children.size() + 1, fallback);
+    int count = children.size() + MessageLimits.CONTAINER_COMPONENTS;
+    return new ReportMessage.Components(
+        top,
+        text,
+        image == null ? count : count + MessageLimits.IMAGE_COMPONENTS - 1,
+        fallback,
+        image == null ? List.of() : List.of(image));
   }
 
   private static String header(String title, String verdict) {

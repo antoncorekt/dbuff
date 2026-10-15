@@ -38,7 +38,9 @@ import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.ComponentsViewRenderer;
+import com.ako.dbuff.service.replay.report.view.ImageAttachment;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.LocalDateTime;
@@ -52,6 +54,7 @@ import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 import net.dv8tion.jda.api.requests.ErrorResponse;
+import net.dv8tion.jda.api.utils.FileUpload;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -925,5 +928,84 @@ class ReplayReportServiceTest {
     text.getAllValues().forEach(t -> assertThat(t.length()).isLessThanOrEqualTo(2000));
     verify(discord, Mockito.atLeast(2)).sendThreadComponentsBlocking(any(), any());
     verify(postedRepo).save(any());
+  }
+
+  private static ReplayReportSection withImage(String name) {
+    return new ReplaySection() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public boolean defaultEnabled() {
+        return false;
+      }
+
+      @Override
+      public List<String> lines(ReplayReportInput input) {
+        return List.of("**" + name + "**", "verdict of " + name);
+      }
+
+      @Override
+      public Optional<ImageAttachment> image(ReplayReportInput input) {
+        return Optional.of(new ImageAttachment(name + ".png", new byte[] {1, 2, 3}));
+      }
+
+      @Override
+      public Optional<SectionView> view(ReplayReportInput input) {
+        return Optional.of(
+            new SectionView(
+                name,
+                "verdict of " + name,
+                Accent.NEUTRAL,
+                List.of(),
+                null,
+                image(input).orElseThrow()));
+      }
+    };
+  }
+
+  @Test
+  void deliverSection_plainFormatPostsTheTextWithTheImageAsAFile() {
+    storedRun(ReplayStatus.DONE);
+    service = serviceWith(withImage("graph"));
+
+    assertThat(service.deliverSection(1L, "i1", "graph")).isEqualTo(ReportDelivery.POSTED);
+
+    ArgumentCaptor<List<FileUpload>> files = ArgumentCaptor.forClass(List.class);
+    verify(discord)
+        .sendThreadMessageBlocking(
+            Mockito.eq(thread), Mockito.eq("**graph**\nverdict of graph"), files.capture());
+    assertThat(files.getValue()).hasSize(1);
+    assertThat(files.getValue().get(0).getName()).isEqualTo("graph.png");
+  }
+
+  @Test
+  void deliverSection_componentsFormatPostsTheCardWithTheImageAsAFile() {
+    storedRun(ReplayStatus.DONE);
+    properties.setFormat(ReportFormat.COMPONENTS);
+    service = serviceWith(withImage("graph"));
+
+    assertThat(service.deliverSection(1L, "i1", "graph")).isEqualTo(ReportDelivery.POSTED);
+
+    ArgumentCaptor<List<FileUpload>> files = ArgumentCaptor.forClass(List.class);
+    verify(discord).sendThreadComponentsBlocking(Mockito.eq(thread), any(), files.capture());
+    assertThat(files.getValue()).extracting(FileUpload::getName).containsExactly("graph.png");
+  }
+
+  @Test
+  void deliverSection_aRejectedImageCardFallsBackToTextWithTheImageOnTheLastMessage() {
+    storedRun(ReplayStatus.DONE);
+    properties.setFormat(ReportFormat.COMPONENTS);
+    service = serviceWith(withImage("graph"));
+    ErrorResponseException invalid = rejected(ErrorResponse.INVALID_FORM_BODY);
+    when(discord.sendThreadComponentsBlocking(any(), any(), any())).thenThrow(invalid);
+
+    assertThat(service.deliverSection(1L, "i1", "graph")).isEqualTo(ReportDelivery.POSTED);
+
+    ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
+    verify(discord).sendThreadMessageBlocking(Mockito.eq(thread), text.capture(), any());
+    assertThat(text.getValue()).contains("verdict of graph");
   }
 }

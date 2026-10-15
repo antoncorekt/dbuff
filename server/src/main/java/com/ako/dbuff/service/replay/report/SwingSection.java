@@ -39,16 +39,6 @@ public class SwingSection implements ReplayReportSection {
           "COMEBACK", "comeback gold",
           "BUYBACKS", "buybacks");
 
-  private static final Map<SpikeCause, String> CAUSES =
-      Map.of(
-          SpikeCause.FIGHT_WIN, "a won fight",
-          SpikeCause.PICKOFF, "picked-off heroes",
-          SpikeCause.OBJECTIVE, "buildings",
-          SpikeCause.ROSHAN_AEGIS, "Roshan",
-          SpikeCause.BUYBACK_SWING, "buybacks",
-          SpikeCause.CARRY_FARM, "farming",
-          SpikeCause.COMEBACK_GOLD, "comeback gold");
-
   private final GameSpikeRepo spikeRepo;
   private final GameSpikeFactorRepo factorRepo;
   private final FightExplanationReader explanationReader;
@@ -204,7 +194,7 @@ public class SwingSection implements ReplayReportSection {
                         + Math.round(f.getSharePercent())
                         + "%")
             .collect(Collectors.joining(", "));
-    String cause = causeText(spike.getPrimaryCause());
+    String cause = SwingCauses.phrase(spike.getPrimaryCause());
     return String.format(
         Locale.ROOT,
         "%s-%s: %s gained %.1fk net worth%s%s%s",
@@ -215,13 +205,5 @@ public class SwingSection implements ReplayReportSection {
         Boolean.TRUE.equals(spike.getDirectionChange()) ? " and took the lead" : "",
         cause.isEmpty() ? "" : ", mostly from " + cause,
         because.isEmpty() ? "" : " (" + because + ")");
-  }
-
-  private static String causeText(String stored) {
-    try {
-      return CAUSES.getOrDefault(SpikeCause.valueOf(stored), "");
-    } catch (IllegalArgumentException | NullPointerException e) {
-      return "";
-    }
   }
 }

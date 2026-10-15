@@ -25,6 +25,7 @@ import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.GameModeRegistry;
 import com.ako.dbuff.service.replay.report.view.ComponentsFallback;
 import com.ako.dbuff.service.replay.report.view.ComponentsViewRenderer;
+import com.ako.dbuff.service.replay.report.view.ImageAttachment;
 import com.ako.dbuff.service.replay.report.view.MessageLimits;
 import com.ako.dbuff.service.replay.report.view.ReportMessage;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
@@ -35,6 +36,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -306,10 +308,17 @@ public class ReplayReportService {
 
   private void send(long matchId, ThreadChannel channel, ReportMessage message) {
     switch (message) {
-      case ReportMessage.Plain plain -> discord.sendThreadMessageBlocking(channel, plain.text());
+      case ReportMessage.Plain plain -> sendPlain(channel, plain.text(), plain.image());
       case ReportMessage.Components cards -> {
         try {
-          discord.sendThreadComponentsBlocking(channel, cards.components());
+          if (cards.images().isEmpty()) {
+            discord.sendThreadComponentsBlocking(channel, cards.components());
+          } else {
+            discord.sendThreadComponentsBlocking(
+                channel,
+                cards.components(),
+                cards.images().stream().map(ImageAttachment::upload).toList());
+          }
         } catch (RuntimeException e) {
           if (!ComponentsFallback.payloadRejected(e)) {
             throw e;
@@ -318,10 +327,26 @@ public class ReplayReportService {
               "Components of the replay report of match {} rejected, posting plain text: {}",
               matchId,
               e.getMessage());
-          plainTexts(cards.fallback()).forEach(t -> discord.sendThreadMessageBlocking(channel, t));
+          List<String> texts = plainTexts(cards.fallback());
+          for (int i = 0; i < texts.size(); i++) {
+            boolean last = i == texts.size() - 1;
+            sendPlain(channel, texts.get(i), last ? firstImage(cards) : null);
+          }
         }
       }
     }
+  }
+
+  private void sendPlain(ThreadChannel channel, String text, ImageAttachment image) {
+    if (image == null) {
+      discord.sendThreadMessageBlocking(channel, text);
+    } else {
+      discord.sendThreadMessageBlocking(channel, text, List.of(image.upload()));
+    }
+  }
+
+  private static ImageAttachment firstImage(ReportMessage.Components cards) {
+    return cards.images().isEmpty() ? null : cards.images().get(0);
   }
 
   private List<String> plainTexts(String text) {
@@ -375,13 +400,24 @@ public class ReplayReportService {
   }
 
   private List<ReportMessage> plain(List<ReplayReportSection> active, ReplayReportInput input) {
+    List<ReportMessage> messages = new ArrayList<>();
     List<Report> reports = new ArrayList<>();
     for (ReplayReportSection section : active) {
       List<String> lines = section.lines(input);
-      if (!lines.isEmpty()) {
+      Optional<ImageAttachment> image = section.image(input);
+      if (image.isPresent()) {
+        messages.addAll(formatted(reports));
+        reports.clear();
+        messages.add(new ReportMessage.Plain(String.join("\n", lines), image.get()));
+      } else if (!lines.isEmpty()) {
         reports.add(new TextReport("replay", String.join("\n", lines)));
       }
     }
+    messages.addAll(formatted(reports));
+    return messages;
+  }
+
+  private List<ReportMessage> formatted(List<Report> reports) {
     if (reports.isEmpty()) {
       return List.of();
     }
