@@ -1,14 +1,16 @@
 package com.ako.dbuff.service.ai.reasons;
 
 import com.ako.dbuff.service.discord.icon.IconService;
+import com.ako.dbuff.service.replay.report.Finding;
+import com.ako.dbuff.service.replay.report.FindingKind;
 import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.ReplayReportSection;
-import com.ako.dbuff.service.replay.report.view.SectionView;
+import com.ako.dbuff.service.replay.report.SectionFindings;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
@@ -32,7 +34,17 @@ class SectionFacts {
           Map.entry("opening", FactKind.RUNES),
           Map.entry("outliers", FactKind.OUTLIER),
           Map.entry("rotations", FactKind.ROTATION),
-          Map.entry("smoke", FactKind.SMOKE));
+          Map.entry("smoke", FactKind.SMOKE),
+          Map.entry("mid-activity", FactKind.MID),
+          Map.entry("skill-picks", FactKind.PICK));
+
+  private static FactKind factKind(FindingKind kind) {
+    return switch (kind) {
+      case PICK -> FactKind.PICK;
+      case BUILD -> FactKind.BUILD;
+      case MISSED -> FactKind.MISSED;
+    };
+  }
 
   private final ObjectProvider<ReplayReportSection> sections;
   private final IconService icons;
@@ -53,9 +65,8 @@ class SectionFacts {
   }
 
   private List<Fact> factsOf(ReplayReportSection section, FactKind kind, ReplayReportInput input) {
-    Optional<SectionView> view;
     try {
-      view = icons.withoutIcons(() -> section.view(input));
+      return icons.withoutIcons(() -> facts(section, kind, input));
     } catch (RuntimeException e) {
       log.warn(
           "Section {} of match {} left out of the AI facts: {}",
@@ -64,20 +75,36 @@ class SectionFacts {
           e.getMessage());
       return List.of();
     }
-    List<String> texts = new ArrayList<>();
-    view.ifPresent(
-        v -> {
-          texts.add(v.verdict());
-          texts.addAll(v.bullets());
-        });
+  }
+
+  private static List<Fact> facts(
+      ReplayReportSection section, FactKind kind, ReplayReportInput input) {
+    Map<FactKind, Integer> counts = new EnumMap<>(FactKind.class);
     List<Fact> facts = new ArrayList<>();
-    for (String text : texts) {
-      String plain = plain(text);
+    for (Finding finding : findings(section, input)) {
+      String plain = plain(finding.text());
       if (!plain.isEmpty()) {
-        facts.add(new Fact(kind.id(facts.size() + 1), kind, plain));
+        FactKind own = finding.kind() == null ? kind : factKind(finding.kind());
+        int number = counts.merge(own, 1, Integer::sum);
+        facts.add(new Fact(own.id(number), own, plain));
       }
     }
     return facts;
+  }
+
+  private static List<Finding> findings(ReplayReportSection section, ReplayReportInput input) {
+    if (section instanceof SectionFindings kinded) {
+      return kinded.findings(input);
+    }
+    List<Finding> found = new ArrayList<>();
+    section
+        .view(input)
+        .ifPresent(
+            v -> {
+              found.add(new Finding(null, v.verdict()));
+              v.bullets().forEach(b -> found.add(new Finding(null, b)));
+            });
+    return found;
   }
 
   private static String plain(String text) {

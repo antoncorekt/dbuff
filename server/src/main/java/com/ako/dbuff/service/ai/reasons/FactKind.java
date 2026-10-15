@@ -22,7 +22,11 @@ public enum FactKind {
   OUTLIER("OUTLIER", "outliers", 45),
   ROLE("ROLE", "roles", 40),
   ROTATION("ROTATION", "rotations", 40),
-  SMOKE("SMOKE", "smoke", 35);
+  SMOKE("SMOKE", "smoke", 35),
+  MID("MID", "mid hero", 34),
+  MISSED("MISSED", "missed picks", 33),
+  BUILD("BUILD", "build fit", 32),
+  PICK("PICK", "skill picks", 31);
 
   private final String prefix;
   private final Pattern idPattern;
