@@ -126,7 +126,7 @@ class FarmChartBuilderTest {
     FarmChart chart = builder.build(1L, Set.of(1L, 2L), 1).orElseThrow();
 
     assertThat(chart.spec().panels()).extracting(p -> p.label()).containsExactly("Lina");
-    assertThat(chart.lines()).isEmpty();
+    assertThat(chart.lines()).containsExactly("1 more tracked hero is not shown.");
   }
 
   @Test
