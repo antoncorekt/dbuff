@@ -3,6 +3,7 @@ package com.ako.dbuff.service.ai.reasons;
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.service.discord.command.AsyncReply;
 import com.ako.dbuff.service.discord.command.CommandContext;
+import com.ako.dbuff.service.replay.report.OnDemandCooldown;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
 import com.ako.dbuff.service.replay.report.ReportDelivery;
 import lombok.extern.slf4j.Slf4j;
@@ -20,10 +21,13 @@ public class AiReasonsCommandHandler {
 
   private final AiReasonsService service;
   private final ReplayReportService reports;
+  private final OnDemandCooldown cooldown;
 
-  public AiReasonsCommandHandler(AiReasonsService service, @Lazy ReplayReportService reports) {
+  public AiReasonsCommandHandler(
+      AiReasonsService service, @Lazy ReplayReportService reports, OnDemandCooldown cooldown) {
     this.service = service;
     this.reports = reports;
+    this.cooldown = cooldown;
   }
 
   public void handle(CommandContext context, long matchId, DbufInstanceConfigDomain config) {
@@ -49,6 +53,12 @@ public class AiReasonsCommandHandler {
               + " has no stored replay analysis yet (the replay run must be done or partial).");
       return;
     }
+    long wait = cooldown.acquire(context.getChannelId());
+    if (wait > 0) {
+      context.replyEphemeral(
+          "⏳ This thread just had a report or AI card. Try again in " + wait + " s.");
+      return;
+    }
     AsyncReply reply =
         context.acknowledge(
             "🔄 Working out the top reasons for match " + matchId + "…", "Match " + matchId);
@@ -56,9 +66,11 @@ public class AiReasonsCommandHandler {
       ReportDelivery delivery =
           reports.deliverSection(matchId, config.getId(), AiReasonsSection.NAME, model);
       if (delivery != ReportDelivery.POSTED) {
+        cooldown.release(context.getChannelId());
         reply.post("The top reasons were not posted: " + delivery.reason() + ".");
       }
     } catch (RuntimeException e) {
+      cooldown.release(context.getChannelId());
       log.warn("AI reasons of match {} failed: {}", matchId, e.getMessage(), e);
       reply.fail("❌ The top reasons of match " + matchId + " failed, see the log.");
     }

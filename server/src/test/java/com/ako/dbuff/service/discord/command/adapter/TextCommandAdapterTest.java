@@ -76,6 +76,7 @@ class TextCommandAdapterTest {
                 null,
                 null,
                 null,
+                null,
                 null));
     Mockito.doNothing().when(real).execute(any(), any());
     TextCommandProperties properties = new TextCommandProperties();

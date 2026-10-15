@@ -155,7 +155,17 @@ Off by default everywhere. It sends a few thousand tokens of match facts to Open
 3. What to look at: the card `Top 5 reasons` with `Dire won; your team won/lost`, numbered reasons that end with `(based on: ...)`, and the line saying how many reasons had enough data when fewer than five. Send `~ai` again: no second paid call (log has no new `AI reasons of match ... reasons` line, and the card is the same).
 4. A failure (bad key, timeout, unusable answer) posts nothing in the thread and logs a WARN `AI reasons of match <id> failed`.
 
-## 12. Sync hero, ability and item icons (optional)
+## 12. On-demand sections, channel sections and language
+
+Everything here works without turning anything else on: `/match report` posts from the stored DONE or PARTIAL run even while `REPLAY_REPORT_ENABLED` is false.
+
+1. In a `Match <id>` thread send `/match report lanes` (or `~report lanes`; `section` autocompletes from the registered sections, plus `all`). One section is posted in the report format. A section with no data for that match answers "has nothing to show ... its data does not exist for this match". `/match report opendota` posts the old OpenDota report (lanes, items, abilities, damage, and the AI summary when the channel has it on) built from stored data.
+2. `/match report all` posts what the channel posts automatically (the same sections and message cap as a normal delivery, the quiet hours skipped). With nothing selected it says no section applies.
+3. Which sections post automatically: `/dbuff settings sections:lanes,swing` for this channel, `sections:none` for none, `sections:default` to follow the server. The server list is `REPLAY_REPORT_DEFAULT_SECTIONS=lanes,swing` (set it empty for none). When that variable is not set at all, nothing changes: each section keeps its own default. `REPLAY_REPORT_SECTIONS_<NAME>_ENABLED=false` hides a section everywhere, `/match report` too (a refusal line).
+4. `/dbuff settings language:Russian` writes the AI reasons in that language for this channel; `language:default` goes back to `REPLAY_REPORT_AI_LANGUAGE` (English). A different language is a different question, so the stored answer is not reused.
+5. A thread waits between two `/match report` or `/match ai` requests: `REPLAY_REPORT_ON_DEMAND_COOLDOWN_SECONDS` (default 30, 0 turns it off). Send two in a row to see the one-line "Try again in N s". The wait is kept in memory per running app, so a restart or a second app instance does not share it.
+
+## 13. Sync hero, ability and item icons (optional)
 
 Off by default, and nothing in the reports uses the icons yet (the core is here, the sections come in a later change), so this step only prepares the emoji and shows their state. The test bot has its own quota of 2000 application emoji, separate from the production bot: syncing here never touches production emoji.
 
