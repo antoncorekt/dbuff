@@ -36,6 +36,7 @@ import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
 import com.ako.dbuff.dao.repo.LaneAssignmentRepo;
 import com.ako.dbuff.dao.repo.LaneReasonRepo;
 import com.ako.dbuff.dao.repo.LaneResultRepo;
+import com.ako.dbuff.dao.repo.MidActivityRepo;
 import com.ako.dbuff.dao.repo.MissedPickRepo;
 import com.ako.dbuff.dao.repo.OpeningSummaryRepo;
 import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
@@ -83,6 +84,7 @@ import com.ako.dbuff.service.replay.report.GraphIncomeSection;
 import com.ako.dbuff.service.replay.report.ImportantFightsSection;
 import com.ako.dbuff.service.replay.report.ItemsSection;
 import com.ako.dbuff.service.replay.report.LanesSection;
+import com.ako.dbuff.service.replay.report.MidActivitySection;
 import com.ako.dbuff.service.replay.report.MissedPickWording;
 import com.ako.dbuff.service.replay.report.MovementSection;
 import com.ako.dbuff.service.replay.report.ObjectivesSection;
@@ -191,6 +193,8 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private ObjectivesSection objectivesSection;
   @Autowired private EndGameSection endGameSection;
   @Autowired private EndGameSummaryRepo endGameRepo;
+  @Autowired private MidActivitySection midActivitySection;
+  @Autowired private MidActivityRepo midActivityRepo;
   @Autowired private ItemsSection itemsSection;
   @Autowired private OutliersSection outliersSection;
   @Autowired private OpeningSection openingSection;
@@ -273,6 +277,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertRunes(id, match.getId());
       assertItemEfficiency(id, match.getId());
       assertLanes(id, match.getId());
+      saveMidActivity(id, match);
       assertThat(buybackRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(spikeRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(stateSegmentRepo.findByMatchId(match.getId())).isNotEmpty();
@@ -346,6 +351,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertRunes(id, match.getId());
       assertItemEfficiency(id, match.getId());
       assertLanes(id, match.getId());
+      saveMidActivity(id, match);
       assertAbilityDraftReasons(id, match.getId());
       assertFightExplanations(id, match.getId());
       saveSwingKeyItems(id, match.getId());
@@ -995,6 +1001,75 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     saveSection("outliers", outliersSection.lines(input), id, 5);
     saveSection("opening", openingSection.lines(input), id, 4);
     saveSection("vision", visionSection.lines(input), id, 7);
+  }
+
+  private static final java.util.Map<String, String> MID_ACTIVITY_DOC =
+      new java.util.concurrent.ConcurrentSkipListMap<>();
+
+  /** Each team's mid hero in plain words with the numbers behind it, for every match run so far. */
+  private void saveMidActivity(String id, MatchDomain match) {
+    long matchId = match.getId();
+    List<com.ako.dbuff.dao.model.MidActivityDomain> rows = midActivityRepo.findByMatchId(matchId);
+    assertThat(rows).as("%s: a mid activity row per team", id).hasSize(2);
+    assertThat(rows)
+        .allSatisfy(
+            r -> {
+              assertThat(r.getVerdict()).isIn("ACTIVE", "PASSIVE");
+              assertThat(r.getWindowStartSeconds()).isLessThan(r.getWindowEndSeconds());
+              assertThat(r.getGoldPerMinute()).as("%s: gold per minute", id).isNotNull();
+            });
+    List<String> lines =
+        midActivitySection.lines(new ReplayReportInput(matchId, match, Set.of(), Map.of(), 3));
+    assertThat(lines).hasSize(2);
+    StringBuilder text = new StringBuilder("## Match " + id + "\n\n");
+    lines.forEach(l -> text.append("- ").append(l).append("\n"));
+    text.append("\nNumbers behind it:\n\n");
+    rows.stream()
+        .sorted(java.util.Comparator.comparing(r -> r.getPlayerSlot()))
+        .forEach(
+            r ->
+                text.append(
+                    ("- %s mid (slot %d): level 6 at %s, next step %s; mid game %s to %s; kills %d,"
+                         + " assists %d; fights %d of %d (team median %s); rotations %d (%d good);"
+                         + " gold per minute %d (enemy mid %d, team %d); experience per minute %d"
+                         + " (enemy mid %d, team %d); verdict %s%n")
+                        .formatted(
+                            r.getTeam(),
+                            r.getPlayerSlot(),
+                            r.getLevel6Seconds() == null
+                                ? "never"
+                                : com.ako.dbuff.service.replay.report.GameTime.clock(
+                                    r.getLevel6Seconds()),
+                            r.getNextAction(),
+                            com.ako.dbuff.service.replay.report.GameTime.clock(
+                                r.getWindowStartSeconds()),
+                            com.ako.dbuff.service.replay.report.GameTime.clock(
+                                r.getWindowEndSeconds()),
+                            r.getKills(),
+                            r.getAssists(),
+                            r.getFightsJoined(),
+                            r.getFightsTotal(),
+                            r.getTeamMedianFights(),
+                            r.getRotations(),
+                            r.getRotationsGood(),
+                            r.getGoldPerMinute(),
+                            r.getEnemyGoldPerMinute(),
+                            r.getTeamGoldPerMinute(),
+                            r.getXpPerMinute(),
+                            r.getEnemyXpPerMinute(),
+                            r.getTeamXpPerMinute(),
+                            r.getVerdict())));
+    MID_ACTIVITY_DOC.put(id, text.toString());
+    System.out.println("MID ACTIVITY " + id + "\n" + text);
+    try {
+      Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
+      Files.createDirectories(dir);
+      Files.writeString(
+          dir.resolve("mid-activity.md"),
+          "# Mid hero activity\n\n" + String.join("\n", MID_ACTIVITY_DOC.values()));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   private void saveSection(String name, List<String> lines, String id, int maxLines) {
