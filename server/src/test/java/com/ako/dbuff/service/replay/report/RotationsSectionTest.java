@@ -2,6 +2,9 @@ package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.TeamRotationDomain;
 import com.ako.dbuff.dao.repo.TeamRotationRepo;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -211,5 +214,47 @@ class RotationsSectionTest {
 
     assertThat(lines.get(1)).endsWith("died. No reason recorded.");
     assertThat(lines.get(2)).endsWith("wasted. No reason recorded.");
+  }
+
+  @Test
+  void view_countsGoodAndBadTripsAndKeepsPlainTextAsItWas() {
+    TeamRotationDomain r = row(0, 750, "WASTED", "DID_NOTHING,INCOME_DROP");
+    r.setIncomeBefore(620);
+    r.setIncomeDuring(1250);
+    row(0, 900, "GOOD", "");
+
+    SectionView mine = section.view(input(0L)).orElseThrow();
+    SectionView both = section.view(input()).orElseThrow();
+
+    ViewRendering.assertWithinLimits(mine);
+    assertThat(mine.title()).isEqualTo("Team rotations");
+    assertThat(mine.verdict()).isEqualTo("Your team's trips: 1 good, 1 wasted or ended in a death");
+    assertThat(mine.accent()).isEqualTo(Accent.NEUTRAL);
+    assertThat(both.verdict())
+        .isEqualTo("Trips of both teams: 1 good, 1 wasted or ended in a death");
+    assertThat(both.bullets()).hasSize(2);
+    assertThat(new PlainViewRenderer().lines(both)).isEqualTo(section.lines(input()));
+    assertThat(section.lines(input()).get(1))
+        .isEqualTo(
+            "12:30 Axe (Radiant) went from top lane to mid lane: wasted. Why: Axe did nothing"
+                + " there; Axe's farm dropped from 620 to 1.3k gold per minute (experience from ?"
+                + " to ? per minute).");
+  }
+
+  @Test
+  void view_isRedWhenTheTrackedTeamsTripsWentWrong() {
+    row(128, 300, "DIED", "DIED");
+
+    SectionView view = section.view(input(130L)).orElseThrow();
+
+    assertThat(view.verdict()).isEqualTo("Your team's trips: 0 good, 1 wasted or ended in a death");
+    assertThat(view.accent()).isEqualTo(Accent.LOSS);
+  }
+
+  @Test
+  void view_isEmptyWithoutTrips() {
+    row(0, 100, "NEUTRAL", "");
+
+    assertThat(section.view(input())).isEmpty();
   }
 }

@@ -12,6 +12,8 @@ import com.ako.dbuff.service.replay.analysis.item.HeroInputs;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.spike.SpikeCause;
+import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -69,7 +71,35 @@ public class SwingSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return render(input, selectedSwings(input));
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
     List<GameSpikeDomain> spikes = selectedSwings(input);
+    List<String> lines = render(input, spikes);
+    if (lines.isEmpty()) {
+      return Optional.empty();
+    }
+    GameSpikeDomain biggest =
+        spikes.stream().max(Comparator.comparingLong(GameSpikeDomain::getDeltaGold)).orElseThrow();
+    TeamSide yours = TeamSide.commonSide(input.focusSlots());
+    String verdict =
+        String.format(
+            Locale.ROOT,
+            "Biggest swing: %s gained %.1fk net worth between %s and %s",
+            Prettify.teamOf(biggest.getBenefitingTeam(), yours),
+            biggest.getDeltaGold() / 1000.0,
+            GameTime.clock(biggest.getStartSeconds()),
+            GameTime.clock(biggest.getEndSeconds()));
+    return SectionViews.titled(
+        lines,
+        new Verdict(
+            verdict,
+            SectionViews.forTeam(Enums.find(TeamSide.class, biggest.getBenefitingTeam()), yours)));
+  }
+
+  private List<String> render(ReplayReportInput input, List<GameSpikeDomain> spikes) {
     if (spikes.isEmpty()) {
       return List.of();
     }

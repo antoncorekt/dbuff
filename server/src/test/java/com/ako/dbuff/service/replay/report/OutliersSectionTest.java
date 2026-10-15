@@ -4,6 +4,9 @@ import com.ako.dbuff.dao.model.PlayerOutlierDomain;
 import com.ako.dbuff.dao.model.TeamRotationDomain;
 import com.ako.dbuff.dao.repo.PlayerOutlierRepo;
 import com.ako.dbuff.dao.repo.TeamRotationRepo;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -170,5 +173,43 @@ class OutliersSectionTest {
     assertThatThrownBy(properties::validate).hasMessageContaining("max-outlier-lines");
     properties.setMaxOutlierLines(11);
     assertThatThrownBy(properties::validate).hasMessageContaining("max-outlier-lines");
+  }
+
+  @Test
+  void view_countsTheOutliersAndKeepsPlainTextAsItWas() {
+    outlier(0, "NW_OUTLIER", 1440, 1800, 41.2)
+        .setExplanation("his income came mostly from jungle creeps");
+
+    SectionView view = section.view(input(0L)).orElseThrow();
+
+    ViewRendering.assertWithinLimits(view);
+    assertThat(view.title()).isEqualTo("Net worth outliers");
+    assertThat(view.verdict())
+        .isEqualTo("1 player on your team held an unusual share of the team's net worth");
+    assertThat(view.accent()).isEqualTo(Accent.NEUTRAL);
+    assertThat(String.join("\n", section.lines(input(0L))))
+        .isEqualTo(
+            "**Net worth outliers**\n"
+                + "Sven held 41% of the net worth of Radiant (your team) from 24:00 (his income"
+                + " came mostly from jungle creeps)");
+    assertThat(new PlainViewRenderer().lines(view)).isEqualTo(section.lines(input(0L)));
+  }
+
+  @Test
+  void view_isRedForAFeederOnTheTrackedTeam() {
+    outlier(0, "FEEDER", 600, 900, 7.0);
+
+    SectionView mine = section.view(input(0L)).orElseThrow();
+    SectionView nobody = section.view(input()).orElseThrow();
+
+    assertThat(mine.accent()).isEqualTo(Accent.LOSS);
+    assertThat(nobody.accent()).isEqualTo(Accent.NEUTRAL);
+    assertThat(nobody.verdict())
+        .isEqualTo("1 player held an unusual share of the team's net worth");
+  }
+
+  @Test
+  void view_isEmptyWithoutUsableRows() {
+    assertThat(section.view(input())).isEmpty();
   }
 }

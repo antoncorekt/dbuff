@@ -9,6 +9,9 @@ import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyJson;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -376,5 +379,58 @@ class ItemsSectionTest {
     }
     properties.setMaxItemLines(10);
     properties.validate();
+  }
+
+  @Test
+  void view_countsTheItemsThatPaidBackAndKeepsPlainTextAsItWas() {
+    add(farming(1, 1500));
+    add(midas(2, 600, 0.9));
+    add(stick(0, 200, 1.5, 2));
+
+    SectionView view = section.view(input()).orElseThrow();
+
+    ViewRendering.assertWithinLimits(view);
+    assertThat(view.title()).isEqualTo("Items");
+    assertThat(view.verdict()).isEqualTo("Items shown: 2 of 3 paid back their cost");
+    assertThat(view.accent()).isEqualTo(Accent.WIN);
+    assertThat(String.join("\n", section.lines(input())))
+        .isEqualTo(
+            "**Items**\n"
+                + "Axe's Magic Stick (bought at 3:20): 3 uses, 2 saves, 1.5x its cost\n"
+                + "Pudge's Hand Of Midas (bought at 10:00) paid for itself at 25:00 and earned 800"
+                + " gold (0.9x its cost)\n"
+                + "Lion's Battle Fury (bought at 25:00) paid back at 30:00: his creep gold rose"
+                + " from 200 to 350 per minute after buying it; camps per minute rose from 0.5 to"
+                + " 1.0");
+    assertThat(new PlainViewRenderer().lines(view)).isEqualTo(section.lines(input()));
+  }
+
+  @Test
+  void view_looksAtTheTrackedPlayersItemsFirst() {
+    add(farming(1, 1500));
+    add(midas(2, 600, 0.9));
+
+    SectionView view = section.view(input(2L)).orElseThrow();
+
+    assertThat(view.verdict()).isEqualTo("Your players' items shown: 0 of 1 paid back their cost");
+    assertThat(view.accent()).isEqualTo(Accent.LOSS);
+  }
+
+  @Test
+  void view_isEmptyWithoutUsableRows() {
+    assertThat(section.view(input())).isEmpty();
+  }
+
+  @Test
+  void view_countsOnlyTheItemsTheCardShows() {
+    properties.setMaxItemLines(1);
+    add(farming(1, 1500));
+    add(midas(2, 600, 0.9));
+    add(stick(0, 200, 1.5, 2));
+
+    SectionView view = section.view(input()).orElseThrow();
+
+    assertThat(view.bullets()).hasSize(1);
+    assertThat(view.verdict()).matches("Items shown: [01] of 1 paid back their cost");
   }
 }

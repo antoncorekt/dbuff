@@ -10,6 +10,9 @@ import com.ako.dbuff.dao.repo.FightVisionRepo;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.vision.VisionVerdict;
+import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -103,12 +106,33 @@ public class VisionSection implements ReplayReportSection {
     return ReportDetail.STANDARD;
   }
 
+  private record Found(List<String> lines, int shown, boolean ownView, boolean tracked) {}
+
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return found(input).lines();
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    Found found = found(input);
+    String problems = SectionViews.count(found.shown(), "vision problem");
+    Verdict verdict =
+        found.ownView()
+            ? new Verdict(problems + " for your team in important fights", Accent.LOSS)
+            : found.tracked()
+                ? new Verdict(
+                    "No vision problems for your team; %s for the other team".formatted(problems),
+                    Accent.WIN)
+                : new Verdict(problems + " in important fights", Accent.NEUTRAL);
+    return SectionViews.titled(found.lines(), verdict);
+  }
+
+  private Found found(ReplayReportInput input) {
     List<Entry> entries = entries(input.matchId(), visionRepo.findByMatchId(input.matchId()));
     List<Entry> problems = entries.stream().filter(e -> !e.problems().isEmpty()).toList();
     if (problems.isEmpty()) {
-      return List.of();
+      return new Found(List.of(), 0, false, false);
     }
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     List<Entry> own = problems.stream().filter(e -> e.team() == yours).toList();
@@ -139,7 +163,7 @@ public class VisionSection implements ReplayReportSection {
           "and %d more vision %s%s"
               .formatted(picked.leftOut(), picked.leftOut() == 1 ? "problem" : "problems", scope));
     }
-    return lines;
+    return new Found(lines, shown.size(), ownView, yours != null);
   }
 
   private List<Entry> entries(long matchId, List<FightVisionDomain> stored) {

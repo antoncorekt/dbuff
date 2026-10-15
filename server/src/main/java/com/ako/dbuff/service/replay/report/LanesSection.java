@@ -13,6 +13,9 @@ import com.ako.dbuff.service.replay.analysis.lane.LaneResult;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.map.Zone;
+import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -67,7 +70,43 @@ public class LanesSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return render(input, pairs(input.matchId()));
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
     List<Pair> pairs = pairs(input.matchId());
+    return SectionViews.titled(render(input, pairs), lanesVerdict(pairs, input));
+  }
+
+  private Verdict lanesVerdict(List<Pair> pairs, ReplayReportInput input) {
+    long radiant = wins(pairs, TeamSide.RADIANT);
+    long dire = wins(pairs, TeamSide.DIRE);
+    if (radiant + dire == 0) {
+      return new Verdict("No lane had a clear winner", Accent.NEUTRAL);
+    }
+    Verdict decided =
+        SectionViews.contest(
+            TeamSide.commonSide(input.focusSlots()),
+            radiant,
+            dire,
+            radiant + dire,
+            "decided lanes");
+    long even = pairs.size() - radiant - dire;
+    return even == 0
+        ? decided
+        : new Verdict(
+            decided.text() + "; " + SectionViews.count(even, "lane") + " even", decided.accent());
+  }
+
+  private static long wins(List<Pair> pairs, TeamSide side) {
+    return pairs.stream()
+        .map(p -> winner(p.sides()))
+        .filter(w -> w != null && w.side() == side)
+        .count();
+  }
+
+  private List<String> render(ReplayReportInput input, List<Pair> pairs) {
     if (pairs.isEmpty()) {
       return List.of();
     }

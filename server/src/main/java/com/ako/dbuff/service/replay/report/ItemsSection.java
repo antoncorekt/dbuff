@@ -5,6 +5,9 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyJson;
+import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -58,16 +61,51 @@ public class ItemsSection implements ReplayReportSection {
     return ReportDetail.STANDARD;
   }
 
+  /** The rows the cap kept and their lines, so the verdict counts what the card lists. */
+  private record Rendered(List<Entry> shown, List<String> lines) {}
+
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return render(input, entries(input)).lines();
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    Rendered rendered = render(input, entries(input));
+    return SectionViews.titled(rendered.lines(), paidBack(input, rendered.shown()));
+  }
+
+  private List<Entry> entries(ReplayReportInput input) {
     List<ItemEfficiencyDomain> stored = itemRepo.findByMatchId(input.matchId());
     if (stored == null) {
       return List.of();
     }
-    List<Entry> rows =
-        stored.stream().map(row -> usable(input.matchId(), row)).flatMap(Optional::stream).toList();
+    return stored.stream()
+        .map(row -> usable(input.matchId(), row))
+        .flatMap(Optional::stream)
+        .toList();
+  }
+
+  private Verdict paidBack(ReplayReportInput input, List<Entry> rows) {
+    Set<Long> focus = input.focusSlots() == null ? Set.of() : input.focusSlots();
+    List<Entry> own = rows.stream().filter(e -> focus.contains(e.row().slot())).toList();
+    List<Entry> scope = own.isEmpty() ? rows : own;
+    long known = scope.stream().filter(e -> e.row().ratio() != null).count();
+    long paid = scope.stream().filter(e -> e.row().ratio() != null && e.row().ratio() >= 1).count();
+    String whose = own.isEmpty() ? "Items shown" : "Your players' items shown";
+    if (known == 0) {
+      return new Verdict(
+          "%s: %s checked".formatted(whose, SectionViews.count(scope.size(), "purchase")),
+          Accent.NEUTRAL);
+    }
+    return new Verdict(
+        "%s: %d of %d paid back their cost".formatted(whose, paid, known),
+        SectionViews.balance(paid, known - paid));
+  }
+
+  private Rendered render(ReplayReportInput input, List<Entry> rows) {
     if (rows.isEmpty()) {
-      return List.of();
+      return new Rendered(List.of(), List.of());
     }
     Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
     Set<Long> focus = input.focusSlots() == null ? Set.of() : input.focusSlots();
@@ -75,14 +113,15 @@ public class ItemsSection implements ReplayReportSection {
         Comparator.comparingInt((Entry e) -> focus.contains(e.row().slot()) ? 0 : 1)
             .thenComparing(ItemsSection::distanceFromCost, Comparator.reverseOrder())
             .thenComparing(CHRONOLOGICAL);
-    return BehaviourLines.render(
-        "**Items**",
-        rows,
-        byWorth,
-        CHRONOLOGICAL,
-        properties.getMaxItemLines(),
-        properties.getMaxBehaviourLineLength(),
-        entry -> entry.wording().shortVerdict(entry.row(), subject(entry.row(), heroes)));
+    List<Entry> shown =
+        BehaviourLines.pick(rows, byWorth, CHRONOLOGICAL, properties.getMaxItemLines()).listed();
+    return new Rendered(
+        shown,
+        BehaviourLines.lines(
+            "**Items**",
+            shown,
+            properties.getMaxBehaviourLineLength(),
+            entry -> entry.wording().shortVerdict(entry.row(), subject(entry.row(), heroes))));
   }
 
   private Optional<Entry> usable(long matchId, ItemEfficiencyDomain stored) {

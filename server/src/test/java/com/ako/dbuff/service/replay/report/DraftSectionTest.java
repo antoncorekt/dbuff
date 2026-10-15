@@ -3,6 +3,9 @@ package com.ako.dbuff.service.replay.report;
 import com.ako.dbuff.dao.model.AbilityDraftPickDomain;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -95,5 +98,33 @@ class DraftSectionTest {
             "**Draft**",
             "Anton drafted Sven Gods Strength (pick 5), Sven Storm Bolt (team pick 2), Sven Great"
                 + " Cleave");
+  }
+
+  @Test
+  void view_countsTheTrackedPlayersAndKeepsPlainTextAsItWas() {
+    when(repo.findByMatchId(1L))
+        .thenReturn(List.of(pick(12, 0, "sven_gods_strength"), pick(3, 0, "sven_storm_bolt")));
+    ReplayReportInput in = new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3);
+
+    SectionView view = section.view(in).orElseThrow();
+
+    ViewRendering.assertWithinLimits(view);
+    assertThat(view.title()).isEqualTo("Draft");
+    assertThat(view.verdict()).isEqualTo("Ability picks of 1 tracked player");
+    assertThat(view.accent()).isEqualTo(Accent.NEUTRAL);
+    assertThat(view.bullets())
+        .containsExactly("Anton drafted Sven Storm Bolt (pick 3), Sven Gods Strength (pick 12)");
+    assertThat(String.join("\n", section.lines(in)))
+        .isEqualTo(
+            "**Draft**\nAnton drafted Sven Storm Bolt (pick 3), Sven Gods Strength (pick 12)");
+    assertThat(new PlainViewRenderer().lines(view)).isEqualTo(section.lines(in));
+  }
+
+  @Test
+  void view_isEmptyWithoutADraft() {
+    when(repo.findByMatchId(1L)).thenReturn(List.of());
+
+    assertThat(section.view(new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3)))
+        .isEmpty();
   }
 }

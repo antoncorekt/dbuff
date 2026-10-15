@@ -8,10 +8,14 @@ import com.ako.dbuff.dao.repo.TeamRotationRepo;
 import com.ako.dbuff.service.replay.analysis.behaviour.RotationVerdict;
 import com.ako.dbuff.service.replay.analysis.outlier.OutlierRowOrder;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -72,8 +76,37 @@ public class OutliersSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
+    return render(input, usableRows(input));
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    List<PlayerOutlierDomain> rows = usableRows(input);
+    return SectionViews.titled(render(input, rows), outliersVerdict(rows, input));
+  }
+
+  private List<PlayerOutlierDomain> usableRows(ReplayReportInput input) {
     List<PlayerOutlierDomain> rows = outlierRepo.findByMatchId(input.matchId());
-    if (rows == null || rows.stream().noneMatch(OutliersSection::usable)) {
+    return rows == null ? List.of() : rows.stream().filter(OutliersSection::usable).toList();
+  }
+
+  private static Verdict outliersVerdict(List<PlayerOutlierDomain> rows, ReplayReportInput input) {
+    SectionViews.Scope<PlayerOutlierDomain> scope =
+        SectionViews.scope(
+            rows,
+            o -> TeamSide.ofSlot(o.getPlayerSlot()).name(),
+            TeamSide.commonSide(input.focusSlots()));
+    long players = scope.rows().stream().map(PlayerOutlierDomain::getPlayerSlot).distinct().count();
+    boolean feeder = scope.rows().stream().anyMatch(o -> "FEEDER".equals(o.getKind()));
+    String who = scope.ownTeam() ? " on your team" : "";
+    return new Verdict(
+        "%s%s held an unusual share of the team's net worth"
+            .formatted(SectionViews.count(players, "player"), who),
+        feeder && scope.ownTeam() ? Accent.LOSS : Accent.NEUTRAL);
+  }
+
+  private List<String> render(ReplayReportInput input, List<PlayerOutlierDomain> rows) {
+    if (rows.isEmpty()) {
       return List.of();
     }
     Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
@@ -88,7 +121,7 @@ public class OutliersSection implements ReplayReportSection {
             .thenComparing(CHRONOLOGICAL);
     return BehaviourLines.render(
         "**Net worth outliers**",
-        rows.stream().filter(OutliersSection::usable).toList(),
+        rows,
         byWorth,
         CHRONOLOGICAL,
         properties.getMaxOutlierLines(),

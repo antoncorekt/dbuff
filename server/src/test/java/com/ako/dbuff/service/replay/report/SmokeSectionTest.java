@@ -2,6 +2,9 @@ package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.SmokeUseDomain;
 import com.ako.dbuff.dao.repo.SmokeUseRepo;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -183,5 +186,40 @@ class SmokeSectionTest {
     assertThat(lines).hasSize(3);
     assertThat(lines.get(1)).startsWith("5:00 to").contains("came to nothing");
     assertThat(lines.get(2)).startsWith("6:40 to").contains("backfired");
+  }
+
+  @Test
+  void view_countsWhatTheSmokesCameToAndKeepsPlainTextAsItWas() {
+    row(0, "0,1, 2", 720, "PAID_OFF");
+    row(128, "128", 900, "BACKFIRED");
+
+    SectionView mine = section.view(input(1L)).orElseThrow();
+    SectionView both = section.view(input()).orElseThrow();
+
+    ViewRendering.assertWithinLimits(mine);
+    assertThat(mine.title()).isEqualTo("Smoke");
+    assertThat(mine.verdict())
+        .isEqualTo("Your team's Smokes of Deceit: 1 paid off, 0 backfired, 0 came to nothing");
+    assertThat(mine.accent()).isEqualTo(Accent.WIN);
+    assertThat(both.verdict())
+        .isEqualTo("Smokes of Deceit, both teams: 1 paid off, 1 backfired, 0 came to nothing");
+    assertThat(both.accent()).isEqualTo(Accent.NEUTRAL);
+    assertThat(new PlainViewRenderer().lines(both)).isEqualTo(section.lines(input()));
+    assertThat(section.lines(input(1L)).get(1))
+        .isEqualTo(
+            "12:00 to 12:40 Axe (Radiant, your team) used a Smoke of Deceit with Lion and Pudge:"
+                + " from the top lane to the river; paid off; the smoke broke.");
+  }
+
+  @Test
+  void view_isRedWhenTheTrackedTeamsSmokesBackfired() {
+    row(128, "128", 300, "BACKFIRED");
+
+    assertThat(section.view(input(130L)).orElseThrow().accent()).isEqualTo(Accent.LOSS);
+  }
+
+  @Test
+  void view_isEmptyWithoutSmoke() {
+    assertThat(section.view(input())).isEmpty();
   }
 }

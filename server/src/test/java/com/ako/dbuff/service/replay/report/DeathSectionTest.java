@@ -2,6 +2,9 @@ package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.DeathAnalysisDomain;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,6 +55,54 @@ class DeathSectionTest {
     when(repo.findByMatchId(1L)).thenReturn(List.of(death(0, 600, "OTHER", "")));
 
     assertThat(section.lines(new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3)))
+        .isEmpty();
+  }
+
+  @Test
+  void view_countsTheDeathsWorthALookAndKeepsPlainTextAsItWas() {
+    when(repo.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                death(0, 2470, "BKB_READY_UNUSED", "npc_dota_hero_lycan"),
+                death(0, 1500, "DISABLE_CHAIN", "npc_dota_hero_sven")));
+    ReplayReportInput in = new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3);
+
+    SectionView view = section.view(in).orElseThrow();
+
+    ViewRendering.assertWithinLimits(view);
+    assertThat(view.title()).isEqualTo("Deaths");
+    assertThat(view.verdict()).isEqualTo("2 deaths worth a look");
+    assertThat(view.accent()).isEqualTo(Accent.LOSS);
+    assertThat(view.bullets())
+        .containsExactly(
+            "25:00 Anton died to Sven: disabled for 4.2 s in the last seconds",
+            "41:10 Anton died to Lycan: had Black King Bar ready and did not use it");
+    assertThat(String.join("\n", section.lines(in)))
+        .isEqualTo(
+            "**Deaths**\n"
+                + "25:00 Anton died to Sven: disabled for 4.2 s in the last seconds\n"
+                + "41:10 Anton died to Lycan: had Black King Bar ready and did not use it");
+    assertThat(new PlainViewRenderer().lines(view)).isEqualTo(section.lines(in));
+  }
+
+  @Test
+  void view_saysDeathInTheSingular() {
+    when(repo.findByMatchId(1L))
+        .thenReturn(List.of(death(0, 600, "TOWER", "npc_dota_goodguys_tower1_top")));
+
+    SectionView view =
+        section
+            .view(new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3))
+            .orElseThrow();
+
+    assertThat(view.verdict()).isEqualTo("1 death worth a look");
+  }
+
+  @Test
+  void view_isEmptyWithoutAnythingToExplain() {
+    when(repo.findByMatchId(1L)).thenReturn(List.of(death(0, 600, "OTHER", "")));
+
+    assertThat(section.view(new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3)))
         .isEmpty();
   }
 }
