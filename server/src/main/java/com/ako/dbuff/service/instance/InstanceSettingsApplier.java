@@ -104,6 +104,14 @@ public class InstanceSettingsApplier {
                               + String.join(", ", sectionSwitch.visibleNames())
                               + ". Use `none` for no automatic sections or `default` for the"
                               + " server's list."));
+      if (sectionSwitch.isHidden(section)) {
+        throw new IllegalArgumentException(
+            "Report section `"
+                + section.name()
+                + "` is switched off on the server. Valid sections: "
+                + String.join(", ", sectionSwitch.visibleNames())
+                + ".");
+      }
       names.add(section.name());
     }
     return String.join(",", names);

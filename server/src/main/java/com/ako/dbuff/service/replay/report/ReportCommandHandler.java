@@ -58,31 +58,49 @@ public class ReportCommandHandler {
               + " has no stored replay analysis yet (the replay run must be done or partial).");
       return;
     }
-    long wait = cooldown.acquire(context.getChannelId());
-    if (wait > 0) {
+    OnDemandCooldown.Permit permit = cooldown.acquire(context.getChannelId());
+    if (!permit.granted()) {
       context.replyEphemeral(
-          "⏳ This thread just had a report or AI card. Try again in " + wait + " s.");
+          "⏳ This thread just had a report or AI card. Try again in "
+              + permit.waitSeconds()
+              + " s.");
       return;
     }
-    String label = all ? "the report" : "section `" + section.get().name() + "`";
-    AsyncReply reply =
-        context.acknowledge(
-            "🔄 Preparing " + label + " of match " + matchId + "…", "Match " + matchId);
+    boolean posted = false;
+    try {
+      String label = all ? "the report" : "section `" + section.get().name() + "`";
+      AsyncReply reply =
+          context.acknowledge(
+              "🔄 Preparing " + label + " of match " + matchId + "…", "Match " + matchId);
+      posted = deliver(reply, matchId, config, requested, all, section);
+    } finally {
+      if (!posted) {
+        cooldown.release(permit);
+      }
+    }
+  }
+
+  private boolean deliver(
+      AsyncReply reply,
+      long matchId,
+      DbufInstanceConfigDomain config,
+      String requested,
+      boolean all,
+      Optional<ReplayReportSection> section) {
     try {
       ReportDelivery delivery =
           all
               ? reports.redeliver(matchId, config.getId())
               : reports.deliverSection(matchId, config.getId(), section.get().name());
       if (delivery == ReportDelivery.POSTED) {
-        return;
+        return true;
       }
-      cooldown.release(context.getChannelId());
       reply.post(notPosted(delivery, all, section, matchId));
     } catch (RuntimeException e) {
-      cooldown.release(context.getChannelId());
       log.warn("Report {} of match {} failed: {}", requested, matchId, e.getMessage(), e);
       reply.fail("❌ The report of match " + matchId + " failed, see the log.");
     }
+    return false;
   }
 
   private static String notPosted(

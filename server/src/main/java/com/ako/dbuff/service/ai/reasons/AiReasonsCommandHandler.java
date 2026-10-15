@@ -53,26 +53,40 @@ public class AiReasonsCommandHandler {
               + " has no stored replay analysis yet (the replay run must be done or partial).");
       return;
     }
-    long wait = cooldown.acquire(context.getChannelId());
-    if (wait > 0) {
+    OnDemandCooldown.Permit permit = cooldown.acquire(context.getChannelId());
+    if (!permit.granted()) {
       context.replyEphemeral(
-          "⏳ This thread just had a report or AI card. Try again in " + wait + " s.");
+          "⏳ This thread just had a report or AI card. Try again in "
+              + permit.waitSeconds()
+              + " s.");
       return;
     }
-    AsyncReply reply =
-        context.acknowledge(
-            "🔄 Working out the top reasons for match " + matchId + "…", "Match " + matchId);
+    boolean posted = false;
+    try {
+      AsyncReply reply =
+          context.acknowledge(
+              "🔄 Working out the top reasons for match " + matchId + "…", "Match " + matchId);
+      posted = deliver(reply, matchId, config, model);
+    } finally {
+      if (!posted) {
+        cooldown.release(permit);
+      }
+    }
+  }
+
+  private boolean deliver(
+      AsyncReply reply, long matchId, DbufInstanceConfigDomain config, String model) {
     try {
       ReportDelivery delivery =
           reports.deliverSection(matchId, config.getId(), AiReasonsSection.NAME, model);
-      if (delivery != ReportDelivery.POSTED) {
-        cooldown.release(context.getChannelId());
-        reply.post("The top reasons were not posted: " + delivery.reason() + ".");
+      if (delivery == ReportDelivery.POSTED) {
+        return true;
       }
+      reply.post("The top reasons were not posted: " + delivery.reason() + ".");
     } catch (RuntimeException e) {
-      cooldown.release(context.getChannelId());
       log.warn("AI reasons of match {} failed: {}", matchId, e.getMessage(), e);
       reply.fail("❌ The top reasons of match " + matchId + " failed, see the log.");
     }
+    return false;
   }
 }

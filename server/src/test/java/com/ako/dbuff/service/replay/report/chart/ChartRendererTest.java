@@ -256,6 +256,23 @@ class ChartRendererTest {
   }
 
   @Test
+  void fingerprint_tellsApartSpecsThatDifferOnlyInALegendShape() {
+    java.util.function.Function<ChartSpec.PinShape, ChartSpec> spec =
+        shape ->
+            new ChartSpec(
+                "t",
+                60,
+                java.util.List.of(),
+                java.util.List.of(),
+                java.util.List.of(),
+                java.util.List.of(new ChartSpec.LegendEntry(ChartPalette.RADIANT, "Died", shape)));
+
+    assertThat(spec.apply(ChartSpec.PinShape.CROSS).fingerprint())
+        .isNotEqualTo(spec.apply(ChartSpec.PinShape.STAR).fingerprint())
+        .isNotEqualTo(spec.apply(null).fingerprint());
+  }
+
+  @Test
   void panelBandsPinsAndLegendShapesDrawEvenOutsideTheSeries() throws IOException {
     ChartSpec.Series series =
         new ChartSpec.Series(

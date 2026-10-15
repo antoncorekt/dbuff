@@ -171,6 +171,42 @@ class ReportIconsTest {
   }
 
   @Test
+  void iconText_neverCutsAUnicodePlaceholderOrItsVariationSelector() {
+    String hero = IconKind.HERO.getPlaceholder();
+    String item = IconKind.ITEM.getPlaceholder();
+    String text = "ab " + hero + " cd " + item + " ef";
+    int heroStart = 3;
+    int heroEnd = heroStart + hero.length();
+
+    for (int cut = heroStart + 1; cut < heroEnd; cut++) {
+      assertThat(IconText.safeEnd(text, cut))
+          .as("cut %s inside the hero", cut)
+          .isEqualTo(heroStart);
+    }
+    assertThat(IconText.safeEnd(text, heroEnd)).isEqualTo(heroEnd);
+    String itemText = "x" + item + "y";
+    assertThat(IconText.safeEnd(itemText, 2)).isEqualTo(1);
+    assertThat(IconText.safeEnd(itemText, 1 + item.length())).isEqualTo(1 + item.length());
+    assertThat(IconText.splitIndex(hero + "x".repeat(10), 1)).isEqualTo(1);
+  }
+
+  @Test
+  void iconText_neverSplitsASurrogatePairOrAJoinerSequence() {
+    String pair = "a\uD83D\uDE00b";
+    assertThat(IconText.safeEnd(pair, 2)).isEqualTo(1);
+    assertThat(IconText.safeEnd(pair, 3)).isEqualTo(3);
+
+    String variation = "a\u2694\uFE0Fb";
+    assertThat(IconText.safeEnd(variation, 2)).isEqualTo(1);
+
+    String family = "a\uD83D\uDC68\u200D\uD83D\uDC69b";
+    assertThat(IconText.safeEnd(family, 3)).isEqualTo(1);
+    assertThat(IconText.safeEnd(family, 4)).isEqualTo(1);
+    assertThat(IconText.safeEnd(family, 5)).isEqualTo(1);
+    assertThat(IconText.safeEnd(family, family.length() - 1)).isEqualTo(family.length() - 1);
+  }
+
+  @Test
   void lineCap_holdsWithIconsAndNeverSplitsATag() {
     String tag = "<:h_antimage:11>";
     String line = tag + tag + tag + tag + tag + tag;

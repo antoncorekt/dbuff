@@ -182,6 +182,10 @@ public class ReplayReportService {
       if (sectionSwitch.isHidden(section)) {
         return logSkipped(matchId, ReportDelivery.SECTION_HIDDEN);
       }
+      GameModeProfile mode = modes.activeFor(match.getGameModeId()).orElse(null);
+      if (mode != null && !section.supports(mode)) {
+        return logSkipped(matchId, ReportDelivery.SECTION_NOT_FOR_MODE);
+      }
       List<PlayerMatchStatisticDomain> stats = statRepo.findAllByMatchId(matchId);
       return logSkipped(
           matchId,

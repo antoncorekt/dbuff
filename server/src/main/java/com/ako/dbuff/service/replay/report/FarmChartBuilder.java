@@ -181,11 +181,7 @@ public class FarmChartBuilder {
                     .thenComparingLong(HeroFarm::slot))
             .limit(cap)
             .toList();
-    return new Chosen(
-        top,
-        focusSlots == null || focusSlots.isEmpty()
-            ? "No players are tracked; showing the top farmers. "
-            : "None of your players farmed; showing the top farmers. ");
+    return new Chosen(top, FallbackNote.of(focusSlots, "farmed", "the top farmers"));
   }
 
   private Map<Long, List<PlayerActivitySegmentDomain>> segments(long matchId) {

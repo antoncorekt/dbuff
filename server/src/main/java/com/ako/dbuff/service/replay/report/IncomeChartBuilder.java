@@ -47,7 +47,8 @@ public class IncomeChartBuilder {
   public Optional<IncomeChart> build(
       long matchId, Set<Long> focusSlots, int maxHeroes, int maxFindings, int lineLength) {
     Map<Long, TreeMap<Integer, Long>> gold = goldBySlot(matchId);
-    Choice choice = chosen(gold, focusSlots == null ? Set.of() : focusSlots, maxHeroes);
+    Set<Long> focus = focusSlots == null ? Set.of() : focusSlots;
+    Choice choice = chosen(gold, focus, maxHeroes);
     List<Long> slots = choice.slots();
     if (slots.isEmpty()) {
       return Optional.empty();
@@ -86,7 +87,8 @@ public class IncomeChartBuilder {
     }
     ChartSpec spec =
         new ChartSpec("Hero income", end, panels, List.of(), List.of(), legend(found, allPins));
-    return Optional.of(new IncomeChart(spec, finish(verdict(worst, heroes), lineLength), bullets));
+    return Optional.of(
+        new IncomeChart(spec, finish(choice.note() + verdict(worst, heroes), lineLength), bullets));
   }
 
   private static List<Dip> biggest(List<Dip> dips) {
@@ -168,7 +170,7 @@ public class IncomeChartBuilder {
             : hidden + " more tracked heroes are not shown.";
   }
 
-  private record Choice(List<Long> slots, int hidden) {}
+  private record Choice(List<Long> slots, int hidden, String note) {}
 
   private static String sentence(Found f, Map<Long, String> heroes) {
     Dip d = f.dip();
@@ -216,6 +218,11 @@ public class IncomeChartBuilder {
     boolean followTracked = !tracked.isEmpty();
     List<Long> pool = followTracked ? tracked : drawable.stream().sorted(richest).toList();
     int shown = Math.min(pool.size(), Math.max(1, max));
-    return new Choice(pool.subList(0, shown), followTracked ? pool.size() - shown : 0);
+    return new Choice(
+        pool.subList(0, shown),
+        followTracked ? pool.size() - shown : 0,
+        followTracked || pool.isEmpty()
+            ? ""
+            : FallbackNote.of(focus, "have income data", "the richest heroes"));
   }
 }

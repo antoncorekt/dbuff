@@ -26,26 +26,33 @@ public class OnDemandCooldown {
     this.clock = clock;
   }
 
-  /** Ends the wait of a request that posted nothing, so a miss does not cost the thread. */
-  public void release(String threadKey) {
-    if (threadKey != null) {
-      readyAtMillis.remove(threadKey);
+  /**
+   * The outcome of {@link #acquire}: {@code waitSeconds} is 0 when the request may go ahead. Only
+   * the permit that started a wait can end it, so a slow request cannot cancel a newer one's wait.
+   */
+  public record Permit(String threadKey, long readyAtMillis, long waitSeconds) {
+    public boolean granted() {
+      return waitSeconds == 0;
     }
   }
 
-  /**
-   * Starts the wait for the thread unless one is running.
-   *
-   * @return 0 when the request may go ahead, else the whole seconds still to wait
-   */
-  public long acquire(String threadKey) {
+  /** Ends the wait this permit started, if it is still the one running; a miss costs no wait. */
+  public void release(Permit permit) {
+    if (permit != null && permit.granted() && permit.threadKey() != null) {
+      readyAtMillis.remove(permit.threadKey(), permit.readyAtMillis());
+    }
+  }
+
+  /** Starts the wait for the thread unless one is running. */
+  public Permit acquire(String threadKey) {
     long waitMillis = properties.getOnDemandCooldownSeconds() * 1000L;
     if (waitMillis <= 0 || threadKey == null) {
-      return 0;
+      return new Permit(null, 0, 0);
     }
     long now = clock.millis();
     readyAtMillis.values().removeIf(readyAt -> readyAt <= now);
     long[] remaining = {0};
+    long[] started = {0};
     readyAtMillis.compute(
         threadKey,
         (key, readyAt) -> {
@@ -53,8 +60,9 @@ public class OnDemandCooldown {
             remaining[0] = readyAt - now;
             return readyAt;
           }
-          return now + waitMillis;
+          started[0] = now + waitMillis;
+          return started[0];
         });
-    return remaining[0] == 0 ? 0 : (remaining[0] + 999) / 1000;
+    return new Permit(threadKey, started[0], (remaining[0] + 999) / 1000);
   }
 }
