@@ -129,8 +129,7 @@ class DraftBoardSectionTest {
   void view_ordersByTickWhenNoTurnIsStoredAndAHeroTiesAfterASkill() {
     draft();
     when(heroRepo.findByMatchId(1L))
-        .thenReturn(
-            List.of(hero(SNIPER, 0L, null, -400.0), hero(MEEPO, null, null, null)));
+        .thenReturn(List.of(hero(SNIPER, 0L, null, -400.0), hero(MEEPO, null, null, null)));
     when(skillRepo.findByMatchId(1L))
         .thenReturn(
             List.of(
@@ -204,7 +203,8 @@ class DraftBoardSectionTest {
     assertThat(((ReportMessage.Components) cards.getFirst()).fallback())
         .contains("Picks in draft order", "Left over");
     assertThat(text).hasSize(1);
-    assertThat(((ReportMessage.Plain) text.getFirst()).text()).contains("Picks in draft order", "Left over");
+    assertThat(((ReportMessage.Plain) text.getFirst()).text())
+        .contains("Picks in draft order", "Left over");
   }
 
   @Test
