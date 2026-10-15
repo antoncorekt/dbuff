@@ -45,7 +45,7 @@ class SkillLookupTest {
   }
 
   @Test
-  void aHeroListsItsSkillsMostReliableFirstAndKeepsSkillsWithNoGames() {
+  void aHeroListsItsSkillsMostReliableFirstAndDropsSkillsWithNoGames() {
     Mockito.when(counts.hero(Mockito.anyLong(), Mockito.any())).thenReturn(new SkillCounts(50, 30));
     Mockito.when(counts.heroWithSkills(Mockito.anyLong(), Mockito.any(), Mockito.any()))
         .thenReturn(Map.of(1L, new SkillCounts(2, 2), 2L, new SkillCounts(100, 60)));
@@ -56,7 +56,19 @@ class SkillLookupTest {
     assertThat(answer.subject().getGames()).isEqualTo(50);
     assertThat(answer.details())
         .extracting(SkillPickStatDomain::getSecondId, SkillPickStatDomain::getGames)
-        .containsExactly(tuple(2L, 100L), tuple(1L, 2L), tuple(3L, 0L));
+        .containsExactly(tuple(2L, 100L), tuple(1L, 2L));
+  }
+
+  @Test
+  void aHeroWithNoGamesRunsNoSkillQuery() {
+    Mockito.when(counts.hero(Mockito.anyLong(), Mockito.any())).thenReturn(SkillCounts.NONE);
+
+    SkillAnswer answer = lookup.hero(7, List.of(1L, 2L));
+
+    assertThat(answer.subject().getGames()).isZero();
+    assertThat(answer.details()).isEmpty();
+    Mockito.verify(counts, Mockito.never())
+        .heroWithSkills(Mockito.anyLong(), Mockito.any(), Mockito.any());
   }
 
   @Test

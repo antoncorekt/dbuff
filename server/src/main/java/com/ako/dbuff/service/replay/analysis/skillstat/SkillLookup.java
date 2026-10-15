@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.analysis.skillstat;
 import com.ako.dbuff.dao.model.SkillPickStatDomain;
 import com.ako.dbuff.dao.repo.SkillCountRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
@@ -20,6 +21,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class SkillLookup {
   private static final long NO_EXCLUDED_MATCH = -1;
+  private static final Comparator<SkillPickStatDomain> RELIABILITY =
+      Comparator.comparingDouble(
+          row -> SkillStatMath.wilsonLowerBound(row.getWins(), row.getGames()));
 
   private final SkillCountRepository counts;
   private final SkillStatProperties properties;
@@ -36,12 +40,16 @@ public class SkillLookup {
     this.clock = clock;
   }
 
+  /** The hero and those of its skills that have games, most reliable first; none if no game. */
   public SkillAnswer hero(long heroId, List<Long> skillIds) {
     SkillWindow window = window();
     SkillPickStatDomain template = template();
     SkillPickStatDomain subject =
         SkillStatCalculator.row(
             template, SkillStatKind.HERO, heroId, null, counts.hero(heroId, window));
+    if (subject.getGames() == 0) {
+      return new SkillAnswer(subject, List.of());
+    }
     Map<Long, SkillCounts> withHero = counts.heroWithSkills(heroId, skillIds, window);
     List<SkillPickStatDomain> details =
         skillIds.stream()
@@ -53,7 +61,8 @@ public class SkillLookup {
                         heroId,
                         skill,
                         withHero.getOrDefault(skill, SkillCounts.NONE)))
-            .sorted(BY_RELIABLE_RATE)
+            .filter(row -> row.getGames() > 0)
+            .sorted(RELIABILITY.reversed())
             .toList();
     return new SkillAnswer(subject, details);
   }
@@ -76,7 +85,7 @@ public class SkillLookup {
                         entry.getKey(),
                         skillId,
                         entry.getValue()))
-            .min(BY_RELIABLE_RATE);
+            .max(RELIABILITY);
     return new SkillAnswer(subject, best.stream().toList());
   }
 
@@ -97,21 +106,11 @@ public class SkillLookup {
         List.of());
   }
 
-  private static final Comparator<SkillPickStatDomain> BY_RELIABLE_RATE =
-      Comparator.comparingDouble(
-              (SkillPickStatDomain row) ->
-                  SkillStatMath.wilsonLowerBound(row.getWins(), row.getGames()))
-          .reversed();
-
   private SkillWindow window() {
-    long now = clock.instant().getEpochSecond();
+    Instant now = clock.instant();
     long from =
-        clock
-            .instant()
-            .atZone(ZoneOffset.UTC)
-            .minusMonths(properties.getWindowMonths())
-            .toEpochSecond();
-    return new SkillWindow(from, now + 1, NO_EXCLUDED_MATCH);
+        now.atZone(ZoneOffset.UTC).minusMonths(properties.getWindowMonths()).toEpochSecond();
+    return new SkillWindow(from, now.getEpochSecond() + 1, NO_EXCLUDED_MATCH);
   }
 
   private SkillPickStatDomain template() {

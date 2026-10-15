@@ -16,7 +16,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -43,6 +42,8 @@ public class SkillsCommand implements DbuffCommand {
   private static final Pattern OPTION_KEY =
       Pattern.compile(
           "(?:^|\\s)(" + String.join("|", SkillsOptions.ALL) + "):", Pattern.CASE_INSENSITIVE);
+
+  private static final int MAX_ECHO = 40;
 
   private final ConstantNameResolver heroResolver;
   private final SkillNameIndex skillIndex;
@@ -77,7 +78,11 @@ public class SkillsCommand implements DbuffCommand {
                 true));
   }
 
-  /** {@code ~skills skill:Storm Bolt with:Thunder Clap}: each known key starts a value. */
+  /**
+   * {@code ~skills skill:Storm Bolt with:Thunder Clap}: each known key starts a value. A key with
+   * nothing after it is kept as an empty value so validation can name it; text with no key at all
+   * is kept as {@link SkillsOptions#UNLABELLED}.
+   */
   @Override
   public Map<String, String> parseTextArguments(String alias, String subcommand, String arguments) {
     String text = ((subcommand == null ? "" : subcommand) + " " + arguments).strip();
@@ -86,37 +91,64 @@ public class SkillsCommand implements DbuffCommand {
     String key = null;
     int valueStart = 0;
     while (keys.find()) {
-      store(options, key, text.substring(valueStart, keys.start()));
+      String before = text.substring(valueStart, keys.start()).strip();
+      if (key == null && !before.isEmpty()) {
+        options.put(SkillsOptions.UNLABELLED, before);
+      } else if (key != null) {
+        options.put(key, before);
+      }
       key = keys.group(1).toLowerCase();
       valueStart = keys.end();
     }
-    store(options, key, text.substring(valueStart));
+    String last = text.substring(valueStart).strip();
+    if (key != null) {
+      options.put(key, last);
+    } else if (!last.isEmpty()) {
+      options.put(SkillsOptions.UNLABELLED, last);
+    }
     return options;
   }
 
   @Override
   public void execute(String subcommand, CommandContext context) {
-    String hero = value(context, SkillsOptions.HERO);
-    String skill = value(context, SkillsOptions.SKILL);
-    String with = value(context, SkillsOptions.WITH);
-
-    Optional<String> problem = problem(hero, skill, with);
+    Optional<String> problem = problem(context);
     if (problem.isPresent()) {
       context.replyEphemeral("❌ " + problem.get());
       return;
     }
+    String hero = value(context, SkillsOptions.HERO);
     if (hero != null) {
       answerHero(context, hero);
     } else {
-      answerSkills(context, skill, with);
+      answerSkills(
+          context, value(context, SkillsOptions.SKILL), value(context, SkillsOptions.WITH));
     }
   }
 
-  private Optional<String> problem(String hero, String skill, String with) {
+  private Optional<String> problem(CommandContext context) {
+    for (String option : SkillsOptions.ALL) {
+      String raw = context.getOption(option);
+      if (raw != null && raw.isBlank()) {
+        return Optional.of("`" + option + ":` has no name after it.");
+      }
+    }
+    String hero = value(context, SkillsOptions.HERO);
+    String skill = value(context, SkillsOptions.SKILL);
+    String with = value(context, SkillsOptions.WITH);
+    String loose = value(context, SkillsOptions.UNLABELLED);
     if (hero == null && skill == null && with == null) {
+      String loosely =
+          loose == null
+              ? ""
+              : "`"
+                  + safe(loose)
+                  + "` needs an option name in front: `hero:`, `skill:` or `with:`."
+                  + " ";
       return Optional.of(
-          "Name a hero or a skill, e.g. `/skills hero:Axe`, `/skills skill:Storm Bolt` or"
-              + " `/skills skill:Storm Bolt with:Thunder Clap`.");
+          loosely
+              + "Name a hero or a skill, e.g. `hero:Axe`, `skill:Storm Bolt` or"
+              + " `skill:Storm Bolt with:Thunder Clap` (after `/skills` or the text prefix and"
+              + " `skills`).");
     }
     if (hero != null && (skill != null || with != null)) {
       return Optional.of(
@@ -124,26 +156,57 @@ public class SkillsCommand implements DbuffCommand {
     }
     if (with != null && skill == null) {
       return Optional.of(
-          "`with:` needs `skill:` too, e.g. `/skills skill:Storm Bolt with:" + with + "`.");
+          "`with:` needs `skill:` too, e.g. `skill:Storm Bolt with:" + safe(with) + "`.");
     }
     return Optional.empty();
   }
 
   private void answerHero(CommandContext context, String heroInput) {
-    Optional<Long> heroId = resolveHero(heroInput);
-    if (heroId.isEmpty()) {
+    List<Long> heroes = skillIndex.heroes(heroInput);
+    if (heroes.isEmpty()) {
       context.replyEphemeral(unknown("hero", heroInput, heroResolver.suggestHero(heroInput)));
       return;
     }
-    String heroName = names.hero(heroId.get());
+    if (heroes.size() > 1) {
+      context.replyEphemeral(
+          "❌ `"
+              + safe(heroInput)
+              + "` matches several heroes: "
+              + String.join(", ", heroes.stream().map(names::hero).toList())
+              + ". Use the full hero name.");
+      return;
+    }
+    long heroId = heroes.get(0);
+    String heroName = names.hero(heroId);
     AsyncReply reply = acknowledge(context, heroName);
-    work(reply, heroName, () -> heroLines(heroId.get(), heroName));
+    work(reply, heroName, () -> heroLines(heroId, heroName));
+  }
+
+  private Optional<Long> pick(CommandContext context, String typed) {
+    List<Long> matches = skillIndex.resolve(typed);
+    if (matches.isEmpty()) {
+      context.replyEphemeral(unknown("skill", typed, skillIndex.suggest(typed)));
+      return Optional.empty();
+    }
+    if (matches.size() > 1) {
+      context.replyEphemeral(
+          "❌ `"
+              + safe(typed)
+              + "` is the name of several skills: "
+              + String.join(
+                  ", ",
+                  matches.stream()
+                      .map(id -> skillIndex.internalName(id).orElse("skill " + id))
+                      .toList())
+              + ". Type one of these exactly.");
+      return Optional.empty();
+    }
+    return Optional.of(matches.get(0));
   }
 
   private void answerSkills(CommandContext context, String skillInput, String withInput) {
-    Optional<Long> first = skillIndex.resolve(skillInput);
+    Optional<Long> first = pick(context, skillInput);
     if (first.isEmpty()) {
-      context.replyEphemeral(unknown("skill", skillInput, skillIndex.suggest(skillInput)));
       return;
     }
     if (withInput == null) {
@@ -152,9 +215,8 @@ public class SkillsCommand implements DbuffCommand {
       work(reply, title, () -> skillLines(first.get()));
       return;
     }
-    Optional<Long> second = skillIndex.resolve(withInput);
+    Optional<Long> second = pick(context, withInput);
     if (second.isEmpty()) {
-      context.replyEphemeral(unknown("skill", withInput, skillIndex.suggest(withInput)));
       return;
     }
     if (first.get().equals(second.get())) {
@@ -169,9 +231,18 @@ public class SkillsCommand implements DbuffCommand {
   private List<String> heroLines(long heroId, String heroName) {
     List<Long> skills = skillIndex.skillsOfHero(heroId);
     SkillAnswer answer = lookup.hero(heroId, skills);
-    if (answer.details().isEmpty()) {
+    if (answer.subject().getGames() == 0) {
+      return List.of(header(), describe(answer.subject()));
+    }
+    if (skills.isEmpty()) {
       return List.of(
           header(), describe(answer.subject()), "No skill list is known for " + heroName + ".");
+    }
+    if (answer.details().isEmpty()) {
+      return List.of(
+          header(),
+          describe(answer.subject()),
+          "None of the skills listed for " + heroName + " has a game on him.");
     }
     return List.of(
         header(),
@@ -211,7 +282,7 @@ public class SkillsCommand implements DbuffCommand {
       reply.post(String.join("\n", lines.get()));
     } catch (RuntimeException e) {
       log.warn("Skill statistics for {} failed", title, e);
-      reply.fail("⚠️ Could not fetch statistics for " + title + ": " + e.getMessage());
+      reply.fail("⚠️ Could not fetch statistics for " + title + ". Try again later.");
     }
   }
 
@@ -219,27 +290,26 @@ public class SkillsCommand implements DbuffCommand {
     return context.acknowledge("📊 " + title + " in Ability Draft…", title + " skills");
   }
 
-  private Optional<Long> resolveHero(String input) {
-    return heroResolver.resolveHeroes(Set.of(input)).resolvedIds().stream().findFirst();
-  }
-
   private static String unknown(String what, String typed, Optional<String> suggestion) {
     return "❌ No "
         + what
         + " called `"
-        + typed
+        + safe(typed)
         + "`."
-        + suggestion.map(name -> " Did you mean `" + name + "`?").orElse("");
+        + suggestion.map(name -> " Did you mean `" + safe(name) + "`?").orElse("");
+  }
+
+  /**
+   * Typed text shown back: backticks removed so it cannot break out of its code span, and a
+   * zero-width space after each @ so it cannot ping anyone; long input is cut.
+   */
+  private static String safe(String typed) {
+    String plain = typed.replace("`", "").replace("@", "@\u200b");
+    return plain.length() > MAX_ECHO ? plain.substring(0, MAX_ECHO) + "…" : plain;
   }
 
   private static String value(CommandContext context, String option) {
     String raw = context.getOption(option);
     return raw == null || raw.isBlank() ? null : raw.strip();
-  }
-
-  private static void store(Map<String, String> options, String key, String value) {
-    if (key != null && !value.isBlank()) {
-      options.put(key, value.strip());
-    }
   }
 }

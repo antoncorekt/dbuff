@@ -2,7 +2,6 @@ package com.ako.dbuff.service.discord.command.impl;
 
 import com.ako.dbuff.dao.model.SkillPickStatDomain;
 import com.ako.dbuff.service.constant.ConstantNameResolver;
-import com.ako.dbuff.service.constant.NameResolution;
 import com.ako.dbuff.service.discord.command.FakeCommandContext;
 import com.ako.dbuff.service.discord.command.SkillNameIndex;
 import com.ako.dbuff.service.discord.command.SkillsOptions;
@@ -15,7 +14,6 @@ import com.ako.dbuff.service.replay.analysis.skillstat.SkillStatWording;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,15 +52,17 @@ class SkillsCommandTest {
             new SkillStatWording(names),
             names,
             new SkillStatProperties());
-    Mockito.when(heroResolver.resolveHeroes(Set.of("Axe")))
-        .thenReturn(new NameResolution(Set.of(2L), Set.of()));
-    Mockito.when(heroResolver.resolveHeroes(Set.of("Axx")))
-        .thenReturn(new NameResolution(Set.of(), Set.of("Axx")));
+    Mockito.when(index.heroes("Axe")).thenReturn(List.of(2L));
+    Mockito.when(index.heroes("Axx")).thenReturn(List.of());
+    Mockito.when(index.heroes("Twin")).thenReturn(List.of(2L, 5L));
     Mockito.when(heroResolver.suggestHero("Axx")).thenReturn(Optional.of("Axe"));
-    Mockito.when(index.resolve("Storm Bolt")).thenReturn(Optional.of(1L));
-    Mockito.when(index.resolve("Thunder Clap")).thenReturn(Optional.of(3L));
-    Mockito.when(index.resolve("Storm Bolt ")).thenReturn(Optional.of(1L));
-    Mockito.when(index.resolve("Nothing")).thenReturn(Optional.empty());
+    Mockito.when(index.resolve("Storm Bolt")).thenReturn(List.of(1L));
+    Mockito.when(index.resolve("Thunder Clap")).thenReturn(List.of(3L));
+    Mockito.when(index.resolve("Storm Bolt ")).thenReturn(List.of(1L));
+    Mockito.when(index.resolve("Nothing")).thenReturn(List.of());
+    Mockito.when(index.resolve("Twin Skill")).thenReturn(List.of(7L, 8L));
+    Mockito.when(index.internalName(7L)).thenReturn(Optional.of("a_twin"));
+    Mockito.when(index.internalName(8L)).thenReturn(Optional.of("b_twin"));
     Mockito.when(index.suggest("Nothing")).thenReturn(Optional.empty());
   }
 
@@ -110,7 +110,7 @@ class SkillsCommandTest {
 
     command.execute(null, context);
 
-    assertRefused(context, "/skills hero:Axe", "/skills skill:Storm Bolt with:");
+    assertRefused(context, "hero:Axe", "skill:Storm Bolt with:");
   }
 
   @Test
@@ -196,16 +196,89 @@ class SkillsCommandTest {
   }
 
   @Test
-  void aHeroWithNoKnownSkillsStillShowsItsOwnRate() {
-    Mockito.when(index.skillsOfHero(2L)).thenReturn(List.of());
-    Mockito.when(lookup.hero(2L, List.of()))
+  void aHeroWithNoGamesIsOneLine() {
+    Mockito.when(index.skillsOfHero(2L)).thenReturn(List.of(1L));
+    Mockito.when(lookup.hero(2L, List.of(1L)))
         .thenReturn(new SkillAnswer(row(SkillStatKind.HERO, 2, null, 0, 0), List.of()));
     FakeCommandContext context = context("hero", "Axe");
 
     command.execute(null, context);
 
     assertThat(context.getPosts().get(0))
-        .contains("Axe: no games in the last 12 months", "No skill list is known for Axe.");
+        .isEqualTo("Ability Draft, the last 12 months\nAxe: no games in the last 12 months");
+  }
+
+  @Test
+  void aHeroWhoseSkillsHaveNoGamesSaysSo() {
+    Mockito.when(index.skillsOfHero(2L)).thenReturn(List.of(1L));
+    Mockito.when(lookup.hero(2L, List.of(1L)))
+        .thenReturn(new SkillAnswer(row(SkillStatKind.HERO, 2, null, 9, 4), List.of()));
+    FakeCommandContext context = context("hero", "Axe");
+
+    command.execute(null, context);
+
+    assertThat(context.getPosts().get(0)).contains("None of the skills listed for Axe");
+  }
+
+  @Test
+  void severalHeroesWithTheNameAreListedNotGuessed() {
+    FakeCommandContext context = context("hero", "Twin");
+
+    command.execute(null, context);
+
+    assertRefused(context, "matches several heroes", "Axe, Axe");
+  }
+
+  @Test
+  void severalSkillsWithTheNameAreListedByInternalName() {
+    FakeCommandContext context = context("skill", "Twin Skill");
+
+    command.execute(null, context);
+
+    assertRefused(context, "several skills", "a_twin, b_twin");
+  }
+
+  @Test
+  void typedTextIsEchoedWithoutBackticksOrMentions() {
+    FakeCommandContext context = context("hero", "`@everyone` x");
+    Mockito.when(index.heroes("`@everyone` x")).thenReturn(List.of());
+
+    command.execute(null, context);
+
+    String reply = context.getEphemeralReplies().get(0);
+    assertThat(reply).contains("No hero called `@\u200beveryone x`");
+    assertThat(reply).doesNotContain("@everyone");
+  }
+
+  @Test
+  void aKeyWithNoNameIsNamedInTheRefusal() {
+    FakeCommandContext context = context("skill", "", "with", "Thunder Clap");
+
+    command.execute(null, context);
+
+    assertRefused(context, "`skill:` has no name after it");
+  }
+
+  @Test
+  void loneTextTellsThatAnOptionNameIsNeeded() {
+    FakeCommandContext context = context("text", "Axe");
+
+    command.execute(null, context);
+
+    assertRefused(context, "`Axe` needs an option name in front");
+  }
+
+  @Test
+  void aHeroWithNoKnownSkillsStillShowsItsOwnRate() {
+    Mockito.when(index.skillsOfHero(2L)).thenReturn(List.of());
+    Mockito.when(lookup.hero(2L, List.of()))
+        .thenReturn(new SkillAnswer(row(SkillStatKind.HERO, 2, null, 5, 2), List.of()));
+    FakeCommandContext context = context("hero", "Axe");
+
+    command.execute(null, context);
+
+    assertThat(context.getPosts().get(0))
+        .contains("Axe: 40% in only 5 games", "No skill list is known for Axe.");
   }
 
   @Test
@@ -267,7 +340,11 @@ class SkillsCommandTest {
     command.execute(null, context);
 
     assertThat(context.getAcknowledgeSummary()).isNotNull();
-    assertThat(context.getFailures()).singleElement().asString().contains("db down");
+    assertThat(context.getFailures())
+        .singleElement()
+        .asString()
+        .contains("Try again later")
+        .doesNotContain("db down");
   }
 
   @Test
@@ -283,6 +360,8 @@ class SkillsCommandTest {
   @Test
   void textWithoutKnownKeysYieldsNoOptionsSoValidationExplains() {
     assertThat(command.parseTextArguments("skills", null, "")).isEmpty();
-    assertThat(command.parseTextArguments("skills", "Axe", "")).isEmpty();
+    assertThat(command.parseTextArguments("skills", "Axe", "")).isEqualTo(Map.of("text", "Axe"));
+    assertThat(command.parseTextArguments("skills", "skill:", "with:Thunder Clap"))
+        .isEqualTo(Map.of("skill", "", "with", "Thunder Clap"));
   }
 }

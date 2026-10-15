@@ -4,9 +4,9 @@ import com.ako.dbuff.service.discord.command.SkillNameIndex;
 import com.ako.dbuff.service.discord.command.SkillsOptions;
 import org.springframework.stereotype.Component;
 
-/** The second skill of {@code /skills skill:<a> with:<b>}: the same list as the first. */
+/** {@code /skills with:}, the second skill of a pair: the same list as the first. */
 @Component
-public class SkillWithAutocomplete extends SkillAutocomplete {
+public class SkillWithAutocomplete extends SkillPickerAutocomplete {
   public SkillWithAutocomplete(SkillNameIndex skills) {
     super(skills);
   }

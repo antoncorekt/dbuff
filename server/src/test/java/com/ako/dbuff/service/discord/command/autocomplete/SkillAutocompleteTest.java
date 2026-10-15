@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SkillAutocompleteTest {
   private final SkillNameIndex index = Mockito.mock(SkillNameIndex.class);
 
-  private SkillAutocomplete provider() {
+  private SkillPickerAutocomplete provider() {
     Map<String, String> skills = new LinkedHashMap<>();
     skills.put("Storm Bolt", "sven_storm_bolt");
     skills.put("Thunder Clap", "brewmaster_thunder_clap");
@@ -24,13 +24,21 @@ class SkillAutocompleteTest {
 
   @Test
   void servesTheSkillAndWithOptionsOfSkills() {
-    SkillAutocomplete skill = provider();
-    SkillAutocomplete with = new SkillWithAutocomplete(index);
+    SkillPickerAutocomplete skill = provider();
+    SkillPickerAutocomplete with = new SkillWithAutocomplete(index);
 
     assertThat(skill.getCommandNames()).containsExactly("skills");
     assertThat(skill.getOptionName()).isEqualTo("skill");
     assertThat(with.getCommandNames()).containsExactly("skills");
     assertThat(with.getOptionName()).isEqualTo("with");
+  }
+
+  @Test
+  void theTwoOptionsAreSeparateBeansOfOneAbstractBase() {
+    assertThat(SkillAutocomplete.class.getSuperclass()).isEqualTo(SkillPickerAutocomplete.class);
+    assertThat(SkillWithAutocomplete.class.getSuperclass())
+        .isEqualTo(SkillPickerAutocomplete.class);
+    assertThat(SkillAutocomplete.class.isAssignableFrom(SkillWithAutocomplete.class)).isFalse();
   }
 
   @Test
