@@ -12,6 +12,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -32,7 +33,7 @@ abstract class GraphSection implements ReplayReportSection {
 
   private final ChartService charts;
   private final PlainViewRenderer plain;
-  private final Cache<ReplayReportInput, Optional<SectionView>> views =
+  private final Cache<ReplayReportInput, List<SectionView>> views =
       Caffeine.newBuilder().weakKeys().maximumSize(DELIVERIES_KEPT).build();
 
   GraphSection(ChartService charts, PlainViewRenderer plain) {
@@ -49,6 +50,11 @@ abstract class GraphSection implements ReplayReportSection {
   }
 
   @Override
+  public boolean paged() {
+    return true;
+  }
+
+  @Override
   public List<String> lines(ReplayReportInput input) {
     return view(input).map(v -> plain.lines(v, true)).orElse(List.of());
   }
@@ -58,23 +64,47 @@ abstract class GraphSection implements ReplayReportSection {
     return view(input).map(SectionView::image);
   }
 
+  /** The first page; a section with several posts them through {@link #pages}. */
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
+    return pages(input).stream().findFirst();
+  }
+
+  @Override
+  public List<SectionView> pages(ReplayReportInput input) {
     return views.get(input, this::buildOrApologise);
   }
 
-  private Optional<SectionView> buildOrApologise(ReplayReportInput input) {
+  private List<SectionView> buildOrApologise(ReplayReportInput input) {
     try {
       return build(input);
     } catch (RuntimeException e) {
       log.warn("Graph section {} of match {} failed: {}", name(), input.matchId(), e.toString(), e);
-      return Optional.of(
+      return List.of(
           new SectionView(title(), null, Accent.NEUTRAL, List.of(NOT_DRAWN), null, null));
     }
   }
 
-  /** The section for one delivery; empty when the stored data has nothing to draw. */
-  protected abstract Optional<SectionView> build(ReplayReportInput input);
+  /** The pages of one delivery; empty when the stored data has nothing to draw. */
+  protected abstract List<SectionView> build(ReplayReportInput input);
+
+  /** One page for each chart, numbered when there are several. */
+  protected <C> List<SectionView> pagesOf(List<C> charts, PageBuilder<C> page) {
+    return IntStream.range(0, charts.size())
+        .mapToObj(i -> page.build(charts.get(i), i, charts.size()))
+        .toList();
+  }
+
+  /** Builds the page of one chart, knowing its place among {@code count}. */
+  @FunctionalInterface
+  protected interface PageBuilder<C> {
+    SectionView build(C chart, int index, int count);
+  }
+
+  /** The heading of page {@code index} of {@code count}: the title, with the page when several. */
+  protected String pageTitle(String title, int index, int count) {
+    return count <= 1 ? title : title + " (" + (index + 1) + "/" + count + ")";
+  }
 
   /** The section's view with the picture drawn from the spec, or with the apology when it fails. */
   protected SectionView view(

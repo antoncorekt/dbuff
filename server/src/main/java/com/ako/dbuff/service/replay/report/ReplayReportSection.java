@@ -57,6 +57,19 @@ public interface ReplayReportSection {
     return Optional.empty();
   }
 
+  /** Whether the section may post several views, one picture each; see {@link #pages}. */
+  default boolean paged() {
+    return false;
+  }
+
+  /**
+   * The views the section posts, in order; one view unless the section is {@link #paged}.
+   * Components posts every one, a plain report posts each as a message with its picture.
+   */
+  default List<SectionView> pages(ReplayReportInput input) {
+    return view(input).stream().toList();
+  }
+
   /**
    * The section as a view for the renderers. A section that has not moved to views shows its lines
    * as bullets of an INFO card; a leading {@code **Title**} line becomes the card's title.

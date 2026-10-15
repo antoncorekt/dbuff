@@ -79,8 +79,10 @@ public sealed interface ReportMessage {
           allImages);
     }
 
+    /** Two cards with a picture each never share a message, so each picture keeps its own post. */
     boolean fitsWith(Components next) {
-      return textLength + next.textLength <= MessageLimits.CARD_TEXT
+      return (images.isEmpty() || next.images.isEmpty())
+          && textLength + next.textLength <= MessageLimits.CARD_TEXT
           && componentCount + next.componentCount <= MessageLimits.CARD_COMPONENTS;
     }
   }

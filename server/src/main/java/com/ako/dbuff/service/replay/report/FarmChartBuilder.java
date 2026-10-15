@@ -60,21 +60,46 @@ public class FarmChartBuilder {
    */
   public record FarmChart(ChartSpec spec, String verdict, List<String> lines) {}
 
-  /** Empty when the match has neither creep kills nor farming items stored. */
+  /** The first picture only, with {@code maxHeroes} heroes. */
   public Optional<FarmChart> build(long matchId, Set<Long> focusSlots, int maxHeroes) {
+    return pages(matchId, focusSlots, maxHeroes, 1).stream().findFirst();
+  }
+
+  /**
+   * One chart for each {@code perImage} tracked heroes, at most {@code maxImages}; with none
+   * tracked that farmed, one chart of the top farmers. Empty when the match has neither creep kills
+   * nor farming items stored.
+   */
+  public List<FarmChart> pages(long matchId, Set<Long> focusSlots, int perImage, int maxImages) {
     Map<Long, String> names = heroNames.bySlot(matchId);
     Map<Long, List<ItemEfficiency>> items = farmingItems(matchId);
     Map<Long, HeroFarm> farms = farms(matchId);
     if (farms.isEmpty()) {
-      return noCreepKills(items, focusSlots, names, maxHeroes);
+      return noCreepKills(items, focusSlots, names, perImage).stream().toList();
     }
     Map<Long, List<PlayerActivitySegmentDomain>> segments = segments(matchId);
-    Chosen chosen = choose(farms, items, focusSlots, maxHeroes);
+    Chosen chosen = choose(farms, items, focusSlots, perImage, maxImages);
+    List<List<HeroFarm>> groups = HeroGroups.of(chosen.heroes(), perImage);
+    List<FarmChart> charts = new ArrayList<>();
+    for (int i = 0; i < groups.size(); i++) {
+      String hidden = i == groups.size() - 1 ? hiddenNote(chosen.hidden()) : null;
+      charts.add(chart(groups.get(i), i == 0 ? chosen.note() : "", hidden, items, names, segments));
+    }
+    return charts;
+  }
+
+  private FarmChart chart(
+      List<HeroFarm> heroes,
+      String note,
+      String hiddenNote,
+      Map<Long, List<ItemEfficiency>> items,
+      Map<Long, String> names,
+      Map<Long, List<PlayerActivitySegmentDomain>> segments) {
     List<String> sentences = new ArrayList<>();
     List<ChartSpec.Panel> panels = new ArrayList<>();
     Map<Long, List<ChartSpec.Marker>> markers = new HashMap<>();
     int minutes = 1;
-    for (HeroFarm farm : chosen.heroes()) {
+    for (HeroFarm farm : heroes) {
       List<ChartSpec.Marker> own = markers(items.getOrDefault(farm.slot(), List.of()));
       markers.put(farm.slot(), own);
       minutes = Math.max(minutes, farm.lane().length);
@@ -84,7 +109,7 @@ public class FarmChartBuilder {
     }
     minutes = Math.min(minutes, HeroFarm.MAX_MINUTES);
     Set<Color> used = new HashSet<>();
-    for (HeroFarm farm : chosen.heroes()) {
+    for (HeroFarm farm : heroes) {
       List<ItemEfficiency> heroItems = items.getOrDefault(farm.slot(), List.of());
       String name = name(names, farm.slot());
       sentences.add(sentence(name, farm, segments.getOrDefault(farm.slot(), List.of()), heroItems));
@@ -106,9 +131,11 @@ public class FarmChartBuilder {
     ChartSpec spec =
         new ChartSpec(
             "Farm gold per minute", minutes * MINUTE, panels, List.of(), List.of(), legend);
-    return Optional.of(
-        new FarmChart(
-            spec, chosen.note() + sentences.get(0), sentences.subList(1, sentences.size())));
+    List<String> lines = new ArrayList<>(sentences.subList(1, sentences.size()));
+    if (hiddenNote != null) {
+      lines.add(hiddenNote);
+    }
+    return new FarmChart(spec, note + sentences.get(0), lines);
   }
 
   private Optional<FarmChart> noCreepKills(
@@ -154,24 +181,33 @@ public class FarmChartBuilder {
   }
 
   /** The heroes to draw, and the words to put before the verdict when they are not the tracked. */
-  private record Chosen(List<HeroFarm> heroes, String note) {}
+  private record Chosen(List<HeroFarm> heroes, String note, int hidden) {}
+
+  private static String hiddenNote(int hidden) {
+    return hidden <= 0
+        ? null
+        : hidden == 1
+            ? "1 more tracked hero is not shown."
+            : hidden + " more tracked heroes are not shown.";
+  }
 
   private static Chosen choose(
       Map<Long, HeroFarm> farms,
       Map<Long, List<ItemEfficiency>> items,
       Set<Long> focusSlots,
-      int maxHeroes) {
-    int cap = Math.max(1, maxHeroes);
-    List<HeroFarm> tracked =
+      int perImage,
+      int maxImages) {
+    int size = Math.max(1, perImage);
+    List<HeroFarm> allTracked =
         Stream.concat(farms.keySet().stream(), items.keySet().stream())
             .distinct()
             .filter(s -> isTracked(focusSlots, s))
             .sorted()
             .map(s -> farms.getOrDefault(s, HeroFarm.none(s)))
-            .limit(cap)
             .toList();
-    if (!tracked.isEmpty()) {
-      return new Chosen(tracked, "");
+    if (!allTracked.isEmpty()) {
+      int shown = Math.min(allTracked.size(), size * Math.max(1, maxImages));
+      return new Chosen(allTracked.subList(0, shown), "", allTracked.size() - shown);
     }
     List<HeroFarm> top =
         farms.values().stream()
@@ -179,9 +215,9 @@ public class FarmChartBuilder {
                 Comparator.comparingDouble(HeroFarm::totalGold)
                     .reversed()
                     .thenComparingLong(HeroFarm::slot))
-            .limit(cap)
+            .limit(size)
             .toList();
-    return new Chosen(top, FallbackNote.of(focusSlots, "farmed", "the top farmers"));
+    return new Chosen(top, FallbackNote.of(focusSlots, "farmed", "the top farmers"), 0);
   }
 
   private Map<Long, List<PlayerActivitySegmentDomain>> segments(long matchId) {
