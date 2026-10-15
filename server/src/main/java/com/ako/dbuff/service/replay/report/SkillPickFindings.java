@@ -28,6 +28,39 @@ import org.springframework.stereotype.Component;
 public class SkillPickFindings {
   private static final double EVEN = 0.5;
 
+  /** A skill that did at least this many times the damage is a clear miss whatever the fights. */
+  static final double CLEAR_RATIO = 1.5;
+
+  /** Greatest is the best missed pick: a clear damage gap, then won fights, then the ratio. */
+  static final Comparator<MissedPickDomain> MISSED_ORDER =
+      Comparator.comparing(
+              (MissedPickDomain m) -> m.getRatio() != null && m.getRatio() >= CLEAR_RATIO)
+          .thenComparing(m -> orZero(m.getCandidateWonFights()))
+          .thenComparing(m -> m.getRatio() == null ? 0 : m.getRatio())
+          .thenComparing(
+              MissedPickDomain::getTakenTurn, Comparator.nullsLast(Comparator.reverseOrder()))
+          .thenComparing(
+              MissedPickDomain::getCandidateAbility,
+              Comparator.nullsLast(Comparator.<String>naturalOrder()));
+
+  private static final Comparator<BuildFitDomain> BUILD_ORDER =
+      Comparator.comparing(
+              BuildFitDomain::getStage, Comparator.nullsLast(Comparator.<String>naturalOrder()))
+          .thenComparing(
+              BuildFitDomain::getId, Comparator.nullsLast(Comparator.<Long>naturalOrder()));
+
+  private static final Comparator<SkillPickStatDomain> STAT_ORDER =
+      Comparator.comparingDouble(SkillPickFindings::statStrength)
+          .reversed()
+          .thenComparing(Comparator.comparing(SkillPickStatDomain::getGames).reversed())
+          .thenComparing(SkillPickStatDomain::getKind)
+          .thenComparing(
+              SkillPickStatDomain::getFirstId,
+              Comparator.nullsLast(Comparator.<Long>naturalOrder()))
+          .thenComparing(
+              SkillPickStatDomain::getSecondId,
+              Comparator.nullsLast(Comparator.<Long>naturalOrder()));
+
   private final SkillPickStatRepo statRepo;
   private final BuildFitRepo buildRepo;
   private final MissedPickRepo missedRepo;
@@ -48,16 +81,17 @@ public class SkillPickFindings {
       List<Finding> own = new ArrayList<>();
       missed.stream()
           .filter(m -> Objects.equals(m.getPlayerSlot(), slot))
-          .max(Comparator.comparingDouble(SkillPickFindings::missedStrength))
+          .max(MISSED_ORDER)
           .ifPresent(
               m -> own.add(finding(FindingKind.MISSED, who, MissedPickWording.line(m, labels))));
       builds.stream()
           .filter(b -> Objects.equals(b.getPlayerSlot(), slot) && stated(b))
-          .findFirst()
+          .min(BUILD_ORDER)
           .ifPresent(b -> own.add(finding(FindingKind.BUILD, who, b.getEvidence().strip())));
       stats.stream()
           .filter(s -> Objects.equals(s.getPlayerSlot(), slot) && s.getGames() > 0)
-          .sorted(Comparator.comparingDouble(SkillPickFindings::statStrength).reversed())
+          .filter(s -> statStrength(s) > 0)
+          .sorted(STAT_ORDER)
           .limit(Math.max(0, limit - own.size()))
           .forEach(s -> own.add(finding(FindingKind.PICK, who, statWording.describe(s))));
       findings.addAll(own.subList(0, Math.min(limit, own.size())));
@@ -94,8 +128,8 @@ public class SkillPickFindings {
     return Math.max(strong, weak);
   }
 
-  private static double missedStrength(MissedPickDomain row) {
-    return row.getRatio() == null ? 0 : row.getRatio();
+  private static int orZero(Integer value) {
+    return value == null ? 0 : value;
   }
 
   private static <T> List<T> nonNull(List<T> rows) {

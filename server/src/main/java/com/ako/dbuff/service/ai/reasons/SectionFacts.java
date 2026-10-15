@@ -38,11 +38,13 @@ class SectionFacts {
           Map.entry("mid-activity", FactKind.MID),
           Map.entry("skill-picks", FactKind.PICK));
 
-  private static final Map<FindingKind, FactKind> FINDING_KINDS =
-      Map.of(
-          FindingKind.PICK, FactKind.PICK,
-          FindingKind.BUILD, FactKind.BUILD,
-          FindingKind.MISSED, FactKind.MISSED);
+  private static FactKind factKind(FindingKind kind) {
+    return switch (kind) {
+      case PICK -> FactKind.PICK;
+      case BUILD -> FactKind.BUILD;
+      case MISSED -> FactKind.MISSED;
+    };
+  }
 
   private final ObjectProvider<ReplayReportSection> sections;
   private final IconService icons;
@@ -63,9 +65,8 @@ class SectionFacts {
   }
 
   private List<Fact> factsOf(ReplayReportSection section, FactKind kind, ReplayReportInput input) {
-    List<Finding> findings;
     try {
-      findings = icons.withoutIcons(() -> findings(section, input));
+      return icons.withoutIcons(() -> facts(section, kind, input));
     } catch (RuntimeException e) {
       log.warn(
           "Section {} of match {} left out of the AI facts: {}",
@@ -74,12 +75,16 @@ class SectionFacts {
           e.getMessage());
       return List.of();
     }
+  }
+
+  private static List<Fact> facts(
+      ReplayReportSection section, FactKind kind, ReplayReportInput input) {
     Map<FactKind, Integer> counts = new EnumMap<>(FactKind.class);
     List<Fact> facts = new ArrayList<>();
-    for (Finding finding : findings) {
+    for (Finding finding : findings(section, input)) {
       String plain = plain(finding.text());
       if (!plain.isEmpty()) {
-        FactKind own = finding.kind() == null ? kind : FINDING_KINDS.get(finding.kind());
+        FactKind own = finding.kind() == null ? kind : factKind(finding.kind());
         int number = counts.merge(own, 1, Integer::sum);
         facts.add(new Fact(own.id(number), own, plain));
       }

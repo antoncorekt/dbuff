@@ -129,7 +129,7 @@ class SkillPicksSectionTest {
             List.of(
                 stat(SkillStatKind.HERO, 1, 40, 30),
                 stat(SkillStatKind.SKILL, 1, 2, 1),
-                stat(SkillStatKind.SKILL, 2, 3, 3)));
+                stat(SkillStatKind.SKILL, 2, 4, 4)));
 
     List<Finding> findings = section.findings(input(3, 0L));
 
@@ -148,14 +148,14 @@ class SkillPicksSectionTest {
     when(statRepo.findByMatchId(1L))
         .thenReturn(
             List.of(
-                stat(SkillStatKind.SKILL, 2, 2, 2),
+                stat(SkillStatKind.SKILL, 2, 5, 5),
                 stat(SkillStatKind.HERO, 1, 40, 30),
                 stat(SkillStatKind.SKILL, 1, 1, 1)));
 
     assertThat(section.lines(input(2, 0L)))
         .containsExactly(
             "Anton (Pudge): Pudge: 75% in 40 games",
-            "Anton (Pudge): Thunder Clap: 100% in only 2 games");
+            "Anton (Pudge): Thunder Clap: 100% in only 5 games");
   }
 
   @Test
@@ -200,5 +200,65 @@ class SkillPicksSectionTest {
       properties.setMaxSkillPickLineLength(bad);
       assertThatThrownBy(properties::validate).hasMessageContaining("max-skill-pick-line-length");
     }
+  }
+
+  @Test
+  void rowsCloseToACoinFlipAreDroppedInsteadOfFillingTheSlots() {
+    when(statRepo.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                stat(SkillStatKind.SKILL, 1, 2, 1),
+                stat(SkillStatKind.SKILL, 2, 1, 1),
+                stat(SkillStatKind.HERO, 1, 10, 5)));
+
+    assertThat(section.lines(input(3, 0L))).isEmpty();
+  }
+
+  @Test
+  void aNameWithoutAKnownHeroIsPrintedAlone() {
+    when(heroNames.iconBySlot(1L)).thenReturn(Map.of());
+    when(missedRepo.findByMatchId(1L)).thenReturn(List.of(missed(0, 1.38)));
+    MatchDomain match = MatchDomain.builder().id(1L).gameModeId(18L).build();
+
+    assertThat(section.lines(new ReplayReportInput(1L, match, Set.of(0L), Map.of(0L, "Anton"), 3)))
+        .singleElement()
+        .satisfies(l -> assertThat(l).startsWith("Anton: The enemy").doesNotContain("null"));
+  }
+
+  @Test
+  void theBuildRowIsChosenByStageThenId() {
+    BuildFitDomain intent = build("ESCAPE", "Drafted as carry: Pudge had no escape.");
+    intent.setStage("INTENT");
+    intent.setId(9L);
+    BuildFitDomain played = build("ESCAPE", "Played mid: Pudge had no farming skill.");
+    played.setStage("FINAL");
+    played.setId(1L);
+    when(buildRepo.findByMatchId(1L)).thenReturn(List.of(played, intent));
+
+    assertThat(section.lines(input(3, 0L)))
+        .containsExactly("Anton (Pudge): Played mid: Pudge had no farming skill.");
+  }
+
+  @Test
+  void aClearDamageGapBeatsFightsAndOtherwiseMoreWonFightsWin() {
+    MissedPickDomain clear = missed(0, 1.6);
+    clear.setCandidateWonFights(1);
+    MissedPickDomain fights = missed(0, 0);
+    fights.setRatio(null);
+    fights.setBasis("FIGHTS");
+    fights.setCandidateWonFights(4);
+    MissedPickDomain modest = missed(0, 1.2);
+    modest.setCandidateWonFights(2);
+
+    assertThat(
+            java.util.stream.Stream.of(fights, modest, clear).max(SkillPickFindings.MISSED_ORDER))
+        .containsSame(clear);
+    assertThat(java.util.stream.Stream.of(modest, fights).max(SkillPickFindings.MISSED_ORDER))
+        .containsSame(fights);
+    MissedPickDomain twin = missed(0, 1.2);
+    twin.setCandidateWonFights(2);
+    twin.setTakenTurn(5);
+    assertThat(java.util.stream.Stream.of(modest, twin).max(SkillPickFindings.MISSED_ORDER))
+        .containsSame(twin);
   }
 }
