@@ -966,6 +966,71 @@ class ReplayReportServiceTest {
     };
   }
 
+  private static ReplayReportSection pagedGraph(String name, int pages) {
+    return new ReplaySection() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public boolean paged() {
+        return true;
+      }
+
+      @Override
+      public List<String> lines(ReplayReportInput input) {
+        return List.of("**" + name + "**", "page 1");
+      }
+
+      @Override
+      public List<SectionView> pages(ReplayReportInput input) {
+        return java.util.stream.IntStream.rangeClosed(1, pages)
+            .mapToObj(
+                n ->
+                    new SectionView(
+                        name + " (" + n + "/" + pages + ")",
+                        "verdict " + n,
+                        Accent.NEUTRAL,
+                        List.of(),
+                        null,
+                        new ImageAttachment(name + "-" + n + ".png", new byte[] {1})))
+            .toList();
+      }
+    };
+  }
+
+  @Test
+  void deliverSection_plainFormatPostsEachPageOfAGraphAsItsOwnMessageWithItsPicture() {
+    storedRun(ReplayStatus.DONE);
+    service = serviceWith(pagedGraph("graph", 3));
+
+    assertThat(service.deliverSection(1L, "i1", "graph")).isEqualTo(ReportDelivery.POSTED);
+
+    ArgumentCaptor<List<FileUpload>> files = ArgumentCaptor.forClass(List.class);
+    verify(discord, Mockito.times(3))
+        .sendThreadMessageBlocking(Mockito.eq(thread), Mockito.anyString(), files.capture());
+    assertThat(files.getAllValues())
+        .extracting(f -> f.getFirst().getName())
+        .containsExactly("graph-1.png", "graph-2.png", "graph-3.png");
+  }
+
+  @Test
+  void deliverSection_componentsFormatPostsEachPageOfAGraphAsItsOwnMessage() {
+    storedRun(ReplayStatus.DONE);
+    properties.setFormat(ReportFormat.COMPONENTS);
+    service = serviceWith(pagedGraph("graph", 3));
+
+    assertThat(service.deliverSection(1L, "i1", "graph")).isEqualTo(ReportDelivery.POSTED);
+
+    ArgumentCaptor<List<FileUpload>> files = ArgumentCaptor.forClass(List.class);
+    verify(discord, Mockito.times(3))
+        .sendThreadComponentsBlocking(Mockito.eq(thread), any(), files.capture());
+    assertThat(files.getAllValues())
+        .extracting(f -> f.getFirst().getName())
+        .containsExactly("graph-1.png", "graph-2.png", "graph-3.png");
+  }
+
   @Test
   void deliverSection_plainFormatPostsTheTextWithTheImageAsAFile() {
     storedRun(ReplayStatus.DONE);

@@ -40,7 +40,8 @@ class GraphIncomeSectionTest {
   }
 
   private void builds(Optional<IncomeChart> chart) {
-    when(builder.build(anyLong(), any(), anyInt(), anyInt(), anyInt())).thenReturn(chart);
+    when(builder.pages(anyLong(), any(), anyInt(), anyInt(), anyInt(), anyInt()))
+        .thenReturn(chart.map(List::of).orElse(List.of()));
   }
 
   @Test
@@ -49,7 +50,8 @@ class GraphIncomeSectionTest {
     assertThat(section.defaultEnabled()).isFalse();
     assertThat(section.minimumDetail()).isEqualTo(ReportDetail.STANDARD);
     assertThat(new SectionSwitch(properties, List.of(section)).isEnabled(section)).isFalse();
-    assertThat(properties.getGraphIncomeMaxHeroes()).isEqualTo(2);
+    assertThat(properties.getGraphHeroesPerImage()).isEqualTo(2);
+    assertThat(properties.getGraphMaxImages()).isEqualTo(5);
   }
 
   @Test
@@ -59,14 +61,15 @@ class GraphIncomeSectionTest {
 
     SectionView view = section.view(input).orElseThrow();
 
-    assertThat(view.image().name()).isEqualTo("income-7.png");
+    assertThat(view.image().name()).isEqualTo("income-7-1.png");
     assertThat(view.verdict()).isEqualTo("Biggest income drop: Axe.");
     assertThat(section.lines(input))
         .containsExactly(
             "**Hero income**",
             "Biggest income drop: Axe.",
             "Axe's Hand of Midas paid for itself at 10:00.");
-    verify(builder, times(1)).build(7L, Set.of(0L), 2, 3, properties.getMaxBehaviourLineLength());
+    verify(builder, times(1))
+        .pages(7L, Set.of(0L), 2, 5, 3, properties.getMaxBehaviourLineLength());
   }
 
   @Test
@@ -107,16 +110,16 @@ class GraphIncomeSectionTest {
 
   @Test
   void aBuilderThatFailsGivesTheApologyForThatDeliveryAndIsRetriedForTheNext() {
-    when(builder.build(anyLong(), any(), anyInt(), anyInt(), anyInt()))
+    when(builder.pages(anyLong(), any(), anyInt(), anyInt(), anyInt(), anyInt()))
         .thenThrow(new IllegalStateException("bad row"));
 
     assertThat(section.lines(input)).containsExactly("**Hero income**", GraphSection.NOT_DRAWN);
     assertThat(section.image(input)).isEmpty();
-    verify(builder, times(1)).build(anyLong(), any(), anyInt(), anyInt(), anyInt());
+    verify(builder, times(1)).pages(anyLong(), any(), anyInt(), anyInt(), anyInt(), anyInt());
 
-    org.mockito.Mockito.doReturn(Optional.of(chart(60)))
+    org.mockito.Mockito.doReturn(List.of(chart(60)))
         .when(builder)
-        .build(anyLong(), any(), anyInt(), anyInt(), anyInt());
+        .pages(anyLong(), any(), anyInt(), anyInt(), anyInt(), anyInt());
     when(charts.png(anyString(), any())).thenReturn(Optional.of(new byte[] {9}));
     ReplayReportInput next = new ReplayReportInput(7L, null, Set.of(0L), Map.of(), 3);
 

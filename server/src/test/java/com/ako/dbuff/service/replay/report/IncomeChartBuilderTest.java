@@ -151,6 +151,35 @@ class IncomeChartBuilderTest {
 
   @Test
   @SuppressWarnings("unchecked")
+  void drawsEveryTrackedHeroTwoToAPictureAndNamesTheOnesPastTheImageCap() {
+    timeline(
+        gold(0, steady(10, 500)),
+        gold(1, steady(10, 600)),
+        gold(2, steady(10, 700)),
+        gold(3, steady(10, 800)),
+        gold(4, steady(10, 900)));
+    Set<Long> all = Set.of(0L, 1L, 2L, 3L, 4L);
+
+    List<IncomeChart> five = builder.pages(MATCH, all, 2, 5, 3, LINE);
+    List<IncomeChart> capped = builder.pages(MATCH, all, 2, 2, 3, LINE);
+
+    assertThat(five).extracting(c -> c.spec().panels().size()).containsExactly(2, 2, 1);
+    assertThat(five).allSatisfy(c -> assertThat(c.bullets()).isEmpty());
+    assertThat(capped).hasSize(2);
+    assertThat(capped.getFirst().bullets()).isEmpty();
+    assertThat(capped.getLast().bullets()).containsExactly("1 more tracked hero is not shown.");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void withNobodyTrackedTheRichestHeroesFillOnlyOnePicture() {
+    timeline(gold(0, steady(10, 500)), gold(1, steady(10, 600)), gold(2, steady(10, 700)));
+
+    assertThat(builder.pages(MATCH, Set.of(), 2, 5, 3, LINE)).hasSize(1);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
   void trackedHeroesWithoutIncomeData_saysThatTheRichestHeroesAreShown() {
     timeline(gold(0, 500, 500), gold(128, steady(10, 2000)));
 

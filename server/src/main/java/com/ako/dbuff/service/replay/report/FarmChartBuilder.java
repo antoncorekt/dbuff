@@ -60,21 +60,47 @@ public class FarmChartBuilder {
    */
   public record FarmChart(ChartSpec spec, String verdict, List<String> lines) {}
 
-  /** Empty when the match has neither creep kills nor farming items stored. */
+  /** The first picture only, with {@code maxHeroes} heroes. */
   public Optional<FarmChart> build(long matchId, Set<Long> focusSlots, int maxHeroes) {
+    return pages(matchId, focusSlots, maxHeroes, 1).stream().findFirst();
+  }
+
+  /**
+   * One chart for each {@code perImage} tracked heroes, at most {@code maxImages}; with none
+   * tracked that farmed, one chart of the top farmers. Empty when the match has neither creep kills
+   * nor farming items stored.
+   */
+  public List<FarmChart> pages(long matchId, Set<Long> focusSlots, int perImage, int maxImages) {
     Map<Long, String> names = heroNames.bySlot(matchId);
     Map<Long, List<ItemEfficiency>> items = farmingItems(matchId);
     Map<Long, HeroFarm> farms = farms(matchId);
     if (farms.isEmpty()) {
-      return noCreepKills(items, focusSlots, names, maxHeroes);
+      return noCreepKills(items, focusSlots, names, perImage * Math.max(1, maxImages)).stream()
+          .toList();
     }
     Map<Long, List<PlayerActivitySegmentDomain>> segments = segments(matchId);
-    Chosen chosen = choose(farms, items, focusSlots, maxHeroes);
+    Chosen chosen = choose(farms, items, focusSlots, perImage, maxImages);
+    int size = Math.max(1, perImage);
+    List<FarmChart> charts = new ArrayList<>();
+    for (int from = 0; from < chosen.heroes().size(); from += size) {
+      List<HeroFarm> group =
+          chosen.heroes().subList(from, Math.min(chosen.heroes().size(), from + size));
+      charts.add(chart(group, from == 0 ? chosen.note() : "", items, names, segments));
+    }
+    return charts;
+  }
+
+  private FarmChart chart(
+      List<HeroFarm> heroes,
+      String note,
+      Map<Long, List<ItemEfficiency>> items,
+      Map<Long, String> names,
+      Map<Long, List<PlayerActivitySegmentDomain>> segments) {
     List<String> sentences = new ArrayList<>();
     List<ChartSpec.Panel> panels = new ArrayList<>();
     Map<Long, List<ChartSpec.Marker>> markers = new HashMap<>();
     int minutes = 1;
-    for (HeroFarm farm : chosen.heroes()) {
+    for (HeroFarm farm : heroes) {
       List<ChartSpec.Marker> own = markers(items.getOrDefault(farm.slot(), List.of()));
       markers.put(farm.slot(), own);
       minutes = Math.max(minutes, farm.lane().length);
@@ -84,7 +110,7 @@ public class FarmChartBuilder {
     }
     minutes = Math.min(minutes, HeroFarm.MAX_MINUTES);
     Set<Color> used = new HashSet<>();
-    for (HeroFarm farm : chosen.heroes()) {
+    for (HeroFarm farm : heroes) {
       List<ItemEfficiency> heroItems = items.getOrDefault(farm.slot(), List.of());
       String name = name(names, farm.slot());
       sentences.add(sentence(name, farm, segments.getOrDefault(farm.slot(), List.of()), heroItems));
@@ -106,9 +132,7 @@ public class FarmChartBuilder {
     ChartSpec spec =
         new ChartSpec(
             "Farm gold per minute", minutes * MINUTE, panels, List.of(), List.of(), legend);
-    return Optional.of(
-        new FarmChart(
-            spec, chosen.note() + sentences.get(0), sentences.subList(1, sentences.size())));
+    return new FarmChart(spec, note + sentences.get(0), sentences.subList(1, sentences.size()));
   }
 
   private Optional<FarmChart> noCreepKills(
@@ -160,15 +184,16 @@ public class FarmChartBuilder {
       Map<Long, HeroFarm> farms,
       Map<Long, List<ItemEfficiency>> items,
       Set<Long> focusSlots,
-      int maxHeroes) {
-    int cap = Math.max(1, maxHeroes);
+      int perImage,
+      int maxImages) {
+    int size = Math.max(1, perImage);
     List<HeroFarm> tracked =
         Stream.concat(farms.keySet().stream(), items.keySet().stream())
             .distinct()
             .filter(s -> isTracked(focusSlots, s))
             .sorted()
             .map(s -> farms.getOrDefault(s, HeroFarm.none(s)))
-            .limit(cap)
+            .limit((long) size * Math.max(1, maxImages))
             .toList();
     if (!tracked.isEmpty()) {
       return new Chosen(tracked, "");
@@ -179,7 +204,7 @@ public class FarmChartBuilder {
                 Comparator.comparingDouble(HeroFarm::totalGold)
                     .reversed()
                     .thenComparingLong(HeroFarm::slot))
-            .limit(cap)
+            .limit(size)
             .toList();
     return new Chosen(top, FallbackNote.of(focusSlots, "farmed", "the top farmers"));
   }

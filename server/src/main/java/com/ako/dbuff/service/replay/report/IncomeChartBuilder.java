@@ -43,19 +43,63 @@ public class IncomeChartBuilder {
   /** The chart and what it says: the biggest fall first, then one line per fall and per Midas. */
   public record IncomeChart(ChartSpec spec, String verdict, List<String> bullets) {}
 
-  /** Empty when no hero has enough stored minutes of gold to draw. */
+  /** The first picture only, with {@code maxHeroes} heroes; empty when there is no gold to draw. */
   public Optional<IncomeChart> build(
       long matchId, Set<Long> focusSlots, int maxHeroes, int maxFindings, int lineLength) {
+    return pages(matchId, focusSlots, maxHeroes, 1, maxFindings, lineLength).stream().findFirst();
+  }
+
+  /**
+   * One chart for each {@code perImage} heroes of the tracked heroes, richest first, at most {@code
+   * maxImages}; with no tracked hero that has data, one chart of the richest heroes. Empty when no
+   * hero has enough stored minutes of gold to draw.
+   */
+  public List<IncomeChart> pages(
+      long matchId,
+      Set<Long> focusSlots,
+      int perImage,
+      int maxImages,
+      int maxFindings,
+      int lineLength) {
     Map<Long, TreeMap<Integer, Long>> gold = goldBySlot(matchId);
     Set<Long> focus = focusSlots == null ? Set.of() : focusSlots;
-    Choice choice = chosen(gold, focus, maxHeroes);
-    List<Long> slots = choice.slots();
-    if (slots.isEmpty()) {
-      return Optional.empty();
+    Choice choice = chosen(gold, focus, perImage, maxImages);
+    if (choice.slots().isEmpty()) {
+      return List.of();
     }
     Map<Long, String> heroes = heroNames.bySlot(matchId);
     IncomeReasons.Explainer why = reasons.read(matchId, heroes);
     IncomePins.Events events = pins.read(matchId);
+    int size = Math.max(1, perImage);
+    List<IncomeChart> charts = new ArrayList<>();
+    for (int from = 0; from < choice.slots().size(); from += size) {
+      List<Long> slots = choice.slots().subList(from, Math.min(choice.slots().size(), from + size));
+      boolean last = from + size >= choice.slots().size();
+      charts.add(
+          chart(
+              slots,
+              gold,
+              heroes,
+              why,
+              events,
+              from == 0 ? choice.note() : "",
+              last ? choice.hidden() : 0,
+              maxFindings,
+              lineLength));
+    }
+    return charts;
+  }
+
+  private IncomeChart chart(
+      List<Long> slots,
+      Map<Long, TreeMap<Integer, Long>> gold,
+      Map<Long, String> heroes,
+      IncomeReasons.Explainer why,
+      IncomePins.Events events,
+      String note,
+      int hiddenHeroes,
+      int maxFindings,
+      int lineLength) {
     List<ChartSpec.Panel> panels = new ArrayList<>();
     List<Pin> allPins = new ArrayList<>();
     List<Found> found = new ArrayList<>();
@@ -79,7 +123,7 @@ public class IncomeChartBuilder {
     List<String> lines = new ArrayList<>();
     midas.forEach(m -> lines.add(finish(m, lineLength)));
     worst.stream().skip(1).forEach(f -> lines.add(finish(line(f, heroes), lineLength)));
-    String hidden = hiddenNote(choice.hidden());
+    String hidden = hiddenNote(hiddenHeroes);
     int room = Math.max(0, maxFindings - (hidden == null ? 0 : 1));
     List<String> bullets = new ArrayList<>(lines.stream().limit(room).toList());
     if (hidden != null) {
@@ -87,8 +131,7 @@ public class IncomeChartBuilder {
     }
     ChartSpec spec =
         new ChartSpec("Hero income", end, panels, List.of(), List.of(), legend(found, allPins));
-    return Optional.of(
-        new IncomeChart(spec, choice.note() + finish(verdict(worst, heroes), lineLength), bullets));
+    return new IncomeChart(spec, note + finish(verdict(worst, heroes), lineLength), bullets);
   }
 
   private static List<Dip> biggest(List<Dip> dips) {
@@ -208,8 +251,12 @@ public class IncomeChartBuilder {
     return gold;
   }
 
-  /** The tracked heroes with enough data, else the richest heroes; the richest first. */
-  private static Choice chosen(Map<Long, TreeMap<Integer, Long>> gold, Set<Long> focus, int max) {
+  /**
+   * The tracked heroes with enough data, else the richest heroes; the richest first. The tracked
+   * fill up to {@code maxImages} pictures; the richest fallback fills one.
+   */
+  private static Choice chosen(
+      Map<Long, TreeMap<Integer, Long>> gold, Set<Long> focus, int perImage, int maxImages) {
     Comparator<Long> richest =
         Comparator.comparingLong((Long s) -> gold.get(s).lastEntry().getValue()).reversed();
     List<Long> drawable =
@@ -217,7 +264,8 @@ public class IncomeChartBuilder {
     List<Long> tracked = drawable.stream().filter(focus::contains).sorted(richest).toList();
     boolean followTracked = !tracked.isEmpty();
     List<Long> pool = followTracked ? tracked : drawable.stream().sorted(richest).toList();
-    int shown = Math.min(pool.size(), Math.max(1, max));
+    int size = Math.max(1, perImage);
+    int shown = Math.min(pool.size(), size * (followTracked ? Math.max(1, maxImages) : 1));
     return new Choice(
         pool.subList(0, shown),
         followTracked ? pool.size() - shown : 0,

@@ -6,7 +6,7 @@ import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
-import java.util.Optional;
+import java.util.stream.IntStream;
 import org.springframework.stereotype.Component;
 
 /**
@@ -48,18 +48,31 @@ public class GraphFarmSection extends GraphSection {
   }
 
   @Override
-  protected Optional<SectionView> build(ReplayReportInput input) {
-    return builder
-        .build(input.matchId(), input.focusSlots(), properties.getGraphFarmMaxHeroes())
-        .map(chart -> view(input.matchId(), chart));
+  protected List<SectionView> build(ReplayReportInput input) {
+    List<FarmChart> charts =
+        builder.pages(
+            input.matchId(),
+            input.focusSlots(),
+            properties.getGraphHeroesPerImage(),
+            properties.getGraphMaxImages());
+    return IntStream.range(0, charts.size())
+        .mapToObj(i -> view(input.matchId(), charts.get(i), i, charts.size()))
+        .toList();
   }
 
-  private SectionView view(long matchId, FarmChart chart) {
+  private SectionView view(long matchId, FarmChart chart, int index, int count) {
+    String title = pageTitle(TITLE, index, count);
     String verdict = LineText.cut(chart.verdict(), MAX_LINE_LENGTH);
     List<String> lines = chart.lines().stream().map(l -> LineText.cut(l, MAX_LINE_LENGTH)).toList();
     if (chart.spec() == null) {
-      return new SectionView(TITLE, verdict, Accent.NEUTRAL, lines, null, null);
+      return new SectionView(title, verdict, Accent.NEUTRAL, lines, null, null);
     }
-    return view(TITLE, verdict, lines, "farm:" + matchId, "farm-" + matchId + ".png", chart.spec());
+    return view(
+        title,
+        verdict,
+        lines,
+        "farm:" + matchId + ":" + index,
+        "farm-" + matchId + "-" + (index + 1) + ".png",
+        chart.spec());
   }
 }

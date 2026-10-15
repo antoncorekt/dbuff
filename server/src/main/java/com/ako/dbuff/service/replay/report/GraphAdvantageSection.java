@@ -6,7 +6,6 @@ import com.ako.dbuff.service.replay.report.chart.ChartService;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
-import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 /**
@@ -39,11 +38,13 @@ public class GraphAdvantageSection extends GraphSection {
   }
 
   @Override
-  protected Optional<SectionView> build(ReplayReportInput input) {
+  protected List<SectionView> build(ReplayReportInput input) {
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     return builder
         .build(input.matchId(), yours, input.maxFindings())
-        .map(chart -> view(input.matchId(), yours, chart));
+        .map(chart -> view(input.matchId(), yours, chart))
+        .stream()
+        .toList();
   }
 
   private SectionView view(long matchId, TeamSide yours, AdvantageChart chart) {

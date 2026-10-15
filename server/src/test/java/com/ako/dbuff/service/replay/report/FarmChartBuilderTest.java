@@ -96,6 +96,23 @@ class FarmChartBuilderTest {
   }
 
   @Test
+  void drawsEveryTrackedHeroTwoToAPictureUpToTheImageCap() {
+    List<CreepKillDomain> rows = new ArrayList<>();
+    for (long slot = 0; slot < 5; slot++) {
+      rows.addAll(jungleHero(slot));
+    }
+    kills(rows.toArray(CreepKillDomain[]::new));
+    when(items.findByMatchId(1L)).thenReturn(List.of());
+    Set<Long> all = Set.of(0L, 1L, 2L, 3L, 4L);
+
+    List<FarmChart> five = builder.pages(1L, all, 2, 5);
+    List<FarmChart> capped = builder.pages(1L, all, 2, 2);
+
+    assertThat(five).extracting(c -> c.spec().panels().size()).containsExactly(2, 2, 1);
+    assertThat(capped).hasSize(2);
+  }
+
+  @Test
   void capsTheHeroesAndKeepsTheTrackedOnes() {
     List<CreepKillDomain> rows = new ArrayList<>();
     for (long slot : new long[] {0, 1, 2}) {

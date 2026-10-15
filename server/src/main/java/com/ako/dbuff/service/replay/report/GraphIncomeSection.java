@@ -4,7 +4,8 @@ import com.ako.dbuff.service.replay.report.IncomeChartBuilder.IncomeChart;
 import com.ako.dbuff.service.replay.report.chart.ChartService;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
-import java.util.Optional;
+import java.util.List;
+import java.util.stream.IntStream;
 import org.springframework.stereotype.Component;
 
 /**
@@ -43,24 +44,27 @@ public class GraphIncomeSection extends GraphSection {
   }
 
   @Override
-  protected Optional<SectionView> build(ReplayReportInput input) {
-    return builder
-        .build(
+  protected List<SectionView> build(ReplayReportInput input) {
+    List<IncomeChart> charts =
+        builder.pages(
             input.matchId(),
             input.focusSlots(),
-            properties.getGraphIncomeMaxHeroes(),
+            properties.getGraphHeroesPerImage(),
+            properties.getGraphMaxImages(),
             input.maxFindings(),
-            properties.getMaxBehaviourLineLength())
-        .map(chart -> view(input.matchId(), chart));
+            properties.getMaxBehaviourLineLength());
+    return IntStream.range(0, charts.size())
+        .mapToObj(i -> view(input.matchId(), charts.get(i), i, charts.size()))
+        .toList();
   }
 
-  private SectionView view(long matchId, IncomeChart chart) {
+  private SectionView view(long matchId, IncomeChart chart, int index, int count) {
     return view(
-        "Hero income",
+        pageTitle(title(), index, count),
         chart.verdict(),
         chart.bullets(),
-        "income:" + matchId,
-        "income-" + matchId + ".png",
+        "income:" + matchId + ":" + index,
+        "income-" + matchId + "-" + (index + 1) + ".png",
         chart.spec());
   }
 }

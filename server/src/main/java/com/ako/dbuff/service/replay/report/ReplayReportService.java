@@ -28,7 +28,9 @@ import com.ako.dbuff.service.replay.report.view.ComponentsFallback;
 import com.ako.dbuff.service.replay.report.view.ComponentsViewRenderer;
 import com.ako.dbuff.service.replay.report.view.ImageAttachment;
 import com.ako.dbuff.service.replay.report.view.MessageLimits;
+import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.ReportMessage;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import com.ako.dbuff.service.scheduler.QuietHoursGuard;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -57,6 +59,9 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class ReplayReportService {
+  /** How a page of a multi-page section reads as text; it holds no state. */
+  private static final PlainViewRenderer PAGE_TEXT = new PlainViewRenderer();
+
   private final ReplayReportProperties properties;
   private final ReplayProcessingProperties processing;
   private final ReplayParseRunRepo runRepo;
@@ -427,6 +432,14 @@ public class ReplayReportService {
     List<ReportMessage> messages = new ArrayList<>();
     List<Report> reports = new ArrayList<>();
     for (ReplayReportSection section : active) {
+      List<SectionView> pages = section.paged() ? section.pages(input) : List.of();
+      if (pages.size() > 1) {
+        messages.addAll(formatted(reports));
+        reports.clear();
+        pages.forEach(
+            page -> messages.addAll(withImage(PAGE_TEXT.lines(page, true), page.image())));
+        continue;
+      }
       List<String> lines = section.lines(input);
       Optional<ImageAttachment> image = section.image(input);
       if (image.isPresent()) {
@@ -443,6 +456,12 @@ public class ReplayReportService {
 
   /** The section's text split to the message limit, the image on the last message. */
   private List<ReportMessage> withImage(List<String> lines, ImageAttachment image) {
+    if (image == null) {
+      return formatted(
+          lines.isEmpty()
+              ? List.of()
+              : List.of(new TextReport("replay", String.join("\n", lines))));
+    }
     List<String> texts =
         lines.isEmpty()
             ? List.of()
@@ -470,7 +489,7 @@ public class ReplayReportService {
   private List<ReportMessage> components(
       List<ReplayReportSection> active, ReplayReportInput input) {
     return componentsRenderer.renderAll(
-        active.stream().flatMap(section -> section.view(input).stream()).toList());
+        active.stream().flatMap(section -> section.pages(input).stream()).toList());
   }
 
   private ReplayReportInput input(

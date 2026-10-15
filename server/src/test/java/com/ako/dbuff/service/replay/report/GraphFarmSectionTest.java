@@ -39,28 +39,46 @@ class GraphFarmSectionTest {
     assertThat(section.defaultEnabled()).isFalse();
     assertThat(section.minimumDetail()).isEqualTo(ReportDetail.STANDARD);
     assertThat(new SectionSwitch(properties, List.of(section)).isEnabled(section)).isFalse();
-    assertThat(properties.getGraphFarmMaxHeroes()).isEqualTo(2);
+    assertThat(properties.getGraphHeroesPerImage()).isEqualTo(2);
+    assertThat(properties.getGraphMaxImages()).isEqualTo(5);
   }
 
   @Test
   void carriesTheImageAndTheVerdictFirstAndBuildsTheViewOnce() {
-    when(builder.build(7L, Set.of(0L), 2))
-        .thenReturn(Optional.of(chart("Pudge farmed.", List.of("Lina farmed."))));
+    when(builder.pages(7L, Set.of(0L), 2, 5))
+        .thenReturn(List.of(chart("Pudge farmed.", List.of("Lina farmed."))));
     when(charts.png(anyString(), any())).thenReturn(Optional.of(new byte[] {9}));
 
     SectionView view = section.view(input).orElseThrow();
 
-    assertThat(view.image().name()).isEqualTo("farm-7.png");
+    assertThat(view.image().name()).isEqualTo("farm-7-1.png");
     assertThat(section.lines(input))
         .containsExactly("**Farm effectiveness**", "Pudge farmed.", "Lina farmed.");
     assertThat(section.image(input)).isPresent();
-    verify(builder, times(1)).build(7L, Set.of(0L), 2);
+    verify(builder, times(1)).pages(7L, Set.of(0L), 2, 5);
+  }
+
+  @Test
+  void severalChartsArePagesWithNumberedTitlesAndTheirOwnPictures() {
+    when(builder.pages(7L, Set.of(0L), 2, 5))
+        .thenReturn(List.of(chart("Pudge farmed.", List.of()), chart("Axe farmed.", List.of())));
+    when(charts.png(anyString(), any())).thenReturn(Optional.of(new byte[] {9}));
+
+    List<SectionView> pages = section.pages(input);
+
+    assertThat(pages)
+        .extracting(SectionView::title)
+        .containsExactly("Farm effectiveness (1/2)", "Farm effectiveness (2/2)");
+    assertThat(pages)
+        .extracting(v -> v.image().name())
+        .containsExactly("farm-7-1.png", "farm-7-2.png");
+    assertThat(section.paged()).isTrue();
   }
 
   @Test
   void aChartThatCouldNotBeDrawnPostsTheVerdictAndAnApology() {
-    when(builder.build(7L, Set.of(0L), 2))
-        .thenReturn(Optional.of(chart("Pudge farmed.", List.of())));
+    when(builder.pages(7L, Set.of(0L), 2, 5))
+        .thenReturn(List.of(chart("Pudge farmed.", List.of())));
     when(charts.png(anyString(), any())).thenReturn(Optional.empty());
 
     assertThat(section.image(input)).isEmpty();
@@ -70,9 +88,9 @@ class GraphFarmSectionTest {
 
   @Test
   void aMatchWithoutCreepKillsIsTextOnlyAndNeverAsksForADrawing() {
-    when(builder.build(7L, Set.of(0L), 2))
+    when(builder.pages(7L, Set.of(0L), 2, 5))
         .thenReturn(
-            Optional.of(
+            List.of(
                 new FarmChart(
                     null,
                     FarmChartBuilder.NO_CREEP_KILLS,
@@ -89,12 +107,12 @@ class GraphFarmSectionTest {
 
   @Test
   void longTextIsCutAndNothingToSayGivesNoSection() {
-    when(builder.build(7L, Set.of(0L), 2))
-        .thenReturn(Optional.of(chart("word ".repeat(200), List.of())));
+    when(builder.pages(7L, Set.of(0L), 2, 5))
+        .thenReturn(List.of(chart("word ".repeat(200), List.of())));
     when(charts.png(anyString(), any())).thenReturn(Optional.of(new byte[] {9}));
 
     assertThat(section.view(input).orElseThrow().verdict()).hasSizeLessThanOrEqualTo(300);
-    when(builder.build(8L, Set.of(0L), 2)).thenReturn(Optional.empty());
+    when(builder.pages(8L, Set.of(0L), 2, 5)).thenReturn(List.of());
     assertThat(section.lines(new ReplayReportInput(8L, null, Set.of(0L), Map.of(), 3))).isEmpty();
   }
 }
