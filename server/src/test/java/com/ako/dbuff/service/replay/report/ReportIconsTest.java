@@ -261,12 +261,14 @@ class ReportIconsTest {
     PlainViewRenderer plain = new PlainViewRenderer();
     DraftBoardSection section =
         new DraftBoardSection(
-            heroRepo,
-            skillRepo,
-            poolRepo,
-            new AbilityDraftProfile(),
-            labels(icons),
-            heroNames(icons),
+            List.of(
+                new AbilityDraftBoard(
+                    heroRepo,
+                    skillRepo,
+                    poolRepo,
+                    new AbilityDraftProfile(),
+                    labels(icons),
+                    heroNames(icons))),
             plain);
     SectionView view =
         section.view(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3)).orElseThrow();
@@ -313,12 +315,14 @@ class ReportIconsTest {
     when(poolRepo.findByMatchId(1L)).thenReturn(List.of());
     DraftBoardSection section =
         new DraftBoardSection(
-            heroRepo,
-            skillRepo,
-            poolRepo,
-            new AbilityDraftProfile(),
-            labels(icons),
-            heroNames(icons),
+            List.of(
+                new AbilityDraftBoard(
+                    heroRepo,
+                    skillRepo,
+                    poolRepo,
+                    new AbilityDraftProfile(),
+                    labels(icons),
+                    heroNames(icons))),
             new PlainViewRenderer());
     return section.view(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3)).orElseThrow();
   }

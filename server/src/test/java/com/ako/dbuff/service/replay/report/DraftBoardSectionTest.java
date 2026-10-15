@@ -34,12 +34,14 @@ class DraftBoardSectionTest {
   private final PlainViewRenderer plain = new PlainViewRenderer();
   private final DraftBoardSection section =
       new DraftBoardSection(
-          heroRepo,
-          skillRepo,
-          poolRepo,
-          new AbilityDraftProfile(),
-          Prettify::ability,
-          heroNames,
+          List.of(
+              new AbilityDraftBoard(
+                  heroRepo,
+                  skillRepo,
+                  poolRepo,
+                  new AbilityDraftProfile(),
+                  Prettify::ability,
+                  heroNames)),
           plain);
 
   private ReplayReportInput input(Set<Long> focus, Map<Long, String> names) {

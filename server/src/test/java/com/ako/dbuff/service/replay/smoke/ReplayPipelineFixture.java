@@ -8,6 +8,7 @@ import com.ako.dbuff.dao.model.TeamTimelineDomain;
 import com.ako.dbuff.dao.model.TeamfightDomain;
 import com.ako.dbuff.dao.model.TeamfightPlayerDomain;
 import com.ako.dbuff.dao.repo.DeathEventRepo;
+import com.ako.dbuff.dao.repo.DraftEventRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
@@ -22,7 +23,9 @@ import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.constant.data.ItemConstant;
+import com.ako.dbuff.service.discord.icon.IconService;
 import com.ako.dbuff.service.discord.icon.TestIcons;
+import com.ako.dbuff.service.match.data.DraftEventMapper;
 import com.ako.dbuff.service.match.data.RuneEventMapper;
 import com.ako.dbuff.service.match.data.WardEventMapper;
 import com.ako.dbuff.service.replay.AbilityNames;
@@ -101,6 +104,11 @@ public abstract class ReplayPipelineFixture {
     @Bean
     SimpleMeterRegistry meterRegistry() {
       return new SimpleMeterRegistry();
+    }
+
+    @Bean
+    IconService iconService() {
+      return TestIcons.off();
     }
 
     @Bean
@@ -210,6 +218,7 @@ public abstract class ReplayPipelineFixture {
   @Autowired private TeamTimelineRepo teamTimelineRepo;
   @Autowired private RuneEventRepo runeEventRepo;
   @Autowired private WardEventRepo wardEventRepo;
+  @Autowired private DraftEventRepo draftEventRepo;
 
   protected static Path fixture(String fileName) {
     return Path.of(System.getenv("REPLAY_FIXTURE_DIR"), fileName);
@@ -275,10 +284,12 @@ public abstract class ReplayPipelineFixture {
   private void seedMatchLogs(MatchDomain match, String id) throws IOException {
     wardEventRepo.deleteByMatchId(match.getId());
     runeEventRepo.deleteByMatchId(match.getId());
+    draftEventRepo.deleteByMatchId(match.getId());
     MatchResponse response =
         new JSON().getMapper().readValue(fixture(id + ".json").toFile(), MatchResponse.class);
     new WardEventMapper(wardEventRepo).map(response, match);
     new RuneEventMapper(runeEventRepo).map(response, match);
+    new DraftEventMapper(draftEventRepo).map(response, match);
   }
 
   /** OpenDota's per-minute Radiant gold and experience advantage. */

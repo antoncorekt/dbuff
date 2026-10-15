@@ -354,6 +354,32 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Test
   @Commit
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void anAllPickDraftBoardListsOpenDotasPicksAndBansInOrder() throws Exception {
+    List<String> out = new ArrayList<>();
+    for (String id : MATCHES) {
+      Assumptions.assumeTrue(hasFixture(id), id + " fixture missing");
+      MatchDomain match = seedMatch(id);
+      ReplayReportInput input =
+          new ReplayReportInput(match.getId(), match, Set.of(0L), Map.of(0L, "P0"), 3);
+
+      List<String> lines = draftBoardSection.lines(input);
+
+      assertThat(lines).as("%s: board", id).isNotEmpty();
+      assertThat(lines.stream().filter(l -> l.contains("picked by")))
+          .as("%s: picks", id)
+          .hasSizeGreaterThanOrEqualTo(8);
+      assertThat(lines).contains("**Hero picks**");
+      out.add("## " + id);
+      out.addAll(lines);
+    }
+    Path dir = Path.of(System.getProperty("user.home"), "dbuff-fixtures", "send");
+    Files.createDirectories(dir);
+    Files.writeString(dir.resolve("draft-board-allpick.md"), String.join("\n", out) + "\n");
+  }
+
+  @Test
+  @Commit
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   void theAdvantageGraphOfARealMatchIsDrawnFromWhatWasStored() throws Exception {
     Assumptions.assumeTrue(hasFixture(GRAPH_MATCH), GRAPH_MATCH + " fixture missing");
     MatchDomain match = seedMatch(GRAPH_MATCH);
