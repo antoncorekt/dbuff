@@ -23,6 +23,9 @@ public class ItemConstant implements ConstantData {
 
   private Boolean created;
 
+  /** CDN path of the icon. */
+  private String img;
+
   /** Cooldown in seconds; OpenDota sends false for an item without one, read as null. */
   @JsonDeserialize(using = LevelValuesDeserializer.class)
   private List<Double> cd;
