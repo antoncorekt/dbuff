@@ -22,8 +22,9 @@ final class WonFightCasts {
       wonFights.put(side, new HashSet<>());
     }
     for (FightImportanceDomain i : importance) {
-      if (i.isImportant() && i.getFightIndex() != null && i.getWinningTeam() != null) {
-        wonFights.get(TeamSide.valueOf(i.getWinningTeam())).add(i.getFightIndex());
+      TeamSide winner = side(i.getWinningTeam());
+      if (i.isImportant() && i.getFightIndex() != null && winner != null) {
+        wonFights.get(winner).add(i.getFightIndex());
       }
     }
     for (FightAbilityUseDomain u : uses) {
@@ -37,6 +38,15 @@ final class WonFightCasts {
             .add(u.getFightIndex());
       }
     }
+  }
+
+  private static TeamSide side(String name) {
+    for (TeamSide side : TeamSide.values()) {
+      if (side.name().equalsIgnoreCase(name == null ? null : name.trim())) {
+        return side;
+      }
+    }
+    return null;
   }
 
   int teamWon(TeamSide team) {

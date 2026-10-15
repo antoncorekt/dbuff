@@ -52,13 +52,13 @@ public class MissedPickDomain {
   /** Both skills hold the ultimate slot, or both a regular one. */
   private Boolean ultimate;
 
-  /** DAMAGE (the candidate did more total damage) or FIGHTS (neither did damage). */
+  /** DAMAGE (the taken skill did damage and the candidate more) or FIGHTS (neither did damage). */
   private String basis;
 
   private Long takenDamage;
   private Long candidateDamage;
 
-  /** Candidate damage over the taken skill's; null when the taken skill did none. */
+  /** Candidate damage over the taken skill's; null on a FIGHTS pair, where neither did damage. */
   private Double ratio;
 
   /** Important fights the enemy won in which the candidate was cast. */

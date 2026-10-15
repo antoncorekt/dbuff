@@ -35,13 +35,13 @@ class MissedPickWordingTest {
   }
 
   @Test
-  void aTakenSkillWithNoDamageSaysSo() {
+  void thePercentIsNeverRoundedUp() {
     String line =
         MissedPickWording.line(
-            row().basis("DAMAGE").takenDamage(0L).candidateDamage(1240L).build(), LABELS);
+            row().basis("DAMAGE").takenDamage(1000L).candidateDamage(1104L).ratio(1.104).build(),
+            LABELS);
 
-    assertThat(line)
-        .contains("it did 1.2k damage where your Dragon Blood did none, and it was in 3");
+    assertThat(line).contains("it did 10% more damage");
   }
 
   @Test
@@ -60,5 +60,6 @@ class MissedPickWordingTest {
   void damageIsShortenedFromAThousand() {
     assertThat(MissedPickWording.damage(840)).isEqualTo("840");
     assertThat(MissedPickWording.damage(12400)).isEqualTo("12.4k");
+    assertThat(MissedPickWording.damage(999960)).isEqualTo("999.9k");
   }
 }

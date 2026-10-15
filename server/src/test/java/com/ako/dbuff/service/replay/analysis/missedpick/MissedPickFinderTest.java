@@ -165,16 +165,51 @@ class MissedPickFinderTest {
   }
 
   @Test
-  void aTakenSkillWithNoDamageAgainstADamagingCandidateHasNoRatio() {
+  void aTakenSkillWithNoDamageIsNotComparedWithADamagingCandidate() {
     basicPair(false);
     dealt(ENEMY, 20, 700);
     cast(ENEMY, 20, 0);
 
-    MissedPickDomain row = find().getFirst();
+    assertThat(find()).isEmpty();
+  }
 
-    assertThat(row.getBasis()).isEqualTo("DAMAGE");
-    assertThat(row.getRatio()).isNull();
-    assertThat(row.getTakenDamage()).isZero();
+  @Test
+  void onlyTheBestCandidatePerTakenPickIsKept() {
+    pick(1, 1, MINE, 10, false);
+    pick(2, 3, ENEMY, 20, false);
+    pick(3, 5, ENEMY + 1, 21, false);
+    fight(0, "DIRE", true);
+    dealt(MINE, 10, 1000);
+    dealt(ENEMY, 20, 1500);
+    dealt(ENEMY + 1, 21, 3000);
+    cast(ENEMY, 20, 0);
+    cast(ENEMY + 1, 21, 0);
+
+    List<MissedPickDomain> rows = find();
+
+    assertThat(rows).hasSize(1);
+    assertThat(rows.getFirst().getCandidateAbility()).isEqualTo("skill_21");
+  }
+
+  @Test
+  void aPickMissingAFieldIsSkippedAndTheRestStillWork() {
+    basicPair(false);
+    pick(3, 5, ENEMY + 1, 21, false);
+    picks.getLast().setPoolRemainingBeforePick(null);
+    pick(4, 7, ENEMY + 2, 22, false);
+    picks.getLast().setTurnNumber(null);
+    pick(5, 9, ENEMY + 3, 23, false);
+    picks.getLast().setUltimate(null);
+    dealt(MINE, 10, 1000);
+    dealt(ENEMY, 20, 2000);
+    dealt(ENEMY + 1, 21, 9000);
+    cast(ENEMY, 20, 0);
+    cast(ENEMY + 1, 21, 0);
+
+    List<MissedPickDomain> rows = find();
+
+    assertThat(rows).hasSize(1);
+    assertThat(rows.getFirst().getCandidateAbility()).isEqualTo("skill_20");
   }
 
   @Test

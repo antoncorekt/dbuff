@@ -99,8 +99,29 @@ class MissedPickAnalyzerTest {
   }
 
   @Test
-  void aDraftWithoutTurnNumbersStoresNothing() {
+  void aPickWithoutATurnNumberIsSkippedOnItsOwn() {
+    draft(3);
+    pick(3, null, 128, 21);
+
+    analyzer.analyze(MATCH);
+
+    assertThat(missedPickRepo.findByMatchId(MATCH)).hasSize(1);
+  }
+
+  @Test
+  void aDraftWhoseEveryPickLacksATurnStoresNothing() {
     draft(null);
+    pickRepo.findByMatchId(MATCH).forEach(p -> p.setTurnNumber(null));
+
+    analyzer.analyze(MATCH);
+
+    assertThat(missedPickRepo.findByMatchId(MATCH)).isEmpty();
+  }
+
+  @Test
+  void aMatchWithNoAbilityDamageStoresNothing() {
+    draft(3);
+    abilityRepo.deleteAll();
 
     analyzer.analyze(MATCH);
 

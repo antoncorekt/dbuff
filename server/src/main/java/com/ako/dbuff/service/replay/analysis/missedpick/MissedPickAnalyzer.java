@@ -65,13 +65,21 @@ public class MissedPickAnalyzer implements ReplayAnalyzer {
   public void analyze(long matchId) {
     deleteByMatchId(matchId);
     List<AbilityDraftPickDomain> picks = pickRepo.findByMatchId(matchId);
-    if (picks.isEmpty() || picks.stream().anyMatch(p -> p.getTurnNumber() == null)) {
-      log.info("Match {} has no draft turn numbers, so no missed picks", matchId);
+    long usable = picks.stream().filter(MissedPickFinder::complete).count();
+    if (usable < picks.size()) {
+      log.info(
+          "Match {}: {} of {} draft picks lack a turn number or other field and are skipped",
+          matchId,
+          picks.size() - usable,
+          picks.size());
+    }
+    if (usable == 0) {
       return;
     }
     List<AbilityDomain> abilities = abilityRepo.findAllByMatchId(matchId);
     if (abilities.isEmpty()) {
-      log.info("Match {} has no stored ability damage, so skills are compared on fights", matchId);
+      log.info("Match {} has no stored ability damage, so no missed picks", matchId);
+      return;
     }
     Map<String, Long> damage = new HashMap<>();
     abilities.forEach(
