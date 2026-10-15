@@ -372,10 +372,10 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       List<String> lines = draftBoardSection.lines(input);
 
       assertThat(lines).as("%s: board", id).isNotEmpty();
-      assertThat(lines.stream().filter(l -> l.contains("picked by")))
+      assertThat(lines.stream().filter(l -> l.contains("hero ")))
           .as("%s: picks", id)
           .hasSizeGreaterThanOrEqualTo(8);
-      assertThat(lines).contains("**Hero picks**");
+      assertThat(lines).contains("**Picks in draft order**");
       out.add("## " + id);
       out.addAll(lines);
     }
