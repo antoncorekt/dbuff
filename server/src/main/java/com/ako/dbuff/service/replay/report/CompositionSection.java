@@ -8,11 +8,15 @@ import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionStage;
 import com.ako.dbuff.service.replay.analysis.role.RoleStage;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -62,7 +66,10 @@ public class CompositionSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
-    List<PlayerRoleProfileDomain> profiles = profileRepo.findByMatchId(input.matchId());
+    return render(input, profileRepo.findByMatchId(input.matchId()));
+  }
+
+  private List<String> render(ReplayReportInput input, List<PlayerRoleProfileDomain> profiles) {
     List<String> lines = new ArrayList<>();
     int listed = 0;
     for (Map.Entry<Long, String> player : input.namesBySlot().entrySet()) {
@@ -100,6 +107,38 @@ public class CompositionSection implements ReplayReportSection {
     }
     lines.addFirst("**Roles and composition**");
     return lines;
+  }
+
+  @Override
+  public Optional<SectionView> view(ReplayReportInput input) {
+    List<PlayerRoleProfileDomain> profiles = profileRepo.findByMatchId(input.matchId());
+    return SectionViews.titled(render(input, profiles), rolesVerdict(input, profiles));
+  }
+
+  private Verdict rolesVerdict(ReplayReportInput input, List<PlayerRoleProfileDomain> profiles) {
+    long kept = 0;
+    long changed = 0;
+    for (Long slot : input.namesBySlot().keySet()) {
+      String intended = role(profiles, slot, RoleStage.INTENT);
+      String played = role(profiles, slot, RoleStage.FINAL);
+      if (intended != null && played != null) {
+        if (intended.equals(played)) {
+          kept++;
+        } else {
+          changed++;
+        }
+      }
+    }
+    if (changed > 0) {
+      return new Verdict(
+          "%d of %d tracked players played a different role than they were meant to"
+              .formatted(changed, kept + changed),
+          Accent.NEUTRAL);
+    }
+    if (kept > 0) {
+      return new Verdict("Every tracked player played the role they were meant to", Accent.WIN);
+    }
+    return new Verdict("The roles and team makeup of this match", Accent.NEUTRAL);
   }
 
   private String capped(String line) {

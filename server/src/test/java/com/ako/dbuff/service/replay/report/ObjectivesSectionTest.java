@@ -6,6 +6,8 @@ import com.ako.dbuff.dao.model.ObjectiveConversionDomain;
 import com.ako.dbuff.dao.repo.FightImportanceRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.ObjectiveConversionRepo;
+import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -333,5 +335,71 @@ class ObjectivesSectionTest {
     properties.setObjectiveCloseDistance(1);
     properties.setObjectiveFarDistance(20000);
     properties.validate();
+  }
+
+  @Test
+  void view_countsTheTrackedTeamsConversionsAndKeepsPlainTextAsItWas() {
+    missed(1, 760, 4200);
+    fight(2, 900, "DIRE", "CONVERTED");
+
+    SectionView view = section.view(input(1L)).orElseThrow();
+
+    ViewRendering.assertWithinLimits(view);
+    assertThat(view.title()).isEqualTo("Objectives");
+    assertThat(view.verdict()).isEqualTo("Won fights turned into objectives: 1 of 2");
+    assertThat(view.accent()).isEqualTo(Accent.LOSS);
+    assertThat(view.bullets()).hasSize(2);
+    assertThat(view.bullets().get(0))
+        .isEqualTo("Radiant (your team) turned 0 of 1 won fight into objectives");
+    assertThat(String.join("\n", section.lines(input(1L))))
+        .isEqualTo(
+            "**Objectives**\n"
+                + "Won fights turned into objectives: 1 of 2\n"
+                + "12:40 Radiant (your team) won the fight but did not take an objective in the"
+                + " next 90 seconds; the nearest Dire tower still standing was the top lane tier 1"
+                + " tower and Axe, the winner's closest hero, stood in the top lane, far from"
+                + " it.");
+    assertThat(view.bullets().get(1)).isEqualTo(section.lines(input(1L)).get(2));
+  }
+
+  @Test
+  void view_usesTheSummaryAndIsGreyWithoutATrackedTeam() {
+    missed(1, 760, 4200);
+    fight(2, 900, "DIRE", "CONVERTED");
+
+    SectionView view = section.view(input()).orElseThrow();
+
+    assertThat(view.verdict()).isEqualTo("Won fights turned into objectives: 1 of 2");
+    assertThat(view.accent()).isEqualTo(Accent.NEUTRAL);
+  }
+
+  @Test
+  void view_isEmptyWithoutWonFights() {
+    assertThat(section.view(input())).isEmpty();
+  }
+
+  @Test
+  void view_withOnlyTheSummaryHasNoBulletsAndNoIndexingTrouble() {
+    fight(1, 900, "DIRE", "CONVERTED");
+
+    SectionView view = section.view(input()).orElseThrow();
+
+    assertThat(section.lines(input()))
+        .containsExactly("**Objectives**", "Won fights turned into objectives: 1 of 1");
+    assertThat(view.verdict()).isEqualTo("Won fights turned into objectives: 1 of 1");
+    assertThat(view.bullets()).isEmpty();
+  }
+
+  @Test
+  void view_ownTeamCountIsAnExtraBulletAndTheVerdictCountsTheSameFightsAsThePlainSummary() {
+    fight(1, 900, "RADIANT", "CONVERTED");
+    fight(2, 1000, "DIRE", "CONVERTED");
+
+    SectionView view = section.view(input(1L)).orElseThrow();
+
+    assertThat(view.verdict()).isEqualTo(section.lines(input(1L)).get(1));
+    assertThat(view.bullets())
+        .containsExactly("Radiant (your team) turned 1 of 1 won fight into objectives");
+    assertThat(view.accent()).isEqualTo(Accent.WIN);
   }
 }
