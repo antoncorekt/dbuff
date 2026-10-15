@@ -9,6 +9,8 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -64,12 +66,35 @@ public class InstanceSettings {
   @Column(name = "report_detail")
   private ReportDetail reportDetail;
 
+  /**
+   * Comma-separated names of the report sections posted automatically; null follows the server's
+   * list, an empty string posts none.
+   */
+  @Column(name = "sections")
+  private String sections;
+
+  /** Language the AI reasons are written in; null follows the server's. */
+  @Column(name = "language")
+  private String language;
+
   public boolean isAiSummaryOn() {
     return aiSummaryEnabled == null || aiSummaryEnabled;
   }
 
   public boolean isReplayReportOn() {
     return replayReportEnabled == null || replayReportEnabled;
+  }
+
+  /** The channel's own section list; empty when it follows the server's. */
+  public Optional<List<String>> sectionNames() {
+    if (sections == null) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        Arrays.stream(sections.split(","))
+            .map(String::trim)
+            .filter(name -> !name.isEmpty())
+            .toList());
   }
 
   public ReportDetail detail() {

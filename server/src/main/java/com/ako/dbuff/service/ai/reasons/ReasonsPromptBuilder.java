@@ -31,6 +31,15 @@ public class ReasonsPromptBuilder {
   private final ReplayReportAiProperties properties;
 
   public ReasonsPrompt build(FactTrimmer.Trimmed facts) {
+    return build(facts, null);
+  }
+
+  /** {@code channelLanguage} wins over the server's language when it is set. */
+  public ReasonsPrompt build(FactTrimmer.Trimmed facts, String channelLanguage) {
+    String language =
+        channelLanguage == null || channelLanguage.isBlank()
+            ? properties.getLanguage()
+            : channelLanguage;
     String system =
         String.format(
             Locale.ROOT,
@@ -39,7 +48,7 @@ public class ReasonsPromptBuilder {
             ReplayReportAiProperties.MAX_REASONS,
             MAX_TITLE_LENGTH,
             MAX_EXPLANATION_LENGTH,
-            properties.getLanguage());
+            language);
     String rows = facts.kept().stream().map(Fact::line).collect(Collectors.joining("\n"));
     String left =
         facts.dropped() == 0

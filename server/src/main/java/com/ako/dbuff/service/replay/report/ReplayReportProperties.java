@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.report;
 
 import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -101,6 +102,19 @@ public class ReplayReportProperties {
   private Map<String, SectionToggle> sections = new HashMap<>();
 
   /**
+   * Names of the sections that post automatically when a channel has no list of its own. Null (not
+   * set) keeps each section on its own default; set, even empty, the list is the only automatic
+   * switch.
+   */
+  private List<String> defaultSections;
+
+  /**
+   * Seconds a thread waits between on-demand {@code /match report} and {@code /match ai} requests;
+   * 0 turns the wait off. Kept in memory, so it holds per running instance of the app.
+   */
+  private int onDemandCooldownSeconds = 30;
+
+  /**
    * Fails at startup on an important fights cap that leaves the section empty or too long for a
    * message, and on lane settings that cannot cut a line or tell narrow from clear wins.
    */
@@ -108,6 +122,11 @@ public class ReplayReportProperties {
   public void validate() {
     if (format == null) {
       throw new IllegalStateException("replay.report.format must be PLAIN or COMPONENTS");
+    }
+    if (onDemandCooldownSeconds < 0) {
+      throw new IllegalStateException(
+          "replay.report.on-demand-cooldown-seconds must be 0 or more, got "
+              + onDemandCooldownSeconds);
     }
     requireRange("max-important-fight-lines", maxImportantFightLines, 1, MAX_IMPORTANT_FIGHT_LINES);
     requireRange("max-rotation-lines", maxRotationLines, 1, MAX_BEHAVIOUR_LINES);

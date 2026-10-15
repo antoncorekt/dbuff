@@ -151,9 +151,9 @@ public class ReplayReportService {
 
   /**
    * Posts one section of a match with a stored replay into one channel's thread for a person who
-   * asked for it, in the report's format. Only the section's own output decides; the report and
-   * section switches, the detail level and the quiet hours do not apply, so a section that is off
-   * for automatic posting can still be asked for.
+   * asked for it, in the report's format. Only the section's own output decides; the report switch,
+   * the section lists, the detail level and the quiet hours do not apply, so a section that is off
+   * for automatic posting can still be asked for. A section hidden by its kill switch is refused.
    */
   public ReportDelivery deliverSection(long matchId, String instanceId, String sectionName) {
     return deliverSection(matchId, instanceId, sectionName, null);
@@ -175,6 +175,9 @@ public class ReplayReportService {
       DbufInstanceConfigDomain instance = instanceRepo.findById(instanceId).orElse(null);
       if (section == null || match == null || instance == null) {
         return logSkipped(matchId, ReportDelivery.NO_INSTANCE);
+      }
+      if (sectionSwitch.isHidden(section)) {
+        return logSkipped(matchId, ReportDelivery.SECTION_HIDDEN);
       }
       List<PlayerMatchStatisticDomain> stats = statRepo.findAllByMatchId(matchId);
       return logSkipped(
@@ -345,7 +348,7 @@ public class ReplayReportService {
     if (mode == null) {
       return List.of();
     }
-    if (sections.stream().noneMatch(sectionSwitch::isEnabled)) {
+    if (sections.stream().noneMatch(s -> sectionSwitch.isAutomatic(s, settings))) {
       log.info(
           "Replay report of match {} not posted: every section is switched off", match.getId());
       return List.of();
@@ -353,7 +356,7 @@ public class ReplayReportService {
     ReplayReportInput input = input(match, stats, instance);
     List<ReplayReportSection> active =
         sections.stream()
-            .filter(sectionSwitch::isEnabled)
+            .filter(s -> sectionSwitch.isAutomatic(s, settings))
             .filter(s -> s.supports(mode))
             .filter(s -> settings.detail().includes(s.minimumDetail()))
             .sorted(Comparator.comparingInt(ReplayReportSection::order))
@@ -369,9 +372,29 @@ public class ReplayReportService {
   }
 
   private List<ReportMessage> render(List<ReplayReportSection> active, ReplayReportInput input) {
+    List<ReportMessage> all = new ArrayList<>();
+    List<ReplayReportSection> batch = new ArrayList<>();
+    for (ReplayReportSection section : active) {
+      if (!section.postsOwnMessages()) {
+        batch.add(section);
+        continue;
+      }
+      all.addAll(renderBatch(batch, input));
+      batch.clear();
+      section.lines(input).forEach(text -> all.add(new ReportMessage.Plain(text)));
+    }
+    all.addAll(renderBatch(batch, input));
+    return all;
+  }
+
+  private List<ReportMessage> renderBatch(
+      List<ReplayReportSection> batch, ReplayReportInput input) {
+    if (batch.isEmpty()) {
+      return List.of();
+    }
     return properties.getFormat() == ReportFormat.COMPONENTS
-        ? components(active, input)
-        : plain(active, input);
+        ? components(batch, input)
+        : plain(batch, input);
   }
 
   private List<ReportMessage> plain(List<ReplayReportSection> active, ReplayReportInput input) {
@@ -421,10 +444,11 @@ public class ReplayReportService {
                         names.getOrDefault(s.getPlayerId(), "Player"),
                         heroes.get(s.getPlayerSlot()))));
     return new ReplayReportInput(
-        match.getId(),
-        match,
-        Set.copyOf(namesBySlot.keySet()),
-        namesBySlot,
-        properties.getMaxFindingsPerSection());
+            match.getId(),
+            match,
+            Set.copyOf(namesBySlot.keySet()),
+            namesBySlot,
+            properties.getMaxFindingsPerSection())
+        .withInstance(instance);
   }
 }

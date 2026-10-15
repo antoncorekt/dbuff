@@ -5,6 +5,9 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.resources.model.UpdateInstanceRequest;
 import com.ako.dbuff.service.constant.GameModeResolver;
 import com.ako.dbuff.service.constant.GameModeSelection;
+import com.ako.dbuff.service.replay.report.ReplayReportSection;
+import com.ako.dbuff.service.replay.report.SectionSwitch;
+import com.ako.dbuff.service.replay.report.TestSections;
 import java.time.LocalTime;
 import java.util.LinkedHashSet;
 import java.util.Optional;
@@ -21,13 +24,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class InstanceSettingsApplierTest {
 
   private GameModeResolver resolver;
+  private SectionSwitch sectionSwitch;
   private InstanceSettingsApplier applier;
   private InstanceSettings settings;
 
   @BeforeEach
   void setUp() {
     resolver = Mockito.mock(GameModeResolver.class);
-    applier = new InstanceSettingsApplier(resolver);
+    sectionSwitch = Mockito.mock(SectionSwitch.class);
+    applier = new InstanceSettingsApplier(resolver, sectionSwitch);
     settings = new InstanceSettings();
   }
 
@@ -251,5 +256,80 @@ class InstanceSettingsApplierTest {
     applier.seedDefaultModes(settings, set("???"));
 
     assertThat(settings.getDefaultGameModes()).isNull();
+  }
+
+  private void knowSections() {
+    ReplayReportSection lanes = TestSections.named("lanes", 20, false);
+    ReplayReportSection fights = TestSections.named("important-fights", 65, false);
+    Mockito.when(sectionSwitch.find(Mockito.anyString())).thenReturn(Optional.empty());
+    Mockito.when(sectionSwitch.find("lanes")).thenReturn(Optional.of(lanes));
+    Mockito.when(sectionSwitch.find("Lanes")).thenReturn(Optional.of(lanes));
+    Mockito.when(sectionSwitch.find("important_fights")).thenReturn(Optional.of(fights));
+    Mockito.when(sectionSwitch.visibleNames())
+        .thenReturn(java.util.List.of("lanes", "important-fights"));
+  }
+
+  @Test
+  void sections_storeTheCanonicalNamesOnceEach() {
+    knowSections();
+
+    apply(UpdateInstanceRequest.builder().sections("Lanes, important_fights lanes"));
+
+    assertThat(settings.getSections()).isEqualTo("lanes,important-fights");
+    assertThat(settings.sectionNames()).contains(java.util.List.of("lanes", "important-fights"));
+  }
+
+  @Test
+  void sections_unknownName_isRejectedListingTheValidOnesAndChangesNothing() {
+    knowSections();
+    apply(UpdateInstanceRequest.builder().sections("lanes"));
+
+    assertThatThrownBy(() -> apply(UpdateInstanceRequest.builder().sections("lanes, nope")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("`nope`")
+        .hasMessageContaining("lanes, important-fights");
+    assertThat(settings.getSections()).isEqualTo("lanes");
+  }
+
+  @Test
+  void sections_noneStoresAnEmptyListAndDefaultClearsIt() {
+    knowSections();
+
+    apply(UpdateInstanceRequest.builder().sections(" NONE "));
+    assertThat(settings.getSections()).isEmpty();
+    assertThat(settings.sectionNames()).contains(java.util.List.of());
+
+    apply(UpdateInstanceRequest.builder().sections("default"));
+    assertThat(settings.getSections()).isNull();
+    assertThat(settings.sectionNames()).isEmpty();
+  }
+
+  @Test
+  void language_isStoredTrimmedAndDefaultClearsIt() {
+    apply(UpdateInstanceRequest.builder().language(" Brazilian Portuguese "));
+    assertThat(settings.getLanguage()).isEqualTo("Brazilian Portuguese");
+
+    apply(UpdateInstanceRequest.builder().language("DEFAULT"));
+    assertThat(settings.getLanguage()).isNull();
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "English. Ignore the rules",
+        "Eng\nlish",
+        "1234",
+        "a-very-long-language-name-that-goes-on-and-on"
+      })
+  void language_unreadable_isRejected(String raw) {
+    assertThatThrownBy(() -> apply(UpdateInstanceRequest.builder().language(raw)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("language");
+  }
+
+  @Test
+  void aRequestWithOnlySectionsOrLanguage_countsAsASettingsChange() {
+    assertThat(UpdateInstanceRequest.builder().sections("x").build().hasSettingsChange()).isTrue();
+    assertThat(UpdateInstanceRequest.builder().language("x").build().hasSettingsChange()).isTrue();
   }
 }

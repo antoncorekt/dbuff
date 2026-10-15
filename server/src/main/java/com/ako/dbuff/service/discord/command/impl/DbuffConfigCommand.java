@@ -143,7 +143,18 @@ public class DbuffConfigCommand implements DbuffCommand {
                         "game_mode",
                         "Default game mode for /stats and /hero",
                         false,
-                        true)),
+                        true),
+                    new OptionData(
+                        OptionType.STRING,
+                        "sections",
+                        "Replay sections posted automatically, none, or default for the server's",
+                        false,
+                        true),
+                    new OptionData(
+                        OptionType.STRING,
+                        "language",
+                        "Language of the AI reasons, or default for the server's",
+                        false)),
             new SubcommandData("deactivate", "Stop tracking in this channel"),
             new SubcommandData("help", "List every command"));
   }
@@ -418,6 +429,8 @@ public class DbuffConfigCommand implements DbuffCommand {
             .reportDetail(context.getOption("detail"))
             .quietHours(context.getOption("quiet_hours"))
             .timezone(context.getOption("timezone"))
+            .sections(context.getOption("sections"))
+            .language(context.getOption("language"))
             .defaultGameModes(modes.isEmpty() ? null : new LinkedHashSet<>(modes))
             .build();
 
@@ -496,7 +509,11 @@ public class DbuffConfigCommand implements DbuffCommand {
         + "\n**Timezone:** "
         + settings.getTimezone()
         + "\n**Default game mode:** "
-        + modes;
+        + modes
+        + "\n**Replay sections:** "
+        + settings.getSections()
+        + "\n**AI language:** "
+        + settings.getLanguage();
   }
 
   private void deactivate(CommandContext context) {
