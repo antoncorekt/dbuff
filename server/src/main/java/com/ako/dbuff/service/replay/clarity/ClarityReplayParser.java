@@ -42,7 +42,7 @@ import skadistats.clarity.source.MappedFileSource;
 @Slf4j
 @Component
 public class ClarityReplayParser implements ReplayParser {
-  static final String CLARITY_VERSION = "5.0.1";
+  static final String CLARITY_VERSION = "5.0.1-2";
 
   private final Map<Long, DraftReaderFactory<AbilityDraftFacts>> draftReaders;
   private final Map<Long, DraftReaderFactory<HeroDraftFacts>> heroDraftReaders;

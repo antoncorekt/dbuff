@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.clarity;
 
+import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.GoldReason;
 import com.ako.dbuff.service.replay.XpReason;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,26 @@ class CombatLogRecorderTest {
     assertThat(events.get(0).goldReason()).isEqualTo(GoldReason.NEUTRAL_KILL);
     assertThat(events.get(1).xpReason()).isEqualTo(XpReason.CREEP_KILL);
     assertThat(events.get(2).aux()).as("a stun duration in hundredths").isEqualTo(50);
+  }
+
+  @Test
+  void record_keepsAHealWithItsInflictorTargetAndValue_whenAHeroIsInvolved() {
+    CombatLogRecorder recorder = new CombatLogRecorder();
+    CombatLogEntry heal = entry(DOTA_COMBATLOG_TYPES.DOTA_COMBATLOG_HEAL, 0, 0, 0f);
+    when(heal.getInflictorName()).thenReturn("item_mekansm");
+    when(heal.getValue()).thenReturn(250);
+    CombatLogEntry creepHeal = entry(DOTA_COMBATLOG_TYPES.DOTA_COMBATLOG_HEAL, 0, 0, 0f);
+    when(creepHeal.isTargetHero()).thenReturn(false);
+    recorder.record(heal);
+    recorder.record(creepHeal);
+
+    var events = recorder.result(0).events();
+
+    assertThat(events).hasSize(1);
+    assertThat(events.getFirst().kind()).isEqualTo(CombatEventKind.HEAL);
+    assertThat(events.getFirst().inflictor()).isEqualTo("item_mekansm");
+    assertThat(events.getFirst().target()).isEqualTo("npc_dota_hero_luna");
+    assertThat(events.getFirst().value()).isEqualTo(250);
   }
 
   private static CombatLogEntry entry(

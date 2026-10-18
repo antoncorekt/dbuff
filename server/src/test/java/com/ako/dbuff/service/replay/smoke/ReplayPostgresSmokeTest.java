@@ -52,6 +52,8 @@ import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
 import com.ako.dbuff.dao.repo.RunePickupRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
+import com.ako.dbuff.service.replay.CombatEventKind;
+import com.ako.dbuff.service.replay.CombatLogCodec;
 import com.ako.dbuff.service.replay.ReplayDataService;
 import com.ako.dbuff.service.replay.ReplayRunService;
 import com.ako.dbuff.service.replay.StateChangeKind;
@@ -255,6 +257,13 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertThat(stateRepo.findByMatchIdOrderByGameSeconds(match.getId())).isNotEmpty();
       assertThat(combatLogRepo.findAll().stream().filter(c -> c.getMatchId().equals(match.getId())))
           .hasSize(1);
+      assertThat(
+              combatLogRepo.findAll().stream()
+                  .filter(c -> c.getMatchId().equals(match.getId()))
+                  .flatMap(c -> CombatLogCodec.decode(c.getData()).stream())
+                  .filter(e -> e.kind() == CombatEventKind.HEAL))
+          .as("%s: heal events", id)
+          .isNotEmpty();
       assertThat(activityRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(fightRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(deathRepo.findByMatchId(match.getId())).hasSizeGreaterThan(40);
