@@ -1,6 +1,6 @@
 # First guesses, tuned in the review loop (docs/replay-item-loop/README.md).
 prices: {}
-alternatives: {}
+alternatives: { altCostBand: 0.3, altTimeBand: 300, altMinGames: 5 }
 categories:
   farming: Farming
   sustain: Sustain and mana
@@ -36,7 +36,19 @@ entries:
   - key: farming_items
     category: farming
     items: [bfury, maelstrom, mjollnir]
-    aspects: [farm-rate, item-damage, stat-uplift]
+    aspects: [farm-rate, item-damage, stat-uplift, alternatives]
+    parameters:
+      windowMinutes: 5
+      minBeforeSeconds: 120
+      minAfterSeconds: 60
+      campGapSeconds: 30
+      damagePrice: 100
+      damageWindowMinutes: 5
+  - key: radiance
+    category: farming
+    items: [radiance]
+    aspects: [farm-rate, item-damage, alternatives]
+    alternatives: [maelstrom, bfury, manta]
     parameters:
       windowMinutes: 5
       minBeforeSeconds: 120

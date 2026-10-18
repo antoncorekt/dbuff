@@ -50,6 +50,7 @@ public class ItemEfficiencyFile {
   private final String source;
   private List<ItemEfficiencyEntry> entries;
   private Map<String, String> categories;
+  private Map<String, Double> alternativeSettings;
 
   @Autowired
   public ItemEfficiencyFile(
@@ -65,6 +66,12 @@ public class ItemEfficiencyFile {
   public synchronized List<ItemEfficiencyEntry> entries() {
     ensureLoaded();
     return entries;
+  }
+
+  /** The numbers of the {@code alternatives} section; one the file omits is not in the map. */
+  public synchronized Map<String, Double> alternativeSettings() {
+    ensureLoaded();
+    return alternativeSettings;
   }
 
   /** The category ids with their display names. */
@@ -107,6 +114,8 @@ public class ItemEfficiencyFile {
       throw invalid(String.join("; ", problems));
     }
     categories = Map.copyOf(content.categories());
+    alternativeSettings =
+        content.alternatives() == null ? Map.of() : Map.copyOf(content.alternatives());
     entries = List.copyOf(checked);
   }
 

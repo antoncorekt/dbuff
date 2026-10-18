@@ -69,7 +69,8 @@ public class ItemEfficiencyInputs {
                 eventsOf(events, hero),
                 tracks.get(slot),
                 kills.getOrDefault(slot, List.of()),
-                segments.getOrDefault(slot, List.of())));
+                segments.getOrDefault(slot, List.of()),
+                matchId));
       }
     }
     return new MatchInputs(gameEnd(events, tracks.values()), heroes);
