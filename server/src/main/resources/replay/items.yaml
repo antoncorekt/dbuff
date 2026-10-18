@@ -47,7 +47,6 @@ entries:
       minBeforeSeconds: 120
       minAfterSeconds: 60
       campGapSeconds: 30
-      damagePrice: 100
       damageWindowMinutes: 5
   - key: radiance
     category: farming
@@ -59,7 +58,6 @@ entries:
       minBeforeSeconds: 120
       minAfterSeconds: 60
       campGapSeconds: 30
-      damagePrice: 100
       damageWindowMinutes: 5
   - key: arcane_boots
     category: sustain

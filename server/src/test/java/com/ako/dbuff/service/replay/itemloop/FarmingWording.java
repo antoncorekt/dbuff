@@ -65,13 +65,13 @@ final class FarmingWording implements Wording {
     return new String[] {
       LoopWording.clock(detail.seconds()),
       "enemy heroes",
-      ("%s damage from the item's own effects and %s more from its stats, worth %s gold at %s per"
-              + " 1k damage")
+      ("%s damage from the item's own effects and %s more from its stats, worth %s gold by kill"
+              + " share, the item's own damage helped %s kills")
           .formatted(
               LoopWording.gold(f.get("procDamage")),
               LoopWording.gold(f.get("passiveDamage")),
               LoopWording.gold(f.get("damageValue")),
-              LoopWording.gold(f.get("damagePrice"))),
+              LoopWording.gold(f.getOrDefault("killsHelped", 0.0))),
       ("hero damage per min %s before the purchase and %s after (the stage of the game also raises"
               + " it)%s")
           .formatted(

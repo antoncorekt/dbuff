@@ -242,7 +242,19 @@ class ItemLoopReportTest {
             5500L,
             0.7,
             null,
-            figures("netGoldPerMinute", 66, "creepGain", 2200, "damageValue", 1650),
+            figures(
+                "netGoldPerMinute",
+                66,
+                "creepGain",
+                2200,
+                "damageValue",
+                1650,
+                "gain.farm-rate",
+                2200,
+                "gain.item-damage",
+                1650,
+                "killsHelped",
+                4),
             List.of(),
             List.of(
                 new Detail(
@@ -286,8 +298,8 @@ class ItemLoopReportTest {
                         10500,
                         "damageValue",
                         1650,
-                        "damagePrice",
-                        100,
+                        "killsHelped",
+                        4,
                         "beforePerMinute",
                         600,
                         "afterPerMinute",
@@ -300,9 +312,9 @@ class ItemLoopReportTest {
     String report = ItemLoopReport.render(data(List.of(item)));
 
     assertThat(report)
-        .contains("creeps +0.4x its cost, damage +0.3x, 0.7x in total, not paid back")
+        .contains("farm +0.4x, fights +0.3x (4 kills helped), 0.7x in total, not paid back")
         .contains("| Windrunner: mjollnir, damage at 10:00 | 10:00 | enemy heroes | 6k damage")
-        .contains("worth 1.7k gold at 100 per 1k damage")
+        .contains("worth 1.7k gold by kill share")
         .doesNotContain("DAMAGE");
   }
 }

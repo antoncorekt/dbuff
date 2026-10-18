@@ -53,6 +53,11 @@ final class KillShare {
     return value;
   }
 
+  /** The enemy deaths in whose window the hero dealt damage that passes the filter. */
+  int killsHelped(Predicate<CombatEvent> damageFilter) {
+    return (int) deaths.stream().filter(d -> mineIn(d, damageFilter) > 0).count();
+  }
+
   /**
    * A disable cast on the victim just before the victim died: the fixed share of that death, 0 when
    * the victim did not die within the window.
