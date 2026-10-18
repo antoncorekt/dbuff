@@ -7,6 +7,10 @@ import java.util.Set;
  * with a stun duration is kept whatever its name.
  */
 public final class ModifierWhitelist {
+  /*
+   * Unverified (not present in the fixtures): modifier_item_aeon_disk_buff, modifier_item_sphere,
+   * modifier_item_sphere_target, modifier_truesight, modifier_item_gem_of_true_sight.
+   */
   private static final Set<String> NAMES =
       Set.of(
           "modifier_black_king_bar_immune",
@@ -25,7 +29,19 @@ public final class ModifierWhitelist {
           "modifier_fountain_aura_buff",
           "modifier_invulnerable",
           "modifier_aegis",
-          "modifier_buyback_gold_penalty");
+          "modifier_buyback_gold_penalty",
+          "modifier_bottle_regeneration",
+          "modifier_item_soul_ring_buff",
+          "modifier_item_glimmer_cape_fade",
+          "modifier_item_forcestaff_active",
+          "modifier_item_dustofappearance",
+          "modifier_item_lotus_orb_active",
+          "modifier_eul_cyclone",
+          "modifier_item_aeon_disk_buff",
+          "modifier_item_sphere",
+          "modifier_item_sphere_target",
+          "modifier_truesight",
+          "modifier_item_gem_of_true_sight");
 
   /** The effects of the runes a hero picks up; a few events per pickup. */
   private static final String RUNE_PREFIX = "modifier_rune_";
