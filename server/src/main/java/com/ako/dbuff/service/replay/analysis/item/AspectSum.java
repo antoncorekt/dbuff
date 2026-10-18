@@ -17,16 +17,26 @@ final class AspectSum {
 
   private AspectSum() {}
 
-  /** One row per hero who held one of the entry's items, judged by the entry's aspects. */
   static List<ItemEfficiency> judge(
       ItemEfficiencyEntry entry,
       List<ItemAspect> aspects,
       ItemKits kits,
       int gameEndSeconds,
       List<HeroInputs> heroes) {
+    return judge(entry, aspects, kits, gameEndSeconds, heroes, Map.of());
+  }
+
+  /** One row per hero who held one of the entry's items, judged by the entry's aspects. */
+  static List<ItemEfficiency> judge(
+      ItemEfficiencyEntry entry,
+      List<ItemAspect> aspects,
+      ItemKits kits,
+      int gameEndSeconds,
+      List<HeroInputs> heroes,
+      Map<String, Double> prices) {
     List<ItemEfficiency> rows = new ArrayList<>();
     for (HeroInputs hero : heroes) {
-      AspectContext context = AspectContext.of(entry, kits, gameEndSeconds, hero);
+      AspectContext context = AspectContext.of(entry, kits, gameEndSeconds, hero, prices);
       if (!context.held().isEmpty()) {
         rows.add(of(context, aspects.stream().map(a -> a.measure(context)).toList()));
       }

@@ -50,6 +50,7 @@ public class ItemEfficiencyFile {
   private final String source;
   private List<ItemEfficiencyEntry> entries;
   private Map<String, String> categories;
+  private Map<String, Double> prices;
 
   @Autowired
   public ItemEfficiencyFile(
@@ -81,6 +82,12 @@ public class ItemEfficiencyFile {
     return names;
   }
 
+  /** The prices shared by every entry; an entry's parameter of the same name replaces one. */
+  public synchronized Map<String, Double> prices() {
+    ensureLoaded();
+    return prices;
+  }
+
   private void ensureLoaded() {
     if (entries == null) {
       load();
@@ -97,6 +104,12 @@ public class ItemEfficiencyFile {
     }
     List<String> problems = new ArrayList<>();
     checkNumbers("prices", content.prices(), problems);
+    if (content.prices() != null) {
+      content.prices().keySet().stream()
+          .filter(name -> !WorthPrices.NAMES.contains(name))
+          .sorted()
+          .forEach(name -> problems.add("prices has unknown price '" + name + "'"));
+    }
     checkNumbers("alternatives", content.alternatives(), problems);
     Set<String> keys = new HashSet<>();
     List<ItemEfficiencyEntry> checked = new ArrayList<>();
@@ -106,7 +119,8 @@ public class ItemEfficiencyFile {
     if (!problems.isEmpty()) {
       throw invalid(String.join("; ", problems));
     }
-    categories = Map.copyOf(content.categories());
+    prices = content.prices() == null ? Map.of() : ordered(content.prices());
+    categories = ordered(content.categories());
     entries = List.copyOf(checked);
   }
 
@@ -184,6 +198,10 @@ public class ItemEfficiencyFile {
 
   private static boolean invalidNumber(Double value) {
     return value == null || value.isNaN() || value.isInfinite() || value < 0;
+  }
+
+  private static <V> Map<String, V> ordered(Map<String, V> map) {
+    return java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(map));
   }
 
   private static List<String> copy(List<String> list) {

@@ -185,4 +185,41 @@ class ItemEfficiencyFileTest {
     assertThat(new ItemEfficiencyFile("replay/items.yaml").categories())
         .containsKeys("farming", "sustain");
   }
+
+  @Test
+  void anUnknownPriceNameFailsOnceAndIsNamed() {
+    ItemEfficiencyFile bad =
+        file(
+            """
+            prices: {pokePrise: 1, xpWeight: 2}
+            categories: {c: C}
+            entries:
+              - {key: a, category: c, items: [x], aspects: [save]}
+            """);
+
+    assertThatThrownBy(bad::entries)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("unknown price 'pokePrise'")
+        .hasMessageNotContaining("xpWeight");
+  }
+
+  @Test
+  void categoriesAndEntriesKeepTheOrderOfTheFile() {
+    ItemEfficiencyFile ordered =
+        file(
+            """
+            categories: {zeta: Z, alpha: A, mid: M, beta: B}
+            entries:
+              - {key: q, category: mid, items: [x], aspects: [save]}
+              - {key: b, category: zeta, items: [y], aspects: [save]}
+              - {key: m, category: alpha, items: [z], aspects: [save]}
+            """);
+
+    assertThat(ordered.categories().keySet()).containsExactly("zeta", "alpha", "mid", "beta");
+    assertThat(ordered.entries())
+        .extracting(ItemEfficiencyEntry::key)
+        .containsExactly("q", "b", "m");
+    assertThat(ordered.selectableNames())
+        .containsExactly("zeta", "alpha", "mid", "beta", "q", "b", "m");
+  }
 }
