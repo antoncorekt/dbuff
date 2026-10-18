@@ -1,7 +1,5 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import com.ako.dbuff.dao.model.ItemEfficiencyDomain;
 import com.ako.dbuff.dao.model.ReplayCombatLogDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
@@ -28,6 +26,8 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The whole analyzer over stored rows, with a file that lists a Magic Stick entry and an entry of a

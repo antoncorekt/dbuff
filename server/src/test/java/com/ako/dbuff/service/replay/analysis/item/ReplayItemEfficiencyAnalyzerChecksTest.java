@@ -1,17 +1,17 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyInputs.MatchInputs;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class ReplayItemEfficiencyAnalyzerChecksTest {
   private final ItemEfficiencyInputs inputs = mock(ItemEfficiencyInputs.class);
