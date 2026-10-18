@@ -119,8 +119,8 @@ public class ItemEfficiencyFile {
     if (!problems.isEmpty()) {
       throw invalid(String.join("; ", problems));
     }
-    prices = content.prices() == null ? Map.of() : Map.copyOf(content.prices());
-    categories = Map.copyOf(content.categories());
+    prices = content.prices() == null ? Map.of() : ordered(content.prices());
+    categories = ordered(content.categories());
     entries = List.copyOf(checked);
   }
 
@@ -198,6 +198,10 @@ public class ItemEfficiencyFile {
 
   private static boolean invalidNumber(Double value) {
     return value == null || value.isNaN() || value.isInfinite() || value < 0;
+  }
+
+  private static <V> Map<String, V> ordered(Map<String, V> map) {
+    return java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(map));
   }
 
   private static List<String> copy(List<String> list) {
