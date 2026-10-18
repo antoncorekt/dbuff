@@ -54,10 +54,11 @@ public class SelfHarmAspect implements ItemAspect {
     double gain = 0;
     boolean estimated = false;
     boolean unknown = false;
+    Set<Double> counted = new HashSet<>();
     for (CombatEvent use : uses) {
       double t = use.gameSecond();
       OptionalDouble death = judge.health().deathBetween(t, t + window);
-      if (death.isEmpty()) {
+      if (death.isEmpty() || counted.contains(death.getAsDouble())) {
         continue;
       }
       OptionalInt hpBefore = judge.judge(t).hpNow();
@@ -69,6 +70,7 @@ public class SelfHarmAspect implements ItemAspect {
       if (damage >= hpBefore.getAsInt()) {
         continue;
       }
+      counted.add(death.getAsDouble());
       DeathCost.Cost cost = deathCost.at(death.getAsDouble());
       estimated |= cost.estimated();
       gain -= cost.value();
