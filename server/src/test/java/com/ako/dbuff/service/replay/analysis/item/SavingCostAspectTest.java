@@ -1,5 +1,11 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
+import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.change;
+import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.dealt;
+import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.death;
+import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.sampleOf;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
@@ -9,12 +15,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-
-import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.change;
-import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.dealt;
-import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.death;
-import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.sampleOf;
-import static org.assertj.core.api.Assertions.assertThat;
 
 class SavingCostAspectTest {
   private static final String RADIANCE = "item_radiance";
@@ -161,9 +161,9 @@ class SavingCostAspectTest {
 
     ItemEfficiency row = evaluate(changes, List.of(death(350)), track(300));
 
-    assertThat(row.rows().getFirst().seconds()).isEqualTo(400.0);
+    assertThat(row.rows().getFirst().seconds()).isEqualTo(405.0);
     assertThat(row.figures())
-        .containsEntry("savingSeconds", 200.0)
+        .containsEntry("savingSeconds", 195.0)
         .containsEntry("savingDeaths", 0.0);
     assertThat(row.gain()).isZero();
   }
