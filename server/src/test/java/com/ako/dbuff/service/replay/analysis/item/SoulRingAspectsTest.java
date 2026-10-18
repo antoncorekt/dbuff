@@ -99,8 +99,7 @@ class SoulRingAspectsTest {
 
   @Test
   void severalUsesBeforeOneDeathCountItOnce() {
-    ItemEfficiency one =
-        evaluate(List.of(hit(199, 20, 150), use(200, RING, ""), death(205)));
+    ItemEfficiency one = evaluate(List.of(hit(199, 20, 150), use(200, RING, ""), death(205)));
     ItemEfficiency three =
         evaluate(
             List.of(
@@ -111,7 +110,7 @@ class SoulRingAspectsTest {
                 death(205)));
 
     assertThat(three.figures()).containsEntry("selfDeaths", 1.0);
-    assertThat(three.gain()).isEqualTo(one.gain(), org.assertj.core.data.Offset.offset(0.001));
+    assertThat(three.figures().get("selfHarmGain")).isEqualTo(one.figures().get("selfHarmGain"));
     assertThat(three.rows().stream().filter(r -> r.label().equals("SOUL_RING_DEATH"))).hasSize(1);
   }
 }
