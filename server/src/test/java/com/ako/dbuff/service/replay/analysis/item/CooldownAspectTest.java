@@ -79,9 +79,18 @@ class CooldownAspectTest {
 
   private static ItemEfficiency evaluate(
       List<Double> castSeconds, List<CombatEvent> more, boolean withReduction) {
+    return evaluate(castSeconds, more, withReduction, List.of());
+  }
+
+  private static ItemEfficiency evaluate(
+      List<Double> castSeconds,
+      List<CombatEvent> more,
+      boolean withReduction,
+      List<ReplayStateChangeDomain> extraChanges) {
     List<CombatEvent> events = new ArrayList<>(more);
     List<ReplayStateChangeDomain> changes =
         new ArrayList<>(List.of(change(100, StateChangeKind.ITEM_ADDED, OCTARINE)));
+    changes.addAll(extraChanges);
     for (double t : castSeconds) {
       events.add(cast(t));
       changes.add(cooldown(t));
@@ -146,6 +155,23 @@ class CooldownAspectTest {
 
     assertThat(result.figures()).containsEntry("extraCasts", 2.0).containsEntry("extraGold", 160.0);
     assertThat(result.gain()).isEqualTo(160.0);
+  }
+
+  @Test
+  void anAbilityWhoseCastsOftenShowNoCooldownIsTakenForOneWithChargesAndSkipped() {
+    ItemEfficiency result = evaluate(List.of(200.0, 217.0), List.of(cast(300)), true);
+
+    assertThat(result.count()).isZero();
+    assertThat(result.flags()).contains(CooldownAspect.CHARGES_SKIPPED);
+  }
+
+  @Test
+  void theCooldownNearestToTheCastIsTheOneShown() {
+    ReplayStateChangeDomain early = cooldown(214.5);
+    early.setCooldownLength(40.0);
+    ItemEfficiency result = evaluate(List.of(200.0, 217.0), List.of(), true, List.of(early));
+
+    assertThat(result.count()).isEqualTo(1);
   }
 
   @Test

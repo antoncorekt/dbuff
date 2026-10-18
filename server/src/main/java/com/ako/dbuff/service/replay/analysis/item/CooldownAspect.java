@@ -20,7 +20,8 @@ import org.springframework.stereotype.Component;
  * Cooldown reduction, an investment: a cast made sooner after the previous cast of the same ability
  * than its base cooldown allows is an extra cast. The base is the cooldown the replay showed at the
  * cast divided by one minus the item's reduction. An extra cast is worth the share of the kills its
- * damage helped within a few seconds, or the gold of an extra Hand of Midas use.
+ * damage helped within a few seconds, or the gold of an extra Hand of Midas use. Damage is matched
+ * by the ability's own name, so damage logged under another name is not counted.
  */
 @Component
 public class CooldownAspect implements ItemAspect {
@@ -28,6 +29,7 @@ public class CooldownAspect implements ItemAspect {
 
   static final String REDUCTION_UNKNOWN = "REDUCTION_UNKNOWN";
   static final String COOLDOWN_NOT_SEEN = "COOLDOWN_NOT_SEEN";
+  static final String CHARGES_SKIPPED = "CHARGES_SKIPPED";
 
   private static final String CAST = "CAST";
   private static final String REDUCTION = "bonus_cooldown";
@@ -71,12 +73,17 @@ public class CooldownAspect implements ItemAspect {
       double tolerance = context.price("toleranceSeconds", 0.5);
       Map<String, Double> midasGold = midasGold(context);
       Map<String, Double> last = new LinkedHashMap<>();
+      Set<String> charged = chargeLike(context, windows, reduction);
       for (CombatEvent cast : hero.events()) {
         if (!isCast(cast, hero)) {
           continue;
         }
         Double previous = last.put(cast.inflictor(), cast.gameSecond());
         if (cast.gameSecond() <= windows.bought() || cast.gameSecond() > windows.ownedTo()) {
+          continue;
+        }
+        if (charged.contains(cast.inflictor())) {
+          flags.add(CHARGES_SKIPPED);
           continue;
         }
         OptionalDouble shown = shownCooldown(context, cast, reduction);
@@ -88,16 +95,32 @@ public class CooldownAspect implements ItemAspect {
         double base = shown.getAsDouble() / (1 - reduction);
         double gap = previous == null ? 0 : cast.gameSecond() - previous;
         if (previous != null && gap >= shown.getAsDouble() - tolerance && gap < base - tolerance) {
-          extras.add(
-              new Extra(
-                  cast,
-                  cast.gameSecond() - previous,
-                  base,
-                  midasGold.getOrDefault(key(cast), 0.0)));
+          extras.add(new Extra(cast, gap, base, midasGold.getOrDefault(key(cast), 0.0)));
         }
       }
     }
     return part(context, windows, extras, casts, flags);
+  }
+
+  /**
+   * Abilities with some casts that showed a cooldown and some that did not: with charges, only the
+   * cast that spends the last charge starts a cooldown, so their gaps say nothing about it.
+   */
+  private static Set<String> chargeLike(
+      AspectContext context, FarmWindows windows, double reduction) {
+    Set<String> seen = new HashSet<>();
+    Set<String> unseen = new HashSet<>();
+    for (CombatEvent cast : context.hero().events()) {
+      if (cast.kind() != CombatEventKind.ABILITY
+          || !context.hero().hero().equals(cast.attacker())
+          || cast.gameSecond() <= windows.bought()
+          || cast.gameSecond() > windows.ownedTo()) {
+        continue;
+      }
+      (shownCooldown(context, cast, reduction).isPresent() ? seen : unseen).add(cast.inflictor());
+    }
+    seen.retainAll(unseen);
+    return seen;
   }
 
   private AspectPart part(
@@ -203,6 +226,10 @@ public class CooldownAspect implements ItemAspect {
             c ->
                 c.getGameSeconds() >= cast.gameSecond() - COOLDOWN_LOOKBACK_SECONDS
                     && c.getGameSeconds() <= cast.gameSecond() + COOLDOWN_LOOKAHEAD_SECONDS)
+        .min(
+            java.util.Comparator.comparingDouble(
+                c -> Math.abs(c.getGameSeconds() - cast.gameSecond())))
+        .stream()
         .mapToDouble(ReplayStateChangeDomain::getCooldownLength)
         .findFirst();
   }
