@@ -9,6 +9,7 @@ import com.ako.dbuff.resources.model.RegisterInstanceRequest;
 import com.ako.dbuff.resources.model.UpdateInstanceRequest;
 import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.GameModeResolver;
+import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyFile;
 import com.ako.dbuff.service.replay.report.ReplayReportProperties;
 import com.ako.dbuff.service.replay.report.SectionSwitch;
 import com.ako.dbuff.service.replay.report.TestSections;
@@ -56,8 +57,8 @@ class DbufInstanceConfigServiceTest {
             new InstanceSettingsApplier(
                 Mockito.mock(GameModeResolver.class),
                 new SectionSwitch(
-                    new ReplayReportProperties(),
-                    List.of(TestSections.named("lanes", 20, false)))));
+                    new ReplayReportProperties(), List.of(TestSections.named("lanes", 20, false))),
+                new ItemEfficiencyFile("replay/items.yaml")));
   }
 
   private static RegisterInstanceRequest request() {

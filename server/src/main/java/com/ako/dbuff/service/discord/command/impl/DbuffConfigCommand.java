@@ -152,6 +152,12 @@ public class DbuffConfigCommand implements DbuffCommand {
                         true),
                     new OptionData(
                         OptionType.STRING,
+                        "items",
+                        "Item categories or items analysed, or all",
+                        false,
+                        true),
+                    new OptionData(
+                        OptionType.STRING,
                         "language",
                         "Language of the AI reasons, or default for the server's",
                         false)),
@@ -430,6 +436,7 @@ public class DbuffConfigCommand implements DbuffCommand {
             .quietHours(context.getOption("quiet_hours"))
             .timezone(context.getOption("timezone"))
             .sections(context.getOption("sections"))
+            .itemCategories(context.getOption("items"))
             .language(context.getOption("language"))
             .defaultGameModes(modes.isEmpty() ? null : new LinkedHashSet<>(modes))
             .build();
@@ -512,6 +519,8 @@ public class DbuffConfigCommand implements DbuffCommand {
         + modes
         + "\n**Replay sections:** "
         + settings.getSections()
+        + "\n**Item categories:** "
+        + settings.getItemCategories()
         + "\n**AI language:** "
         + settings.getLanguage();
   }

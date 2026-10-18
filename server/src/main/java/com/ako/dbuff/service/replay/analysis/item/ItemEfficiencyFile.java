@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -70,6 +71,14 @@ public class ItemEfficiencyFile {
   public synchronized Map<String, String> categories() {
     ensureLoaded();
     return categories;
+  }
+
+  /** Every category id and entry key a channel may choose, categories first. */
+  public synchronized Set<String> selectableNames() {
+    ensureLoaded();
+    Set<String> names = new LinkedHashSet<>(categories.keySet());
+    entries.forEach(entry -> names.add(entry.key()));
+    return names;
   }
 
   private void ensureLoaded() {

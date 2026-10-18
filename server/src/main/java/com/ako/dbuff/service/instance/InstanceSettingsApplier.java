@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.resources.model.UpdateInstanceRequest;
 import com.ako.dbuff.service.constant.GameModeResolver;
 import com.ako.dbuff.service.constant.GameModeSelection;
+import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyFile;
 import com.ako.dbuff.service.replay.report.ReplayReportSection;
 import com.ako.dbuff.service.replay.report.SectionSwitch;
 import java.time.DateTimeException;
@@ -37,17 +38,22 @@ public class InstanceSettingsApplier {
   private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("H:mm");
 
   private static final String NONE = "none";
+  private static final String ALL = "all";
   private static final int MAX_LANGUAGE_LENGTH = 40;
   private static final Pattern LANGUAGE = Pattern.compile("^\\p{L}[\\p{L} \\-]*$");
 
   private final GameModeResolver gameModeResolver;
   private final SectionSwitch sectionSwitch;
+  private final ItemEfficiencyFile itemCatalog;
 
   /** The switch is lazy: it holds every report section, which reach back into the services. */
   public InstanceSettingsApplier(
-      GameModeResolver gameModeResolver, @Lazy SectionSwitch sectionSwitch) {
+      GameModeResolver gameModeResolver,
+      @Lazy SectionSwitch sectionSwitch,
+      ItemEfficiencyFile itemCatalog) {
     this.gameModeResolver = gameModeResolver;
     this.sectionSwitch = sectionSwitch;
+    this.itemCatalog = itemCatalog;
   }
 
   /** Applies whichever settings the request carries to {@code target}, leaving the rest alone. */
@@ -72,6 +78,9 @@ public class InstanceSettingsApplier {
     }
     if (request.getSections() != null) {
       target.setSections(parseSections(request.getSections()));
+    }
+    if (request.getItemCategories() != null) {
+      target.setItemCategories(parseItemCategories(request.getItemCategories()));
     }
     if (request.getLanguage() != null) {
       target.setLanguage(parseLanguage(request.getLanguage()));
@@ -115,6 +124,32 @@ public class InstanceSettingsApplier {
       names.add(section.name());
     }
     return String.join(",", names);
+  }
+
+  /** Canonical comma-separated names, null for every category. */
+  private String parseItemCategories(String raw) {
+    String trimmed = raw.trim();
+    if (trimmed.isEmpty() || ALL.equalsIgnoreCase(trimmed) || DEFAULT.equalsIgnoreCase(trimmed)) {
+      return null;
+    }
+    Set<String> valid = itemCatalog.selectableNames();
+    Set<String> names = new LinkedHashSet<>();
+    for (String token : trimmed.split("[,\\s]+")) {
+      if (token.isEmpty()) {
+        continue;
+      }
+      String name = token.toLowerCase(Locale.ROOT).replace('-', '_');
+      if (!valid.contains(name)) {
+        throw new IllegalArgumentException(
+            "Unknown item category `"
+                + token
+                + "`. Valid categories and items: "
+                + String.join(", ", valid)
+                + ". Use `all` for every category.");
+      }
+      names.add(name);
+    }
+    return names.isEmpty() ? null : String.join(",", names);
   }
 
   private String parseLanguage(String raw) {

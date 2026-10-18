@@ -244,6 +244,7 @@ class DbuffConfigCommandTest {
             .option("game_mode", "ability_draft,all_pick")
             .option("sections", "lanes,swing")
             .option("language", "Russian")
+            .option("items", "farming,magic_stick")
             .build();
 
     command.execute("settings", context);
@@ -260,6 +261,7 @@ class DbuffConfigCommandTest {
     assertThat(request.getDefaultGameModes()).containsExactly("ability_draft", "all_pick");
     assertThat(request.getSections()).isEqualTo("lanes,swing");
     assertThat(request.getLanguage()).isEqualTo("Russian");
+    assertThat(request.getItemCategories()).isEqualTo("farming,magic_stick");
     assertThat(context.getEmbeds()).hasSize(1);
   }
 

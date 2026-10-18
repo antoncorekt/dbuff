@@ -73,6 +73,12 @@ public class InstanceSettings {
   @Column(name = "sections")
   private String sections;
 
+  /**
+   * Comma-separated item categories or entry keys the item analysis covers; null means all of them.
+   */
+  @Column(name = "item_categories")
+  private String itemCategories;
+
   /** Language the AI reasons are written in; null follows the server's. */
   @Column(name = "language")
   private String language;
@@ -92,6 +98,18 @@ public class InstanceSettings {
     }
     return Optional.of(
         Arrays.stream(sections.split(","))
+            .map(String::trim)
+            .filter(name -> !name.isEmpty())
+            .toList());
+  }
+
+  /** The channel's own item choice; empty when it covers every category. */
+  public Optional<List<String>> itemCategoryNames() {
+    if (itemCategories == null || itemCategories.isBlank()) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        Arrays.stream(itemCategories.split(","))
             .map(String::trim)
             .filter(name -> !name.isEmpty())
             .toList());
