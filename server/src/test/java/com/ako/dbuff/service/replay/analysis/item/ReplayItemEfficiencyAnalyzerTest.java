@@ -74,7 +74,7 @@ class ReplayItemEfficiencyAnalyzerTest {
     assertThat(stick.getUseCount()).isEqualTo(1);
     assertThat(stick.getCost()).isEqualTo(200);
     assertThat(stick.getPurchaseSeconds()).isEqualTo(-60.0);
-    assertThat(stick.getAnalysisVersion()).isEqualTo(2);
+    assertThat(stick.getAnalysisVersion()).isEqualTo(3);
     assertThat(stick.getFigures()).contains("\"charges\":4.0");
     ItemEfficiency back = ItemEfficiencyJson.fromRow(stick);
     assertThat(back.rows()).hasSize(1);

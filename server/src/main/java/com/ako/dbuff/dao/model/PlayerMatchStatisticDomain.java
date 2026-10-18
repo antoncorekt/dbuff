@@ -25,7 +25,8 @@ import lombok.ToString;
     indexes = {
       @Index(name = "idx_player_match_stat_player_match", columnList = "playerId, matchId"),
       @Index(name = "idx_player_match_stat_player_hero", columnList = "playerId, heroId"),
-      @Index(name = "idx_player_match_stat_match_id", columnList = "matchId")
+      @Index(name = "idx_player_match_stat_match_id", columnList = "matchId"),
+      @Index(name = "idx_player_match_stat_hero_match", columnList = "heroId, matchId, playerSlot")
     })
 @IdClass(PlayerGameStatisticDomainId.class)
 @Data
