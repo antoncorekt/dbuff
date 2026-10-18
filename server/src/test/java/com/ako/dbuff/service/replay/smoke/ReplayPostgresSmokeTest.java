@@ -1,8 +1,5 @@
 package com.ako.dbuff.service.replay.smoke;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.within;
-
 import com.ako.dbuff.dao.model.AbilityDraftPickDomain;
 import com.ako.dbuff.dao.model.CreepKillDomain;
 import com.ako.dbuff.dao.model.FightDomain;
@@ -130,6 +127,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 /**
  * Runs a real replay through the whole pipeline against a real PostgreSQL: a local HTTP server

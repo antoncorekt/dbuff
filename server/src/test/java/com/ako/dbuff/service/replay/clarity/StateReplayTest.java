@@ -1,7 +1,5 @@
 package com.ako.dbuff.service.replay.clarity;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import com.ako.dbuff.service.replay.ReplayFacts;
 import com.ako.dbuff.service.replay.SampleFacts;
 import com.ako.dbuff.service.replay.StateChange;
@@ -13,6 +11,8 @@ import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Checks the recorded cooldowns and inventory against what OpenDota counts for the same hero. */
 @Tag("replay")
