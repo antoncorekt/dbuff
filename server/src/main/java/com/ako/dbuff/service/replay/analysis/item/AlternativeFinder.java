@@ -1,8 +1,6 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
-import com.ako.dbuff.dao.model.PlayerRoleDomain;
-import com.ako.dbuff.dao.model.id.PlayerGameStatisticDomainId;
 import com.ako.dbuff.dao.repo.ItemRepository;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleRepo;
@@ -34,8 +32,9 @@ public class AlternativeFinder {
   private static final double DEFAULT_TIME_BAND = 300;
   private static final double DEFAULT_MIN_GAMES = 5;
   private static final Duration WINDOW = Duration.ofDays(365);
-  private static final Map<Integer, Long> LANE_OF_ROLE = Map.of(1, 1L, 2, 2L, 3, 3L, 4, 4L);
-  private static final Map<Long, Integer> ROLE_OF_LANE = Map.of(1L, 1, 2L, 2, 3L, 3, 4L, 4);
+  private static final int MID_ROLE = 2;
+  private static final long MID_LANE = 2;
+  private static final int CACHED = 64;
 
   /**
    * @param costBand how far a candidate's cost may be from the purchase's, as a fraction of it
@@ -91,6 +90,21 @@ public class AlternativeFinder {
   private final PlayerRoleRepo roleRepo;
   private final ItemKits kits;
   private final Clock clock;
+  private final Map<Long, MatchFacts> matches = lru();
+  private final Map<List<Object>, List<Object[]>> purchases = lru();
+
+  private record MatchFacts(
+      Map<Long, PlayerMatchStatisticDomain> players, Map<Long, Integer> roles) {}
+
+  private static <K, V> Map<K, V> lru() {
+    return java.util.Collections.synchronizedMap(
+        new java.util.LinkedHashMap<>(16, 0.75f, true) {
+          @Override
+          protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
+            return size() > CACHED;
+          }
+        });
+  }
 
   @Autowired
   public AlternativeFinder(
@@ -115,8 +129,9 @@ public class AlternativeFinder {
   }
 
   public Result find(Purchase purchase, Settings settings) {
+    MatchFacts facts = matches.computeIfAbsent(purchase.matchId(), this::load);
     Optional<PlayerMatchStatisticDomain> player =
-        statRepo.findById(new PlayerGameStatisticDomainId(purchase.matchId(), purchase.slot()));
+        Optional.ofNullable(facts.players().get(purchase.slot()));
     OptionalLong subjectId =
         kits.item(purchase.itemKey()).map(i -> i.getId()).stream()
             .filter(java.util.Objects::nonNull)
@@ -125,20 +140,31 @@ public class AlternativeFinder {
     if (player.isEmpty() || player.get().getHeroId() == null || subjectId.isEmpty()) {
       return Result.NONE;
     }
-    Integer role = role(purchase, player.get());
+    Integer role = role(facts, purchase.slot(), player.get());
     if (role == null) {
       return Result.NONE;
     }
+    long from = Math.round(purchase.seconds() - settings.timeBand());
+    long to = Math.round(purchase.seconds() + settings.timeBand());
+    long since =
+        clock
+            .instant()
+            .minus(WINDOW)
+            .truncatedTo(java.time.temporal.ChronoUnit.DAYS)
+            .getEpochSecond();
     List<Object[]> rows =
-        itemRepo.findHeroPurchases(
-            player.get().getHeroId(),
-            role,
-            LANE_OF_ROLE.get(role),
-            Math.round(purchase.seconds() - settings.timeBand()),
-            Math.round(purchase.seconds() + settings.timeBand()),
-            LEAD_MINUTES,
-            purchase.matchId(),
-            clock.instant().minus(WINDOW).getEpochSecond());
+        purchases.computeIfAbsent(
+            List.of(player.get().getHeroId(), role, from, to, purchase.matchId(), since),
+            key ->
+                itemRepo.findHeroPurchases(
+                    player.get().getHeroId(),
+                    role,
+                    role == MID_ROLE ? MID_LANE : null,
+                    from,
+                    to,
+                    LEAD_MINUTES,
+                    purchase.matchId(),
+                    since));
     Map<Long, Tally> tallies = tally(rows);
     Tally own = tallies.getOrDefault(subjectId.getAsLong(), new Tally(0, 0, 0, 0));
     Set<Long> candidates = candidates(purchase, settings, tallies.keySet());
@@ -155,15 +181,25 @@ public class AlternativeFinder {
     return new Result(own.games(), List.copyOf(alternatives));
   }
 
-  private Integer role(Purchase purchase, PlayerMatchStatisticDomain player) {
-    Optional<Integer> stored =
-        roleRepo.findByMatchId(purchase.matchId()).stream()
-            .filter(r -> r.getPlayerSlot() != null && r.getPlayerSlot() == purchase.slot())
-            .map(PlayerRoleDomain::getRole)
-            .filter(java.util.Objects::nonNull)
-            .findFirst();
-    return stored.orElseGet(
-        () -> player.getLaneRole() == null ? null : ROLE_OF_LANE.get(player.getLaneRole()));
+  private MatchFacts load(long matchId) {
+    Map<Long, PlayerMatchStatisticDomain> players = new HashMap<>();
+    statRepo.findAllByMatchId(matchId).stream()
+        .filter(p -> p.getPlayerSlot() != null)
+        .forEach(p -> players.put(p.getPlayerSlot(), p));
+    Map<Long, Integer> roles = new HashMap<>();
+    roleRepo.findByMatchId(matchId).stream()
+        .filter(r -> r.getPlayerSlot() != null && r.getRole() != null)
+        .forEach(r -> roles.putIfAbsent(r.getPlayerSlot(), r.getRole()));
+    return new MatchFacts(players, roles);
+  }
+
+  /** The stored role; without one only the middle lane tells a role, a side lane holds two. */
+  private static Integer role(MatchFacts facts, long slot, PlayerMatchStatisticDomain player) {
+    Integer stored = facts.roles().get(slot);
+    if (stored != null) {
+      return stored;
+    }
+    return player.getLaneRole() != null && player.getLaneRole() == MID_LANE ? MID_ROLE : null;
   }
 
   private Set<Long> candidates(Purchase purchase, Settings settings, Collection<Long> bought) {

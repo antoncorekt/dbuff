@@ -44,7 +44,8 @@ public class AlternativesAspect implements ItemAspect {
 
   @Override
   public AspectPart measure(AspectContext context) {
-    Long cost = context.cost();
+    String subject = HeroInputs.itemKey(context.held().getFirst());
+    Long cost = context.kits().cost(subject).stream().boxed().findFirst().orElse(null);
     Result result =
         cost == null || context.hero().matchId() == 0
             ? new Result(0, List.of())
@@ -52,7 +53,7 @@ public class AlternativesAspect implements ItemAspect {
                 new Purchase(
                     context.hero().matchId(),
                     context.hero().slot(),
-                    HeroInputs.itemKey(context.held().getFirst()),
+                    subject,
                     Set.copyOf(context.entry().items()),
                     context.bought(),
                     cost,

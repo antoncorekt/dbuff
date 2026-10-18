@@ -188,6 +188,6 @@ final class ItemTestData {
       ReplayPlayerTrackDomain track,
       List<CreepKillDomain> kills,
       List<ActivitySegment> activity) {
-    return new HeroInputs(0, HERO, changes, events, track, kills, activity);
+    return new HeroInputs(0, HERO, changes, events, track, kills, activity, 0);
   }
 }

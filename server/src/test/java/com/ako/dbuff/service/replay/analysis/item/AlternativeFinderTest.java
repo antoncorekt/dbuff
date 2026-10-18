@@ -2,7 +2,6 @@ package com.ako.dbuff.service.replay.analysis.item;
 
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerRoleDomain;
-import com.ako.dbuff.dao.model.id.PlayerGameStatisticDomainId;
 import com.ako.dbuff.dao.repo.ItemRepository;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleRepo;
@@ -26,7 +25,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -70,9 +72,9 @@ class AlternativeFinderTest {
   }
 
   private void player(Long laneRole) {
-    when(statRepo.findById(new PlayerGameStatisticDomainId(MATCH, 0L)))
+    when(statRepo.findAllByMatchId(MATCH))
         .thenReturn(
-            Optional.of(
+            List.of(
                 PlayerMatchStatisticDomain.builder()
                     .matchId(MATCH)
                     .playerSlot(0L)
@@ -187,7 +189,7 @@ class AlternativeFinderTest {
         .findHeroPurchases(
             eq(HERO),
             eq(3),
-            eq(3L),
+            isNull(),
             from.capture(),
             to.capture(),
             eq(10),
@@ -199,7 +201,7 @@ class AlternativeFinderTest {
   }
 
   @Test
-  void withoutARoleRowTheLaneRoleStandsInAndWithoutBothThereIsNothing() {
+  void withoutARoleRowOnlyTheMiddleLaneStandsInForARole() {
     player(2L);
     role(null);
     rows();
@@ -207,8 +209,37 @@ class AlternativeFinderTest {
     verify(itemRepo)
         .findHeroPurchases(
             eq(HERO), eq(2), eq(2L), anyLong(), anyLong(), eq(10), eq(MATCH), anyLong());
+  }
+
+  @Test
+  void aSideLaneWithoutARoleRowOrNoLaneAtAllGivesNothing() {
+    player(1L);
+    role(null);
+    assertThat(finder.find(radiance(List.of()), SETTINGS)).isEqualTo(Result.NONE);
 
     player(null);
-    assertThat(finder.find(radiance(List.of()), SETTINGS)).isEqualTo(Result.NONE);
+    assertThat(newFinder().find(radiance(List.of()), SETTINGS)).isEqualTo(Result.NONE);
+    verify(itemRepo, never())
+        .findHeroPurchases(any(), any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void aMatchIsLoadedOnceAndTheSameQueryIsAskedOnce() {
+    player(null);
+    role(1);
+    rows();
+
+    finder.find(radiance(List.of()), SETTINGS);
+    finder.find(radiance(List.of()), SETTINGS);
+
+    verify(statRepo, times(1)).findAllByMatchId(MATCH);
+    verify(roleRepo, times(1)).findByMatchId(MATCH);
+    verify(itemRepo, times(1))
+        .findHeroPurchases(any(), any(), any(), anyLong(), anyLong(), any(), any(), anyLong());
+  }
+
+  private AlternativeFinder newFinder() {
+    return new AlternativeFinder(
+        itemRepo, statRepo, roleRepo, kits, Clock.fixed(NOW, ZoneOffset.UTC));
   }
 }
