@@ -29,9 +29,12 @@ class CooldownAspectTest {
         Optional.of(
             ItemConstant.builder()
                 .cost(4800L)
+                .cd(List.of(90.0))
                 .attrib(
                     withReduction
-                        ? List.of(Map.of("key", "bonus_cooldown", "value", "25"))
+                        ? List.of(
+                            Map.of("key", "bonus_cooldown", "value", "25"),
+                            Map.of("key", "bonus_gold", "value", "160"))
                         : List.of(Map.of("key", "bonus_mana", "value", "450")))
                 .build());
   }
@@ -98,29 +101,30 @@ class CooldownAspectTest {
 
   @Test
   void aCastSoonerThanTheBaseCooldownIsExtraAndOneAfterItIsNot() {
-    ItemEfficiency result = evaluate(List.of(200.0, 212.0, 240.0), List.of(), true);
+    ItemEfficiency result = evaluate(List.of(200.0, 217.0, 245.0), List.of(), true);
 
     assertThat(result.count()).isEqualTo(1);
     assertThat(result.figures()).containsEntry("casts", 3.0).containsEntry("extraCasts", 1.0);
     assertThat(result.rows()).hasSize(1);
-    assertThat(result.rows().getFirst().seconds()).isEqualTo(212.0);
+    assertThat(result.rows().getFirst().seconds()).isEqualTo(217.0);
     assertThat(result.rows().getFirst().figures())
-        .containsEntry("gap", 12.0)
+        .containsEntry("gap", 17.0)
         .containsEntry("baseCooldown", 20.0);
   }
 
   @Test
-  void aGapBetweenTheShownAndTheBaseCooldownIsExtraAndOneJustAtTheBaseIsNot() {
+  void aGapBetweenTheShownAndTheBaseCooldownIsExtraAndOneAtTheBaseOrBelowTheShownIsNot() {
     assertThat(evaluate(List.of(200.0, 215.0), List.of(), true).count()).isEqualTo(1);
     assertThat(evaluate(List.of(200.0, 220.0), List.of(), true).count()).isZero();
+    assertThat(evaluate(List.of(200.0, 210.0), List.of(), true).count()).isZero();
   }
 
   @Test
   void theDamageOfAnExtraCastIsValuedByTheKillItHelped() {
     List<CombatEvent> fight =
-        List.of(damage(213, 300), died(215), gold(215, 500), damage(241, 300), died(244));
+        List.of(damage(218, 300), died(220), gold(220, 500), damage(246, 300), died(249));
 
-    ItemEfficiency result = evaluate(List.of(200.0, 212.0, 240.0), fight, true);
+    ItemEfficiency result = evaluate(List.of(200.0, 217.0, 245.0), fight, true);
 
     assertThat(result.figures()).containsEntry("killsHelped", 1.0);
     assertThat(result.gain()).isEqualTo(500.0);
@@ -128,15 +132,32 @@ class CooldownAspectTest {
   }
 
   @Test
+  void anExtraMidasUseIsWorthItsBonusGoldAndTheConstantsCooldownIsTheBase() {
+    List<CombatEvent> uses =
+        List.of(
+            ItemTestData.use(200, "item_hand_of_midas", "npc_dota_neutral_satyr_hellcaller"),
+            gold(200, 160),
+            ItemTestData.use(270, "item_hand_of_midas", "npc_dota_neutral_satyr_hellcaller"),
+            gold(270, 160),
+            ItemTestData.use(340, "item_hand_of_midas", "npc_dota_neutral_satyr_hellcaller"),
+            ItemTestData.use(341, "item_hand_of_midas", "npc_dota_neutral_satyr_hellcaller"));
+
+    ItemEfficiency result = evaluate(List.of(), uses, true);
+
+    assertThat(result.figures()).containsEntry("extraCasts", 2.0).containsEntry("extraGold", 160.0);
+    assertThat(result.gain()).isEqualTo(160.0);
+  }
+
+  @Test
   void aCastBeforeThePurchaseIsOnlyThePreviousCastNotCounted() {
-    ItemEfficiency result = evaluate(List.of(95.0, 105.0), List.of(), true);
+    ItemEfficiency result = evaluate(List.of(95.0, 112.0), List.of(), true);
 
     assertThat(result.figures()).containsEntry("casts", 1.0).containsEntry("extraCasts", 1.0);
   }
 
   @Test
   void withoutAReductionInTheConstantsNothingIsCountedAndTheRowSaysSo() {
-    ItemEfficiency result = evaluate(List.of(200.0, 212.0), List.of(), false);
+    ItemEfficiency result = evaluate(List.of(200.0, 217.0), List.of(), false);
 
     assertThat(result.count()).isZero();
     assertThat(result.flags()).contains(CooldownAspect.REDUCTION_UNKNOWN);

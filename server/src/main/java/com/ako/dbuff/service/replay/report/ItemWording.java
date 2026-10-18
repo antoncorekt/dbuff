@@ -64,6 +64,8 @@ public final class ItemWording {
           "the gold lost or the respawn time of the saved death is estimated";
       case "COST_UNKNOWN" -> "the item constants give no cost for it, so there is no ratio";
       case "BONUS_GOLD_UNKNOWN" -> "the constants give no bonus gold, so no gold is counted";
+      case "COOLDOWN_NOT_SEEN" -> "a cast with no cooldown shown in the replay is not counted";
+      case "REDUCTION_UNKNOWN" -> "the constants give no cooldown reduction, so no cast is counted";
       case "USE_WITHOUT_GOLD" -> "a use had no gold entry in the log";
       case "NO_BEFORE_WINDOW" -> "bought too early for a before window, not compared";
       case "SHORT_AFTER_WINDOW" -> "bought too late for an after window, not compared";

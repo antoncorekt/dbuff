@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
 import com.ako.dbuff.dao.model.ReplayStateChangeDomain;
+import com.ako.dbuff.service.constant.data.ItemConstant;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.StateChangeKind;
@@ -78,14 +79,15 @@ public class CooldownAspect implements ItemAspect {
         if (cast.gameSecond() <= windows.bought() || cast.gameSecond() > windows.ownedTo()) {
           continue;
         }
-        OptionalDouble observed = observedCooldown(hero, cast);
-        if (observed.isEmpty()) {
+        OptionalDouble shown = shownCooldown(context, cast, reduction);
+        if (shown.isEmpty()) {
           flags.add(COOLDOWN_NOT_SEEN);
           continue;
         }
         casts++;
-        double base = observed.getAsDouble() / (1 - reduction);
-        if (previous != null && cast.gameSecond() - previous < base - tolerance) {
+        double base = shown.getAsDouble() / (1 - reduction);
+        double gap = previous == null ? 0 : cast.gameSecond() - previous;
+        if (previous != null && gap >= shown.getAsDouble() - tolerance && gap < base - tolerance) {
           extras.add(
               new Extra(
                   cast,
@@ -171,6 +173,25 @@ public class CooldownAspect implements ItemAspect {
       gold.put(key(use.event()), (double) use.gold());
     }
     return gold;
+  }
+
+  /**
+   * The cooldown the hero had at the cast: the one the replay showed, else for an item the
+   * constants' cooldown reduced by the item's share.
+   */
+  private static OptionalDouble shownCooldown(
+      AspectContext context, CombatEvent cast, double reduction) {
+    OptionalDouble observed = observedCooldown(context.hero(), cast);
+    if (observed.isPresent() || cast.kind() != CombatEventKind.ITEM) {
+      return observed;
+    }
+    return context
+        .kits()
+        .item(HeroInputs.itemKey(cast.inflictor()))
+        .map(ItemConstant::getCd)
+        .filter(cd -> cd != null && !cd.isEmpty() && cd.getFirst() != null && cd.getFirst() > 0)
+        .map(cd -> OptionalDouble.of(cd.getFirst() * (1 - reduction)))
+        .orElse(OptionalDouble.empty());
   }
 
   private static OptionalDouble observedCooldown(HeroInputs hero, CombatEvent cast) {
