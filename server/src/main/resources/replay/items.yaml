@@ -28,6 +28,7 @@ entries:
     category: farming
     items: [hand_of_midas]
     aspects: [midas-uses]
+    winStats: [[hand_of_midas], [hand_of_midas, octarine_core]]
     parameters:
       cooldownSeconds: 90
       xpWeight: 1
