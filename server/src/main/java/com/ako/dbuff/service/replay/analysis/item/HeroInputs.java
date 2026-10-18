@@ -20,6 +20,7 @@ import java.util.OptionalInt;
  * @param events the combat log entries of or about the hero (item uses by him, damage to him, his
  *     deaths, his gold and experience), in log order
  * @param track null when the hero has none
+ * @param match what the worth model reads across heroes
  */
 public record HeroInputs(
     long slot,
@@ -28,7 +29,19 @@ public record HeroInputs(
     List<CombatEvent> events,
     ReplayPlayerTrackDomain track,
     List<CreepKillDomain> creepKills,
-    List<ActivitySegment> activity) {
+    List<ActivitySegment> activity,
+    MatchFacts match) {
+
+  public HeroInputs(
+      long slot,
+      String hero,
+      List<ReplayStateChangeDomain> changes,
+      List<CombatEvent> events,
+      ReplayPlayerTrackDomain track,
+      List<CreepKillDomain> creepKills,
+      List<ActivitySegment> activity) {
+    this(slot, hero, changes, events, track, creepKills, activity, MatchFacts.EMPTY);
+  }
 
   public static final String ITEM_PREFIX = "item_";
 

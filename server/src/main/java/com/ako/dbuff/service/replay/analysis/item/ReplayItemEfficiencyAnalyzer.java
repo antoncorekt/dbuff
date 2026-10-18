@@ -40,12 +40,13 @@ public class ReplayItemEfficiencyAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 1;
+    return 2;
   }
 
   @Override
   public Set<String> requires() {
-    return Set.of("players", "tracks", "state-changes", "combat-log", "activity", "creep-kills");
+    return Set.of(
+        "players", "tracks", "state-changes", "combat-log", "activity", "creep-kills", "minutes");
   }
 
   @Override
@@ -59,7 +60,12 @@ public class ReplayItemEfficiencyAnalyzer implements ReplayAnalyzer {
     for (int i = 0; i < entries.size(); i++) {
       results.addAll(
           AspectSum.judge(
-              entries.get(i), chosen.get(i), kits, match.gameEndSeconds(), match.heroes()));
+              entries.get(i),
+              chosen.get(i),
+              kits,
+              match.gameEndSeconds(),
+              match.heroes(),
+              file.prices()));
     }
     Map<String, String> categories =
         entries.stream()
