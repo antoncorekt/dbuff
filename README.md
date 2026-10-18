@@ -79,7 +79,7 @@ The server starts on `http://localhost:8080`
 
 ## Add the bot to your Discord server
 
-Group admins: see [docs/ONBOARDING.md](docs/ONBOARDING.md). The bot logs its invite URL at startup
+Group admins: see `docs/ONBOARDING.md` (kept next to the repo, not in git). The bot logs its invite URL at startup
 (`Invite URL: ...`).
 
 ## API Endpoints
