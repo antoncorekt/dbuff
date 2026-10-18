@@ -93,9 +93,12 @@ public class ReplayItemEfficiencyAnalyzer implements ReplayAnalyzer {
     List<List<ItemAspect>> chosen = new ArrayList<>();
     for (ItemEfficiencyEntry entry : entries) {
       List<ItemAspect> own = new ArrayList<>();
+      Set<String> listed = new java.util.HashSet<>();
       for (String name : entry.aspects()) {
         ItemAspect aspect = byName.get(name);
-        if (aspect == null) {
+        if (!listed.add(name)) {
+          problems.add("entry '%s': aspect '%s' is listed twice".formatted(entry.key(), name));
+        } else if (aspect == null) {
           problems.add("entry '%s': unknown aspect '%s'".formatted(entry.key(), name));
         } else {
           own.add(aspect);

@@ -69,6 +69,17 @@ class ReplayItemEfficiencyAnalyzerChecksTest {
   }
 
   @Test
+  void anAspectListedTwiceInOneEntryStopsTheRunNamingTheEntry() {
+    ReplayItemEfficiencyAnalyzer analyzer =
+        analyzer(
+            "{\"key\": \"a\", \"category\": \"farming\", \"aspects\": [\"save\", \"save\"],"
+                + " \"items\": [\"x\"]}");
+
+    assertThatThrownBy(() -> analyzer.analyze(1))
+        .hasMessageContaining("entry 'a': aspect 'save' is listed twice");
+  }
+
+  @Test
   void everyProblemOfTheFileIsReportedInOneError() {
     ReplayItemEfficiencyAnalyzer analyzer =
         analyzer(
