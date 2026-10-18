@@ -18,6 +18,7 @@ public class TeamRestoreAspect implements ItemAspect {
   public static final String NAME = "team-restore";
 
   static final String MANA_ESTIMATED = "MANA_ESTIMATED";
+  static final String RADIUS_ASSUMED = "RADIUS_ASSUMED";
 
   private static final String USE = "USE";
   private static final Set<String> PARAMETERS = parameters();
@@ -60,7 +61,7 @@ public class TeamRestoreAspect implements ItemAspect {
         gain,
         true,
         totals,
-        mana > 0 ? List.of(MANA_ESTIMATED) : List.of(),
+        flags(mana > 0, uses.stream().anyMatch(Use::radiusAssumed)),
         uses.stream().map(TeamRestoreAspect::row).toList(),
         uses.size(),
         null,
@@ -73,5 +74,16 @@ public class TeamRestoreAspect implements ItemAspect {
     figures.put("mana", use.mana());
     figures.put("allies", (double) use.reached().size());
     return new Detail(USE, use.second(), null, figures);
+  }
+
+  private static List<String> flags(boolean manaEstimated, boolean radiusAssumed) {
+    List<String> flags = new java.util.ArrayList<>();
+    if (manaEstimated) {
+      flags.add(MANA_ESTIMATED);
+    }
+    if (radiusAssumed) {
+      flags.add(RADIUS_ASSUMED);
+    }
+    return flags;
   }
 }

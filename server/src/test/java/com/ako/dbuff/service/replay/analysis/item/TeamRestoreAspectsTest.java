@@ -285,4 +285,86 @@ class TeamRestoreAspectsTest {
     assertThat(row.count()).isZero();
     assertThat(row.gain()).isZero();
   }
+
+  @Test
+  void theUserGetsTheRestoreToo_withoutBeingAnAllyOrASave() {
+    ReplayPlayerTrackDomain user = trackAt(0, 0);
+    user.getMana()[sampleOf(200)] = 300;
+    user.getManaPercent()[sampleOf(200)] = 75;
+    ItemEfficiency row =
+        judge(
+                entry("mekansm", MEKANSM, List.of(TeamRestoreAspect.NAME, SaveAspect.NAME)),
+                MEKANSM,
+                List.of(
+                    use(200.0, MEKANSM, ""),
+                    heal(200.0, MEKANSM, ItemTestData.HERO, 250),
+                    heal(200.0, MEKANSM, LION, 250)),
+                List.of(ally(1, LION, trackAt(300, 0), List.of())))
+            .getFirst();
+
+    assertThat(row.figures()).containsEntry("hp", 500.0).containsEntry("allies", 1.0);
+    assertThat(row.figures()).containsEntry("saves", 0.0);
+  }
+
+  @Test
+  void anAllyTheItemDidNotHealIsNoSaveEvenAtLowHealthUnderHeavyDamage() {
+    List<CombatEvent> lionEvents =
+        List.of(hitOn(LION, 199.0, 600, 150), hitOn(LION, 201.0, 100, 300));
+
+    ItemEfficiency row =
+        judge(
+                entry("mekansm", MEKANSM, List.of(TeamRestoreAspect.NAME, SaveAspect.NAME)),
+                MEKANSM,
+                List.of(use(200.0, MEKANSM, "")),
+                List.of(ally(1, LION, trackAt(300, 0), lionEvents)))
+            .getFirst();
+
+    assertThat(row.figures()).containsEntry("allies", 1.0).containsEntry("saves", 0.0);
+  }
+
+  @Test
+  void aMissingRadiusInTheConstantsIsFlagged() {
+    ItemKits none = key -> Optional.of(ItemConstant.builder().cost(100L).attrib(List.of()).build());
+    ItemEfficiencyEntry entry = entry("mekansm", MEKANSM, List.of(TeamRestoreAspect.NAME));
+    HeroInputs user =
+        ItemTestData.hero(
+            List.of(change(-60, StateChangeKind.ITEM_ADDED, MEKANSM)),
+            List.of(use(200.0, MEKANSM, "")),
+            trackAt(0, 0),
+            List.of(),
+            List.of());
+
+    ItemEfficiency row = ItemTestData.judge(entry, aspects, none, 600, List.of(user)).getFirst();
+
+    assertThat(row.flags()).contains(TeamRestoreAspect.RADIUS_ASSUMED);
+  }
+
+  @Test
+  void theAttributeKeysAreTheOnesTheRealConstantsUse() throws Exception {
+    Map<String, Map<String, Object>> items =
+        new com.fasterxml.jackson.databind.ObjectMapper()
+            .readValue(
+                getClass().getResourceAsStream("/replay/team-restore-constants.json"),
+                new com.fasterxml.jackson.core.type.TypeReference<>() {});
+    ItemKits kits =
+        key ->
+            Optional.of(items.get(key))
+                .map(
+                    item ->
+                        ItemConstant.builder()
+                            .cost(((Number) item.get("cost")).longValue())
+                            .attrib((List<Map<String, String>>) item.get("attrib"))
+                            .build());
+
+    for (String key : items.keySet()) {
+      assertThat(TeamUses.RADIUS_ATTRIBUTES.stream().map(a -> kits.attribute(key, a)))
+          .as("%s radius", key)
+          .anyMatch(java.util.OptionalDouble::isPresent);
+    }
+    assertThat(TeamUses.MANA_ATTRIBUTES.stream().map(a -> kits.attribute("arcane_boots", a)))
+        .anyMatch(java.util.OptionalDouble::isPresent);
+    assertThat(TeamUses.MANA_ATTRIBUTES.stream().map(a -> kits.attribute("guardian_greaves", a)))
+        .anyMatch(java.util.OptionalDouble::isPresent);
+    assertThat(kits.attribute("holy_locket", TeamUses.MANA_PER_CHARGE)).isPresent();
+  }
 }

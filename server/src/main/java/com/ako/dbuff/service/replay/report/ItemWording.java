@@ -65,6 +65,7 @@ public final class ItemWording {
       case "MANA_ESTIMATED" ->
           "the mana each ally got is estimated from the item's constants, capped by what he was"
               + " missing";
+      case "RADIUS_ASSUMED" -> "the constants give no radius for it, so 1200 is assumed";
       case "COST_UNKNOWN" -> "the item constants give no cost for it, so there is no ratio";
       case "BONUS_GOLD_UNKNOWN" -> "the constants give no bonus gold, so no gold is counted";
       case "USE_WITHOUT_GOLD" -> "a use had no gold entry in the log";

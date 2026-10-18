@@ -92,7 +92,7 @@ public class SaveAspect implements ItemAspect {
     for (TeamUses.Use use : uses) {
       double value = 0;
       for (TeamUses.Reach reach : use.reached()) {
-        if (reach.verdict().saved()) {
+        if (reach.saved()) {
           DeathCost.Cost cost =
               costs
                   .computeIfAbsent(reach.ally().slot(), s -> new DeathCost(reach.ally(), prices))

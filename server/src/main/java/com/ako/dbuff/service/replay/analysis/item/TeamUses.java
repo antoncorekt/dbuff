@@ -26,10 +26,10 @@ record TeamUses(List<Use> uses) {
               SaveJudge.PARAMETERS.stream(), Stream.of("radius", "manaPerUse", "healWindowSeconds"))
           .collect(Collectors.toUnmodifiableSet());
 
-  private static final List<String> RADIUS_ATTRIBUTES =
+  static final List<String> RADIUS_ATTRIBUTES =
       List.of("heal_radius", "replenish_radius", "charge_radius", "aura_radius");
-  private static final List<String> MANA_ATTRIBUTES = List.of("replenish_mana", "replenish_amount");
-  private static final String MANA_PER_CHARGE = "mana_restore_per_charge";
+  static final List<String> MANA_ATTRIBUTES = List.of("replenish_mana", "replenish_amount");
+  static final String MANA_PER_CHARGE = "mana_restore_per_charge";
   private static final double DEFAULT_RADIUS = 1200;
   private static final int ALIVE_FLAG = 1;
 
@@ -40,19 +40,30 @@ record TeamUses(List<Use> uses) {
    * @param mana the mana estimated, capped by what he was missing when the track tells it
    * @param verdict whether the use saved him
    */
-  record Reach(HeroInputs ally, double hp, double mana, SaveJudge.Verdict verdict) {}
+  record Reach(HeroInputs ally, double hp, double mana, SaveJudge.Verdict verdict) {
+    /** A save needs the item to have healed him; a nearby ally it did nothing for is no save. */
+    boolean saved() {
+      return hp > 0 && verdict.saved();
+    }
+  }
 
-  record Use(double second, List<Reach> reached) {
+  /**
+   * One use. The user gets the item's health and mana too, which counts in the totals but is
+   * neither an ally nor a save.
+   *
+   * @param radiusAssumed the constants gave no radius, so the default was used
+   */
+  record Use(double second, List<Reach> reached, Reach self, boolean radiusAssumed) {
     double hp() {
-      return reached.stream().mapToDouble(Reach::hp).sum();
+      return reached.stream().mapToDouble(Reach::hp).sum() + self.hp();
     }
 
     double mana() {
-      return reached.stream().mapToDouble(Reach::mana).sum();
+      return reached.stream().mapToDouble(Reach::mana).sum() + self.mana();
     }
 
     long saves() {
-      return reached.stream().filter(r -> r.verdict().saved()).count();
+      return reached.stream().filter(Reach::saved).count();
     }
 
     long diedSoon() {
@@ -64,6 +75,7 @@ record TeamUses(List<Use> uses) {
     HeroInputs hero = context.hero();
     List<HeroInputs> allies = hero.match().allies(hero);
     Map<Long, SaveJudge> judges = new HashMap<>();
+    judges.put(hero.slot(), new SaveJudge(hero, context));
     allies.forEach(a -> judges.put(a.slot(), new SaveJudge(a, context)));
     List<CombatEvent> heals =
         hero.match().events().stream()
@@ -85,35 +97,50 @@ record TeamUses(List<Use> uses) {
     double t = use.gameSecond();
     String key = HeroInputs.itemKey(use.inflictor());
     double window = context.price("healWindowSeconds", 2.0);
-    double radius = radius(context, key);
+    OptionalDouble known = radius(context, key);
+    double radius = known.orElse(DEFAULT_RADIUS);
     OptionalInt position = nearest(context.hero().track(), t);
     double manaPerUse = manaPerUse(context, key, t);
     List<Reach> reached = new ArrayList<>();
     for (HeroInputs ally : allies) {
-      double hp =
-          heals.stream()
-              .filter(h -> use.inflictor().equals(h.inflictor()) && ally.hero().equals(h.target()))
-              .filter(h -> Math.abs(h.gameSecond() - t) <= window)
-              .mapToDouble(CombatEvent::value)
-              .sum();
+      double hp = healed(heals, use, ally, window);
       if (hp > 0 || within(context.hero().track(), position, ally.track(), t, radius)) {
-        SaveJudge judge = judges.get(ally.slot());
-        HeroHealth.Mana missing = judge.health().mana(t);
-        double mana = missing == null ? manaPerUse : Math.min(manaPerUse, missing.missing());
-        reached.add(new Reach(ally, hp, mana, judge.judge(t)));
+        reached.add(reach(ally, hp, manaPerUse, judges.get(ally.slot()), t));
       }
     }
-    return new Use(t, reached);
+    HeroInputs user = context.hero();
+    Reach self =
+        reach(user, healed(heals, use, user, window), manaPerUse, judges.get(user.slot()), t);
+    return new Use(t, reached, self, known.isEmpty());
   }
 
-  private static double radius(AspectContext context, String key) {
+  /**
+   * The heals of one use are told apart by item, healer and target within the window; two uses
+   * closer than twice the window would share heals, which a cooldown rules out.
+   */
+  private static double healed(
+      List<CombatEvent> heals, CombatEvent use, HeroInputs target, double window) {
+    return heals.stream()
+        .filter(h -> use.inflictor().equals(h.inflictor()) && target.hero().equals(h.target()))
+        .filter(h -> Math.abs(h.gameSecond() - use.gameSecond()) <= window)
+        .mapToDouble(CombatEvent::value)
+        .sum();
+  }
+
+  private static Reach reach(
+      HeroInputs target, double hp, double manaPerUse, SaveJudge judge, double second) {
+    HeroHealth.Mana missing = judge.health().mana(second);
+    double mana = missing == null ? manaPerUse : Math.min(manaPerUse, missing.missing());
+    return new Reach(target, hp, mana, judge.judge(second));
+  }
+
+  private static OptionalDouble radius(AspectContext context, String key) {
     return context.entry().parameters().containsKey("radius")
-        ? context.entry().parameter("radius", DEFAULT_RADIUS)
+        ? OptionalDouble.of(context.entry().parameter("radius", DEFAULT_RADIUS))
         : RADIUS_ATTRIBUTES.stream()
             .map(name -> context.kits().attribute(key, name))
             .flatMapToDouble(OptionalDouble::stream)
-            .findFirst()
-            .orElse(DEFAULT_RADIUS);
+            .findFirst();
   }
 
   private static double manaPerUse(AspectContext context, String key, double second) {
