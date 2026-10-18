@@ -1,11 +1,5 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
-import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.change;
-import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.dealt;
-import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.death;
-import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.sampleOf;
-import static org.assertj.core.api.Assertions.assertThat;
-
 import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
@@ -15,6 +9,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+
+import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.change;
+import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.dealt;
+import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.death;
+import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.sampleOf;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class SavingCostAspectTest {
   private static final String RADIANCE = "item_radiance";
