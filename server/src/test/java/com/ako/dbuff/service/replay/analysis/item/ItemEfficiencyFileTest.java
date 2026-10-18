@@ -29,10 +29,12 @@ class ItemEfficiencyFileTest {
                 "farming_items",
                 List.of("farm-rate", "item-damage", "stat-uplift", "alternatives")),
             org.assertj.core.groups.Tuple.tuple(
-                "radiance", List.of("farm-rate", "item-damage", "alternatives")));
+                "radiance", List.of("farm-rate", "item-damage", "alternatives")),
+            org.assertj.core.groups.Tuple.tuple(
+                "soul_ring", List.of("self-harm", "charge-restore")));
     assertThat(entries)
         .extracting(ItemEfficiencyEntry::category)
-        .containsExactly("sustain", "farming", "farming", "farming");
+        .containsExactly("sustain", "farming", "farming", "farming", "sustain");
     assertThat(entries.get(0).items()).containsExactly("magic_stick", "magic_wand");
     assertThat(entries.get(2).items()).containsExactly("bfury", "maelstrom", "mjollnir");
   }
@@ -44,6 +46,7 @@ class ItemEfficiencyFileTest {
         java.util.List.<ItemAspect>of(
             new ChargeRestoreAspect(),
             new SaveAspect(),
+            new SelfHarmAspect(),
             new MidasUsesAspect(null),
             new FarmRateAspect(),
             new ItemDamageAspect(),

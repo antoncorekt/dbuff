@@ -12,6 +12,7 @@ class ItemKindWordingsTest {
     assertThat(wordings.find("charge-restore")).containsInstanceOf(StickKindWording.class);
     assertThat(wordings.find("midas-uses")).containsInstanceOf(MidasKindWording.class);
     assertThat(wordings.find("farm-rate")).containsInstanceOf(FarmingKindWording.class);
+    assertThat(wordings.find("self-harm")).containsInstanceOf(SoulRingKindWording.class);
   }
 
   @Test
