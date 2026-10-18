@@ -3,6 +3,8 @@ package com.ako.dbuff.service.replay.report;
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.service.discord.command.AsyncReply;
 import com.ako.dbuff.service.discord.command.CommandContext;
+import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyFile;
+import java.util.List;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
@@ -17,16 +19,21 @@ import org.springframework.stereotype.Component;
 @Component
 public class ReportCommandHandler {
   public static final String SECTION_OPTION = "section";
+  public static final String ITEMS_OPTION = "items";
   public static final String ALL = "all";
+  private static final String ITEMS_SECTION = "items";
 
   private final ReplayReportService reports;
   private final SectionSwitch sectionSwitch;
   private final OnDemandCooldown cooldown;
+  private final ItemEfficiencyFile itemCatalog;
 
   public ReportCommandHandler(
       @Lazy ReplayReportService reports,
       @Lazy SectionSwitch sectionSwitch,
-      OnDemandCooldown cooldown) {
+      OnDemandCooldown cooldown,
+      ItemEfficiencyFile itemCatalog) {
+    this.itemCatalog = itemCatalog;
     this.reports = reports;
     this.sectionSwitch = sectionSwitch;
     this.cooldown = cooldown;
@@ -51,6 +58,13 @@ public class ReportCommandHandler {
           "❌ Section `" + section.get().name() + "` is switched off on the server.");
       return;
     }
+    List<String> items;
+    try {
+      items = itemFilter(context, section);
+    } catch (IllegalArgumentException e) {
+      context.replyEphemeral("❌ " + e.getMessage());
+      return;
+    }
     if (!reports.hasStoredAnalysis(matchId)) {
       context.replyEphemeral(
           "❌ Match "
@@ -72,7 +86,7 @@ public class ReportCommandHandler {
       AsyncReply reply =
           context.acknowledge(
               "🔄 Preparing " + label + " of match " + matchId + "…", "Match " + matchId);
-      posted = deliver(reply, matchId, config, requested, all, section);
+      posted = deliver(reply, matchId, config, requested, all, section, items);
     } finally {
       if (!posted) {
         cooldown.release(permit);
@@ -86,12 +100,16 @@ public class ReportCommandHandler {
       DbufInstanceConfigDomain config,
       String requested,
       boolean all,
-      Optional<ReplayReportSection> section) {
+      Optional<ReplayReportSection> section,
+      List<String> items) {
     try {
       ReportDelivery delivery =
           all
               ? reports.redeliver(matchId, config.getId())
-              : reports.deliverSection(matchId, config.getId(), section.get().name());
+              : items == null
+                  ? reports.deliverSection(matchId, config.getId(), section.get().name())
+                  : reports.deliverSection(
+                      matchId, config.getId(), section.get().name(), null, items);
       if (delivery == ReportDelivery.POSTED) {
         return true;
       }
@@ -101,6 +119,18 @@ public class ReportCommandHandler {
       reply.fail("❌ The report of match " + matchId + " failed, see the log.");
     }
     return false;
+  }
+
+  /** The items a person named for the items section; null when none, so the channel's apply. */
+  private List<String> itemFilter(CommandContext context, Optional<ReplayReportSection> section) {
+    String raw = context.getOption(ITEMS_OPTION);
+    if (raw == null || raw.isBlank()) {
+      return null;
+    }
+    if (section.isEmpty() || !ITEMS_SECTION.equals(section.get().name())) {
+      throw new IllegalArgumentException("`items:` only applies to `section:items`.");
+    }
+    return itemCatalog.parseSelection(raw).orElse(null);
   }
 
   private static String notPosted(

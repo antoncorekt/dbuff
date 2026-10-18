@@ -7,10 +7,14 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -81,6 +85,39 @@ public class ItemEfficiencyFile {
     return names;
   }
 
+  /**
+   * The categories and entry keys named in a comma or space separated list, in the canonical
+   * spelling; empty for a blank text, {@code all} or {@code default}.
+   *
+   * @throws IllegalArgumentException with the valid names when one is unknown
+   */
+  public Optional<List<String>> parseSelection(String raw) {
+    String trimmed = raw == null ? "" : raw.trim();
+    if (trimmed.isEmpty()
+        || "all".equalsIgnoreCase(trimmed)
+        || "default".equalsIgnoreCase(trimmed)) {
+      return Optional.empty();
+    }
+    Set<String> valid = selectableNames();
+    Set<String> names = new LinkedHashSet<>();
+    for (String token : trimmed.split("[,\\s]+")) {
+      if (token.isEmpty()) {
+        continue;
+      }
+      String name = token.toLowerCase(Locale.ROOT).replace('-', '_');
+      if (!valid.contains(name)) {
+        throw new IllegalArgumentException(
+            "Unknown item category `"
+                + token
+                + "`. Valid categories and items: "
+                + String.join(", ", valid)
+                + ". Use `all` for every category.");
+      }
+      names.add(name);
+    }
+    return names.isEmpty() ? Optional.empty() : Optional.of(List.copyOf(names));
+  }
+
   private void ensureLoaded() {
     if (entries == null) {
       load();
@@ -106,7 +143,7 @@ public class ItemEfficiencyFile {
     if (!problems.isEmpty()) {
       throw invalid(String.join("; ", problems));
     }
-    categories = Map.copyOf(content.categories());
+    categories = Collections.unmodifiableMap(new LinkedHashMap<>(content.categories()));
     entries = List.copyOf(checked);
   }
 

@@ -4,10 +4,13 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
+import com.ako.dbuff.dao.model.InstanceSettings;
 import com.ako.dbuff.dao.model.ItemEfficiencyDomain;
 import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
+import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyFile;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyJson;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
@@ -32,7 +35,13 @@ class ItemsSectionTest {
   private final AbilityLabels labels =
       name -> name.equals("item_magic_stick") ? "Magic Stick" : Prettify.ability(name);
   private final ItemsSection section =
-      new ItemsSection(repo, heroNames, ItemKindWordings.standard(), labels, properties);
+      new ItemsSection(
+          repo,
+          heroNames,
+          ItemKindWordings.standard(),
+          new ItemEfficiencyFile("replay/items.yaml"),
+          labels,
+          properties);
   private final List<ItemEfficiencyDomain> rows = new ArrayList<>();
   private long nextId = 1;
 
@@ -107,7 +116,7 @@ class ItemsSectionTest {
       Map<String, Double> figures) {
     return new ItemEfficiency(
         slot,
-        "farming",
+        "farming_items",
         "battle_fury",
         "farm-rate",
         bought,
@@ -135,11 +144,92 @@ class ItemsSectionTest {
     return new ReplayReportInput(1L, null, Set.of(focus), Map.of(), 3);
   }
 
+  private List<String> rowLines(ReplayReportInput input) {
+    return section.lines(input).stream().filter(line -> !line.startsWith("**")).toList();
+  }
+
+  private ReplayReportInput filtered(List<String> names) {
+    return input().withItemFilter(names);
+  }
+
+  private ReplayReportInput channelChoosing(String itemCategories) {
+    DbufInstanceConfigDomain channel = new DbufInstanceConfigDomain();
+    InstanceSettings settings = new InstanceSettings();
+    settings.setItemCategories(itemCategories);
+    channel.setSettings(settings);
+    return input().withInstance(channel);
+  }
+
   private ListAppender<ILoggingEvent> warnings() {
     ListAppender<ILoggingEvent> appender = new ListAppender<>();
     appender.start();
     ((Logger) LoggerFactory.getLogger(ItemsSection.class)).addAppender(appender);
     return appender;
+  }
+
+  @Test
+  void aCategoryFilterKeepsOnlyThatCategoryUnderItsHeading() {
+    add(farming(1, 1500));
+    add(stick(0, 200, 1.5, 2));
+
+    assertThat(section.lines(filtered(List.of("sustain"))))
+        .hasSize(3)
+        .containsSubsequence("**Items**", "**Sustain and mana**")
+        .noneMatch(line -> line.contains("Battle Fury"));
+  }
+
+  @Test
+  void anEntryKeyFilterKeepsOnlyThatEntry() {
+    add(midas(2, 600, 0.9));
+    add(farming(1, 1500));
+
+    assertThat(section.lines(filtered(List.of("hand_of_midas"))))
+        .hasSize(3)
+        .anyMatch(line -> line.contains("Hand Of Midas"))
+        .noneMatch(line -> line.contains("Battle Fury"));
+  }
+
+  @Test
+  void aFilterThatMatchesNothingPrintsNothing() {
+    add(stick(0, 200, 1.5, 2));
+
+    assertThat(section.lines(filtered(List.of("farming")))).isEmpty();
+    assertThat(section.view(filtered(List.of("farming")))).isEmpty();
+  }
+
+  @Test
+  void theChannelsChoiceAppliesWhenTheRequestNamesNothing() {
+    add(farming(1, 1500));
+    add(stick(0, 200, 1.5, 2));
+
+    assertThat(section.lines(channelChoosing("farming")))
+        .noneMatch(line -> line.contains("Magic Stick"))
+        .anyMatch(line -> line.contains("Battle Fury"));
+    assertThat(section.lines(channelChoosing(null))).hasSize(5);
+  }
+
+  @Test
+  void theRequestOverridesTheChannelsChoice() {
+    add(farming(1, 1500));
+    add(stick(0, 200, 1.5, 2));
+    ReplayReportInput input = channelChoosing("farming").withItemFilter(List.of("sustain"));
+
+    assertThat(section.lines(input))
+        .anyMatch(line -> line.contains("Magic Stick"))
+        .noneMatch(line -> line.contains("Battle Fury"));
+  }
+
+  @Test
+  void theLineCapAppliesToEachCategory() {
+    properties.setMaxItemLines(1);
+    add(stick(0, 200, 1.5, 2));
+    add(stick(1, 300, 1.5, 2));
+    add(midas(2, 600, 0.9));
+    add(farming(1, 1500));
+
+    assertThat(section.lines(input()))
+        .hasSize(1 + 2 + 2)
+        .containsSubsequence("**Items**", "**Farming**", "**Sustain and mana**");
   }
 
   @Test
@@ -166,11 +256,13 @@ class ItemsSectionTest {
     assertThat(lines)
         .containsExactly(
             "**Items**",
-            "Axe's Magic Stick (bought at 3:20): 3 uses, 2 saves, 1.5x its cost",
+            "**Farming**",
             "Pudge's Hand Of Midas (bought at 10:00) paid for itself at 25:00 and earned 800 gold"
                 + " (0.9x its cost)",
             "Lion's Battle Fury (bought at 25:00) paid back at 30:00: his creep gold rose from 200"
-                + " to 350 per minute after buying it; camps per minute rose from 0.5 to 1.0");
+                + " to 350 per minute after buying it; camps per minute rose from 0.5 to 1.0",
+            "**Sustain and mana**",
+            "Axe's Magic Stick (bought at 3:20): 3 uses, 2 saves, 1.5x its cost");
     assertThat(lines).allSatisfy(line -> assertThat(line).hasSizeLessThan(200));
   }
 
@@ -178,7 +270,7 @@ class ItemsSectionTest {
   void saysAFarmingItemThatDidNotPayBackByWhatHappenedToTheCreepGold() {
     add(farming(1, 900, 0.0, null, 133, 97, Map.of("netGoldPerMinute", -37.0)));
 
-    assertThat(section.lines(input()).get(1))
+    assertThat(rowLines(input()).get(0))
         .isEqualTo(
             "Lion's Battle Fury (bought at 15:00) has not paid back: his creep gold fell from 133"
                 + " to 97 per minute after buying it; camps per minute rose from 0.5 to 1.0");
@@ -196,7 +288,7 @@ class ItemsSectionTest {
             97,
             Map.of("netGoldPerMinute", -37.0, "damageValue", 800.0, "creepGain", -900.0)));
 
-    assertThat(section.lines(input()).get(1)).endsWith(", its damage was worth 0.3x its cost");
+    assertThat(rowLines(input()).get(0)).endsWith(", its damage was worth 0.3x its cost");
   }
 
   @Test
@@ -205,13 +297,13 @@ class ItemsSectionTest {
     add(midas(2, 600, null));
     add(farming(1, 900, null, null, 133, 97, Map.of()));
 
-    List<String> lines = section.lines(input());
+    List<String> lines = rowLines(input());
 
-    assertThat(lines).hasSize(4);
-    assertThat(lines.get(1)).isEqualTo("Axe's Magic Stick (bought at 3:20): 3 uses, no saves");
-    assertThat(lines.get(2)).doesNotContain("worth", "-").endsWith("and earned 800 gold");
-    assertThat(lines.get(3))
+    assertThat(lines).hasSize(3);
+    assertThat(lines.get(0)).doesNotContain("worth", "-").endsWith("and earned 800 gold");
+    assertThat(lines.get(1))
         .startsWith("Lion's Battle Fury (bought at 15:00): his creep gold fell");
+    assertThat(lines.get(2)).isEqualTo("Axe's Magic Stick (bought at 3:20): 3 uses, no saves");
     assertThat(String.join("\n", lines)).doesNotContain("its cost");
   }
 
@@ -220,10 +312,10 @@ class ItemsSectionTest {
     add(stick(0, 200, 1.5, 0));
     add(stick(1, -85, 1.5, 1));
 
-    List<String> lines = section.lines(input());
+    List<String> lines = rowLines(input());
 
-    assertThat(lines.get(1)).startsWith("Lion's Magic Stick (bought at the start):");
-    assertThat(lines.get(2)).startsWith("Axe's Magic Stick (bought at 3:20):");
+    assertThat(lines.get(0)).startsWith("Lion's Magic Stick (bought at the start):");
+    assertThat(lines.get(1)).startsWith("Axe's Magic Stick (bought at 3:20):");
     assertThat(String.join("\n", lines)).doesNotContain("-1:25");
   }
 
@@ -235,11 +327,11 @@ class ItemsSectionTest {
     add(stick(0, 200, 1.0, 0));
     add(stick(1, 250, 1.05, 0));
 
-    List<String> lines = section.lines(input(0L, 1L));
+    List<String> lines = rowLines(input(0L, 1L));
 
-    assertThat(lines).hasSize(3);
-    assertThat(lines.get(1)).startsWith("Axe's");
-    assertThat(lines.get(2)).startsWith("Lion's");
+    assertThat(lines).hasSize(2);
+    assertThat(lines.get(0)).startsWith("Axe's");
+    assertThat(lines.get(1)).startsWith("Lion's");
   }
 
   @Test
@@ -249,11 +341,11 @@ class ItemsSectionTest {
     add(stick(1, 200, 0.1, 0));
     add(stick(2, 300, 4.0, 2));
 
-    List<String> lines = section.lines(input());
+    List<String> lines = rowLines(input());
 
-    assertThat(lines).hasSize(3);
-    assertThat(lines.get(1)).startsWith("Lion's");
-    assertThat(lines.get(2)).startsWith("Pudge's");
+    assertThat(lines).hasSize(2);
+    assertThat(lines.get(0)).startsWith("Lion's");
+    assertThat(lines.get(1)).startsWith("Pudge's");
   }
 
   @Test
@@ -262,7 +354,7 @@ class ItemsSectionTest {
       add(stick(i % 3, 100 + i, 2.0, 0));
     }
 
-    assertThat(section.lines(input())).hasSize(1 + 4);
+    assertThat(rowLines(input())).hasSize(4);
   }
 
   @Test
@@ -276,7 +368,7 @@ class ItemsSectionTest {
     second.setItemKey("magic_wand");
     java.util.Collections.reverse(rows);
 
-    assertThat(section.lines(input()).get(1)).contains("Magic Stick");
+    assertThat(rowLines(input()).get(0)).contains("Magic Stick");
   }
 
   @Test
@@ -297,10 +389,10 @@ class ItemsSectionTest {
     rows.add(null);
     add(stick(0, 400, 2.0, 1));
 
-    List<String> lines = section.lines(input());
+    List<String> lines = rowLines(input());
 
-    assertThat(lines).hasSize(2);
-    assertThat(lines.get(1)).startsWith("Axe's Magic Stick (bought at 6:40)");
+    assertThat(lines).hasSize(1);
+    assertThat(lines.get(0)).startsWith("Axe's Magic Stick (bought at 6:40)");
     assertThat(log.list)
         .hasSize(5)
         .allSatisfy(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN))
@@ -313,7 +405,7 @@ class ItemsSectionTest {
   void aStickRowWithoutItsDetailsIsStillSaid() {
     add(stick(0, 200, 1.5, 1)).setDetails(null);
 
-    assertThat(section.lines(input()).get(1))
+    assertThat(rowLines(input()).get(0))
         .isEqualTo("Axe's Magic Stick (bought at 3:20): 3 uses, 1 save, 1.5x its cost");
   }
 
@@ -323,10 +415,10 @@ class ItemsSectionTest {
     broken.setFigures("{\"gold\":null}");
     add(stick(1, 200, 1.0, 0));
 
-    List<String> lines = section.lines(input());
+    List<String> lines = rowLines(input());
 
-    assertThat(lines).hasSize(2);
-    assertThat(lines.get(1)).startsWith("Lion's");
+    assertThat(lines).hasSize(1);
+    assertThat(lines.get(0)).startsWith("Lion's");
   }
 
   @Test
@@ -357,7 +449,7 @@ class ItemsSectionTest {
             List.of(),
             List.of()));
 
-    assertThat(section.lines(input()).get(1))
+    assertThat(rowLines(input()).get(0))
         .isEqualTo("Dire player 2's Magic Stick (bought at 8:20) was never used");
   }
 
@@ -366,7 +458,7 @@ class ItemsSectionTest {
     properties.setMaxBehaviourLineLength(60);
     add(farming(0, 600));
 
-    String line = section.lines(input()).get(1);
+    String line = rowLines(input()).get(0);
 
     assertThat(line).hasSizeLessThanOrEqualTo(60).endsWith("...");
   }
@@ -396,12 +488,14 @@ class ItemsSectionTest {
     assertThat(String.join("\n", section.lines(input())))
         .isEqualTo(
             "**Items**\n"
-                + "Axe's Magic Stick (bought at 3:20): 3 uses, 2 saves, 1.5x its cost\n"
+                + "**Farming**\n"
                 + "Pudge's Hand Of Midas (bought at 10:00) paid for itself at 25:00 and earned 800"
                 + " gold (0.9x its cost)\n"
                 + "Lion's Battle Fury (bought at 25:00) paid back at 30:00: his creep gold rose"
                 + " from 200 to 350 per minute after buying it; camps per minute rose from 0.5 to"
-                + " 1.0");
+                + " 1.0\n"
+                + "**Sustain and mana**\n"
+                + "Axe's Magic Stick (bought at 3:20): 3 uses, 2 saves, 1.5x its cost");
     assertThat(new PlainViewRenderer().lines(view)).isEqualTo(section.lines(input()));
   }
 
@@ -430,7 +524,7 @@ class ItemsSectionTest {
 
     SectionView view = section.view(input()).orElseThrow();
 
-    assertThat(view.bullets()).hasSize(1);
-    assertThat(view.verdict()).matches("Items shown: [01] of 1 paid back their cost");
+    assertThat(view.bullets()).hasSize(4);
+    assertThat(view.verdict()).matches("Items shown: [012] of 2 paid back their cost");
   }
 }

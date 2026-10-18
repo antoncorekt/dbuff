@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.service.discord.command.FakeCommandContext;
+import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyFile;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,9 +29,12 @@ class ReportCommandHandlerTest {
       new SectionSwitch(
           properties,
           List.of(
-              TestSections.named("lanes", 20, false), TestSections.named("opendota", 200, false)));
+              TestSections.named("lanes", 20, false),
+              TestSections.named("items", 77, false),
+              TestSections.named("opendota", 200, false)));
   private final ReportCommandHandler handler =
-      new ReportCommandHandler(reports, sectionSwitch, cooldown);
+      new ReportCommandHandler(
+          reports, sectionSwitch, cooldown, new ItemEfficiencyFile("replay/items.yaml"));
   private final DbufInstanceConfigDomain config = new DbufInstanceConfigDomain();
 
   @BeforeEach
@@ -58,6 +62,58 @@ class ReportCommandHandlerTest {
     assertThat(context.getEphemeralReplies()).isEmpty();
     assertThat(context.getPosts()).isEmpty();
     verify(reports).deliverSection(MATCH, "i1", "lanes");
+  }
+
+  @Test
+  void theItemsOption_isPassedToTheItemsSectionInTheCanonicalSpelling() {
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .threadName("Match " + MATCH)
+            .channelId("thread-1")
+            .option("section", "items")
+            .option("items", "Farming, magic-stick")
+            .build();
+    when(reports.deliverSection(MATCH, "i1", "items", null, List.of("farming", "magic_stick")))
+        .thenReturn(ReportDelivery.POSTED);
+
+    handler.handle(context, MATCH, config);
+
+    assertThat(context.getEphemeralReplies()).isEmpty();
+    verify(reports).deliverSection(MATCH, "i1", "items", null, List.of("farming", "magic_stick"));
+  }
+
+  @Test
+  void anUnknownItemName_isRefusedWithTheValidOnesBeforeAcknowledging() {
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .threadName("Match " + MATCH)
+            .option("section", "items")
+            .option("items", "bogus")
+            .build();
+
+    handler.handle(context, MATCH, config);
+
+    assertThat(context.getEphemeralReplies())
+        .singleElement()
+        .asString()
+        .contains("Unknown item category `bogus`")
+        .contains("farming");
+    assertThat(context.getAcknowledgeSummary()).isNull();
+  }
+
+  @Test
+  void theItemsOption_isRefusedForAnotherSection() {
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .threadName("Match " + MATCH)
+            .option("section", "lanes")
+            .option("items", "farming")
+            .build();
+
+    handler.handle(context, MATCH, config);
+
+    assertThat(context.getEphemeralReplies()).singleElement().asString().contains("section:items");
+    verify(reports, never()).deliverSection(anyLong(), anyString(), anyString());
   }
 
   @Test
@@ -138,7 +194,7 @@ class ReportCommandHandlerTest {
     assertThat(context.getEphemeralReplies())
         .singleElement()
         .asString()
-        .contains("all, lanes, opendota");
+        .contains("all, lanes, items, opendota");
     assertThat(context.getAcknowledgeSummary()).isNull();
   }
 

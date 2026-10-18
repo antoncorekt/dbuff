@@ -464,7 +464,10 @@ class MatchCommandTest {
         .singleElement()
         .satisfies(
             s -> {
-              assertThat(s.getOptions()).hasSize(1);
+              assertThat(s.getOptions()).hasSize(2);
+              assertThat(s.getOptions().get(1).getName()).isEqualTo("items");
+              assertThat(s.getOptions().get(1).isAutoComplete()).isTrue();
+              assertThat(s.getOptions().get(1).isRequired()).isFalse();
               assertThat(s.getOptions().get(0).getName()).isEqualTo("section");
               assertThat(s.getOptions().get(0).isAutoComplete()).isTrue();
               assertThat(s.getOptions().get(0).isRequired()).isTrue();
