@@ -1,0 +1,7 @@
+categories: {farming: Farming}
+entries:
+  - key: hand_of_midas
+    category: farming
+    items: [hand_of_midas]
+    aspects: [midas-uses]
+    winStats: [[hand_of_midas], [hand_of_midas, octarine_core], [hand_of_midas, missing]]
