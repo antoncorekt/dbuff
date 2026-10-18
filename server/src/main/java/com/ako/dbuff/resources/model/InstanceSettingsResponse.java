@@ -40,6 +40,9 @@ public class InstanceSettingsResponse {
   /** Comma-separated section names, {@code none}, or {@code server default}. */
   private String sections;
 
+  /** Comma-separated category ids or entry keys, or {@code all}. */
+  private String itemCategories;
+
   /** A language name, or {@code server default}. */
   private String language;
 
@@ -65,6 +68,8 @@ public class InstanceSettingsResponse {
                 .sectionNames()
                 .map(names -> names.isEmpty() ? "none" : String.join(",", names))
                 .orElse(SERVER_DEFAULT))
+        .itemCategories(
+            settings.itemCategoryNames().map(names -> String.join(",", names)).orElse("all"))
         .language(settings.getLanguage() == null ? SERVER_DEFAULT : settings.getLanguage())
         .build();
   }

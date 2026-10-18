@@ -61,6 +61,12 @@ public class UpdateInstanceRequest {
    */
   private String sections;
 
+  /**
+   * Item categories or entry keys the item analysis covers, comma-separated; {@code all} for every
+   * category (optional)
+   */
+  private String itemCategories;
+
   /** Language of the AI reasons, or {@code default} for the server's (optional) */
   private String language;
 
@@ -73,6 +79,7 @@ public class UpdateInstanceRequest {
         || defaultGameModes != null
         || reportDetail != null
         || sections != null
+        || itemCategories != null
         || language != null;
   }
 }

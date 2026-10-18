@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.resources.model.UpdateInstanceRequest;
 import com.ako.dbuff.service.constant.GameModeResolver;
 import com.ako.dbuff.service.constant.GameModeSelection;
+import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyFile;
 import com.ako.dbuff.service.replay.report.ReplayReportSection;
 import com.ako.dbuff.service.replay.report.SectionSwitch;
 import com.ako.dbuff.service.replay.report.TestSections;
@@ -32,7 +33,9 @@ class InstanceSettingsApplierTest {
   void setUp() {
     resolver = Mockito.mock(GameModeResolver.class);
     sectionSwitch = Mockito.mock(SectionSwitch.class);
-    applier = new InstanceSettingsApplier(resolver, sectionSwitch);
+    applier =
+        new InstanceSettingsApplier(
+            resolver, sectionSwitch, new ItemEfficiencyFile("replay/items.yaml"));
     settings = new InstanceSettings();
   }
 
@@ -267,6 +270,36 @@ class InstanceSettingsApplierTest {
     Mockito.when(sectionSwitch.find("important_fights")).thenReturn(Optional.of(fights));
     Mockito.when(sectionSwitch.visibleNames())
         .thenReturn(java.util.List.of("lanes", "important-fights"));
+  }
+
+  @Test
+  void itemCategories_storeTheCanonicalNamesOnceEach() {
+    apply(UpdateInstanceRequest.builder().itemCategories("Farming, magic-stick farming"));
+
+    assertThat(settings.getItemCategories()).isEqualTo("farming,magic_stick");
+    assertThat(settings.itemCategoryNames()).contains(java.util.List.of("farming", "magic_stick"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"all", "ALL", "default", "  "})
+  void itemCategories_allClearsTheChoice(String raw) {
+    settings.setItemCategories("farming");
+
+    apply(UpdateInstanceRequest.builder().itemCategories(raw));
+
+    assertThat(settings.getItemCategories()).isNull();
+    assertThat(settings.itemCategoryNames()).isEmpty();
+  }
+
+  @Test
+  void itemCategories_unknownName_isRejectedListingTheValidOnesAndChangesNothing() {
+    settings.setItemCategories("sustain");
+
+    assertThatThrownBy(() -> apply(UpdateInstanceRequest.builder().itemCategories("farming, nope")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("`nope`")
+        .hasMessageContaining("farming, sustain");
+    assertThat(settings.getItemCategories()).isEqualTo("sustain");
   }
 
   @Test

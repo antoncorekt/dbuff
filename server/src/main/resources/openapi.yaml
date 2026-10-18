@@ -1873,6 +1873,9 @@ components:
         sections:
           type: string
           description: "Replay report sections posted automatically, comma-separated, \"none\", or \"server default\""
+        itemCategories:
+          type: string
+          description: "Item categories or entry keys the item analysis covers, comma-separated, or \"all\""
         language:
           type: string
           description: "Language of the AI reasons, or \"server default\""
@@ -2011,6 +2014,9 @@ components:
         sections:
           type: string
           description: "Replay report sections posted automatically, comma-separated (case, \"-\" and \"_\" ignored), \"none\" for none, or \"default\" to follow the server list; an unknown name is rejected with the valid ones"
+        itemCategories:
+          type: string
+          description: "Item categories or entry keys the item analysis covers, comma-separated, or \"all\" (or \"default\") for every category; an unknown name is rejected with the valid ones"
         language:
           type: string
           description: "Language of the AI reasons (letters, spaces and hyphens, at most 40 characters), or \"default\" for the server's"
