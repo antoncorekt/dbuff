@@ -16,20 +16,22 @@ import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.sampleOf;
 import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.use;
 import static org.assertj.core.api.Assertions.assertThat;
 
-class MagicStickEvaluatorTest {
+class StickAspectsTest {
   private static final String STICK = "item_magic_stick";
   private static final String WAND = "item_magic_wand";
   private static final ItemEfficiencyEntry ENTRY =
       ItemTestData.entry(
-          "magic_stick", MagicStickEvaluator.KIND, List.of("magic_stick", "magic_wand"), Map.of());
+          "magic_stick",
+          List.of(ChargeRestoreAspect.NAME, SaveAspect.NAME),
+          List.of("magic_stick", "magic_wand"),
+          Map.of());
   private static final ItemKits KITS =
       ItemTestData.kits(Map.of("magic_stick", 200L, "magic_wand", 460L));
 
-  private final MagicStickEvaluator evaluator = new MagicStickEvaluator();
+  private final List<ItemAspect> aspects = List.of(new ChargeRestoreAspect(), new SaveAspect());
 
   private ItemEfficiency evaluate(HeroInputs hero) {
-    List<ItemEfficiency> rows =
-        evaluator.evaluate(new EntryContext(ENTRY, KITS, 600, List.of(hero)));
+    List<ItemEfficiency> rows = ItemTestData.judge(ENTRY, aspects, KITS, 600, List.of(hero));
     assertThat(rows).hasSize(1);
     return rows.getFirst();
   }
@@ -113,7 +115,7 @@ class MagicStickEvaluatorTest {
 
     assertThat(result.figures()).containsEntry("hp", 150.0).containsEntry("mana", 150.0);
     assertThat(result.flags())
-        .containsExactly(MagicStickEvaluator.HP_UNCAPPED, MagicStickEvaluator.MANA_UNCAPPED);
+        .containsExactly(ChargeRestoreAspect.HP_UNCAPPED, ChargeRestoreAspect.MANA_UNCAPPED);
   }
 
   @Test
@@ -141,13 +143,13 @@ class MagicStickEvaluatorTest {
   @Test
   void aHeroWithoutTheItemGetsNoRowAndAUseWithNoChargesSeenIsFlagged() {
     HeroInputs without = hero(List.of(), List.of(), null, List.of(), List.of());
-    assertThat(evaluator.evaluate(new EntryContext(ENTRY, KITS, 600, List.of(without)))).isEmpty();
+    assertThat(ItemTestData.judge(ENTRY, aspects, KITS, 600, List.of(without))).isEmpty();
 
     var changes = List.of(change(-60, StateChangeKind.ITEM_ADDED, STICK));
     ItemEfficiency result =
         evaluate(hero(changes, List.of(use(-9, STICK, "")), null, List.of(), List.of()));
 
-    assertThat(result.flags()).contains(MagicStickEvaluator.NO_CHARGES_SEEN);
+    assertThat(result.flags()).contains(ChargeRestoreAspect.NO_CHARGES_SEEN);
     assertThat(result.figures()).containsEntry("hp", 0.0);
   }
 
@@ -156,19 +158,18 @@ class MagicStickEvaluatorTest {
     ItemEfficiencyEntry stricter =
         ItemTestData.entry(
             "magic_stick",
-            MagicStickEvaluator.KIND,
+            List.of(ChargeRestoreAspect.NAME, SaveAspect.NAME),
             List.of("magic_stick", "magic_wand"),
             Map.of("lowHpFraction", 0.1, "saveGold", 0.0));
     List<CombatEvent> events = List.of(hit(120.2, 450, 300), use(121.0, STICK, ""));
 
     ItemEfficiency result =
-        evaluator
-            .evaluate(
-                new EntryContext(
-                    stricter,
-                    KITS,
-                    600,
-                    List.of(hero(sticks(), events, track(), List.of(), List.of()))))
+        ItemTestData.judge(
+                stricter,
+                aspects,
+                KITS,
+                600,
+                List.of(hero(sticks(), events, track(), List.of(), List.of())))
             .getFirst();
 
     assertThat(result.figures()).containsEntry("saves", 0.0);
@@ -179,7 +180,7 @@ class MagicStickEvaluatorTest {
     ItemEfficiencyEntry fractional =
         ItemTestData.entry(
             "magic_stick",
-            MagicStickEvaluator.KIND,
+            List.of(ChargeRestoreAspect.NAME, SaveAspect.NAME),
             List.of("magic_stick", "magic_wand"),
             Map.of("damageBeforeSeconds", 0.5, "damageAfterSeconds", 0.4));
     List<CombatEvent> events =
@@ -187,13 +188,12 @@ class MagicStickEvaluatorTest {
             hit(120.2, 450, 300), use(121.0, STICK, ""), hit(121.3, 100, 200), hit(122.0, 50, 150));
 
     ItemEfficiency result =
-        evaluator
-            .evaluate(
-                new EntryContext(
-                    fractional,
-                    KITS,
-                    600,
-                    List.of(hero(sticks(), events, track(), List.of(), List.of()))))
+        ItemTestData.judge(
+                fractional,
+                aspects,
+                KITS,
+                600,
+                List.of(hero(sticks(), events, track(), List.of(), List.of())))
             .getFirst();
 
     assertThat(result.rows().getFirst().figures()).containsEntry("damageAround", 100.0);
@@ -204,18 +204,17 @@ class MagicStickEvaluatorTest {
     List<CombatEvent> events = List.of(use(121.0, STICK, ""));
 
     ItemEfficiency result =
-        evaluator
-            .evaluate(
-                new EntryContext(
-                    ENTRY,
-                    ItemTestData.kits(Map.of()),
-                    600,
-                    List.of(hero(sticks(), events, null, List.of(), List.of()))))
+        ItemTestData.judge(
+                ENTRY,
+                aspects,
+                ItemTestData.kits(Map.of()),
+                600,
+                List.of(hero(sticks(), events, null, List.of(), List.of())))
             .getFirst();
 
     assertThat(result.cost()).isNull();
     assertThat(result.ratio()).isNull();
-    assertThat(result.flags()).contains(MagicStickEvaluator.COST_UNKNOWN);
+    assertThat(result.flags()).contains(AspectSum.COST_UNKNOWN);
     assertThat(result.count()).isEqualTo(1);
   }
 
@@ -229,7 +228,7 @@ class MagicStickEvaluatorTest {
         evaluate(hero(sticks(), List.of(use(121.0, STICK, "")), track, List.of(), List.of()));
 
     assertThat(result.figures()).containsEntry("mana", 150.0);
-    assertThat(result.flags()).doesNotContain(MagicStickEvaluator.MANA_UNCAPPED);
+    assertThat(result.flags()).doesNotContain(ChargeRestoreAspect.MANA_UNCAPPED);
   }
 
   @Test
@@ -241,7 +240,7 @@ class MagicStickEvaluatorTest {
     ItemEfficiency result = evaluate(hero(sticks(), events, track, List.of(), List.of()));
 
     assertThat(result.flags())
-        .contains(MagicStickEvaluator.HP_UNCAPPED, MagicStickEvaluator.MANA_UNCAPPED);
+        .contains(ChargeRestoreAspect.HP_UNCAPPED, ChargeRestoreAspect.MANA_UNCAPPED);
     assertThat(result.figures()).containsEntry("hp", 150.0);
   }
 }

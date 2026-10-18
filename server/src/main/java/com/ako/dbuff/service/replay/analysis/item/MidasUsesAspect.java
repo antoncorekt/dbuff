@@ -25,13 +25,12 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class HandOfMidasEvaluator implements ItemEfficiencyEvaluator {
-  static final String KIND = "hand-of-midas";
+public class MidasUsesAspect implements ItemAspect {
+  public static final String NAME = "midas-uses";
 
   static final String COOLDOWN_ESTIMATED = "COOLDOWN_ESTIMATED";
   static final String USE_WITHOUT_GOLD = "USE_WITHOUT_GOLD";
   static final String EXTRA_ESTIMATED = "EXTRA_ESTIMATED";
-  static final String COST_UNKNOWN = "COST_UNKNOWN";
   static final String BONUS_GOLD_UNKNOWN = "BONUS_GOLD_UNKNOWN";
 
   private static final String USE = "USE";
@@ -45,8 +44,8 @@ public class HandOfMidasEvaluator implements ItemEfficiencyEvaluator {
   private final CreepValues creepValues;
 
   @Override
-  public boolean supports(ItemEfficiencyEntry entry) {
-    return KIND.equals(entry.kind());
+  public String name() {
+    return NAME;
   }
 
   @Override
@@ -54,22 +53,16 @@ public class HandOfMidasEvaluator implements ItemEfficiencyEvaluator {
     return PARAMETERS;
   }
 
-  @Override
-  public List<ItemEfficiency> evaluate(EntryContext context) {
-    List<String> names = context.replayNames();
-    return context.heroes().stream()
-        .filter(hero -> !hero.held(names).isEmpty())
-        .map(hero -> evaluate(context, hero, names))
-        .toList();
-  }
-
   private record Use(CombatEvent event, int gold, int xp) {}
 
-  private ItemEfficiency evaluate(EntryContext context, HeroInputs hero, List<String> names) {
+  @Override
+  public AspectPart measure(AspectContext context) {
     ItemEfficiencyEntry entry = context.entry();
+    HeroInputs hero = context.hero();
+    List<String> names = context.names();
     double weight = entry.parameter("xpWeight", 1.0);
     double cooldown = entry.parameter("cooldownSeconds", 90);
-    Long cost = context.cost(hero.held(names));
+    Long cost = context.cost();
     double bought = hero.firstAdded(names).orElse(0);
     double ownedTo = hero.ownedUntil(names, context.gameEndSeconds());
     int bonus = bonusGold(context.kits(), entry.items().getFirst());
@@ -131,25 +124,20 @@ public class HandOfMidasEvaluator implements ItemEfficiencyEvaluator {
           .ifPresent(v -> totals.put("bonusAttackSpeed", v));
     }
     double gain = gold + weight * xp;
-    return new ItemEfficiency(
-        hero.slot(),
-        entry.key(),
-        HeroInputs.itemKey(hero.held(names).getFirst()),
-        KIND,
-        bought,
-        uses.size(),
+    return new AspectPart(
         gain,
-        cost,
-        cost == null ? null : gain / cost,
-        payback,
+        true,
         totals,
         sortedFlags(flags, cost == null, bonus <= 0),
-        rows);
+        rows,
+        uses.size(),
+        payback,
+        null);
   }
 
   private static List<String> sortedFlags(Set<String> flags, boolean noCost, boolean noBonus) {
     if (noCost) {
-      flags.add(COST_UNKNOWN);
+      flags.add(AspectSum.COST_UNKNOWN);
     }
     if (noBonus) {
       flags.add(BONUS_GOLD_UNKNOWN);

@@ -40,9 +40,24 @@ final class ItemTestData {
   }
 
   static ItemEfficiencyEntry entry(
-      String key, String kind, List<String> items, Map<String, Double> parameters) {
+      String key, List<String> aspects, List<String> items, Map<String, Double> parameters) {
     return new ItemEfficiencyEntry(
-        key, "farming", kind, items, List.of(), List.of(), List.of(), parameters);
+        key, "farming", items, aspects, List.of(), List.of(), parameters);
+  }
+
+  /** The rows of the entry's own aspects, taken from {@code available} in the order it lists. */
+  static List<ItemEfficiency> judge(
+      ItemEfficiencyEntry entry,
+      List<ItemAspect> available,
+      ItemKits kits,
+      int gameEndSeconds,
+      List<HeroInputs> heroes) {
+    List<ItemAspect> own =
+        entry.aspects().stream()
+            .map(name -> available.stream().filter(a -> a.name().equals(name)).findFirst())
+            .flatMap(java.util.Optional::stream)
+            .toList();
+    return AspectSum.judge(entry, own, kits, gameEndSeconds, heroes);
   }
 
   static ReplayStateChangeDomain change(double second, StateChangeKind kind, String name) {

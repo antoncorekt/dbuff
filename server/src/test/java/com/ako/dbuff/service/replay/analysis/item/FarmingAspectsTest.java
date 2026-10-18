@@ -13,21 +13,22 @@ import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.hero;
 import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.kill;
 import static org.assertj.core.api.Assertions.assertThat;
 
-class FarmingGroupEvaluatorTest {
+class FarmingAspectsTest {
   private static final String CAMP_CREEP = "npc_dota_neutral_kobold";
   private static final ItemEfficiencyEntry ENTRY =
       ItemTestData.entry(
           "farming_items",
-          FarmingGroupEvaluator.KIND,
+          List.of(FarmRateAspect.NAME),
           List.of("bfury", "maelstrom", "mjollnir"),
           Map.of());
   private static final ItemKits KITS =
       ItemTestData.kits(Map.of("bfury", 500L, "maelstrom", 500L, "mjollnir", 700L));
 
-  private final FarmingGroupEvaluator evaluator = new FarmingGroupEvaluator();
+  private final List<ItemAspect> aspects =
+      List.of(new FarmRateAspect(), new ItemDamageAspect(), new StatUpliftAspect());
 
   private ItemEfficiency evaluate(HeroInputs hero, int gameEnd) {
-    return evaluator.evaluate(new EntryContext(ENTRY, KITS, gameEnd, List.of(hero))).getFirst();
+    return ItemTestData.judge(ENTRY, aspects, KITS, gameEnd, List.of(hero)).getFirst();
   }
 
   private static List<CreepKillDomain> kills(int count, double from, double to, int gold) {
@@ -80,7 +81,7 @@ class FarmingGroupEvaluatorTest {
     ItemEfficiency result =
         evaluate(hero(changes, List.of(), null, kills(5, 60, 300, 30), List.of()), 900);
 
-    assertThat(result.flags()).containsExactly(FarmingGroupEvaluator.NO_BEFORE_WINDOW);
+    assertThat(result.flags()).containsExactly(FarmWindows.NO_BEFORE_WINDOW);
     assertThat(result.ratio()).isNull();
     assertThat(result.gain()).isZero();
     assertThat(result.rows()).hasSize(2);
@@ -93,19 +94,19 @@ class FarmingGroupEvaluatorTest {
     ItemEfficiency result =
         evaluate(hero(changes, List.of(), null, kills(10, 300, 890, 30), List.of()), 900);
 
-    assertThat(result.flags()).contains(FarmingGroupEvaluator.SHORT_AFTER_WINDOW);
+    assertThat(result.flags()).contains(FarmWindows.SHORT_AFTER_WINDOW);
     assertThat(result.ratio()).isNull();
   }
 
   @Test
   void deniesAreNotCountedAndAHeroWithoutAGroupItemGetsNoRow() {
     assertThat(
-            evaluator.evaluate(
-                new EntryContext(
-                    ENTRY,
-                    KITS,
-                    900,
-                    List.of(hero(List.of(), List.of(), null, List.of(), List.of())))))
+            ItemTestData.judge(
+                ENTRY,
+                aspects,
+                KITS,
+                900,
+                List.of(hero(List.of(), List.of(), null, List.of(), List.of()))))
         .isEmpty();
     CreepKillDomain denied = kill(700, "npc_dota_creep_goodguys_melee", 0, null);
     denied.setDenied(true);
@@ -144,7 +145,7 @@ class FarmingGroupEvaluatorTest {
     assertThat(before.label()).isEqualTo("BEFORE");
     assertThat(before.figures().get("killsPerMinute")).isNull();
     assertThat(before.figures().get("goldPerMinute")).isNull();
-    assertThat(result.flags()).contains(FarmingGroupEvaluator.NO_BEFORE_WINDOW);
+    assertThat(result.flags()).contains(FarmWindows.NO_BEFORE_WINDOW);
     assertThat(result.ratio()).isNull();
   }
 
@@ -167,27 +168,26 @@ class FarmingGroupEvaluatorTest {
     List<CreepKillDomain> kills = kills(10, 300, 600, 30);
 
     ItemEfficiency result =
-        evaluator
-            .evaluate(
-                new EntryContext(
-                    ENTRY,
-                    ItemTestData.kits(Map.of()),
-                    1500,
-                    List.of(hero(changes, List.of(), null, kills, List.of()))))
+        ItemTestData.judge(
+                ENTRY,
+                aspects,
+                ItemTestData.kits(Map.of()),
+                1500,
+                List.of(hero(changes, List.of(), null, kills, List.of())))
             .getFirst();
 
     assertThat(result.cost()).isNull();
     assertThat(result.ratio()).isNull();
     assertThat(result.paybackSeconds()).isNull();
-    assertThat(result.flags()).contains(FarmingGroupEvaluator.COST_UNKNOWN);
+    assertThat(result.flags()).contains(AspectSum.COST_UNKNOWN);
   }
 
   private static ItemEfficiencyEntry withDamage() {
     return ItemTestData.entry(
         "farming_items",
-        FarmingGroupEvaluator.KIND,
+        List.of(FarmRateAspect.NAME, ItemDamageAspect.NAME, StatUpliftAspect.NAME),
         List.of("bfury", "maelstrom", "mjollnir"),
-        Map.of("includeDamage", 1.0, "damagePrice", 100.0, "damageWindowMinutes", 5.0));
+        Map.of("damagePrice", 100.0, "damageWindowMinutes", 5.0));
   }
 
   private static List<CombatEvent> damageEvents() {
@@ -210,13 +210,12 @@ class FarmingGroupEvaluatorTest {
     var changes = List.of(change(600, StateChangeKind.ITEM_ADDED, "item_maelstrom"));
 
     ItemEfficiency result =
-        evaluator
-            .evaluate(
-                new EntryContext(
-                    withDamage(),
-                    KITS,
-                    1500,
-                    List.of(hero(changes, damageEvents(), null, kills, List.of()))))
+        ItemTestData.judge(
+                withDamage(),
+                aspects,
+                KITS,
+                1500,
+                List.of(hero(changes, damageEvents(), null, kills, List.of())))
             .getFirst();
 
     assertThat(result.figures())
@@ -254,19 +253,18 @@ class FarmingGroupEvaluatorTest {
     var changes = List.of(change(-70, StateChangeKind.ITEM_ADDED, "item_maelstrom"));
 
     ItemEfficiency result =
-        evaluator
-            .evaluate(
-                new EntryContext(
-                    withDamage(),
-                    KITS,
-                    900,
-                    List.of(hero(changes, damageEvents(), null, List.of(), List.of()))))
+        ItemTestData.judge(
+                withDamage(),
+                aspects,
+                KITS,
+                900,
+                List.of(hero(changes, damageEvents(), null, List.of(), List.of())))
             .getFirst();
 
     assertThat(result.figures())
         .containsEntry("procDamage", 1500.0)
         .containsEntry("passiveDamage", 0.0);
-    assertThat(result.flags()).contains(FarmingGroupEvaluator.NO_DAMAGE_COMPARISON);
+    assertThat(result.flags()).contains(StatUpliftAspect.NO_DAMAGE_COMPARISON);
     assertThat(result.ratio()).isNull();
   }
 }

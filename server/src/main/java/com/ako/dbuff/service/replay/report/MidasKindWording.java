@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class MidasKindWording implements ItemKindWording {
   @Override
-  public String kind() {
-    return "hand-of-midas";
+  public String aspect() {
+    return "midas-uses";
   }
 
   @Override

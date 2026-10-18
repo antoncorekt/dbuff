@@ -42,7 +42,7 @@ class FarmChartBuilderTest {
         .playerSlot(slot)
         .entryKey("farming_items")
         .itemKey("bfury")
-        .kind("farming-group")
+        .kind("farm-rate")
         .purchaseSeconds(purchase)
         .paybackSeconds(payback)
         .ratio(ratio)

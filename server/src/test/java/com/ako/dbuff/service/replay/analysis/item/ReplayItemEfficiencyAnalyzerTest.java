@@ -31,15 +31,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The whole analyzer over stored rows, with a file that lists a Magic Stick entry and an entry of a
- * kind the analyzer has never heard of: the second is judged by an evaluator bean added here, and
- * nothing in the analyzer changes.
+ * aspect the analyzer has never heard of: it is judged by aspect beans added here, and nothing in
+ * the analyzer changes. A third entry lists two aspects, and its row is their sum.
  */
 @DataJpaTest
 @ActiveProfiles("test")
 @Import({
   ReplayItemEfficiencyAnalyzer.class,
   ItemEfficiencyInputs.class,
-  MagicStickEvaluator.class,
+  ChargeRestoreAspect.class,
+  SaveAspect.class,
   CombatLogReader.class,
   StoredActivity.class,
   ReplayItemEfficiencyAnalyzerTest.Config.class
@@ -64,12 +65,12 @@ class ReplayItemEfficiencyAnalyzerTest {
     List<ItemEfficiencyDomain> rows = repo.findByMatchId(MATCH);
     assertThat(rows)
         .extracting(ItemEfficiencyDomain::getEntryKey)
-        .containsExactlyInAnyOrder("magic_stick", "toy");
+        .containsExactlyInAnyOrder("magic_stick", "toy", "summed");
     ItemEfficiencyDomain stick =
         rows.stream().filter(r -> r.getEntryKey().equals("magic_stick")).findFirst().orElseThrow();
     assertThat(stick.getPlayerSlot()).isZero();
     assertThat(stick.getItemKey()).isEqualTo("magic_stick");
-    assertThat(stick.getKind()).isEqualTo("magic-stick");
+    assertThat(stick.getKind()).isEqualTo("charge-restore");
     assertThat(stick.getUseCount()).isEqualTo(1);
     assertThat(stick.getCost()).isEqualTo(200);
     assertThat(stick.getPurchaseSeconds()).isEqualTo(-60.0);
@@ -82,7 +83,7 @@ class ReplayItemEfficiencyAnalyzerTest {
   }
 
   @Test
-  void analyze_asksTheToyEvaluatorForItsEntryWithItsParameters() {
+  void analyze_asksTheToyAspectForItsEntryWithItsParameters() {
     stored();
 
     analyzer.analyze(MATCH);
@@ -92,9 +93,31 @@ class ReplayItemEfficiencyAnalyzerTest {
             .filter(r -> r.getEntryKey().equals("toy"))
             .findFirst()
             .orElseThrow();
-    assertThat(toy.getKind()).isEqualTo(ToyEvaluator.KIND);
+    assertThat(toy.getKind()).isEqualTo(ToyAspect.NAME);
     assertThat(toy.getGain()).isEqualTo(7.0);
     assertThat(toy.getItemKey()).isEqualTo("quelling_blade");
+  }
+
+  @Test
+  void analyze_sumsThePartsOfTheAspectsOfOneEntry() {
+    stored();
+
+    analyzer.analyze(MATCH);
+
+    ItemEfficiencyDomain summed =
+        repo.findByMatchId(MATCH).stream()
+            .filter(r -> r.getEntryKey().equals("summed"))
+            .findFirst()
+            .orElseThrow();
+    assertThat(summed.getKind()).isEqualTo(ToyAspect.NAME);
+    assertThat(summed.getGain()).isEqualTo(7.0 + 2.0);
+    assertThat(summed.getRatio()).isEqualTo(9.0 / 100);
+    ItemEfficiency back = ItemEfficiencyJson.fromRow(summed);
+    assertThat(back.figures()).containsEntry("blades", 3.0);
+    assertThat(back.rows()).hasSize(1);
+    assertThat(back.rows().getFirst().figures())
+        .containsEntry("weight", 7.0)
+        .containsEntry("bonus", 2.0);
   }
 
   @Test
@@ -169,13 +192,13 @@ class ReplayItemEfficiencyAnalyzerTest {
         .build();
   }
 
-  /** A kind the analyzer does not know: it counts the hero's quelling blades as its gain. */
-  static class ToyEvaluator implements ItemEfficiencyEvaluator {
-    static final String KIND = "toy";
+  /** An aspect the analyzer does not know: its gain is its weight. */
+  static class ToyAspect implements ItemAspect {
+    static final String NAME = "toy";
 
     @Override
-    public boolean supports(ItemEfficiencyEntry entry) {
-      return KIND.equals(entry.kind());
+    public String name() {
+      return NAME;
     }
 
     @Override
@@ -184,26 +207,44 @@ class ReplayItemEfficiencyAnalyzerTest {
     }
 
     @Override
-    public List<ItemEfficiency> evaluate(EntryContext context) {
-      return context.heroes().stream()
-          .filter(h -> !h.held(context.replayNames()).isEmpty())
-          .map(
-              h ->
-                  new ItemEfficiency(
-                      h.slot(),
-                      context.entry().key(),
-                      "quelling_blade",
-                      KIND,
-                      null,
-                      1,
-                      context.entry().parameter("weight", 1.0),
-                      context.cost(h.held(context.replayNames())),
-                      null,
-                      null,
-                      Map.of(),
-                      List.of(),
-                      List.of()))
-          .toList();
+    public AspectPart measure(AspectContext context) {
+      double weight = context.entry().parameter("weight", 1.0);
+      return new AspectPart(
+          weight,
+          true,
+          Map.of("blades", 1.0),
+          List.of(),
+          List.of(new ItemEfficiency.Detail("TOY", 1.0, null, Map.of("weight", weight))),
+          1,
+          null,
+          null);
+    }
+  }
+
+  /** A second aspect, to be summed with the first. */
+  static class ToyBonusAspect implements ItemAspect {
+    @Override
+    public String name() {
+      return "toy-bonus";
+    }
+
+    @Override
+    public Set<String> parameterNames() {
+      return Set.of("bonus");
+    }
+
+    @Override
+    public AspectPart measure(AspectContext context) {
+      double bonus = context.entry().parameter("bonus", 0.0);
+      return new AspectPart(
+          bonus,
+          true,
+          Map.of("blades", 2.0),
+          List.of(),
+          List.of(new ItemEfficiency.Detail("TOY", 1.0, null, Map.of("bonus", bonus))),
+          0,
+          null,
+          null);
     }
   }
 
@@ -221,18 +262,26 @@ class ReplayItemEfficiencyAnalyzerTest {
     }
 
     @Bean
-    ToyEvaluator toyEvaluator() {
-      return new ToyEvaluator();
+    ToyAspect toyAspect() {
+      return new ToyAspect();
+    }
+
+    @Bean
+    ToyBonusAspect toyBonusAspect() {
+      return new ToyBonusAspect();
     }
 
     @Bean
     ItemEfficiencyFile itemEfficiencyFile() {
       String json =
           "{\"categories\": {\"farming\": \"F\"}, \"entries\": [{\"key\": \"magic_stick\","
-              + " \"category\": \"farming\", \"kind\": \"magic-stick\", \"items\":"
-              + " [\"magic_stick\", \"magic_wand\"]},{\"key\": \"toy\", \"category\": \"farming\","
-              + " \"kind\": \"toy\", \"items\": [\"quelling_blade\"], \"parameters\": {\"weight\":"
-              + " 7}}]}";
+              + " \"category\": \"farming\", \"aspects\": [\"charge-restore\", \"save\"],"
+              + " \"items\": [\"magic_stick\", \"magic_wand\"]},{\"key\": \"toy\","
+              + " \"category\": \"farming\", \"aspects\": [\"toy\"], \"items\":"
+              + " [\"quelling_blade\"], \"parameters\": {\"weight\": 7}},{\"key\": \"summed\","
+              + " \"category\": \"farming\", \"aspects\": [\"toy\", \"toy-bonus\"],"
+              + " \"items\": [\"quelling_blade\"], \"parameters\": {\"weight\": 7, \"bonus\":"
+              + " 2}}]}";
       return new ItemEfficiencyFile(
           () -> new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)), "test.yaml");
     }

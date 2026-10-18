@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 /**
  * The item catalog, from the checked-in file {@code replay/items.yaml}. Read and checked on first
  * use, so a bad file stops that use with the entries named and never the application start. Adding
- * an item is a new entry for an existing kind.
+ * an item is a new entry of existing aspects.
  */
 @Component
 public class ItemEfficiencyFile {
@@ -33,7 +33,6 @@ public class ItemEfficiencyFile {
   private record Entry(
       String key,
       String category,
-      String kind,
       List<String> items,
       List<String> aspects,
       List<List<String>> winStats,
@@ -111,8 +110,10 @@ public class ItemEfficiencyFile {
     if (!keys.add(key)) {
       problems.add("'" + key + "' is listed twice");
     }
-    if (entry.kind() == null || entry.kind().isBlank()) {
-      problems.add("'" + key + "' has no kind");
+    if (entry.aspects() == null
+        || entry.aspects().isEmpty()
+        || entry.aspects().stream().anyMatch(a -> a == null || a.isBlank())) {
+      problems.add("'" + key + "' lists no aspects or a blank one");
     }
     if (entry.category() == null || !categories.containsKey(entry.category())) {
       problems.add("'" + key + "' has unknown category '" + entry.category() + "'");
@@ -144,7 +145,6 @@ public class ItemEfficiencyFile {
     return new ItemEfficiencyEntry(
         key,
         entry.category(),
-        entry.kind(),
         copy(entry.items()),
         copy(entry.aspects()),
         entry.winStats() == null

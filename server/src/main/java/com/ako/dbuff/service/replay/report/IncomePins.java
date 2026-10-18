@@ -11,6 +11,7 @@ import com.ako.dbuff.dao.repo.ItemPurchaseEventRepo;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyJson;
 import com.ako.dbuff.service.replay.analysis.item.ItemKits;
+import com.ako.dbuff.service.replay.analysis.item.MidasUsesAspect;
 import com.ako.dbuff.service.replay.report.chart.ChartPalette;
 import com.ako.dbuff.service.replay.report.chart.ChartSpec;
 import com.ako.dbuff.service.replay.report.chart.ChartSpec.Pin;
@@ -37,7 +38,8 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class IncomePins {
-  static final String MIDAS_KIND = "hand-of-midas";
+  static final String MIDAS_KIND = MidasUsesAspect.NAME;
+  private static final Set<String> MIDAS_KINDS = Set.of(MIDAS_KIND, "hand-of-midas");
   private static final int BIG_PURCHASES = 2;
   private static final long BIG_PURCHASE_COST = 2000;
   private static final double SAME_PURCHASE_SECONDS = 5;
@@ -125,7 +127,7 @@ public class IncomePins {
                   ChartPalette.PURCHASE,
                   name(item.itemKey())));
         }
-        if (MIDAS_KIND.equals(item.kind()) && item.paybackSeconds() != null) {
+        if (MIDAS_KINDS.contains(item.kind()) && item.paybackSeconds() != null) {
           pins.add(
               new Pin(
                   item.paybackSeconds(),
@@ -208,7 +210,7 @@ public class IncomePins {
     /** What the Hand of Midas of a hero did, in one sentence; empty without one. */
     Optional<String> midasSentence(long slot, Map<Long, String> heroes) {
       return items.stream()
-          .filter(i -> i.slot() == slot && MIDAS_KIND.equals(i.kind()))
+          .filter(i -> i.slot() == slot && MIDAS_KINDS.contains(i.kind()))
           .findFirst()
           .flatMap(
               i ->

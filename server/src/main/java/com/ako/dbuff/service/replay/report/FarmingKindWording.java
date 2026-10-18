@@ -13,8 +13,8 @@ public class FarmingKindWording implements ItemKindWording {
   private static final double NOTICEABLE_CAMPS = 0.5;
 
   @Override
-  public String kind() {
-    return "farming-group";
+  public String aspect() {
+    return "farm-rate";
   }
 
   @Override

@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class StickKindWording implements ItemKindWording {
   @Override
-  public String kind() {
-    return "magic-stick";
+  public String aspect() {
+    return "charge-restore";
   }
 
   @Override

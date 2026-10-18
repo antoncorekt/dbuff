@@ -23,17 +23,18 @@ class ReplayItemEfficiencyAnalyzerChecksTest {
     return new ReplayItemEfficiencyAnalyzer(
         new ItemEfficiencyFile(
             () -> new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)), "test.yaml"),
-        List.of(new MagicStickEvaluator()),
+        List.of(new SaveAspect()),
         inputs,
         key -> java.util.Optional.empty(),
         repo);
   }
 
   @Test
-  void anEntryWithNoEvaluatorForItsKindStopsTheRunNamingTheEntry() {
+  void anEntryWithAnUnknownAspectStopsTheRunNamingTheEntry() {
     ReplayItemEfficiencyAnalyzer analyzer =
         analyzer(
-            "{\"key\": \"a\", \"category\": \"farming\", \"kind\": \"nope\", \"items\": [\"x\"]}");
+            "{\"key\": \"a\", \"category\": \"farming\", \"aspects\": [\"nope\"], \"items\":"
+                + " [\"x\"]}");
 
     assertThatThrownBy(() -> analyzer.analyze(1))
         .hasMessageContaining("'a'")
@@ -44,7 +45,7 @@ class ReplayItemEfficiencyAnalyzerChecksTest {
   void aParameterTheEvaluatorDoesNotKnowIsCaughtBeforeAnythingIsReplaced() {
     ReplayItemEfficiencyAnalyzer analyzer =
         analyzer(
-            "{\"key\": \"a\", \"category\": \"farming\", \"kind\": \"magic-stick\", \"items\":"
+            "{\"key\": \"a\", \"category\": \"farming\", \"aspects\": [\"save\"], \"items\":"
                 + " [\"x\"], \"parameters\": {\"saveGolds\": 1}}");
 
     assertThatThrownBy(() -> analyzer.analyze(1))
@@ -56,7 +57,7 @@ class ReplayItemEfficiencyAnalyzerChecksTest {
   void aMatchWithoutHeroesStoresNothingAndTheAnalyzerIsModeAgnostic() {
     ReplayItemEfficiencyAnalyzer analyzer =
         analyzer(
-            "{\"key\": \"a\", \"category\": \"farming\", \"kind\": \"magic-stick\", \"items\":"
+            "{\"key\": \"a\", \"category\": \"farming\", \"aspects\": [\"save\"], \"items\":"
                 + " [\"x\"]}");
 
     analyzer.analyze(1);
@@ -71,12 +72,12 @@ class ReplayItemEfficiencyAnalyzerChecksTest {
   void everyProblemOfTheFileIsReportedInOneError() {
     ReplayItemEfficiencyAnalyzer analyzer =
         analyzer(
-            "{\"key\": \"a\", \"category\": \"farming\", \"kind\": \"nope\", \"items\":"
-                + " [\"x\"]},{\"key\": \"b\", \"category\": \"farming\", \"kind\": \"magic-stick\","
+            "{\"key\": \"a\", \"category\": \"farming\", \"aspects\": [\"nope\"], \"items\":"
+                + " [\"x\"]},{\"key\": \"b\", \"category\": \"farming\", \"aspects\": [\"save\"],"
                 + " \"items\": [\"x\"], \"parameters\": {\"saveGolds\": 1}}");
 
     assertThatThrownBy(() -> analyzer.analyze(1))
-        .hasMessageContaining("entry 'a': no evaluator for kind 'nope'")
+        .hasMessageContaining("entry 'a': unknown aspect 'nope'")
         .hasMessageContaining("entry 'b': unknown parameter 'saveGolds'");
   }
 }

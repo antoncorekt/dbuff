@@ -6,15 +6,15 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * How the report words the rows of one evaluator kind. A new kind needs its entry in {@link
+ * How the report words the rows of one main aspect. A new main aspect needs its entry in {@link
  * #FOR_KIND} to read well; without one the generic wording shows its numbers.
  */
 interface Wording {
   Map<String, Wording> FOR_KIND =
       Map.of(
-          "magic-stick", new StickWording(),
-          "hand-of-midas", new MidasWording(),
-          "farming-group", new FarmingWording());
+          "charge-restore", new StickWording(),
+          "midas-uses", new MidasWording(),
+          "farm-rate", new FarmingWording());
 
   static Wording of(String kind) {
     return FOR_KIND.getOrDefault(kind, new GenericWording());
