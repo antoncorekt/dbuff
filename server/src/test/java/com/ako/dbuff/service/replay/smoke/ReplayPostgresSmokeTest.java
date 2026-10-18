@@ -839,7 +839,11 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                 "hand_of_midas", "hand_of_midas",
                 "bfury", "farming_items",
                 "maelstrom", "farming_items",
-                "mjollnir", "farming_items")
+                "mjollnir", "farming_items",
+                "arcane_boots", "arcane_boots",
+                "mekansm", "mekansm",
+                "guardian_greaves", "mekansm",
+                "holy_locket", "holy_locket")
             .entrySet()
             .stream()
             .filter(e -> c.getName().equals("item_" + e.getKey()))
@@ -905,6 +909,11 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertThat(r.rows()).extracting(d -> d.label()).startsWith("BEFORE", "AFTER", "DAMAGE");
       assertThat(r.figures().get("procDamage")).as("damage of the item's own effects").isPositive();
       assertThat(r.figures().get("damageValue")).isGreaterThanOrEqualTo(0.0);
+    }
+    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("team-restore")).toList()) {
+      assertThat(r.figures().get("hp")).as("%s slot %d: hp", id, r.slot()).isNotNegative();
+      assertThat(r.figures().get("allies")).isLessThanOrEqualTo(4.0);
+      assertThat(r.rows().size()).isGreaterThanOrEqualTo(r.count());
     }
     System.out.printf(
         "ITEMS %s: %d rows (%d stick, %d midas, %d farming), %d stick uses, %.0f saves%n",

@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -62,8 +63,8 @@ public class ItemEfficiencyInputs {
         .forEach(k -> kills.computeIfAbsent(k.getPlayerSlot(), s -> new ArrayList<>()).add(k));
     Map<Long, List<ActivitySegment>> segments = activity.bySlot(matchId);
     List<ReplayPlayerDomain> players = playerRepo.findByMatchId(matchId);
-    MatchFacts match = matchFacts(matchId, events, players, heroNames);
     List<HeroInputs> heroes = new ArrayList<>();
+    MatchFacts match = matchFacts(matchId, events, players, heroNames, () -> heroes);
     for (ReplayPlayerDomain player : players) {
       String hero = CombatHeroes.nameOf(player, heroNames);
       Long slot = player.getPlayerSlot();
@@ -88,7 +89,8 @@ public class ItemEfficiencyInputs {
       long matchId,
       List<CombatEvent> events,
       List<ReplayPlayerDomain> players,
-      Set<String> heroNames) {
+      Set<String> heroNames,
+      Supplier<List<HeroInputs>> roster) {
     Map<String, Long> slots = new HashMap<>();
     for (ReplayPlayerDomain player : players) {
       String hero = CombatHeroes.nameOf(player, heroNames);
@@ -102,15 +104,22 @@ public class ItemEfficiencyInputs {
         .sorted(Comparator.comparing(ReplayPlayerMinuteDomain::getGameMinute))
         .forEach(m -> minutes.computeIfAbsent(m.getPlayerSlot(), s -> new ArrayList<>()).add(m));
     return new MatchFacts(
-        events.stream().filter(ItemEfficiencyInputs::acrossHeroes).toList(), slots, minutes);
+        events.stream().filter(ItemEfficiencyInputs::acrossHeroes).toList(),
+        slots,
+        minutes,
+        roster);
   }
 
-  /** Damage to heroes by anyone, hero deaths, and the gold and experience of hero kills. */
+  /**
+   * Damage to heroes by anyone, hero deaths, the gold and experience of hero kills, and heals that
+   * items did to heroes.
+   */
   private static boolean acrossHeroes(CombatEvent e) {
     return switch (e.kind()) {
       case DAMAGE, DEATH -> e.targetIsRealHero();
       case GOLD -> e.goldReason() == GoldReason.HERO_KILL;
       case XP -> e.xpReason() == XpReason.HERO_KILL;
+      case HEAL -> e.targetIsRealHero() && e.inflictor().startsWith(HeroInputs.ITEM_PREFIX);
       default -> false;
     };
   }
