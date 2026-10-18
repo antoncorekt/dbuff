@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Documents (`docs/...` paths named below and in code comments) are kept outside git, in `docs/` of the container folder one level above this repository. Do not add documents to this repository.
+
 ## Project Overview
 
 DBuff is a Dota 2 match analytics backend built with Spring Boot 3.5, Java 21, and PostgreSQL 16. It fetches match data from the OpenDota API, stores player statistics, provides item/ability rankings, and integrates with Discord and OpenAI for match summaries.
