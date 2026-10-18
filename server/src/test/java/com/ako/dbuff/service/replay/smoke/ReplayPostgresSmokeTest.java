@@ -243,6 +243,14 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .isEmpty();
       assertThat(trackRepo.findByMatchId(match.getId())).hasSize(10);
       assertThat(trackRepo.findByMatchId(match.getId()).getFirst().getMana()).isNotEmpty();
+      assertThat(trackRepo.findByMatchId(match.getId()))
+          .allSatisfy(
+              t -> {
+                assertThat(t.getGold()).isNotNull().isNotEmpty();
+                assertThat(Arrays.stream(t.getGold()).min().orElse(-1)).isNotNegative();
+                assertThat(t.getMaxHp()).isNotNull().isNotEmpty();
+                assertThat(Arrays.stream(t.getMaxHp()).max().orElse(0)).isGreaterThanOrEqualTo(200);
+              });
       assertThat(minuteRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(stateRepo.findByMatchIdOrderByGameSeconds(match.getId())).isNotEmpty();
       assertThat(combatLogRepo.findAll().stream().filter(c -> c.getMatchId().equals(match.getId())))

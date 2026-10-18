@@ -76,4 +76,14 @@ public class ReplayPlayerTrackDomain {
   @JdbcTypeCode(SqlTypes.ARRAY)
   @Column(columnDefinition = "integer array")
   private int[] flags;
+
+  /** Unspent gold (reliable plus unreliable); null for tracks stored before this was recorded. */
+  @JdbcTypeCode(SqlTypes.ARRAY)
+  @Column(columnDefinition = "integer array")
+  private int[] gold;
+
+  /** Maximum health; null for tracks stored before this was recorded. */
+  @JdbcTypeCode(SqlTypes.ARRAY)
+  @Column(columnDefinition = "integer array")
+  private int[] maxHp;
 }

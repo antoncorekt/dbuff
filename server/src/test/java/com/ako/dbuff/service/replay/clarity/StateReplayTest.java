@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.clarity;
 
 import com.ako.dbuff.service.replay.ReplayFacts;
+import com.ako.dbuff.service.replay.SampleFacts;
 import com.ako.dbuff.service.replay.StateChange;
 import com.ako.dbuff.service.replay.StateChangeKind;
 import com.ako.dbuff.service.replay.mode.TestModes;
@@ -92,6 +93,19 @@ class StateReplayTest {
         .containsExactly(75);
     assertThat(Arrays.stream(facts.samples().series().get(SNIPER).mana()).max().orElse(0))
         .isGreaterThan(300);
+  }
+
+  @Test
+  void unspentGoldAndMaxHealthAreSampled() {
+    SampleFacts.PlayerSeries sniper = facts.samples().series().get(SNIPER);
+
+    assertThat(sniper.gold()).isNotNull().hasSize(sniper.x().length);
+    assertThat(Arrays.stream(sniper.gold()).min().orElse(-1)).isNotNegative();
+    assertThat(Arrays.stream(sniper.gold()).max().orElse(0)).isPositive();
+    assertThat(sniper.maxHp()).isNotNull().hasSize(sniper.x().length);
+    assertThat(Arrays.stream(sniper.maxHp()).filter(h -> h > 0))
+        .isNotEmpty()
+        .allMatch(h -> h >= 200);
   }
 
   @Test
