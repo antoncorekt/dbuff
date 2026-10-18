@@ -41,7 +41,8 @@ final class ItemTestData {
 
   static ItemEfficiencyEntry entry(
       String key, String kind, List<String> items, Map<String, Double> parameters) {
-    return new ItemEfficiencyEntry(key, kind, items, parameters);
+    return new ItemEfficiencyEntry(
+        key, "farming", kind, items, List.of(), List.of(), List.of(), parameters);
   }
 
   static ReplayStateChangeDomain change(double second, StateChangeKind kind, String name) {

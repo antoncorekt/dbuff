@@ -3,8 +3,10 @@ package com.ako.dbuff.service.replay.analysis.item;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -16,32 +18,42 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 /**
- * The items and item groups to analyse, from the checked-in file {@code
- * replay/item-efficiency.json}. Read and checked on first use, so a bad file stops that use with
- * the entry named and never the application start. Adding an item is a new entry for an existing
- * kind.
+ * The item catalog, from the checked-in file {@code replay/items.yaml}. Read and checked on first
+ * use, so a bad file stops that use with the entries named and never the application start. Adding
+ * an item is a new entry for an existing kind.
  */
 @Component
 public class ItemEfficiencyFile {
-  private record Content(String status, List<Entry> entries) {}
+  private record Content(
+      Map<String, Double> prices,
+      Map<String, Double> alternatives,
+      Map<String, String> categories,
+      List<Entry> entries) {}
 
   private record Entry(
-      String key, String kind, List<String> items, Map<String, Double> parameters) {}
+      String key,
+      String category,
+      String kind,
+      List<String> items,
+      List<String> aspects,
+      List<List<String>> winStats,
+      List<String> alternatives,
+      Map<String, Double> parameters) {}
 
   private static final String ITEM_PREFIX = "item_";
   private static final ObjectMapper MAPPER =
-      new ObjectMapper()
+      new ObjectMapper(new YAMLFactory())
           .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
           .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
 
   private final Supplier<InputStream> input;
   private final String source;
   private List<ItemEfficiencyEntry> entries;
+  private Map<String, String> categories;
 
   @Autowired
   public ItemEfficiencyFile(
-      @Value("${replay.analysis.item-efficiency.resource:replay/item-efficiency.json}")
-          String resource) {
+      @Value("${replay.analysis.item-efficiency.resource:replay/items.yaml}") String resource) {
     this(() -> open(resource), resource);
   }
 
@@ -51,52 +63,122 @@ public class ItemEfficiencyFile {
   }
 
   public synchronized List<ItemEfficiencyEntry> entries() {
-    if (entries == null) {
-      entries = load();
-    }
+    ensureLoaded();
     return entries;
   }
 
-  private List<ItemEfficiencyEntry> load() {
+  /** The category ids with their display names. */
+  public synchronized Map<String, String> categories() {
+    ensureLoaded();
+    return categories;
+  }
+
+  private void ensureLoaded() {
+    if (entries == null) {
+      load();
+    }
+  }
+
+  private void load() {
     Content content = read();
-    if (content.status() == null || content.status().isBlank()) {
-      throw invalid("has no status saying how the parameters were chosen");
+    if (content.categories() == null || content.categories().isEmpty()) {
+      throw invalid("has no categories");
     }
     if (content.entries() == null || content.entries().isEmpty()) {
       throw invalid("has no entries");
     }
+    List<String> problems = new ArrayList<>();
+    checkNumbers("prices", content.prices(), problems);
+    checkNumbers("alternatives", content.alternatives(), problems);
     Set<String> keys = new HashSet<>();
-    return content.entries().stream().map(entry -> checked(entry, keys)).toList();
+    List<ItemEfficiencyEntry> checked = new ArrayList<>();
+    for (Entry entry : content.entries()) {
+      checked.add(checked(entry, keys, content.categories(), problems));
+    }
+    if (!problems.isEmpty()) {
+      throw invalid(String.join("; ", problems));
+    }
+    categories = Map.copyOf(content.categories());
+    entries = List.copyOf(checked);
   }
 
-  private ItemEfficiencyEntry checked(Entry entry, Set<String> keys) {
+  private ItemEfficiencyEntry checked(
+      Entry entry, Set<String> keys, Map<String, String> categories, List<String> problems) {
     if (entry == null || entry.key() == null || entry.key().isBlank()) {
       throw invalid("has an entry without a key");
     }
     String key = entry.key();
     if (!keys.add(key)) {
-      throw invalid("'" + key + "' is listed twice");
+      problems.add("'" + key + "' is listed twice");
     }
     if (entry.kind() == null || entry.kind().isBlank()) {
-      throw invalid("'" + key + "' has no kind");
+      problems.add("'" + key + "' has no kind");
+    }
+    if (entry.category() == null || !categories.containsKey(entry.category())) {
+      problems.add("'" + key + "' has unknown category '" + entry.category() + "'");
     }
     if (entry.items() == null || entry.items().isEmpty()) {
-      throw invalid("'" + key + "' lists no items");
+      problems.add("'" + key + "' lists no items");
+    } else {
+      checkItems(key, "item", entry.items(), problems);
     }
-    for (String item : entry.items()) {
-      if (item == null || item.isBlank() || item.startsWith(ITEM_PREFIX)) {
-        throw invalid("'" + key + "' has item '" + item + "': use the constants key, no item_");
+    if (entry.alternatives() != null) {
+      checkItems(key, "alternative", entry.alternatives(), problems);
+    }
+    if (entry.winStats() != null) {
+      for (List<String> group : entry.winStats()) {
+        if (group == null || group.isEmpty()) {
+          problems.add("'" + key + "' has a malformed winStats group");
+        } else {
+          checkItems(key, "winStats item", group, problems);
+        }
       }
     }
     Map<String, Double> parameters = entry.parameters() == null ? Map.of() : entry.parameters();
     parameters.forEach(
         (name, value) -> {
-          if (value == null || value.isNaN() || value.isInfinite() || value < 0) {
-            throw invalid("'" + key + "' parameter '" + name + "' must be a number of 0 or more");
+          if (invalidNumber(value)) {
+            problems.add("'" + key + "' parameter '" + name + "' must be a number of 0 or more");
           }
         });
     return new ItemEfficiencyEntry(
-        key, entry.kind(), List.copyOf(entry.items()), Map.copyOf(parameters));
+        key,
+        entry.category(),
+        entry.kind(),
+        copy(entry.items()),
+        copy(entry.aspects()),
+        entry.winStats() == null
+            ? List.of()
+            : entry.winStats().stream().map(ItemEfficiencyFile::copy).toList(),
+        copy(entry.alternatives()),
+        Map.copyOf(parameters));
+  }
+
+  private static void checkItems(String key, String what, List<String> items, List<String> out) {
+    for (String item : items) {
+      if (item == null || item.isBlank() || item.startsWith(ITEM_PREFIX)) {
+        out.add("'" + key + "' has " + what + " '" + item + "': use the constants key, no item_");
+      }
+    }
+  }
+
+  private static void checkNumbers(String section, Map<String, Double> map, List<String> out) {
+    if (map != null) {
+      map.forEach(
+          (name, value) -> {
+            if (invalidNumber(value)) {
+              out.add(section + " '" + name + "' must be a number of 0 or more");
+            }
+          });
+    }
+  }
+
+  private static boolean invalidNumber(Double value) {
+    return value == null || value.isNaN() || value.isInfinite() || value < 0;
+  }
+
+  private static List<String> copy(List<String> list) {
+    return list == null ? List.of() : List.copyOf(list);
   }
 
   private Content read() {

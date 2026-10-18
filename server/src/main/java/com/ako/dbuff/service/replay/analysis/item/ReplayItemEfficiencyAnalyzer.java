@@ -1,11 +1,14 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
+import com.ako.dbuff.dao.model.ItemEfficiencyDomain;
 import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyInputs.MatchInputs;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -13,10 +16,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Judges the items of {@code replay/item-efficiency.json} for every hero who held one, with the
- * evaluator that supports each entry (see {@link ItemEfficiencyEvaluator}). It does not know any
- * item: a new item or group is a new entry or a new evaluator bean. The OpenDota based purchase
- * report ({@code ItemEfficiencyAnalyzer} in the match report) is a different feature.
+ * Judges the items of {@code replay/items.yaml} for every hero who held one, with the evaluator
+ * that supports each entry (see {@link ItemEfficiencyEvaluator}). It does not know any item: a new
+ * item or group is a new entry or a new evaluator bean. The OpenDota based purchase report ({@code
+ * ItemEfficiencyAnalyzer} in the match report) is a different feature.
  */
 @Slf4j
 @Order(85)
@@ -59,8 +62,18 @@ public class ReplayItemEfficiencyAnalyzer implements ReplayAnalyzer {
               .evaluate(
                   new EntryContext(entries.get(i), kits, match.gameEndSeconds(), match.heroes())));
     }
+    Map<String, String> categories =
+        entries.stream()
+            .collect(Collectors.toMap(ItemEfficiencyEntry::key, ItemEfficiencyEntry::category));
     repo.saveAll(
-        results.stream().map(r -> ItemEfficiencyJson.toRow(matchId, r, version())).toList());
+        results.stream()
+            .map(
+                r -> {
+                  ItemEfficiencyDomain row = ItemEfficiencyJson.toRow(matchId, r, version());
+                  row.setCategory(categories.get(r.entryKey()));
+                  return row;
+                })
+            .toList());
   }
 
   @Override
