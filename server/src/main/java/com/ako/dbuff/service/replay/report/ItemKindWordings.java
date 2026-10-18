@@ -26,10 +26,14 @@ public class ItemKindWordings {
         wordings.stream().collect(Collectors.toMap(ItemKindWording::aspect, Function.identity()));
   }
 
-  /** The three main aspects the whitelist has, for code that does not run in Spring. */
+  /** The main aspects the whitelist has, for code that does not run in Spring. */
   public static ItemKindWordings standard() {
     return new ItemKindWordings(
-        List.of(new StickKindWording(), new MidasKindWording(), new FarmingKindWording()));
+        List.of(
+            new StickKindWording(),
+            new MidasKindWording(),
+            new FarmingKindWording(),
+            new CooldownKindWording()));
   }
 
   public Optional<ItemKindWording> find(String aspect) {

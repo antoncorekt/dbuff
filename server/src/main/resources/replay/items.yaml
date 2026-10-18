@@ -59,3 +59,10 @@ entries:
       minAfterSeconds: 60
       campGapSeconds: 30
       damageWindowMinutes: 5
+  - key: octarine_core
+    category: farming
+    items: [octarine_core]
+    aspects: [cooldown, alternatives]
+    parameters:
+      damageSeconds: 3
+      toleranceSeconds: 0.5
