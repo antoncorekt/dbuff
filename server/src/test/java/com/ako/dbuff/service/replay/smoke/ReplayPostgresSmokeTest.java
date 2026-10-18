@@ -1,5 +1,8 @@
 package com.ako.dbuff.service.replay.smoke;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
+
 import com.ako.dbuff.dao.model.AbilityDraftPickDomain;
 import com.ako.dbuff.dao.model.CreepKillDomain;
 import com.ako.dbuff.dao.model.FightDomain;
@@ -128,9 +131,6 @@ import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.within;
-
 /**
  * Runs a real replay through the whole pipeline against a real PostgreSQL: a local HTTP server
  * stands in for Valve, the real downloader, decompressor, parser, extractors and analyzers run, and
@@ -243,6 +243,14 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .isEmpty();
       assertThat(trackRepo.findByMatchId(match.getId())).hasSize(10);
       assertThat(trackRepo.findByMatchId(match.getId()).getFirst().getMana()).isNotEmpty();
+      assertThat(trackRepo.findByMatchId(match.getId()))
+          .allSatisfy(
+              t -> {
+                assertThat(t.getGold()).isNotNull().isNotEmpty();
+                assertThat(Arrays.stream(t.getGold()).min().orElse(-1)).isNotNegative();
+                assertThat(t.getMaxHp()).isNotNull().isNotEmpty();
+                assertThat(Arrays.stream(t.getMaxHp()).max().orElse(0)).isGreaterThanOrEqualTo(200);
+              });
       assertThat(minuteRepo.findByMatchId(match.getId())).isNotEmpty();
       assertThat(stateRepo.findByMatchIdOrderByGameSeconds(match.getId())).isNotEmpty();
       assertThat(combatLogRepo.findAll().stream().filter(c -> c.getMatchId().equals(match.getId())))

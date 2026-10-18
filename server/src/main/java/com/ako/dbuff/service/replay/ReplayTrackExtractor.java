@@ -48,6 +48,8 @@ public class ReplayTrackExtractor implements ReplayExtractor {
                         .attackRange(series.attackRange())
                         .level(series.level())
                         .flags(series.flags())
+                        .gold(series.gold())
+                        .maxHp(series.maxHp())
                         .build())
             .toList();
     repo.saveAll(rows);

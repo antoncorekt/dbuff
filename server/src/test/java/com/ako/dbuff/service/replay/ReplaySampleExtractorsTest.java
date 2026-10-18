@@ -1,5 +1,7 @@
 package com.ako.dbuff.service.replay;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerMinuteDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
@@ -12,8 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -49,6 +49,12 @@ class ReplaySampleExtractorsTest {
     assertThat(dire.getSampleCount()).isEqualTo(3);
     assertThat(dire.getX()).containsExactly(-7000, 100, 6500);
     assertThat(dire.getMana()).containsExactly(0, 400, 240);
+    ReplayPlayerTrackDomain radiant =
+        tracks.stream().filter(t -> t.getPlayerSlot() == 0L).findFirst().orElseThrow();
+    assertThat(radiant.getGold()).containsExactly(0, 625, 700);
+    assertThat(radiant.getMaxHp()).containsExactly(0, 580, 640);
+    assertThat(dire.getGold()).isNull();
+    assertThat(dire.getMaxHp()).isNull();
     assertThat(dire.getAttackRange()).containsExactly(0, 600, 600);
     assertThat(dire.getLevel()).containsExactly(0, 1, 2);
     assertThat(dire.getFlags()).containsExactly(0, 1, 1);
@@ -107,7 +113,9 @@ class ReplaySampleExtractorsTest {
                     new int[] {0, 300, 210},
                     new int[] {0, 150, 150},
                     new int[] {0, 1, 2},
-                    new int[] {0, 1, 1}),
+                    new int[] {0, 1, 1},
+                    new int[] {0, 625, 700},
+                    new int[] {0, 580, 640}),
                 new SampleFacts.PlayerSeries(
                     10,
                     new int[] {-7000, 100, 6500},
@@ -117,7 +125,9 @@ class ReplaySampleExtractorsTest {
                     new int[] {0, 400, 240},
                     new int[] {0, 600, 600},
                     new int[] {0, 1, 2},
-                    new int[] {0, 1, 1})),
+                    new int[] {0, 1, 1},
+                    null,
+                    null)),
             List.of(minute(0, 5, 3, 900), minute(10, 5, 1, 0)));
     return ReplayFacts.builder()
         .clockStartTick(100)

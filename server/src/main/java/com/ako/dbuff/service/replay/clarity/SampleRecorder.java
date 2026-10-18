@@ -4,6 +4,7 @@ import com.ako.dbuff.service.replay.MinuteStat;
 import com.ako.dbuff.service.replay.SampleFacts;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -24,6 +25,11 @@ final class SampleRecorder {
   private static final int MINUTE_TICKS = 1800;
   private static final int MINUTE_OFFSET_TICKS = 900;
   private static final int PLAYERS_PER_TEAM = 5;
+  private static final int MISSING = -1;
+  private static final String RADIANT_DATA = "CDOTA_DataRadiant";
+  private static final String DIRE_DATA = "CDOTA_DataDire";
+  private static final String[] RELIABLE_GOLD = goldProperties("m_iReliableGold");
+  private static final String[] UNRELIABLE_GOLD = goldProperties("m_iUnreliableGold");
 
   private final Entities entities;
   private final Map<Integer, Series> series = new TreeMap<>();
@@ -35,6 +41,7 @@ final class SampleRecorder {
 
   private long nextGridTick;
   private boolean stopped;
+  private final Map<String, Entity> teamEntities = new HashMap<>();
   private final List<SampleObserver> observers = new ArrayList<>();
 
   SampleRecorder(Entities entities) {
@@ -101,15 +108,15 @@ final class SampleRecorder {
     List<Controllers.View> players = Controllers.read(entities);
     boolean minuteBoundary = Math.floorMod(grid - clockOriginTick, MINUTE_TICKS) == 0;
     Entity resource = minuteBoundary ? first("CDOTA_PlayerResource") : null;
-    Entity radiant = minuteBoundary ? first("CDOTA_DataRadiant") : null;
-    Entity dire = minuteBoundary ? first("CDOTA_DataDire") : null;
+    Entity radiant = teamData(RADIANT_DATA);
+    Entity dire = teamData(DIRE_DATA);
     int size = series.isEmpty() ? 0 : series.values().iterator().next().size();
     for (Controllers.View player : players) {
       Series s = series.computeIfAbsent(player.playerId(), id -> new Series());
       s.padTo(size);
-      s.add(player.hero());
+      Entity teamData = player.team() == 2 ? radiant : dire;
+      s.add(player.hero(), unspentGold(teamData, (player.playerId() / 2) % PLAYERS_PER_TEAM));
       if (minuteBoundary) {
-        Entity teamData = player.team() == 2 ? radiant : dire;
         snapshots.add(
             new RawSnapshot(player.playerId(), grid, counters(player, resource, teamData)));
       }
@@ -143,6 +150,36 @@ final class SampleRecorder {
         : MinuteStat.MISSING;
   }
 
+  private static String[] goldProperties(String property) {
+    String[] names = new String[PLAYERS_PER_TEAM];
+    for (int i = 0; i < names.length; i++) {
+      names[i] = "m_vecDataTeam." + String.format(Locale.ROOT, "%04d.", i) + property;
+    }
+    return names;
+  }
+
+  private static int unspentGold(Entity teamData, int position) {
+    if (teamData == null) {
+      return MISSING;
+    }
+    String reliable = RELIABLE_GOLD[position];
+    String unreliable = UNRELIABLE_GOLD[position];
+    boolean hasReliable = teamData.getProperty(reliable) instanceof Number;
+    boolean hasUnreliable = teamData.getProperty(unreliable) instanceof Number;
+    if (!hasReliable && !hasUnreliable) {
+      return MISSING;
+    }
+    long total =
+        (hasReliable ? ((Number) teamData.getProperty(reliable)).longValue() : 0)
+            + (hasUnreliable ? ((Number) teamData.getProperty(unreliable)).longValue() : 0);
+    return (int) Math.max(0, Math.min(Integer.MAX_VALUE, total));
+  }
+
+  /** The team data entities live for the whole game, so they are looked up until found. */
+  private Entity teamData(String dtName) {
+    return teamEntities.computeIfAbsent(dtName, this::first);
+  }
+
   private Entity first(String dtName) {
     return entities.stream().filter(Entities.byDtName(dtName)).findFirst().orElse(null);
   }
@@ -160,6 +197,10 @@ final class SampleRecorder {
     private int[] attackRange = new int[256];
     private int[] level = new int[256];
     private int[] flags = new int[256];
+    private int[] gold = new int[256];
+    private int[] maxHp = new int[256];
+    private boolean goldSeen;
+    private boolean maxHpSeen;
     private int size;
 
     int size() {
@@ -169,11 +210,11 @@ final class SampleRecorder {
     /** A player who has no hero yet, or joined late, keeps empty samples aligned with the rest. */
     void padTo(int target) {
       while (size < target) {
-        add(null);
+        add(null, MISSING);
       }
     }
 
-    void add(Entity hero) {
+    void add(Entity hero, int unspentGold) {
       if (size == x.length) {
         int capacity = size * 2;
         x = Arrays.copyOf(x, capacity);
@@ -184,7 +225,16 @@ final class SampleRecorder {
         attackRange = Arrays.copyOf(attackRange, capacity);
         level = Arrays.copyOf(level, capacity);
         flags = Arrays.copyOf(flags, capacity);
+        gold = Arrays.copyOf(gold, capacity);
+        maxHp = Arrays.copyOf(maxHp, capacity);
       }
+      if (unspentGold >= 0) {
+        gold[size] = unspentGold;
+        goldSeen = true;
+      } else {
+        gold[size] = 0;
+      }
+      maxHp[size] = 0;
       if (hero != null) {
         x[size] = Positions.x(hero);
         y[size] = Positions.y(hero);
@@ -194,6 +244,11 @@ final class SampleRecorder {
         attackRange[size] = (int) number(hero, "m_iAttackRange");
         level[size] = (int) number(hero, "m_iCurrentLevel");
         flags[size] = number(hero, "m_lifeState") == 0 ? 1 : 0;
+        if (hero.hasProperty("m_iMaxHealth")
+            && hero.getProperty("m_iMaxHealth") instanceof Number n) {
+          maxHp[size] = n.intValue();
+          maxHpSeen = true;
+        }
       }
       size++;
     }
@@ -208,7 +263,9 @@ final class SampleRecorder {
           Arrays.copyOf(manaPoints, size),
           Arrays.copyOf(attackRange, size),
           Arrays.copyOf(level, size),
-          Arrays.copyOf(flags, size));
+          Arrays.copyOf(flags, size),
+          goldSeen ? Arrays.copyOf(gold, size) : null,
+          maxHpSeen ? Arrays.copyOf(maxHp, size) : null);
     }
 
     private static int percent(Entity hero, String value, String max) {

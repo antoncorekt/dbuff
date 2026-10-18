@@ -20,6 +20,8 @@ public record SampleFacts(
    * @param mana the mana points, as against {@code manaPercent}
    * @param attackRange the hero's attack range in world units, as the game reports it
    * @param flags bit 0 is set while the hero is alive
+   * @param gold reliable plus unreliable gold, or null when the replay has neither property
+   * @param maxHp the hero's maximum health, or null when the replay does not have it
    */
   public record PlayerSeries(
       int replayPlayerId,
@@ -30,7 +32,9 @@ public record SampleFacts(
       int[] mana,
       int[] attackRange,
       int[] level,
-      int[] flags) {}
+      int[] flags,
+      int[] gold,
+      int[] maxHp) {}
 
   /**
    * One player's counters at a game minute, indexed by {@link MinuteStat#ordinal()}, with {@link
