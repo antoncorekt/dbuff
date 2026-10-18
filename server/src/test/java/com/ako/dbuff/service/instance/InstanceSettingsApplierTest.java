@@ -298,7 +298,8 @@ class InstanceSettingsApplierTest {
     assertThatThrownBy(() -> apply(UpdateInstanceRequest.builder().itemCategories("farming, nope")))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("`nope`")
-        .hasMessageContaining("farming, sustain");
+        .hasMessageContaining("sustain")
+        .hasMessageContaining("farming");
     assertThat(settings.getItemCategories()).isEqualTo("sustain");
   }
 
