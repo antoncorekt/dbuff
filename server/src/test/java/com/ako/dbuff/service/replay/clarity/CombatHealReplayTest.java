@@ -1,7 +1,5 @@
 package com.ako.dbuff.service.replay.clarity;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.mode.TestModes;
@@ -10,6 +8,8 @@ import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Checks that heals and the item modifiers reach the stored combat log of real replays. */
 @Tag("replay")
