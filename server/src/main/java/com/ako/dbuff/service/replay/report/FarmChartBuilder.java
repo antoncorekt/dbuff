@@ -6,8 +6,10 @@ import com.ako.dbuff.dao.model.PlayerActivitySegmentDomain;
 import com.ako.dbuff.dao.repo.CreepKillRepo;
 import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
 import com.ako.dbuff.dao.repo.PlayerActivitySegmentRepo;
+import com.ako.dbuff.service.replay.analysis.item.FarmRateAspect;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyJson;
+import com.ako.dbuff.service.replay.analysis.item.MidasUsesAspect;
 import com.ako.dbuff.service.replay.report.chart.ChartFormat;
 import com.ako.dbuff.service.replay.report.chart.ChartSpec;
 import java.awt.Color;
@@ -40,7 +42,8 @@ import org.springframework.stereotype.Component;
 public class FarmChartBuilder {
   static final String NO_CREEP_KILLS =
       "There is no farm graph for this match: no creep kills with gold were stored.";
-  private static final Set<String> FARMING_KINDS = Set.of("farming-group", "hand-of-midas");
+  private static final Set<String> FARMING_KINDS =
+      Set.of(FarmRateAspect.NAME, MidasUsesAspect.NAME, "farming-group", "hand-of-midas");
   private static final Color LANE = new Color(0x4C78A8);
   private static final Color JUNGLE = new Color(0xE8A33D);
   private static final Color PAID_BACK = new Color(0x1A7F37);

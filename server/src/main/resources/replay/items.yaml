@@ -7,8 +7,8 @@ categories:
 entries:
   - key: magic_stick
     category: sustain
-    kind: magic-stick
     items: [magic_stick, magic_wand]
+    aspects: [charge-restore, save]
     parameters:
       restorePerCharge: 15
       goldPerHp: 0.3
@@ -26,21 +26,20 @@ entries:
       maxHpWindowSeconds: 120
   - key: hand_of_midas
     category: farming
-    kind: hand-of-midas
     items: [hand_of_midas]
+    aspects: [midas-uses]
     parameters:
       cooldownSeconds: 90
       xpWeight: 1
       includeAttackSpeed: 1
   - key: farming_items
     category: farming
-    kind: farming-group
     items: [bfury, maelstrom, mjollnir]
+    aspects: [farm-rate, item-damage, stat-uplift]
     parameters:
       windowMinutes: 5
       minBeforeSeconds: 120
       minAfterSeconds: 60
       campGapSeconds: 30
-      includeDamage: 1
       damagePrice: 100
       damageWindowMinutes: 5

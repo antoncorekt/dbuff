@@ -4,7 +4,8 @@ import java.util.List;
 
 /**
  * What an item adds in damage to enemy heroes, as a second part of its worth next to the gold it
- * earns. Two parts, both first guesses:
+ * earns. Two parts, both first guesses, judged by {@link ItemDamageAspect} and {@link
+ * StatUpliftAspect}:
  *
  * <ul>
  *   <li>the item's own damage (chain lightning, static charge, cleave): damage entries of the
@@ -32,8 +33,12 @@ record DamageComponent(
     return beforePerMinute != null && afterPerMinute != null;
   }
 
-  double value(double goldPerThousandDamage) {
-    return (procDamage + passiveDamage) * goldPerThousandDamage / 1000;
+  double procValue(double goldPerThousandDamage) {
+    return procDamage * goldPerThousandDamage / 1000;
+  }
+
+  double passiveValue(double goldPerThousandDamage) {
+    return passiveDamage * goldPerThousandDamage / 1000;
   }
 
   static DamageComponent estimate(

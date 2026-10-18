@@ -38,7 +38,7 @@ class ItemLoopReportTest {
         0,
         "magic_stick",
         "magic_stick",
-        "magic-stick",
+        "charge-restore",
         -60.0,
         2,
         620,
@@ -97,7 +97,7 @@ class ItemLoopReportTest {
         128,
         "hand_of_midas",
         "hand_of_midas",
-        "hand-of-midas",
+        "midas-uses",
         390.0,
         1,
         3781,
@@ -122,7 +122,7 @@ class ItemLoopReportTest {
         0,
         "farming_items",
         "maelstrom",
-        "farming-group",
+        "farm-rate",
         600.0,
         23,
         990,
@@ -194,8 +194,7 @@ class ItemLoopReportTest {
         .contains("| Axe: Hand of Midas, paid for itself at 21:32 | 21:32 | - | paid for itself |")
         .contains(
             "| Windrunner: Maelstrom, before the purchase | 5:00 | - | 10 creeps (2.0 per min)")
-        .doesNotContain(
-            "magic-stick", "farming-group", "HP_UNCAPPED", "npc_dota", "USE", "PAYBACK");
+        .doesNotContain("charge-restore", "farm-rate", "HP_UNCAPPED", "npc_dota", "USE", "PAYBACK");
   }
 
   @Test
@@ -236,7 +235,7 @@ class ItemLoopReportTest {
             0,
             "farming_items",
             "mjollnir",
-            "farming-group",
+            "farm-rate",
             600.0,
             23,
             3800,

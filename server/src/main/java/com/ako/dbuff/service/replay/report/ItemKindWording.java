@@ -3,13 +3,13 @@ package com.ako.dbuff.service.replay.report;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 
 /**
- * How one evaluator kind of {@code item_efficiency} is worded. A new kind is one more bean; a kind
- * without one is not reported.
+ * How the rows of {@code item_efficiency} with one main aspect (the first aspect of their entry)
+ * are worded. A new main aspect is one more bean; a row without one is not reported.
  */
 public interface ItemKindWording {
 
-  /** The evaluator kind of the rows this wording reads. */
-  String kind();
+  /** The main aspect of the rows this wording reads. */
+  String aspect();
 
   /** Whether the row has every figure the wording prints, so it never says "?". */
   boolean complete(ItemEfficiency row);

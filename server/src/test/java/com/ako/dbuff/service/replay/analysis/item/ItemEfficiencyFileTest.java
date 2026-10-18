@@ -21,11 +21,12 @@ class ItemEfficiencyFileTest {
     var entries = new ItemEfficiencyFile("replay/items.yaml").entries();
 
     assertThat(entries)
-        .extracting(ItemEfficiencyEntry::key, ItemEfficiencyEntry::kind)
+        .extracting(ItemEfficiencyEntry::key, ItemEfficiencyEntry::aspects)
         .containsExactly(
-            org.assertj.core.groups.Tuple.tuple("magic_stick", "magic-stick"),
-            org.assertj.core.groups.Tuple.tuple("hand_of_midas", "hand-of-midas"),
-            org.assertj.core.groups.Tuple.tuple("farming_items", "farming-group"));
+            org.assertj.core.groups.Tuple.tuple("magic_stick", List.of("charge-restore", "save")),
+            org.assertj.core.groups.Tuple.tuple("hand_of_midas", List.of("midas-uses")),
+            org.assertj.core.groups.Tuple.tuple(
+                "farming_items", List.of("farm-rate", "item-damage", "stat-uplift")));
     assertThat(entries)
         .extracting(ItemEfficiencyEntry::category)
         .containsExactly("sustain", "farming", "farming");
@@ -34,15 +35,25 @@ class ItemEfficiencyFileTest {
   }
 
   @Test
-  void theShippedParametersAreAllKnownToTheirEvaluators() {
+  void theShippedAspectsAndParametersAreAllKnown() {
     var entries = new ItemEfficiencyFile("replay/items.yaml").entries();
-    var evaluators =
-        java.util.List.of(
-            new MagicStickEvaluator(), new HandOfMidasEvaluator(null), new FarmingGroupEvaluator());
+    var aspects =
+        java.util.List.<ItemAspect>of(
+            new ChargeRestoreAspect(),
+            new SaveAspect(),
+            new MidasUsesAspect(null),
+            new FarmRateAspect(),
+            new ItemDamageAspect(),
+            new StatUpliftAspect());
 
     for (ItemEfficiencyEntry entry : entries) {
-      var evaluator = evaluators.stream().filter(e -> e.supports(entry)).findFirst().orElseThrow();
-      assertThat(evaluator.parameterNames()).containsAll(entry.parameters().keySet());
+      var own =
+          entry.aspects().stream()
+              .map(name -> aspects.stream().filter(a -> a.name().equals(name)).findFirst())
+              .map(java.util.Optional::orElseThrow)
+              .toList();
+      assertThat(own.stream().flatMap(a -> a.parameterNames().stream()))
+          .containsAll(entry.parameters().keySet());
     }
   }
 
@@ -63,7 +74,7 @@ class ItemEfficiencyFileTest {
 
   private static final String CATEGORIES = "categories: {farming: Farming}\n";
 
-  private static final String OK = "  - {key: a, category: farming, kind: k, items: [x]}";
+  private static final String OK = "  - {key: a, category: farming, aspects: [k], items: [x]}";
 
   private static String entries(String... lines) {
     return CATEGORIES + "entries:\n" + String.join("\n", lines) + "\n";
@@ -78,7 +89,7 @@ class ItemEfficiencyFileTest {
     assertThat(entry.category()).isEqualTo("farming");
     assertThat(entry.winStats()).isEmpty();
     assertThat(entry.alternatives()).isEmpty();
-    assertThat(entry.aspects()).isEmpty();
+    assertThat(entry.aspects()).containsExactly("k");
   }
 
   @Test
@@ -87,7 +98,6 @@ class ItemEfficiencyFileTest {
         file(entries(
                 "  - key: a",
                 "    category: farming",
-                "    kind: k",
                 "    items: [x]",
                 "    aspects: [farm-rate]",
                 "    winStats: [[x], [x, y]]",
@@ -110,18 +120,19 @@ class ItemEfficiencyFileTest {
     assertThatThrownBy(() -> file(entries(OK, OK)).entries())
         .hasMessageContaining("'a' is listed twice");
     assertThatThrownBy(() -> file(entries("  - {key: a, category: farming, items: [x]}")).entries())
-        .hasMessageContaining("'a' has no kind");
-    assertThatThrownBy(() -> file(entries("  - {key: a, category: farming, kind: k}")).entries())
+        .hasMessageContaining("'a' lists no aspects");
+    assertThatThrownBy(
+            () -> file(entries("  - {key: a, category: farming, aspects: [k]}")).entries())
         .hasMessageContaining("'a' lists no items");
     assertThatThrownBy(
             () ->
-                file(entries("  - {key: a, category: farming, kind: k, items: [item_x]}"))
+                file(entries("  - {key: a, category: farming, aspects: [k], items: [item_x]}"))
                     .entries())
         .hasMessageContaining("no item_");
     assertThatThrownBy(
             () ->
                 file(entries(
-                        "  - {key: a, category: farming, kind: k, items: [x],"
+                        "  - {key: a, category: farming, aspects: [k], items: [x],"
                             + " parameters: {p: -1}}"))
                     .entries())
         .hasMessageContaining("parameter 'p'");
@@ -133,9 +144,9 @@ class ItemEfficiencyFileTest {
   @Test
   void anUnknownCategoryIsNamedWithItsEntry() {
     assertThatThrownBy(
-            () -> file(entries("  - {key: a, category: nope, kind: k, items: [x]}")).entries())
+            () -> file(entries("  - {key: a, category: nope, aspects: [k], items: [x]}")).entries())
         .hasMessageContaining("'a' has unknown category 'nope'");
-    assertThatThrownBy(() -> file(entries("  - {key: a, kind: k, items: [x]}")).entries())
+    assertThatThrownBy(() -> file(entries("  - {key: a, aspects: [k], items: [x]}")).entries())
         .hasMessageContaining("'a' has unknown category 'null'");
   }
 
@@ -144,14 +155,14 @@ class ItemEfficiencyFileTest {
     assertThatThrownBy(
             () ->
                 file(entries(
-                        "  - {key: a, category: farming, kind: k, items: [x],"
+                        "  - {key: a, category: farming, aspects: [k], items: [x],"
                             + " winStats: [[x], []]}"))
                     .entries())
         .hasMessageContaining("'a' has a malformed winStats group");
     assertThatThrownBy(
             () ->
                 file(entries(
-                        "  - {key: a, category: farming, kind: k, items: [x],"
+                        "  - {key: a, category: farming, aspects: [k], items: [x],"
                             + " winStats: [[item_x]]}"))
                     .entries())
         .hasMessageContaining("'a' has winStats item 'item_x'");
@@ -162,8 +173,8 @@ class ItemEfficiencyFileTest {
     assertThatThrownBy(
             () ->
                 file(entries(
-                        "  - {key: a, category: nope, kind: k, items: [x]}",
-                        "  - {key: b, category: farming, kind: k, items: [item_y]}"))
+                        "  - {key: a, category: nope, aspects: [k], items: [x]}",
+                        "  - {key: b, category: farming, aspects: [k], items: [item_y]}"))
                     .entries())
         .hasMessageContaining("'a' has unknown category")
         .hasMessageContaining("'b' has item 'item_y'");

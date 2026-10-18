@@ -856,7 +856,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertThat(r.rows()).as("%s slot %d %s: rows", id, r.slot(), r.entryKey()).isNotNull();
     }
     List<ItemEfficiency> sticks =
-        rows.stream().filter(r -> r.kind().equals("magic-stick")).toList();
+        rows.stream().filter(r -> r.kind().equals("charge-restore")).toList();
     long uses = 0;
     long followed = 0;
     long withCharges = 0;
@@ -884,7 +884,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(followed)
         .as("%s: uses with charges followed by a drop to half or less (E3 verified)", id)
         .isGreaterThanOrEqualTo(withCharges * 8 / 10);
-    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("hand-of-midas")).toList()) {
+    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("midas-uses")).toList()) {
       assertThat(r.figures().get("gold"))
           .as("%s slot %d: every use pays the bonus gold", id, r.slot())
           .isEqualTo(r.count() * 160.0);
@@ -892,7 +892,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
           .as("paid back exactly when the gain reached the cost")
           .isEqualTo(r.gain() >= r.cost());
     }
-    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("farming-group")).toList()) {
+    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("farm-rate")).toList()) {
       assertThat(r.rows()).extracting(d -> d.label()).startsWith("BEFORE", "AFTER", "DAMAGE");
       assertThat(r.figures().get("procDamage")).as("damage of the item's own effects").isPositive();
       assertThat(r.figures().get("damageValue")).isGreaterThanOrEqualTo(0.0);
@@ -902,8 +902,8 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
         id,
         rows.size(),
         sticks.size(),
-        rows.stream().filter(r -> r.kind().equals("hand-of-midas")).count(),
-        rows.stream().filter(r -> r.kind().equals("farming-group")).count(),
+        rows.stream().filter(r -> r.kind().equals("midas-uses")).count(),
+        rows.stream().filter(r -> r.kind().equals("farm-rate")).count(),
         uses,
         sticks.stream().mapToDouble(r -> r.figures().get("saves")).sum());
   }

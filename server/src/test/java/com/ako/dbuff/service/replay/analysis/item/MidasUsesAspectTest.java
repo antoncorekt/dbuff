@@ -17,22 +17,20 @@ import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.paid;
 import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.use;
 import static org.assertj.core.api.Assertions.assertThat;
 
-class HandOfMidasEvaluatorTest {
+class MidasUsesAspectTest {
   private static final String MIDAS = "item_hand_of_midas";
   private static final String HELLCALLER = "npc_dota_neutral_satyr_hellcaller";
   private static final String MELEE = "npc_dota_creep_goodguys_melee";
 
   private final CreepValues creepValues = new CreepValues("replay/creep-values.json");
-  private final HandOfMidasEvaluator evaluator = new HandOfMidasEvaluator(creepValues);
+  private final List<ItemAspect> aspects = List.of(new MidasUsesAspect(creepValues));
 
   private ItemEfficiency evaluate(long cost, HeroInputs hero, Map<String, Double> parameters) {
     ItemEfficiencyEntry entry =
         ItemTestData.entry(
-            "hand_of_midas", HandOfMidasEvaluator.KIND, List.of("hand_of_midas"), parameters);
-    return evaluator
-        .evaluate(
-            new EntryContext(
-                entry, ItemTestData.kits(Map.of("hand_of_midas", cost)), 400, List.of(hero)))
+            "hand_of_midas", List.of(MidasUsesAspect.NAME), List.of("hand_of_midas"), parameters);
+    return ItemTestData.judge(
+            entry, aspects, ItemTestData.kits(Map.of("hand_of_midas", cost)), 400, List.of(hero))
         .getFirst();
   }
 
@@ -91,7 +89,7 @@ class HandOfMidasEvaluatorTest {
     assertThat(result.rows().get(1).figures()).containsEntry("idleBefore", 10.0);
     assertThat(result.figures()).containsEntry("idleSeconds", 120.0);
     assertThat(result.paybackSeconds()).as("never paid back").isNull();
-    assertThat(result.flags()).contains(HandOfMidasEvaluator.COOLDOWN_ESTIMATED);
+    assertThat(result.flags()).contains(MidasUsesAspect.COOLDOWN_ESTIMATED);
   }
 
   @Test
@@ -117,7 +115,7 @@ class HandOfMidasEvaluatorTest {
 
     double melee = creepValues.of(CreepClass.LANE_MELEE).orElseThrow().gold();
     assertThat(result.rows().get(1).figures()).containsEntry("extraGold", 160 - melee);
-    assertThat(result.flags()).contains(HandOfMidasEvaluator.EXTRA_ESTIMATED);
+    assertThat(result.flags()).contains(MidasUsesAspect.EXTRA_ESTIMATED);
   }
 
   @Test
@@ -151,24 +149,23 @@ class HandOfMidasEvaluatorTest {
             paid(CombatEventKind.XP, 200, 95));
     ItemEfficiencyEntry entry =
         ItemTestData.entry(
-            "hand_of_midas", HandOfMidasEvaluator.KIND, List.of("hand_of_midas"), Map.of());
+            "hand_of_midas", List.of(MidasUsesAspect.NAME), List.of("hand_of_midas"), Map.of());
     ItemKits noBonus =
         key ->
             java.util.Optional.of(
                 com.ako.dbuff.service.constant.data.ItemConstant.builder().cost(300L).build());
 
     ItemEfficiency result =
-        evaluator
-            .evaluate(
-                new EntryContext(
-                    entry,
-                    noBonus,
-                    400,
-                    List.of(hero(owned(), events, null, List.of(), List.of()))))
+        ItemTestData.judge(
+                entry,
+                aspects,
+                noBonus,
+                400,
+                List.of(hero(owned(), events, null, List.of(), List.of())))
             .getFirst();
 
     assertThat(result.figures()).containsEntry("gold", 0.0).containsEntry("xp", 95.0);
-    assertThat(result.flags()).contains(HandOfMidasEvaluator.BONUS_GOLD_UNKNOWN);
+    assertThat(result.flags()).contains(MidasUsesAspect.BONUS_GOLD_UNKNOWN);
   }
 
   @Test
@@ -183,7 +180,7 @@ class HandOfMidasEvaluatorTest {
         evaluate(300, hero(owned(), events, null, List.of(), List.of()), Map.of());
 
     assertThat(result.figures()).containsEntry("gold", 0.0);
-    assertThat(result.flags()).contains(HandOfMidasEvaluator.USE_WITHOUT_GOLD);
+    assertThat(result.flags()).contains(MidasUsesAspect.USE_WITHOUT_GOLD);
   }
 
   @Test
@@ -212,22 +209,21 @@ class HandOfMidasEvaluatorTest {
   void aCostTheConstantsLackGivesAFlagAndNoRatioOrPayback() {
     ItemEfficiencyEntry entry =
         ItemTestData.entry(
-            "hand_of_midas", HandOfMidasEvaluator.KIND, List.of("hand_of_midas"), Map.of());
+            "hand_of_midas", List.of(MidasUsesAspect.NAME), List.of("hand_of_midas"), Map.of());
 
     ItemEfficiency result =
-        evaluator
-            .evaluate(
-                new EntryContext(
-                    entry,
-                    ItemTestData.kits(Map.of()),
-                    400,
-                    List.of(hero(owned(), twoUses(), null, List.of(), List.of()))))
+        ItemTestData.judge(
+                entry,
+                aspects,
+                ItemTestData.kits(Map.of()),
+                400,
+                List.of(hero(owned(), twoUses(), null, List.of(), List.of())))
             .getFirst();
 
     assertThat(result.cost()).isNull();
     assertThat(result.ratio()).isNull();
     assertThat(result.paybackSeconds()).isNull();
-    assertThat(result.flags()).contains(HandOfMidasEvaluator.COST_UNKNOWN);
+    assertThat(result.flags()).contains(AspectSum.COST_UNKNOWN);
   }
 
   @Test
