@@ -209,6 +209,16 @@ class ItemsSectionTest {
   }
 
   @Test
+  void anEmptyRequestFilterMeansEveryCategoryDespiteTheChannelsChoice() {
+    add(farming(1, 1500));
+    add(stick(0, 200, 1.5, 2));
+
+    assertThat(section.lines(channelChoosing("farming").withItemFilter(List.of())))
+        .anyMatch(line -> line.contains("Magic Stick"))
+        .anyMatch(line -> line.contains("Battle Fury"));
+  }
+
+  @Test
   void theRequestOverridesTheChannelsChoice() {
     add(farming(1, 1500));
     add(stick(0, 200, 1.5, 2));

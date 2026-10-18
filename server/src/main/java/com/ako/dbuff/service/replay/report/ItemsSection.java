@@ -96,7 +96,7 @@ public class ItemsSection implements ReplayReportSection {
 
   private static Optional<List<String>> wanted(ReplayReportInput input) {
     if (input.itemFilter() != null) {
-      return Optional.of(input.itemFilter());
+      return input.itemFilter().isEmpty() ? Optional.empty() : Optional.of(input.itemFilter());
     }
     return input.instance() == null
         ? Optional.empty()

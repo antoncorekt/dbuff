@@ -16,7 +16,8 @@ import java.util.Set;
  *     default; only the AI sections read it
  * @param instance the channel the report is for, null when a caller has none
  * @param itemFilter the item categories or entry keys a person asked for in an on-demand request,
- *     null to follow the channel's setting; only the items section reads it
+ *     null to follow the channel's setting, empty for every category; only the items section reads
+ *     it
  */
 public record ReplayReportInput(
     long matchId,

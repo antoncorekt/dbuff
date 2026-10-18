@@ -121,7 +121,10 @@ public class ReportCommandHandler {
     return false;
   }
 
-  /** The items a person named for the items section; null when none, so the channel's apply. */
+  /**
+   * The items a person named for the items section; null when none, so the channel's apply; empty
+   * for all.
+   */
   private List<String> itemFilter(CommandContext context, Optional<ReplayReportSection> section) {
     String raw = context.getOption(ITEMS_OPTION);
     if (raw == null || raw.isBlank()) {
@@ -130,7 +133,7 @@ public class ReportCommandHandler {
     if (section.isEmpty() || !ITEMS_SECTION.equals(section.get().name())) {
       throw new IllegalArgumentException("`items:` only applies to `section:items`.");
     }
-    return itemCatalog.parseSelection(raw).orElse(null);
+    return itemCatalog.parseSelection(raw).orElse(List.of());
   }
 
   private static String notPosted(

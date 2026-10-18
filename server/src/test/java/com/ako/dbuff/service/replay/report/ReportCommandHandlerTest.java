@@ -83,6 +83,23 @@ class ReportCommandHandlerTest {
   }
 
   @Test
+  void allAsTheItemsOption_isPassedAsAnEmptyListToOverrideTheChannel() {
+    FakeCommandContext context =
+        FakeCommandContext.builder()
+            .threadName("Match " + MATCH)
+            .channelId("thread-1")
+            .option("section", "items")
+            .option("items", "all")
+            .build();
+    when(reports.deliverSection(MATCH, "i1", "items", null, List.of()))
+        .thenReturn(ReportDelivery.POSTED);
+
+    handler.handle(context, MATCH, config);
+
+    verify(reports).deliverSection(MATCH, "i1", "items", null, List.of());
+  }
+
+  @Test
   void anUnknownItemName_isRefusedWithTheValidOnesBeforeAcknowledging() {
     FakeCommandContext context =
         FakeCommandContext.builder()
