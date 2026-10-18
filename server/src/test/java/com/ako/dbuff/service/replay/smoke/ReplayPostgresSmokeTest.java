@@ -906,6 +906,13 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertThat(r.figures().get("procDamage")).as("damage of the item's own effects").isPositive();
       assertThat(r.figures().get("damageValue")).isGreaterThanOrEqualTo(0.0);
     }
+    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("target-use")).toList()) {
+      assertThat(r.figures().get("saves")).isLessThanOrEqualTo((double) r.count());
+      assertThat(r.figures().get("selfSaves") + r.figures().get("allySaves"))
+          .as("%s slot %d %s: saves are self or ally", id, r.slot(), r.entryKey())
+          .isEqualTo(r.figures().get("saves"));
+      assertThat(r.rows()).hasSizeGreaterThanOrEqualTo(r.count());
+    }
     System.out.printf(
         "ITEMS %s: %d rows (%d stick, %d midas, %d farming), %d stick uses, %.0f saves%n",
         id,

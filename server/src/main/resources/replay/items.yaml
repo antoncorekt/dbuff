@@ -10,6 +10,7 @@ alternatives: { altCostBand: 0.3, altTimeBand: 300, altMinGames: 5 }
 categories:
   farming: Farming
   sustain: Sustain and mana
+  save: Saves
 entries:
   - key: magic_stick
     category: sustain
@@ -59,3 +60,23 @@ entries:
       minAfterSeconds: 60
       campGapSeconds: 30
       damageWindowMinutes: 5
+  - key: glimmer_cape
+    category: save
+    items: [glimmer_cape]
+    aspects: [target-use, save]
+  - key: force_staff
+    category: save
+    items: [force_staff]
+    aspects: [target-use, save, control]
+  - key: lotus_orb
+    category: save
+    items: [lotus_orb]
+    aspects: [target-use, save]
+  - key: euls_scepter
+    category: save
+    items: [cyclone]
+    aspects: [target-use, save, control]
+  - key: solar_crest
+    category: save
+    items: [solar_crest]
+    aspects: [target-use, save, control]

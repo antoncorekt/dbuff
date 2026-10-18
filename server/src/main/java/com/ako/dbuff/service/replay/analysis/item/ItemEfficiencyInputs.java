@@ -62,7 +62,7 @@ public class ItemEfficiencyInputs {
         .forEach(k -> kills.computeIfAbsent(k.getPlayerSlot(), s -> new ArrayList<>()).add(k));
     Map<Long, List<ActivitySegment>> segments = activity.bySlot(matchId);
     List<ReplayPlayerDomain> players = playerRepo.findByMatchId(matchId);
-    MatchFacts match = matchFacts(matchId, events, players, heroNames);
+    MatchFacts match = matchFacts(matchId, events, players, heroNames, tracks);
     List<HeroInputs> heroes = new ArrayList<>();
     for (ReplayPlayerDomain player : players) {
       String hero = CombatHeroes.nameOf(player, heroNames);
@@ -88,12 +88,17 @@ public class ItemEfficiencyInputs {
       long matchId,
       List<CombatEvent> events,
       List<ReplayPlayerDomain> players,
-      Set<String> heroNames) {
+      Set<String> heroNames,
+      Map<Long, ReplayPlayerTrackDomain> tracks) {
     Map<String, Long> slots = new HashMap<>();
+    Map<String, ReplayPlayerTrackDomain> tracksByHero = new HashMap<>();
     for (ReplayPlayerDomain player : players) {
       String hero = CombatHeroes.nameOf(player, heroNames);
       if (hero != null && player.getPlayerSlot() != null) {
         slots.put(hero, player.getPlayerSlot());
+        if (tracks.containsKey(player.getPlayerSlot())) {
+          tracksByHero.put(hero, tracks.get(player.getPlayerSlot()));
+        }
       }
     }
     Map<Long, List<ReplayPlayerMinuteDomain>> minutes = new HashMap<>();
@@ -102,15 +107,22 @@ public class ItemEfficiencyInputs {
         .sorted(Comparator.comparing(ReplayPlayerMinuteDomain::getGameMinute))
         .forEach(m -> minutes.computeIfAbsent(m.getPlayerSlot(), s -> new ArrayList<>()).add(m));
     return new MatchFacts(
-        events.stream().filter(ItemEfficiencyInputs::acrossHeroes).toList(), slots, minutes);
+        events.stream().filter(ItemEfficiencyInputs::acrossHeroes).toList(),
+        slots,
+        minutes,
+        tracksByHero);
   }
 
-  /** Damage to heroes by anyone, hero deaths, and the gold and experience of hero kills. */
+  /**
+   * Damage to heroes by anyone, hero deaths, the gold and experience of hero kills and the effect
+   * modifiers of targeted items.
+   */
   private static boolean acrossHeroes(CombatEvent e) {
     return switch (e.kind()) {
       case DAMAGE, DEATH -> e.targetIsRealHero();
       case GOLD -> e.goldReason() == GoldReason.HERO_KILL;
       case XP -> e.xpReason() == XpReason.HERO_KILL;
+      case MODIFIER_ADD -> TargetUses.EFFECT_MODIFIERS.contains(e.inflictor());
       default -> false;
     };
   }

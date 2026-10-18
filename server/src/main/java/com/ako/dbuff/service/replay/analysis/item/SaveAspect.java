@@ -26,6 +26,7 @@ public class SaveAspect implements ItemAspect {
   private static Set<String> parameters() {
     Set<String> names = new HashSet<>(StickUses.PARAMETERS);
     names.addAll(WorthPrices.NAMES);
+    names.addAll(TargetUses.PARAMETERS);
     return Set.copyOf(names);
   }
 
@@ -41,6 +42,9 @@ public class SaveAspect implements ItemAspect {
 
   @Override
   public AspectPart measure(AspectContext context) {
+    if (TargetUses.applies(context)) {
+      return TargetUses.of(context).save();
+    }
     List<Use> uses = StickUses.of(context).uses();
     DeathCost deathCost = new DeathCost(context.hero(), WorthPrices.of(context));
     double gain = 0;
