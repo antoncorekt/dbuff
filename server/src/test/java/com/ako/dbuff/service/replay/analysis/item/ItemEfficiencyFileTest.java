@@ -185,4 +185,21 @@ class ItemEfficiencyFileTest {
     assertThat(new ItemEfficiencyFile("replay/items.yaml").categories())
         .containsKeys("farming", "sustain");
   }
+
+  @Test
+  void anUnknownPriceNameFailsOnceAndIsNamed() {
+    ItemEfficiencyFile bad =
+        file(
+            """
+            prices: {pokePrise: 1, xpWeight: 2}
+            categories: {c: C}
+            entries:
+              - {key: a, category: c, items: [x], aspects: [save]}
+            """);
+
+    assertThatThrownBy(bad::entries)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("unknown price 'pokePrise'")
+        .hasMessageNotContaining("xpWeight");
+  }
 }

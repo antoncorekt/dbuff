@@ -80,4 +80,13 @@ class DeathCostTest {
     assertThat(cost.respawnSeconds()).isEqualTo(30);
     assertThat(cost.estimated()).isTrue();
   }
+
+  @Test
+  void twoDeathsInOneMinuteShareThatMinutesGoldLost() {
+    List<CombatEvent> deaths = List.of(ItemTestData.death(122), ItemTestData.death(140));
+
+    DeathCost.Cost cost = new DeathCost(hero(deaths, track()), PRICES).at(122);
+
+    assertThat(cost.goldLost()).isEqualTo(125);
+  }
 }

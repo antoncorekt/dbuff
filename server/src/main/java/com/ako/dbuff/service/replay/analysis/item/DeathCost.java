@@ -49,10 +49,18 @@ final class DeathCost {
   Cost at(double second) {
     OptionalDouble respawn = respawnAfter(second);
     return new Cost(
-        MinuteSeries.at(lostByMinute, second),
+        lostAt(second),
         respawn.orElse(prices.respawnSeconds()),
         MinuteSeries.at(earnedByMinute, second),
         respawn.isEmpty());
+  }
+
+  private double lostAt(double second) {
+    long sameMinute =
+        deaths.stream()
+            .filter(d -> MinuteSeries.minuteOf(d.gameSecond()) == MinuteSeries.minuteOf(second))
+            .count();
+    return MinuteSeries.at(lostByMinute, second) / Math.max(1, sameMinute);
   }
 
   /**
@@ -61,8 +69,7 @@ final class DeathCost {
    * one.
    */
   Cost avoided(double second) {
-    OptionalDouble lost =
-        deaths.stream().mapToDouble(d -> MinuteSeries.at(lostByMinute, d.gameSecond())).average();
+    OptionalDouble lost = deaths.stream().mapToDouble(d -> lostAt(d.gameSecond())).average();
     OptionalDouble respawn =
         deaths.stream()
             .map(d -> respawnAfter(d.gameSecond()))
@@ -73,7 +80,7 @@ final class DeathCost {
         lost.orElse(held.orElse(0)),
         respawn.orElse(prices.respawnSeconds()),
         MinuteSeries.at(earnedByMinute, second),
-        (lost.isEmpty() && held.isEmpty()) || respawn.isEmpty());
+        lost.isEmpty() || respawn.isEmpty());
   }
 
   private OptionalDouble respawnAfter(double second) {

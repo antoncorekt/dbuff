@@ -1,6 +1,5 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
-import com.ako.dbuff.dao.model.ReplayPlayerMinuteDomain;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.GoldReason;
@@ -123,7 +122,7 @@ final class KillShare {
     double xp = 0;
     for (CombatEvent e : events) {
       if (Math.abs(e.gameSecond() - death.gameSecond()) > SAME_MOMENT_SECONDS
-          || death.target().equals(e.target())) {
+          || !hero.match().enemies(death.target(), e.target())) {
         continue;
       }
       if (e.kind() == CombatEventKind.GOLD && e.goldReason() == GoldReason.HERO_KILL) {
@@ -132,16 +131,39 @@ final class KillShare {
         xp += Math.max(0, e.value());
       }
     }
-    return gold + xp * prices.xpWeight() + goldLost(death);
+    int together = deathsTogether(death, events);
+    return (gold + xp * prices.xpWeight()) / together + goldLost(death, events);
   }
 
-  private double goldLost(CombatEvent death) {
+  /** The deaths of the victim's team at the same moment, which share the killers' entries. */
+  private int deathsTogether(CombatEvent death, List<CombatEvent> events) {
+    long count =
+        events.stream()
+            .filter(e -> e.kind() == CombatEventKind.DEATH && e.targetIsRealHero())
+            .filter(e -> Math.abs(e.gameSecond() - death.gameSecond()) <= SAME_MOMENT_SECONDS)
+            .filter(
+                e ->
+                    e.target().equals(death.target())
+                        || (hero.match().slots().containsKey(e.target())
+                            && !hero.match().enemies(death.target(), e.target())))
+            .count();
+    return (int) Math.max(1, count);
+  }
+
+  private double goldLost(CombatEvent death, List<CombatEvent> events) {
     Long slot = hero.match().slots().get(death.target());
     if (slot == null) {
       return 0;
     }
-    List<ReplayPlayerMinuteDomain> rows = hero.match().minutesOf(slot);
-    return MinuteSeries.at(
-        MinuteSeries.during(rows, MinuteSeries::lostToDeath), death.gameSecond());
+    double[] lost = MinuteSeries.during(hero.match().minutesOf(slot), MinuteSeries::lostToDeath);
+    long sameMinute =
+        events.stream()
+            .filter(e -> e.kind() == CombatEventKind.DEATH && death.target().equals(e.target()))
+            .filter(
+                e ->
+                    MinuteSeries.minuteOf(e.gameSecond())
+                        == MinuteSeries.minuteOf(death.gameSecond()))
+            .count();
+    return MinuteSeries.at(lost, death.gameSecond()) / Math.max(1, sameMinute);
   }
 }

@@ -104,6 +104,12 @@ public class ItemEfficiencyFile {
     }
     List<String> problems = new ArrayList<>();
     checkNumbers("prices", content.prices(), problems);
+    if (content.prices() != null) {
+      content.prices().keySet().stream()
+          .filter(name -> !WorthPrices.NAMES.contains(name))
+          .sorted()
+          .forEach(name -> problems.add("prices has unknown price '" + name + "'"));
+    }
     checkNumbers("alternatives", content.alternatives(), problems);
     Set<String> keys = new HashSet<>();
     List<ItemEfficiencyEntry> checked = new ArrayList<>();

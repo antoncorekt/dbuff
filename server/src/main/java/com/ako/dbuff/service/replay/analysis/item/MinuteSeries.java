@@ -9,6 +9,8 @@ import java.util.function.Function;
  * totals at the m:00 mark, so the amount of game minute k is the row at k + 1 less the row at k.
  */
 final class MinuteSeries {
+  private static final double SECONDS_PER_MINUTE = 60;
+
   private MinuteSeries() {}
 
   /**
@@ -57,8 +59,12 @@ final class MinuteSeries {
     return row.getGoldLostToDeath() == null ? null : Math.abs(row.getGoldLostToDeath());
   }
 
+  static int minuteOf(double second) {
+    return (int) Math.floor(second / SECONDS_PER_MINUTE);
+  }
+
   static double at(double[] series, double second) {
-    int minute = (int) Math.floor(second / 60);
+    int minute = minuteOf(second);
     return minute >= 0 && minute < series.length ? series[minute] : 0;
   }
 

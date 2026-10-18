@@ -127,4 +127,26 @@ class KillShareTest {
     assertThat(killShare.disableValue(ENEMY, 80)).isZero();
     assertThat(killShare.disableValue(ENEMY, 101)).isZero();
   }
+
+  @Test
+  void twoDeathsAtOnceShareTheKillersEntriesAndOneMinutesGoldLost() {
+    String other = "npc_dota_hero_axe_two";
+    Map<String, Long> slots = Map.of(ME, 0L, ALLY, 1L, ENEMY, 128L, other, 129L);
+    CombatEvent second =
+        new CombatEvent(CombatEventKind.DEATH, 100, ME, other, "", HEROES, 0, 0, 0, 0, 0, 0, 0);
+    List<CombatEvent> all =
+        List.of(
+            died(100),
+            second,
+            paid(CombatEventKind.GOLD, ME, 100, 400),
+            paid(CombatEventKind.GOLD, ENEMY, 100, 900));
+    MatchFacts match = new MatchFacts(all, slots, LOST_300.minutes());
+    HeroInputs hero =
+        ItemTestData.heroWith(
+            ItemTestData.hero(List.of(), List.of(), null, List.of(), List.of()), match);
+
+    KillShare killShare = new KillShare(hero, PRICES);
+
+    assertThat(killShare.deaths()).extracting(KillShare.Death::value).containsExactly(500.0, 200.0);
+  }
 }
