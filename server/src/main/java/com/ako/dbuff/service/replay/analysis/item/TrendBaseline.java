@@ -69,4 +69,9 @@ final class TrendBaseline {
     }
     return total;
   }
+
+  /** The expected amount per minute over the minutes {@code [fromMinute, toMinute)}. */
+  double mean(int fromMinute, int toMinute) {
+    return toMinute > fromMinute ? total(fromMinute, toMinute) / (toMinute - fromMinute) : 0;
+  }
 }

@@ -47,5 +47,14 @@ entries:
       minBeforeSeconds: 120
       minAfterSeconds: 60
       campGapSeconds: 30
-      damagePrice: 100
+      damageWindowMinutes: 5
+  - key: radiance
+    category: farming
+    items: [radiance]
+    aspects: [farm-rate, item-damage]
+    parameters:
+      windowMinutes: 5
+      minBeforeSeconds: 120
+      minAfterSeconds: 60
+      campGapSeconds: 30
       damageWindowMinutes: 5

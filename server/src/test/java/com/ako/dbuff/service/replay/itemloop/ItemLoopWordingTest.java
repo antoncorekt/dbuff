@@ -140,7 +140,19 @@ class ItemLoopWordingTest {
             2700L,
             0.6,
             null,
-            Map.of("netGoldPerMinute", -37.0, "damageValue", 800.0, "creepGain", -900.0),
+            Map.of(
+                "netGoldPerMinute",
+                -37.0,
+                "damageValue",
+                800.0,
+                "creepGain",
+                -900.0,
+                "gain.farm-rate",
+                -900.0,
+                "gain.item-damage",
+                800.0,
+                "killsHelped",
+                3.0),
             List.of("NO_DAMAGE_COMPARISON"),
             RATES);
     ItemEfficiency noCost =
@@ -167,9 +179,9 @@ class ItemLoopWordingTest {
     assertThat(result(damage))
         .isEqualTo(
             rates
-                + ", net -37 gold per min, creeps -0.3x its cost, damage +0.3x, 0.6x in total, not"
-                + " paid back by the end (bought too early or too late to compare his damage"
-                + " before and after, so only the item's own damage counts)");
+                + ", net -37 gold per min, farm -0.3x, fights +0.3x (3 kills helped), 0.6x in"
+                + " total, not paid back by the end (bought too early or too late to compare his"
+                + " damage before and after, so only the item's own damage counts)");
     assertThat(result(noCost))
         .isEqualTo(rates + " (the item constants give no cost for it, so there is no ratio)");
   }

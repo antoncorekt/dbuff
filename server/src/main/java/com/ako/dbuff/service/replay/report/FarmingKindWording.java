@@ -11,6 +11,9 @@ import org.springframework.stereotype.Component;
 public class FarmingKindWording implements ItemKindWording {
   private static final String[] RATES = {"killsPerMinute", "goldPerMinute", "campsPerMinute"};
   private static final double NOTICEABLE_CAMPS = 0.5;
+  private static final String FARM_GAIN = "gain.farm-rate";
+  private static final String ITEM_DAMAGE_GAIN = "gain.item-damage";
+  private static final String STAT_UPLIFT_GAIN = "gain.stat-uplift";
 
   @Override
   public String aspect() {
@@ -64,12 +67,24 @@ public class FarmingKindWording implements ItemKindWording {
     return row.figures().get("damageValue") != null && row.cost() != null && row.cost() != 0;
   }
 
+  /** {@code farm +0.5x, fights +0.4x (3 kills helped)}, each part in multiples of the cost. */
   private static String parts(ItemEfficiency row) {
     Map<String, Double> f = row.figures();
-    return "creeps %s its cost, damage %s"
+    double farm = f.get(FARM_GAIN) != null ? f.get(FARM_GAIN) : ItemWording.figure(f, "creepGain");
+    double fights = fights(f);
+    long kills = Math.round(ItemWording.figure(f, "killsHelped"));
+    return "farm %s, fights %s%s"
         .formatted(
-            ItemWording.signedRatio(ItemWording.figure(f, "creepGain") / row.cost()),
-            ItemWording.signedRatio(f.get("damageValue") / row.cost()));
+            ItemWording.signedRatio(farm / row.cost()),
+            ItemWording.signedRatio(fights / row.cost()),
+            kills > 0 ? " (%s helped)".formatted(ItemWording.plural(kills, "kill")) : "");
+  }
+
+  private static double fights(Map<String, Double> f) {
+    if (f.get(ITEM_DAMAGE_GAIN) == null && f.get(STAT_UPLIFT_GAIN) == null) {
+      return ItemWording.figure(f, "damageValue");
+    }
+    return ItemWording.figure(f, ITEM_DAMAGE_GAIN) + ItemWording.figure(f, STAT_UPLIFT_GAIN);
   }
 
   @Override
@@ -93,7 +108,7 @@ public class FarmingKindWording implements ItemKindWording {
   }
 
   private static String damage(ItemEfficiency row) {
-    double worth = row.figures().get("damageValue") / row.cost();
+    double worth = fights(row.figures()) / row.cost();
     return ", its damage was worth %s its cost".formatted(ItemWording.ratio(worth));
   }
 

@@ -142,6 +142,28 @@ public record HeroInputs(
     return dealt(from, to, null);
   }
 
+  /** Damage the hero dealt to enemy heroes in each game minute, from 0 to the last one. */
+  public double[] heroDamagePerMinute() {
+    int last =
+        events.stream()
+            .filter(e -> e.kind() == CombatEventKind.DAMAGE && hero.equals(e.attacker()))
+            .filter(e -> e.targetIsRealHero() && !hero.equals(e.target()))
+            .mapToInt(e -> MinuteSeries.minuteOf(e.gameSecond()))
+            .max()
+            .orElse(-1);
+    double[] series = new double[Math.max(0, last + 1)];
+    for (CombatEvent e : events) {
+      if (e.kind() == CombatEventKind.DAMAGE
+          && hero.equals(e.attacker())
+          && e.targetIsRealHero()
+          && !hero.equals(e.target())
+          && e.gameSecond() >= 0) {
+        series[MinuteSeries.minuteOf(e.gameSecond())] += e.value();
+      }
+    }
+    return series;
+  }
+
   /** The part of it that came from the named items (their procs and cleave). */
   public double itemDamage(Collection<String> names, double from, double to) {
     return dealt(from, to, names);
