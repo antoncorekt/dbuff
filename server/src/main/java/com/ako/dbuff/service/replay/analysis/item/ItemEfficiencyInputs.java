@@ -2,9 +2,11 @@ package com.ako.dbuff.service.replay.analysis.item;
 
 import com.ako.dbuff.dao.model.CreepKillDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
+import com.ako.dbuff.dao.model.ReplayPlayerMinuteDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.dao.model.ReplayStateChangeDomain;
 import com.ako.dbuff.dao.repo.CreepKillRepo;
+import com.ako.dbuff.dao.repo.ReplayPlayerMinuteRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
@@ -12,6 +14,8 @@ import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.CombatHeroes;
 import com.ako.dbuff.service.replay.CombatLogReader;
+import com.ako.dbuff.service.replay.GoldReason;
+import com.ako.dbuff.service.replay.XpReason;
 import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
 import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
 import java.util.ArrayList;
@@ -35,6 +39,7 @@ public class ItemEfficiencyInputs {
   public record MatchInputs(int gameEndSeconds, List<HeroInputs> heroes) {}
 
   private final ReplayPlayerRepo playerRepo;
+  private final ReplayPlayerMinuteRepo minuteRepo;
   private final ReplayPlayerTrackRepo trackRepo;
   private final ReplayStateChangeRepo stateRepo;
   private final CreepKillRepo creepKillRepo;
@@ -56,8 +61,10 @@ public class ItemEfficiencyInputs {
         .sorted(Comparator.comparing(CreepKillDomain::getSeconds))
         .forEach(k -> kills.computeIfAbsent(k.getPlayerSlot(), s -> new ArrayList<>()).add(k));
     Map<Long, List<ActivitySegment>> segments = activity.bySlot(matchId);
+    List<ReplayPlayerDomain> players = playerRepo.findByMatchId(matchId);
+    MatchFacts match = matchFacts(matchId, events, players, heroNames);
     List<HeroInputs> heroes = new ArrayList<>();
-    for (ReplayPlayerDomain player : playerRepo.findByMatchId(matchId)) {
+    for (ReplayPlayerDomain player : players) {
       String hero = CombatHeroes.nameOf(player, heroNames);
       Long slot = player.getPlayerSlot();
       if (hero != null && slot != null) {
@@ -70,10 +77,42 @@ public class ItemEfficiencyInputs {
                 tracks.get(slot),
                 kills.getOrDefault(slot, List.of()),
                 segments.getOrDefault(slot, List.of()),
+                match,
                 matchId));
       }
     }
     return new MatchInputs(gameEnd(events, tracks.values()), heroes);
+  }
+
+  private MatchFacts matchFacts(
+      long matchId,
+      List<CombatEvent> events,
+      List<ReplayPlayerDomain> players,
+      Set<String> heroNames) {
+    Map<String, Long> slots = new HashMap<>();
+    for (ReplayPlayerDomain player : players) {
+      String hero = CombatHeroes.nameOf(player, heroNames);
+      if (hero != null && player.getPlayerSlot() != null) {
+        slots.put(hero, player.getPlayerSlot());
+      }
+    }
+    Map<Long, List<ReplayPlayerMinuteDomain>> minutes = new HashMap<>();
+    minuteRepo.findByMatchId(matchId).stream()
+        .filter(m -> m.getPlayerSlot() != null && m.getGameMinute() != null)
+        .sorted(Comparator.comparing(ReplayPlayerMinuteDomain::getGameMinute))
+        .forEach(m -> minutes.computeIfAbsent(m.getPlayerSlot(), s -> new ArrayList<>()).add(m));
+    return new MatchFacts(
+        events.stream().filter(ItemEfficiencyInputs::acrossHeroes).toList(), slots, minutes);
+  }
+
+  /** Damage to heroes by anyone, hero deaths, and the gold and experience of hero kills. */
+  private static boolean acrossHeroes(CombatEvent e) {
+    return switch (e.kind()) {
+      case DAMAGE, DEATH -> e.targetIsRealHero();
+      case GOLD -> e.goldReason() == GoldReason.HERO_KILL;
+      case XP -> e.xpReason() == XpReason.HERO_KILL;
+      default -> false;
+    };
   }
 
   private static List<CombatEvent> eventsOf(List<CombatEvent> events, String hero) {

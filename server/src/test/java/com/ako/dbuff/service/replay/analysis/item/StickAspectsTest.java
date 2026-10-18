@@ -76,9 +76,34 @@ class StickAspectsTest {
     assertThat(result.cost()).isEqualTo(200L);
     assertThat(result.purchaseSeconds()).isEqualTo(-60.0);
     assertThat(result.itemKey()).isEqualTo("magic_stick");
-    assertThat(result.flags()).isEmpty();
-    assertThat(result.gain()).isEqualTo(150 * 0.3 + 150 * 0.3 + 300);
+    assertThat(result.flags()).containsExactly(SaveAspect.DEATH_COST_ESTIMATED);
+    assertThat(result.gain()).isEqualTo(150 * 0.3 + 150 * 0.3);
     assertThat(result.ratio()).isEqualTo(result.gain() / 200);
+  }
+
+  @Test
+  void aSaveIsWorthTheDeathItPreventedAtTheGoldAndIncomeOfThatMoment() {
+    ReplayPlayerTrackDomain track = track();
+    track.setGold(new int[track.getSampleCount()]);
+    track.getGold()[sampleOf(120)] = 600;
+    MatchFacts match =
+        new MatchFacts(
+            List.of(),
+            Map.of(ItemTestData.HERO, 0L),
+            Map.of(
+                0L,
+                List.of(
+                    ItemTestData.minute(1, 600, 0),
+                    ItemTestData.minute(2, 1200, 0),
+                    ItemTestData.minute(3, 1800, 0))));
+    List<CombatEvent> events =
+        List.of(hit(120.2, 450, 300), use(121.0, STICK, ""), hit(122.0, 100, 250));
+
+    ItemEfficiency result =
+        evaluate(ItemTestData.heroWith(hero(sticks(), events, track, List.of(), List.of()), match));
+
+    assertThat(result.figures()).containsEntry("saves", 1.0).containsEntry("saveGain", 900.0);
+    assertThat(result.gain()).isEqualTo(150 * 0.3 + 150 * 0.3 + 900);
   }
 
   @Test
@@ -160,7 +185,7 @@ class StickAspectsTest {
             "magic_stick",
             List.of(ChargeRestoreAspect.NAME, SaveAspect.NAME),
             List.of("magic_stick", "magic_wand"),
-            Map.of("lowHpFraction", 0.1, "saveGold", 0.0));
+            Map.of("lowHpFraction", 0.1));
     List<CombatEvent> events = List.of(hit(120.2, 450, 300), use(121.0, STICK, ""));
 
     ItemEfficiency result =

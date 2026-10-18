@@ -45,6 +45,7 @@ class AlternativesAspectTest {
         null,
         List.of(),
         List.of(),
+        plain.match(),
         matchId);
   }
 
@@ -59,7 +60,7 @@ class AlternativesAspectTest {
                     new Alternative("manta", 3, null, null),
                     new Alternative("bfury", 2, null, null))));
 
-    AspectPart part = aspect.measure(AspectContext.of(ENTRY, KITS, 3_000, hero(7)));
+    AspectPart part = aspect.measure(AspectContext.of(ENTRY, KITS, 3_000, hero(7), Map.of()));
 
     assertThat(part.gain()).isZero();
     assertThat(part.measured()).isTrue();
@@ -76,7 +77,7 @@ class AlternativesAspectTest {
 
   @Test
   void aHeroWithoutAMatchIdIsNotLookedUp() {
-    AspectPart part = aspect.measure(AspectContext.of(ENTRY, KITS, 3_000, hero(0)));
+    AspectPart part = aspect.measure(AspectContext.of(ENTRY, KITS, 3_000, hero(0), Map.of()));
 
     assertThat(part.rows()).isEmpty();
     verifyNoInteractions(finder);
