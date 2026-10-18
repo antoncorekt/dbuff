@@ -26,6 +26,7 @@ public class SavingCostAspect implements ItemAspect {
   public static final String NAME = "saving-cost";
 
   static final String NO_GOLD_TRACK = "NO_GOLD_TRACK";
+  static final String NO_MINUTE_GOLD = "NO_MINUTE_GOLD";
   static final String SAVING = "SAVING";
 
   private static final double SECONDS_PER_MINUTE = 60;
@@ -75,6 +76,7 @@ public class SavingCostAspect implements ItemAspect {
     double cost = 0;
     double heldMost = 0;
     boolean estimated = false;
+    boolean noMinuteGold = false;
     int deaths = 0;
     for (CombatEvent e : hero.events()) {
       if (!isOwnDeath(hero, e) || e.gameSecond() < w.start() || e.gameSecond() >= w.end()) {
@@ -85,6 +87,7 @@ public class SavingCostAspect implements ItemAspect {
       lost += c.goldLost();
       cost += c.value();
       estimated |= c.estimated();
+      noMinuteGold |= c.goldPerMinute() == 0;
       heldMost = Math.max(heldMost, goldBefore(track, e.gameSecond()));
     }
     Map<String, Double> figures = new LinkedHashMap<>();
@@ -99,9 +102,20 @@ public class SavingCostAspect implements ItemAspect {
     return part(
         -cost,
         figures,
-        estimated ? List.of(SaveAspect.DEATH_COST_ESTIMATED) : List.of(),
+        flags(estimated, noMinuteGold),
         List.of(new Detail(SAVING, w.start(), null, row)),
         deaths);
+  }
+
+  private static List<String> flags(boolean estimated, boolean noMinuteGold) {
+    List<String> flags = new ArrayList<>();
+    if (estimated) {
+      flags.add(SaveAspect.DEATH_COST_ESTIMATED);
+    }
+    if (noMinuteGold) {
+      flags.add(NO_MINUTE_GOLD);
+    }
+    return flags;
   }
 
   /** Damage and kill participation per minute in the window and in the equally long one before. */

@@ -105,6 +105,19 @@ class SavingCostAspectTest {
   }
 
   @Test
+  void aDeathWithoutTheMinuteGoldOfTheMatchIsFlagged() {
+    HeroInputs hero =
+        ItemTestData.hero(bought(600), List.of(death(450)), track(300), List.of(), List.of());
+
+    ItemEfficiency row =
+        ItemTestData.judge(ENTRY, List.of(new SavingCostAspect()), KITS, 900, List.of(hero))
+            .getFirst();
+
+    assertThat(row.flags()).contains(SavingCostAspect.NO_MINUTE_GOLD);
+    assertThat(row.figures()).containsEntry("savingDeaths", 1.0);
+  }
+
+  @Test
   void aDeathBeforeTheWindowDoesNotCount() {
     ItemEfficiency row = evaluate(bought(600), List.of(death(200)), track(300));
 
