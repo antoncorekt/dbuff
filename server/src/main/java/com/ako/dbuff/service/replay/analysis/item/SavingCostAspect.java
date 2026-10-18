@@ -31,6 +31,7 @@ public class SavingCostAspect implements ItemAspect {
 
   private static final double SECONDS_PER_MINUTE = 60;
   private static final double MIN_BEFORE_SECONDS = 30;
+  private static final double RETURN_SECONDS = 15;
   private static final Set<String> PARAMETERS = parameters();
 
   private static Set<String> parameters() {
@@ -66,10 +67,11 @@ public class SavingCostAspect implements ItemAspect {
     if (window == null) {
       return part(0, Map.of(), List.of(), List.of(), 0);
     }
-    return withDeaths(context, track, window);
+    return withDeaths(context, track, window, wanted);
   }
 
-  private AspectPart withDeaths(AspectContext context, ReplayPlayerTrackDomain track, Window w) {
+  private AspectPart withDeaths(
+      AspectContext context, ReplayPlayerTrackDomain track, Window w, double wanted) {
     HeroInputs hero = context.hero();
     DeathCost deathCost = new DeathCost(hero, WorthPrices.of(context));
     double lost = 0;
@@ -82,13 +84,17 @@ public class SavingCostAspect implements ItemAspect {
       if (!isOwnDeath(hero, e) || e.gameSecond() < w.start() || e.gameSecond() >= w.end()) {
         continue;
       }
+      double held = goldBefore(track, e.gameSecond());
+      if (held < wanted) {
+        continue;
+      }
       DeathCost.Cost c = deathCost.at(e.gameSecond());
       deaths++;
       lost += c.goldLost();
       cost += c.value();
       estimated |= c.estimated();
-      noMinuteGold |= c.goldPerMinute() == 0;
-      heldMost = Math.max(heldMost, goldBefore(track, e.gameSecond()));
+      noMinuteGold |= !hasMinuteRows(hero, e.gameSecond());
+      heldMost = Math.max(heldMost, held);
     }
     Map<String, Double> figures = new LinkedHashMap<>();
     figures.put("savingSeconds", w.end() - w.start());
@@ -96,6 +102,7 @@ public class SavingCostAspect implements ItemAspect {
     figures.put("savingDeaths", (double) deaths);
     figures.put("savingGoldHeldAtDeath", heldMost);
     figures.put("savingGoldLost", lost);
+    figures.put("savingLostKnown", noMinuteGold ? 0.0 : 1.0);
     figures.put(DamageAspects.GAIN + NAME, -cost);
     Map<String, Double> row = new LinkedHashMap<>(figures);
     comparison(hero, w, row);
@@ -105,6 +112,15 @@ public class SavingCostAspect implements ItemAspect {
         flags(estimated, noMinuteGold),
         List.of(new Detail(SAVING, w.start(), null, row)),
         deaths);
+  }
+
+  /** Whether the minute rows at both ends of the game minute of the second are stored. */
+  private static boolean hasMinuteRows(HeroInputs hero, double second) {
+    int minute = MinuteSeries.minuteOf(second);
+    var rows = hero.match().minutesOf(hero.slot());
+    return rows.stream().anyMatch(r -> r.getGameMinute() != null && r.getGameMinute() == minute)
+        && rows.stream()
+            .anyMatch(r -> r.getGameMinute() != null && r.getGameMinute() == minute + 1);
   }
 
   private static List<String> flags(boolean estimated, boolean noMinuteGold) {
@@ -165,11 +181,31 @@ public class SavingCostAspect implements ItemAspect {
       }
       if (StateChangeKind.ITEM_ADDED.name().equals(c.getKind())
           && !parts.contains(c.getName())
+          && !returned(context, c)
           && context.kits().cost(HeroInputs.itemKey(c.getName())).orElse(0) > small) {
         last = c.getGameSeconds();
       }
     }
     return last;
+  }
+
+  /**
+   * Whether the add only gives back an item let go of a moment ago: the same item picked up again,
+   * or a part of an item that was taken apart.
+   */
+  private static boolean returned(AspectContext context, ReplayStateChangeDomain added) {
+    return context.hero().changes().stream()
+        .filter(r -> StateChangeKind.ITEM_REMOVED.name().equals(r.getKind()))
+        .filter(
+            r ->
+                r.getGameSeconds() <= added.getGameSeconds()
+                    && added.getGameSeconds() - r.getGameSeconds() <= RETURN_SECONDS)
+        .anyMatch(
+            r -> {
+              Set<String> removedParts = new HashSet<>();
+              collectComponents(context.kits(), r.getName(), removedParts);
+              return r.getName().equals(added.getName()) || removedParts.contains(added.getName());
+            });
   }
 
   private static void collectComponents(ItemKits kits, String name, Set<String> into) {
@@ -216,7 +252,7 @@ public class SavingCostAspect implements ItemAspect {
         if (t >= purchase) {
           break;
         }
-        if (t < notBefore || (gold[i] < wanted && Double.isNaN(first))) {
+        if (t <= notBefore || (gold[i] < wanted && Double.isNaN(first))) {
           continue;
         }
         if (Double.isNaN(first)) {

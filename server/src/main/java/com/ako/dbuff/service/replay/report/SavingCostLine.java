@@ -34,11 +34,14 @@ public final class SavingCostLine {
     if (deaths == 0) {
       return saved + " without dying";
     }
-    return "%s, died %s holding %s (lost %s)"
-        .formatted(
-            saved,
-            deaths == 1 ? "once" : deaths == 2 ? "twice" : deaths + " times",
-            BehaviourWording.gold(f.get("savingGoldHeldAtDeath")),
-            BehaviourWording.gold(f.get("savingGoldLost")));
+    String died =
+        "%s, died %s holding %s"
+            .formatted(
+                saved,
+                deaths == 1 ? "once" : deaths == 2 ? "twice" : deaths + " times",
+                BehaviourWording.gold(f.get("savingGoldHeldAtDeath")));
+    return ItemWording.figure(f, "savingLostKnown") == 0
+        ? died
+        : died + " (lost %s)".formatted(BehaviourWording.gold(f.get("savingGoldLost")));
   }
 }

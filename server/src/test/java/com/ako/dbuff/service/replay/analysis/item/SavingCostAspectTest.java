@@ -115,6 +115,33 @@ class SavingCostAspectTest {
 
     assertThat(row.flags()).contains(SavingCostAspect.NO_MINUTE_GOLD);
     assertThat(row.figures()).containsEntry("savingDeaths", 1.0);
+    assertThat(SavingCostLine.of(row))
+        .hasValueSatisfying(l -> assertThat(l).doesNotContain("lost"));
+  }
+
+  @Test
+  void aDeathAfterTheGoldWasSpentElsewhereIsNotCounted() {
+    ReplayPlayerTrackDomain spent = track(300);
+    for (int i = sampleOf(400); i < 200; i++) {
+      spent.getGold()[i] = 100;
+    }
+
+    ItemEfficiency row = evaluate(bought(600), List.of(death(450)), spent);
+
+    assertThat(row.figures()).containsEntry("savingDeaths", 0.0);
+    assertThat(row.gain()).isZero();
+  }
+
+  @Test
+  void aSampleAtTheSecondOfABigPurchaseDoesNotStartTheWindow() {
+    var changes =
+        List.of(
+            change(300, StateChangeKind.ITEM_ADDED, "item_blink"),
+            change(600, StateChangeKind.ITEM_ADDED, RADIANCE));
+
+    ItemEfficiency row = evaluate(changes, List.of(), track(300));
+
+    assertThat(row.rows().getFirst().seconds()).isEqualTo(305.0);
   }
 
   @Test
@@ -139,6 +166,19 @@ class SavingCostAspectTest {
         .containsEntry("savingSeconds", 200.0)
         .containsEntry("savingDeaths", 0.0);
     assertThat(row.gain()).isZero();
+  }
+
+  @Test
+  void anItemPickedUpAgainDoesNotInterruptTheSave() {
+    var changes =
+        List.of(
+            change(380, StateChangeKind.ITEM_REMOVED, "item_blink"),
+            change(390, StateChangeKind.ITEM_ADDED, "item_blink"),
+            change(600, StateChangeKind.ITEM_ADDED, RADIANCE));
+
+    ItemEfficiency row = evaluate(changes, List.of(), track(300));
+
+    assertThat(row.rows().getFirst().seconds()).isEqualTo(300.0);
   }
 
   @Test
