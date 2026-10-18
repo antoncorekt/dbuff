@@ -29,7 +29,7 @@ class ItemEfficiencyFileTest {
                 "farming_items",
                 List.of("farm-rate", "item-damage", "stat-uplift", "alternatives")),
             org.assertj.core.groups.Tuple.tuple(
-                "radiance", List.of("farm-rate", "item-damage", "alternatives")));
+                "radiance", List.of("farm-rate", "item-damage", "alternatives", "saving-cost")));
     assertThat(entries)
         .extracting(ItemEfficiencyEntry::category)
         .containsExactly("sustain", "farming", "farming", "farming");
@@ -48,7 +48,8 @@ class ItemEfficiencyFileTest {
             new FarmRateAspect(),
             new ItemDamageAspect(),
             new StatUpliftAspect(),
-            new AlternativesAspect(null, null));
+            new AlternativesAspect(null, null),
+            new SavingCostAspect());
 
     for (ItemEfficiencyEntry entry : entries) {
       var own =

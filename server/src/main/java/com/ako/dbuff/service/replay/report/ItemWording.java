@@ -62,6 +62,7 @@ public final class ItemWording {
               + " item's own damage counts";
       case "DEATH_COST_ESTIMATED" ->
           "the gold lost or the respawn time of the saved death is estimated";
+      case "NO_GOLD_TRACK" -> "the track has no gold, so the cost of saving up is not counted";
       case "COST_UNKNOWN" -> "the item constants give no cost for it, so there is no ratio";
       case "BONUS_GOLD_UNKNOWN" -> "the constants give no bonus gold, so no gold is counted";
       case "USE_WITHOUT_GOLD" -> "a use had no gold entry in the log";
