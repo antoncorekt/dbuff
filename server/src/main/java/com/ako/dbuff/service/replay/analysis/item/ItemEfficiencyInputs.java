@@ -89,6 +89,7 @@ public class ItemEfficiencyInputs {
                 kills.getOrDefault(slot, List.of()),
                 segments.getOrDefault(slot, List.of()),
                 match,
+                matchId,
                 runes.getOrDefault(slot, List.of())));
       }
     }

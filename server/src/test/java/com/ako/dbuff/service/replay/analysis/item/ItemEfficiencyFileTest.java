@@ -26,12 +26,15 @@ class ItemEfficiencyFileTest {
             org.assertj.core.groups.Tuple.tuple("magic_stick", List.of("charge-restore", "save")),
             org.assertj.core.groups.Tuple.tuple("hand_of_midas", List.of("midas-uses")),
             org.assertj.core.groups.Tuple.tuple(
-                "farming_items", List.of("farm-rate", "item-damage", "stat-uplift")),
+                "farming_items",
+                List.of("farm-rate", "item-damage", "stat-uplift", "alternatives")),
+            org.assertj.core.groups.Tuple.tuple(
+                "radiance", List.of("farm-rate", "item-damage", "alternatives")),
             org.assertj.core.groups.Tuple.tuple(
                 "bottle", List.of("bottle-runes", "charge-restore")));
     assertThat(entries)
         .extracting(ItemEfficiencyEntry::category)
-        .containsExactly("sustain", "farming", "farming", "sustain");
+        .containsExactly("sustain", "farming", "farming", "farming", "sustain");
     assertThat(entries.get(0).items()).containsExactly("magic_stick", "magic_wand");
     assertThat(entries.get(2).items()).containsExactly("bfury", "maelstrom", "mjollnir");
   }
@@ -47,7 +50,8 @@ class ItemEfficiencyFileTest {
             new MidasUsesAspect(null),
             new FarmRateAspect(),
             new ItemDamageAspect(),
-            new StatUpliftAspect());
+            new StatUpliftAspect(),
+            new AlternativesAspect(null, null));
 
     for (ItemEfficiencyEntry entry : entries) {
       var own =
