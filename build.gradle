@@ -153,6 +153,7 @@ project('server') {
 
         // Jackson nullable module for OpenAPI client compatibility
         implementation 'org.openapitools:jackson-databind-nullable:0.2.6'
+        implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
 
         implementation 'org.springframework.boot:spring-boot-starter'
         implementation 'org.springframework.boot:spring-boot-starter-actuator'

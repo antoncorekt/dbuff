@@ -5,8 +5,8 @@ import java.util.Set;
 
 /**
  * Judges the entries of one kind. Adding an item of a known kind is a new entry in {@code
- * replay/item-efficiency.json}; an item whose efficiency means something else is one new
- * implementation, discovered as a bean, with no change to the analyzer.
+ * replay/items.yaml}; an item whose efficiency means something else is one new implementation,
+ * discovered as a bean, with no change to the analyzer.
  */
 public interface ItemEfficiencyEvaluator {
   boolean supports(ItemEfficiencyEntry entry);

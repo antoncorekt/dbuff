@@ -1,5 +1,7 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.ako.dbuff.dao.model.ItemEfficiencyDomain;
 import com.ako.dbuff.dao.model.ReplayCombatLogDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerDomain;
@@ -26,8 +28,6 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The whole analyzer over stored rows, with a file that lists a Magic Stick entry and an entry of a
@@ -228,13 +228,13 @@ class ReplayItemEfficiencyAnalyzerTest {
     @Bean
     ItemEfficiencyFile itemEfficiencyFile() {
       String json =
-          "{\"status\": \"test\", \"entries\": ["
-              + "{\"key\": \"magic_stick\", \"kind\": \"magic-stick\","
-              + " \"items\": [\"magic_stick\", \"magic_wand\"]},"
-              + "{\"key\": \"toy\", \"kind\": \"toy\", \"items\": [\"quelling_blade\"],"
-              + " \"parameters\": {\"weight\": 7}}]}";
+          "{\"categories\": {\"farming\": \"F\"}, \"entries\": [{\"key\": \"magic_stick\","
+              + " \"category\": \"farming\", \"kind\": \"magic-stick\", \"items\":"
+              + " [\"magic_stick\", \"magic_wand\"]},{\"key\": \"toy\", \"category\": \"farming\","
+              + " \"kind\": \"toy\", \"items\": [\"quelling_blade\"], \"parameters\": {\"weight\":"
+              + " 7}}]}";
       return new ItemEfficiencyFile(
-          () -> new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)), "test.json");
+          () -> new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)), "test.yaml");
     }
   }
 }

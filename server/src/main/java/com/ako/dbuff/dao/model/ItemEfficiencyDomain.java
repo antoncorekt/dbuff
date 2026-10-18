@@ -14,9 +14,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * How well one whitelisted item, or item group, paid for one hero (see {@code
- * replay/item-efficiency.json}). The summary columns fit every kind of item; the totals particular
- * to a kind and the per-use rows are JSON text.
+ * How well one whitelisted item, or item group, paid for one hero (see {@code replay/items.yaml}).
+ * The summary columns fit every kind of item; the totals particular to a kind and the per-use rows
+ * are JSON text.
  */
 @Entity
 @Table(
@@ -43,6 +43,9 @@ public class ItemEfficiencyDomain {
 
   /** The item the hero held; the first one of a group. */
   private String itemKey;
+
+  /** The catalog category of the entry. */
+  private String category;
 
   /** The evaluator kind of the entry. */
   private String kind;
