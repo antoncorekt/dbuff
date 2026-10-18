@@ -200,7 +200,8 @@ final class ItemTestData {
         base.track(),
         base.creepKills(),
         base.activity(),
-        match);
+        match,
+        0);
   }
 
   static HeroInputs hero(

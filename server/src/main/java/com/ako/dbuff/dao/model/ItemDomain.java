@@ -25,7 +25,8 @@ import lombok.ToString;
       @Index(
           name = "idx_item_domain_player_match_slot",
           columnList = "playerId, matchId, playerSlot, isNeutral"),
-      @Index(name = "idx_item_domain_item_id", columnList = "itemId")
+      @Index(name = "idx_item_domain_item_id", columnList = "itemId"),
+      @Index(name = "idx_item_domain_match_slot", columnList = "matchId, playerSlot")
     })
 @IdClass(ItemId.class)
 @Builder

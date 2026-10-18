@@ -6,7 +6,7 @@ prices:
   disableShare: 0.25
   trendMinutes: 8
   respawnSeconds: 30
-alternatives: {}
+alternatives: { altCostBand: 0.3, altTimeBand: 300, altMinGames: 5 }
 categories:
   farming: Farming
   sustain: Sustain and mana
@@ -41,7 +41,7 @@ entries:
   - key: farming_items
     category: farming
     items: [bfury, maelstrom, mjollnir]
-    aspects: [farm-rate, item-damage, stat-uplift]
+    aspects: [farm-rate, item-damage, stat-uplift, alternatives]
     parameters:
       windowMinutes: 5
       minBeforeSeconds: 120
@@ -51,7 +51,8 @@ entries:
   - key: radiance
     category: farming
     items: [radiance]
-    aspects: [farm-rate, item-damage]
+    aspects: [farm-rate, item-damage, alternatives]
+    alternatives: [maelstrom, bfury, manta]
     parameters:
       windowMinutes: 5
       minBeforeSeconds: 120

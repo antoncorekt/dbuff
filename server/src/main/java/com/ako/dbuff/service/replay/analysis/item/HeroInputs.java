@@ -21,6 +21,7 @@ import java.util.OptionalInt;
  *     deaths, his gold and experience), in log order
  * @param track null when the hero has none
  * @param match what the worth model reads across heroes
+ * @param matchId the match the facts are of
  */
 public record HeroInputs(
     long slot,
@@ -30,7 +31,8 @@ public record HeroInputs(
     ReplayPlayerTrackDomain track,
     List<CreepKillDomain> creepKills,
     List<ActivitySegment> activity,
-    MatchFacts match) {
+    MatchFacts match,
+    long matchId) {
 
   public HeroInputs(
       long slot,
@@ -40,7 +42,7 @@ public record HeroInputs(
       ReplayPlayerTrackDomain track,
       List<CreepKillDomain> creepKills,
       List<ActivitySegment> activity) {
-    this(slot, hero, changes, events, track, creepKills, activity, MatchFacts.EMPTY);
+    this(slot, hero, changes, events, track, creepKills, activity, MatchFacts.EMPTY, 0);
   }
 
   public static final String ITEM_PREFIX = "item_";

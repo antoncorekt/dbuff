@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.report;
 import com.ako.dbuff.dao.model.ItemEfficiencyDomain;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
+import com.ako.dbuff.service.replay.analysis.item.HeroInputs;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyJson;
 import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
@@ -121,7 +122,9 @@ public class ItemsSection implements ReplayReportSection {
             "**Items**",
             shown,
             properties.getMaxBehaviourLineLength(),
-            entry -> entry.wording().shortVerdict(entry.row(), subject(entry.row(), heroes))));
+            entry ->
+                entry.wording().shortVerdict(entry.row(), subject(entry.row(), heroes))
+                    + AlternativesWording.suffix(entry.row(), this::itemLabel)));
   }
 
   private Optional<Entry> usable(long matchId, ItemEfficiencyDomain stored) {
@@ -160,6 +163,10 @@ public class ItemsSection implements ReplayReportSection {
             BehaviourWording.hero(heroes, row.slot()),
             labels.decorated("item_" + row.itemKey()),
             bought(row.purchaseSeconds()));
+  }
+
+  private String itemLabel(String key) {
+    return labels.decorated(HeroInputs.replayName(key));
   }
 
   private static String bought(double seconds) {

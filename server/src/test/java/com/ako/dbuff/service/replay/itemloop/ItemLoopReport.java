@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
+import com.ako.dbuff.service.replay.report.AlternativesWording;
 import com.ako.dbuff.service.replay.report.ItemWording;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -106,7 +107,9 @@ final class ItemLoopReport {
                   ReviewLoopReport.tableCell(label(d, r)),
                   LoopWording.clock(r.purchaseSeconds()),
                   wording.showsUses() ? String.valueOf(r.count()) : "-",
-                  ReviewLoopReport.tableCell(wording.result(r, d.itemNames())),
+                  ReviewLoopReport.tableCell(
+                      wording.result(r, d.itemNames())
+                          + AlternativesWording.suffix(r, d.itemNames())),
                   ItemWording.ratio(r.ratio())));
     }
     return out;
