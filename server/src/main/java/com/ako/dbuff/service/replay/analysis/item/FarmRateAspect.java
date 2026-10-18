@@ -21,9 +21,15 @@ import org.springframework.stereotype.Component;
 public class FarmRateAspect implements ItemAspect {
   public static final String NAME = "farm-rate";
 
-  private static final Set<String> PARAMETERS =
-      Set.of(
-          "windowMinutes", "minBeforeSeconds", "minAfterSeconds", "campGapSeconds", "trendMinutes");
+  private static final Set<String> PARAMETERS = parameters();
+
+  private static Set<String> parameters() {
+    Set<String> names =
+        new java.util.HashSet<>(
+            Set.of("windowMinutes", "minBeforeSeconds", "minAfterSeconds", "campGapSeconds"));
+    names.addAll(WorthPrices.NAMES);
+    return Set.copyOf(names);
+  }
 
   @Override
   public String name() {

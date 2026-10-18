@@ -1,7 +1,9 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
+import com.ako.dbuff.dao.model.ReplayStateChangeDomain;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.StateChangeKind;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -82,8 +84,16 @@ public class StatUpliftAspect implements ItemAspect {
    */
   private static double statShare(AspectContext context, double bought) {
     double window = context.entry().parameter("statShareSeconds", DEFAULT_SHARE_SECONDS);
+    List<ReplayStateChangeDomain> added =
+        context.hero().changes().stream()
+            .filter(c -> StateChangeKind.ITEM_ADDED.name().equals(c.getKind()))
+            .filter(c -> c.getGameSeconds() != null && c.getName() != null)
+            .toList();
+    List<ReplayStateChangeDomain> group = group(added, bought, window);
+    Set<String> names = new LinkedHashSet<>(context.held());
+    group.forEach(c -> names.add(c.getName()));
     Set<String> components = new LinkedHashSet<>();
-    for (String name : context.held()) {
+    for (String name : names) {
       context
           .kits()
           .item(HeroInputs.itemKey(name))
@@ -91,10 +101,7 @@ public class StatUpliftAspect implements ItemAspect {
           .ifPresent(components::addAll);
     }
     Set<String> others = new LinkedHashSet<>();
-    context.hero().changes().stream()
-        .filter(c -> StateChangeKind.ITEM_ADDED.name().equals(c.getKind()))
-        .filter(c -> Math.abs(c.getGameSeconds() - bought) <= window)
-        .map(c -> c.getName())
+    names.stream()
         .filter(n -> !context.names().contains(n))
         .map(HeroInputs::itemKey)
         .filter(k -> !components.contains(k))
@@ -102,6 +109,26 @@ public class StatUpliftAspect implements ItemAspect {
     double mine = context.held().stream().mapToDouble(n -> weight(context, n)).max().orElse(0);
     double rest = others.stream().mapToDouble(k -> weight(context, HeroInputs.replayName(k))).sum();
     return mine + rest == 0 ? 1 : mine / (mine + rest);
+  }
+
+  /** The purchases connected to {@code bought} by gaps of at most {@code window} seconds. */
+  private static List<ReplayStateChangeDomain> group(
+      List<ReplayStateChangeDomain> added, double bought, double window) {
+    List<ReplayStateChangeDomain> group = new ArrayList<>();
+    List<Double> times = new ArrayList<>(List.of(bought));
+    boolean grew = true;
+    while (grew) {
+      grew = false;
+      for (ReplayStateChangeDomain c : added) {
+        if (!group.contains(c)
+            && times.stream().anyMatch(t -> Math.abs(c.getGameSeconds() - t) <= window)) {
+          group.add(c);
+          times.add(c.getGameSeconds());
+          grew = true;
+        }
+      }
+    }
+    return group;
   }
 
   private static double weight(AspectContext context, String replayName) {

@@ -1,5 +1,7 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
+import com.ako.dbuff.dao.model.ReplayStateChangeDomain;
+import com.ako.dbuff.service.constant.data.ItemConstant;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.StateChangeKind;
@@ -19,22 +21,31 @@ class DamageAspectsTest {
   private static final int HEROES = CombatEvent.ATTACKER_HERO | CombatEvent.TARGET_HERO;
   private static final Map<String, Long> SLOTS = Map.of(ME, 0L, ALLY, 1L, ENEMY, 128L);
   private static final ItemKits KITS =
-      ItemTestData.kits(Map.of("maelstrom", 500L, "daedalus", 500L));
+      ItemTestData.kits(Map.of("maelstrom", 500L, "daedalus", 500L, "butterfly", 500L));
   private static final List<ItemAspect> ASPECTS =
       List.of(new ItemDamageAspect(), new StatUpliftAspect());
 
   private static ItemEfficiency judge(
       List<String> aspects, List<CombatEvent> mine, List<CombatEvent> all, List<String> bought) {
+    return judge(KITS, aspects, mine, all, bought.stream().map(n -> Map.entry(n, 650.0)).toList());
+  }
+
+  private static ItemEfficiency judge(
+      ItemKits kits,
+      List<String> aspects,
+      List<CombatEvent> mine,
+      List<CombatEvent> all,
+      List<Map.Entry<String, Double>> bought) {
     ItemEfficiencyEntry entry =
         ItemTestData.entry("damage_items", aspects, List.of("maelstrom"), Map.of());
-    List<com.ako.dbuff.dao.model.ReplayStateChangeDomain> changes = new ArrayList<>();
+    List<ReplayStateChangeDomain> changes = new ArrayList<>();
     changes.add(change(600, StateChangeKind.ITEM_ADDED, "item_maelstrom"));
-    bought.forEach(name -> changes.add(change(650, StateChangeKind.ITEM_ADDED, name)));
+    bought.forEach(e -> changes.add(change(e.getValue(), StateChangeKind.ITEM_ADDED, e.getKey())));
     HeroInputs hero =
         ItemTestData.heroWith(
             ItemTestData.hero(changes, mine, null, List.of(), List.of()),
             new MatchFacts(all, SLOTS, Map.of()));
-    return ItemTestData.judge(entry, ASPECTS, KITS, 900, List.of(hero)).getFirst();
+    return ItemTestData.judge(entry, ASPECTS, kits, 900, List.of(hero)).getFirst();
   }
 
   private static CombatEvent hit(String by, double second, int value, String inflictor) {
@@ -140,5 +151,68 @@ class DamageAspectsTest {
     ItemEfficiency result = judge(List.of("stat-uplift"), events, events, List.of());
 
     assertThat(result.figures()).containsEntry("passiveDamage", 0.0);
+  }
+
+  @Test
+  void threeItemsBoughtAboutTwoMinutesApartSplitTheUpliftInThirds() {
+    List<CombatEvent> events = flat();
+
+    ItemEfficiency result =
+        judge(
+            KITS,
+            List.of("stat-uplift"),
+            events,
+            events,
+            List.of(Map.entry("item_daedalus", 700.0), Map.entry("item_butterfly", 800.0)));
+
+    assertThat(result.rows().getFirst().figures().get("statShare"))
+        .isCloseTo(1.0 / 3, within(1e-9));
+  }
+
+  @Test
+  void theRecipePartsOfAnotherItemDoNotShrinkTheShare() {
+    ItemKits kits =
+        key ->
+            java.util.Optional.of(
+                ItemConstant.builder()
+                    .cost(500L)
+                    .attrib(List.of(Map.of("key", "bonus_damage", "value", "25")))
+                    .components("daedalus".equals(key) ? List.of("demon_edge") : List.of())
+                    .build());
+    List<CombatEvent> events = flat();
+
+    ItemEfficiency result =
+        judge(
+            kits,
+            List.of("stat-uplift"),
+            events,
+            events,
+            List.of(Map.entry("item_daedalus", 650.0), Map.entry("item_demon_edge", 640.0)));
+
+    assertThat(result.rows().getFirst().figures()).containsEntry("statShare", 0.5);
+  }
+
+  @Test
+  void theMinibossRadianceBurnIsNotTheItemsDamage() {
+    ItemEfficiencyEntry entry =
+        ItemTestData.entry("radiance", List.of("item-damage"), List.of("radiance"), Map.of());
+    List<CombatEvent> mine =
+        List.of(hit(ME, 700, 300, "item_radiance"), hit(ME, 710, 900, "miniboss_radiance"));
+    HeroInputs hero =
+        ItemTestData.heroWith(
+            ItemTestData.hero(
+                List.of(change(600, StateChangeKind.ITEM_ADDED, "item_radiance")),
+                mine,
+                null,
+                List.of(),
+                List.of()),
+            new MatchFacts(mine, SLOTS, Map.of()));
+
+    ItemEfficiency result =
+        ItemTestData.judge(
+                entry, ASPECTS, ItemTestData.kits(Map.of("radiance", 1000L)), 900, List.of(hero))
+            .getFirst();
+
+    assertThat(result.figures()).containsEntry("procDamage", 300.0);
   }
 }
