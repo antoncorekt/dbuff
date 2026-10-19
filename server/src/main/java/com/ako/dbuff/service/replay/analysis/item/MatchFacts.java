@@ -16,12 +16,14 @@ import java.util.function.Supplier;
  * @param slots player slot by combat-log hero name
  * @param minutes the minute rows of each slot, in minute order
  * @param roster every hero's inputs; a supplier because the inputs hold this record
+ * @param vision the ward log, invisibility, detection and positions of the vision aspect
  */
 public record MatchFacts(
     List<CombatEvent> events,
     Map<String, Long> slots,
     Map<Long, List<ReplayPlayerMinuteDomain>> minutes,
-    Supplier<List<HeroInputs>> roster) {
+    Supplier<List<HeroInputs>> roster,
+    VisionFacts vision) {
 
   public static final MatchFacts EMPTY = new MatchFacts(List.of(), Map.of(), Map.of());
 
@@ -29,7 +31,23 @@ public record MatchFacts(
       List<CombatEvent> events,
       Map<String, Long> slots,
       Map<Long, List<ReplayPlayerMinuteDomain>> minutes) {
-    this(events, slots, minutes, List::of);
+    this(events, slots, minutes, List::of, VisionFacts.EMPTY);
+  }
+
+  public MatchFacts(
+      List<CombatEvent> events,
+      Map<String, Long> slots,
+      Map<Long, List<ReplayPlayerMinuteDomain>> minutes,
+      Supplier<List<HeroInputs>> roster) {
+    this(events, slots, minutes, roster, VisionFacts.EMPTY);
+  }
+
+  public MatchFacts(
+      List<CombatEvent> events,
+      Map<String, Long> slots,
+      Map<Long, List<ReplayPlayerMinuteDomain>> minutes,
+      VisionFacts vision) {
+    this(events, slots, minutes, List::of, vision);
   }
 
   /** The other heroes on the hero's team. */

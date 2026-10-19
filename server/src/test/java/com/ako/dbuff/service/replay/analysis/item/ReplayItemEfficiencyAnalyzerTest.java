@@ -13,6 +13,7 @@ import com.ako.dbuff.service.replay.CombatLogCodec;
 import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.StateChangeKind;
 import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
+import com.ako.dbuff.service.replay.analysis.vision.InvisibleHeroFile;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -39,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import({
   ReplayItemEfficiencyAnalyzer.class,
   ItemEfficiencyInputs.class,
+  InvisibleHeroFile.class,
   ChargeRestoreAspect.class,
   SaveAspect.class,
   CombatLogReader.class,
@@ -74,7 +76,7 @@ class ReplayItemEfficiencyAnalyzerTest {
     assertThat(stick.getUseCount()).isEqualTo(1);
     assertThat(stick.getCost()).isEqualTo(200);
     assertThat(stick.getPurchaseSeconds()).isEqualTo(-60.0);
-    assertThat(stick.getAnalysisVersion()).isEqualTo(10);
+    assertThat(stick.getAnalysisVersion()).isEqualTo(11);
     assertThat(stick.getFigures()).contains("\"charges\":4.0");
     ItemEfficiency back = ItemEfficiencyJson.fromRow(stick);
     assertThat(back.rows()).hasSize(1);

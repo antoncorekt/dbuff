@@ -46,12 +46,17 @@ class ItemEfficiencyFileTest {
             org.assertj.core.groups.Tuple.tuple(
                 "euls_scepter", List.of("target-use", "save", "control")),
             org.assertj.core.groups.Tuple.tuple(
-                "solar_crest", List.of("target-use", "save", "control")));
+                "solar_crest", List.of("target-use", "save", "control")),
+            org.assertj.core.groups.Tuple.tuple("ward_observer", List.of("vision")),
+            org.assertj.core.groups.Tuple.tuple("ward_sentry", List.of("vision")),
+            org.assertj.core.groups.Tuple.tuple("dust", List.of("vision")),
+            org.assertj.core.groups.Tuple.tuple("gem", List.of("vision")));
     assertThat(entries)
         .extracting(ItemEfficiencyEntry::category)
         .containsExactly(
             "sustain", "farming", "farming", "farming", "farming", "sustain", "sustain", "sustain",
-            "sustain", "sustain", "save", "save", "save", "save", "save");
+            "sustain", "sustain", "save", "save", "save", "save", "save", "vision", "vision",
+            "vision", "vision");
     assertThat(entries.get(0).items()).containsExactly("magic_stick", "magic_wand");
     assertThat(entries.get(2).items()).containsExactly("bfury", "maelstrom", "mjollnir");
   }
@@ -74,7 +79,8 @@ class ItemEfficiencyFileTest {
             new CooldownAspect(),
             new TeamRestoreAspect(),
             new TargetUseAspect(),
-            new ControlAspect());
+            new ControlAspect(),
+            new VisionAspect(new com.ako.dbuff.service.replay.analysis.vision.VisionProperties()));
 
     for (ItemEfficiencyEntry entry : entries) {
       var own =
@@ -213,7 +219,7 @@ class ItemEfficiencyFileTest {
   @Test
   void theShippedCategoriesAreListed() {
     assertThat(new ItemEfficiencyFile("replay/items.yaml").categories())
-        .containsKeys("farming", "sustain", "save");
+        .containsKeys("farming", "sustain", "save", "vision");
   }
 
   @Test

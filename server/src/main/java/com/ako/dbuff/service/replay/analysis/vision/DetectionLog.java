@@ -17,7 +17,7 @@ import java.util.TreeSet;
  * used, and dust, a gem or a sentry ward held by the heroes in the fight when it began. Oracle's
  * Fortune's End and other rare detection are not read.
  */
-final class DetectionLog {
+public final class DetectionLog {
   static final String DUST = "item_dust";
   static final String GEM = "item_gem";
   static final String SENTRY = "item_ward_sentry";
@@ -26,7 +26,7 @@ final class DetectionLog {
   private final Map<Long, List<Double>> dustUses = new HashMap<>();
   private final Map<Long, Map<String, List<double[]>>> holdings = new HashMap<>();
 
-  DetectionLog(
+  public DetectionLog(
       List<CombatEvent> events,
       Map<String, Long> slotByHero,
       List<ReplayStateChangeDomain> stateChanges) {
@@ -62,15 +62,20 @@ final class DetectionLog {
             });
   }
 
+  /** When the slot used dust, in time order. */
+  public List<Double> dustUsesOf(long slot) {
+    return List.copyOf(dustUses.getOrDefault(slot, List.of()));
+  }
+
   /** Whether any of the slots used dust from {@code from} to {@code to}. */
-  boolean dustUsed(Set<Long> slots, double from, double to) {
+  public boolean dustUsed(Set<Long> slots, double from, double to) {
     return slots.stream()
         .anyMatch(
             s -> dustUses.getOrDefault(s, List.of()).stream().anyMatch(t -> t >= from && t <= to));
   }
 
   /** Which of dust, gem and sentry the slots held at the time, as short words in a fixed order. */
-  Set<String> held(Set<Long> slots, double time) {
+  public Set<String> held(Set<Long> slots, double time) {
     Set<String> held = new TreeSet<>();
     for (long slot : slots) {
       holdings

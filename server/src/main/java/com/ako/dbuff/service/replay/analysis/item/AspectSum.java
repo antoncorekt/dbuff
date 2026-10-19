@@ -12,6 +12,9 @@ import java.util.Set;
 final class AspectSum {
   static final String COST_UNKNOWN = "COST_UNKNOWN";
 
+  /** A figure for the gold actually spent on an item bought many times; it replaces the cost. */
+  static final String SPENT = "spentGold";
+
   private static final String PAYBACK = "PAYBACK";
   private static final double SECONDS_PER_MINUTE = 60;
 
@@ -48,6 +51,10 @@ final class AspectSum {
   private static ItemEfficiency of(AspectContext context, List<AspectPart> parts) {
     ItemEfficiencyEntry entry = context.entry();
     Long cost = context.cost();
+    Long spent = spent(parts);
+    if (cost != null && spent != null) {
+      cost = spent;
+    }
     double gain = parts.stream().mapToDouble(AspectPart::gain).sum();
     boolean measured = parts.stream().allMatch(AspectPart::measured);
     double bought = context.bought();
@@ -80,6 +87,16 @@ final class AspectSum {
         figures(parts),
         List.copyOf(flags),
         rows);
+  }
+
+  private static Long spent(List<AspectPart> parts) {
+    double spent =
+        parts.stream()
+            .map(p -> p.figures().get(SPENT))
+            .filter(v -> v != null)
+            .mapToDouble(Double::doubleValue)
+            .sum();
+    return spent > 0 ? Math.round(spent) : null;
   }
 
   private static Double paidBack(

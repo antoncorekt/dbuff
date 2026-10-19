@@ -37,7 +37,8 @@ public class ItemKindWordings {
             new BottleKindWording(),
             new TeamRestoreKindWording(),
             new SoulRingKindWording(),
-            new TargetUseKindWording()));
+            new TargetUseKindWording(),
+            new VisionKindWording()));
   }
 
   public Optional<ItemKindWording> find(String aspect) {

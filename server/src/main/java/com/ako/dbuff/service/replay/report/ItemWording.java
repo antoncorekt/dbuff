@@ -70,6 +70,9 @@ public final class ItemWording {
       case "NO_GOLD_TRACK" -> "the track has no gold, so the cost of saving up is not counted";
       case "NO_MINUTE_GOLD" ->
           "the match has no gold per minute for a death while saving, so its cost counts as 0";
+      case "NEVER_PLACED" -> "he bought it and never placed one";
+      case "DUST_UNUSED" -> "he bought dust and never used it";
+      case "DEWARDED_FAST" -> "an observer of his was destroyed within a minute";
       case "HP_ESTIMATED" ->
           "the log credits the bottle with no heal, so the health is the constants' amount capped"
               + " by his missing health";

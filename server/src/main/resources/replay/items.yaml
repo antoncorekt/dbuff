@@ -11,6 +11,7 @@ categories:
   farming: Farming
   sustain: Sustain and mana
   save: Saves
+  vision: Vision
 entries:
   - key: magic_stick
     category: sustain
@@ -132,3 +133,35 @@ entries:
     category: save
     items: [solar_crest]
     aspects: [target-use, save, control]
+  - key: ward_observer
+    category: vision
+    items: [ward_observer]
+    aspects: [vision]
+    parameters:
+      dewardFastSeconds: 60
+      minVisionGold: 300
+  - key: ward_sentry
+    category: vision
+    items: [ward_sentry]
+    aspects: [vision]
+    parameters:
+      invisibleSeconds: 5
+      dewardBounty: 50
+      minVisionGold: 300
+  - key: dust
+    category: vision
+    items: [dust]
+    aspects: [vision]
+    parameters:
+      invisibleSeconds: 5
+      dustSeconds: 12
+      dustRadius: 1050
+      minVisionGold: 300
+  - key: gem
+    category: vision
+    items: [gem]
+    aspects: [vision]
+    parameters:
+      invisibleSeconds: 5
+      gemRadius: 900
+      minVisionGold: 300
