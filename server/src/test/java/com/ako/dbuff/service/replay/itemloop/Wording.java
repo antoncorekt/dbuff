@@ -16,7 +16,8 @@ interface Wording {
           "midas-uses", new MidasWording(),
           "farm-rate", new FarmingWording(),
           "cooldown", new CooldownWording(),
-          "bottle-runes", new BottleWording());
+          "bottle-runes", new BottleWording(),
+          "team-restore", new TeamRestoreWording());
 
   static Wording of(String kind) {
     return FOR_KIND.getOrDefault(kind, new GenericWording());

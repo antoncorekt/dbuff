@@ -87,3 +87,15 @@ entries:
       hpLookbackSeconds: 3
       maxHpWindowSeconds: 120
       healWindowSeconds: 4
+  - key: arcane_boots
+    category: sustain
+    items: [arcane_boots]
+    aspects: [team-restore]
+  - key: mekansm
+    category: sustain
+    items: [mekansm, guardian_greaves]
+    aspects: [team-restore, save]
+  - key: holy_locket
+    category: sustain
+    items: [holy_locket]
+    aspects: [team-restore, save]

@@ -34,7 +34,8 @@ public class ItemKindWordings {
             new MidasKindWording(),
             new FarmingKindWording(),
             new CooldownKindWording(),
-            new BottleKindWording()));
+            new BottleKindWording(),
+            new TeamRestoreKindWording()));
   }
 
   public Optional<ItemKindWording> find(String aspect) {

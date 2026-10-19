@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.analysis.item;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.analysis.item.StickUses.Use;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,6 +26,7 @@ public class SaveAspect implements ItemAspect {
 
   private static Set<String> parameters() {
     Set<String> names = new HashSet<>(StickUses.PARAMETERS);
+    names.addAll(TeamUses.PARAMETERS);
     names.addAll(WorthPrices.NAMES);
     return Set.copyOf(names);
   }
@@ -41,6 +43,12 @@ public class SaveAspect implements ItemAspect {
 
   @Override
   public AspectPart measure(AspectContext context) {
+    return context.entry().aspects().contains(TeamRestoreAspect.NAME)
+        ? measureAllies(context)
+        : measureSelf(context);
+  }
+
+  private AspectPart measureSelf(AspectContext context) {
     List<Use> uses = StickUses.of(context).uses();
     DeathCost deathCost = new DeathCost(context.hero(), WorthPrices.of(context));
     double gain = 0;
@@ -59,6 +67,52 @@ public class SaveAspect implements ItemAspect {
     Map<String, Double> totals = new LinkedHashMap<>();
     totals.put("saves", uses.stream().filter(Use::saved).count() * 1.0);
     totals.put("diedSoon", uses.stream().filter(u -> !u.survived()).count() * 1.0);
+    totals.put("saveGain", gain);
+    return new AspectPart(
+        gain,
+        true,
+        totals,
+        estimated ? List.of(DEATH_COST_ESTIMATED) : List.of(),
+        rows,
+        uses.size(),
+        null,
+        null);
+  }
+
+  /** The uses of an item that restores allies save the allies it reached. */
+  private AspectPart measureAllies(AspectContext context) {
+    List<TeamUses.Use> uses = TeamUses.of(context).uses();
+    WorthPrices prices = WorthPrices.of(context);
+    Map<Long, DeathCost> costs = new HashMap<>();
+    double gain = 0;
+    double saves = 0;
+    double diedSoon = 0;
+    boolean estimated = false;
+    List<Detail> rows = new ArrayList<>();
+    for (TeamUses.Use use : uses) {
+      double value = 0;
+      for (TeamUses.Reach reach : use.reached()) {
+        if (reach.saved()) {
+          DeathCost.Cost cost =
+              costs
+                  .computeIfAbsent(reach.ally().slot(), s -> new DeathCost(reach.ally(), prices))
+                  .avoided(use.second());
+          value += cost.value();
+          estimated |= cost.estimated();
+        }
+      }
+      gain += value;
+      saves += use.saves();
+      diedSoon += use.diedSoon();
+      Map<String, Double> figures = new LinkedHashMap<>();
+      figures.put("saved", (double) use.saves());
+      figures.put("diedSoon", (double) use.diedSoon());
+      figures.put("saveGain", value);
+      rows.add(new Detail(USE, use.second(), null, figures));
+    }
+    Map<String, Double> totals = new LinkedHashMap<>();
+    totals.put("saves", saves);
+    totals.put("diedSoon", diedSoon);
     totals.put("saveGain", gain);
     return new AspectPart(
         gain,
