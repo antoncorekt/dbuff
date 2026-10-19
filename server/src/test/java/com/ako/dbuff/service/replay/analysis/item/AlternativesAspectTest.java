@@ -76,6 +76,22 @@ class AlternativesAspectTest {
   }
 
   @Test
+  void popularItemsBecomePopularRowsWithoutFigures() {
+    when(finder.find(any(), any()))
+        .thenReturn(
+            new Result(
+                2,
+                List.of(new Alternative("manta", 1, null, null)),
+                List.of("maelstrom", "bfury")));
+
+    AspectPart part = aspect.measure(AspectContext.of(ENTRY, KITS, 3_000, hero(7), Map.of()));
+
+    assertThat(part.rows()).extracting(d -> d.label()).containsOnly("POPULAR");
+    assertThat(part.rows()).extracting(d -> d.target()).containsExactly("maelstrom", "bfury");
+    assertThat(part.rows()).allSatisfy(d -> assertThat(d.figures()).isEmpty());
+  }
+
+  @Test
   void aHeroWithoutAMatchIdIsNotLookedUp() {
     AspectPart part = aspect.measure(AspectContext.of(ENTRY, KITS, 3_000, hero(0), Map.of()));
 

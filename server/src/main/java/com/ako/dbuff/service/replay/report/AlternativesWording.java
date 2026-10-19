@@ -13,7 +13,8 @@ public final class AlternativesWording {
 
   /**
    * For example {@code ; same gold usually goes to Maelstrom (14 games, +6% win rate) or Manta (few
-   * games)}; empty when the row has no alternatives.
+   * games)}; empty when the row has no alternatives. With none from the stored matches it names the
+   * popular items instead, with no numbers: {@code ; popular for this hero at this point: Manta}.
    *
    * @param itemName the item's display name by key; null for an unknown item
    */
@@ -24,10 +25,29 @@ public final class AlternativesWording {
                 d -> d != null && AlternativesAspect.ROW.equals(d.label()) && d.target() != null)
             .toList();
     if (alternatives.isEmpty()) {
-      return "";
+      return popular(row, itemName);
     }
     return "; same gold usually goes to "
         + alternatives.stream().map(d -> one(d, itemName)).collect(Collectors.joining(" or "));
+  }
+
+  private static String popular(ItemEfficiency row, Function<String, String> itemName) {
+    List<String> names =
+        row.rows().stream()
+            .filter(
+                d ->
+                    d != null
+                        && AlternativesAspect.POPULAR_ROW.equals(d.label())
+                        && d.target() != null)
+            .map(
+                d -> {
+                  String name = itemName.apply(d.target());
+                  return name == null ? d.target().replace('_', ' ') : name;
+                })
+            .toList();
+    return names.isEmpty()
+        ? ""
+        : "; popular for this hero at this point: " + String.join(" or ", names);
   }
 
   private static String one(Detail detail, Function<String, String> itemName) {

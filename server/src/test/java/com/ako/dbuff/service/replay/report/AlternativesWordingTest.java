@@ -31,6 +31,17 @@ class AlternativesWordingTest {
   }
 
   @Test
+  void popularItemsAreNamedWithoutNumbers() {
+    ItemEfficiency row =
+        row(
+            new Detail("POPULAR", 1_500, "maelstrom", Map.of()),
+            new Detail("POPULAR", 1_500, "bfury", Map.of()));
+
+    assertThat(AlternativesWording.suffix(row, key -> "maelstrom".equals(key) ? "Maelstrom" : null))
+        .isEqualTo("; popular for this hero at this point: Maelstrom or bfury");
+  }
+
+  @Test
   void namesTheUsualAlternativesWithTheirGamesAndWinRateOrFewGames() {
     ItemEfficiency row =
         row(

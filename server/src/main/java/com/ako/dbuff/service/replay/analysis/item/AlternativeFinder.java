@@ -70,9 +70,18 @@ public class AlternativeFinder {
    */
   public record Alternative(String itemKey, long games, Double winRateDelta, Double leadDelta) {}
 
-  /** The item's own games and the candidates, those with most games first. */
-  public record Result(long games, List<Alternative> alternatives) {
+  /**
+   * The item's own games and the candidates, those with most games first.
+   *
+   * @param popular the keys OpenDota lists as popular for the hero when no candidate has enough
+   *     games; names only
+   */
+  public record Result(long games, List<Alternative> alternatives, List<String> popular) {
     static final Result NONE = new Result(0, List.of());
+
+    public Result(long games, List<Alternative> alternatives) {
+      this(games, alternatives, List.of());
+    }
   }
 
   private record Tally(long games, long wins, double leadSum, long leads) {
@@ -89,6 +98,7 @@ public class AlternativeFinder {
   private final PlayerGameStatisticRepo statRepo;
   private final PlayerRoleRepo roleRepo;
   private final ItemKits kits;
+  private final PopularItems popularItems;
   private final Clock clock;
   private final Map<Long, MatchFacts> matches = lru();
   private final Map<List<Object>, List<Object[]>> purchases = lru();
@@ -111,8 +121,9 @@ public class AlternativeFinder {
       ItemRepository itemRepo,
       PlayerGameStatisticRepo statRepo,
       PlayerRoleRepo roleRepo,
-      ItemKits kits) {
-    this(itemRepo, statRepo, roleRepo, kits, Clock.systemUTC());
+      ItemKits kits,
+      PopularItems popularItems) {
+    this(itemRepo, statRepo, roleRepo, kits, popularItems, Clock.systemUTC());
   }
 
   AlternativeFinder(
@@ -120,11 +131,13 @@ public class AlternativeFinder {
       PlayerGameStatisticRepo statRepo,
       PlayerRoleRepo roleRepo,
       ItemKits kits,
+      PopularItems popularItems,
       Clock clock) {
     this.itemRepo = itemRepo;
     this.statRepo = statRepo;
     this.roleRepo = roleRepo;
     this.kits = kits;
+    this.popularItems = popularItems;
     this.clock = clock;
   }
 
@@ -178,7 +191,17 @@ public class AlternativeFinder {
         Comparator.comparingLong(Alternative::games)
             .reversed()
             .thenComparing(Alternative::itemKey));
-    return new Result(own.games(), List.copyOf(alternatives));
+    boolean enough = alternatives.stream().anyMatch(a -> a.games() >= settings.minGames());
+    List<String> popular =
+        enough
+            ? List.of()
+            : popularItems.near(
+                player.get().getHeroId(),
+                purchase.seconds(),
+                purchase.cost(),
+                settings.costBand(),
+                purchase.ownItems());
+    return new Result(own.games(), List.copyOf(alternatives), popular);
   }
 
   private MatchFacts load(long matchId) {

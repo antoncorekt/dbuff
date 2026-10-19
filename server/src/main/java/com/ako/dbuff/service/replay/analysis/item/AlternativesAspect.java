@@ -23,6 +23,7 @@ import org.springframework.stereotype.Component;
 public class AlternativesAspect implements ItemAspect {
   public static final String NAME = "alternatives";
   public static final String ROW = "ALTERNATIVE";
+  public static final String POPULAR_ROW = "POPULAR";
   public static final String GAMES = "games";
   public static final String WIN_RATE_DELTA = "winRateDelta";
   public static final String LEAD_DELTA = "leadDelta";
@@ -60,8 +61,14 @@ public class AlternativesAspect implements ItemAspect {
                     context.entry().alternatives()),
                 Settings.of(file.alternativeSettings()));
     List<Detail> rows = new ArrayList<>();
-    for (Alternative alternative : result.alternatives().stream().limit(SHOWN).toList()) {
-      rows.add(row(alternative, context.bought()));
+    if (result.popular().isEmpty()) {
+      for (Alternative alternative : result.alternatives().stream().limit(SHOWN).toList()) {
+        rows.add(row(alternative, context.bought()));
+      }
+    } else {
+      for (String key : result.popular()) {
+        rows.add(new Detail(POPULAR_ROW, context.bought(), key, new LinkedHashMap<>()));
+      }
     }
     Map<String, Double> figures = new LinkedHashMap<>();
     figures.put("altOwnGames", (double) result.games());
