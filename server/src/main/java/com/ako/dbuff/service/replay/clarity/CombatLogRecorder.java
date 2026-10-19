@@ -75,7 +75,7 @@ final class CombatLogRecorder {
 
   private static boolean keeps(CombatEventKind kind, CombatLogEntry c) {
     return switch (kind) {
-      case DAMAGE, DEATH -> c.isAttackerHero() || c.isTargetHero();
+      case DAMAGE, DEATH, HEAL -> c.isAttackerHero() || c.isTargetHero();
       case ABILITY, ITEM -> c.isAttackerHero();
       case MODIFIER_ADD, MODIFIER_REMOVE ->
           c.isTargetHero() && ModifierWhitelist.keeps(c.getInflictorName(), c.getStunDuration());
@@ -95,6 +95,7 @@ final class CombatLogRecorder {
       case "DOTA_COMBATLOG_MODIFIER_REMOVE" -> CombatEventKind.MODIFIER_REMOVE;
       case "DOTA_COMBATLOG_TEAM_BUILDING_KILL" -> CombatEventKind.BUILDING_KILL;
       case "DOTA_COMBATLOG_BUYBACK" -> CombatEventKind.BUYBACK;
+      case "DOTA_COMBATLOG_HEAL" -> CombatEventKind.HEAL;
       default -> null;
     };
   }

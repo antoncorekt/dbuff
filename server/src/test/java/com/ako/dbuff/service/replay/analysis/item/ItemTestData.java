@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
 import com.ako.dbuff.dao.model.CreepKillDomain;
+import com.ako.dbuff.dao.model.ReplayPlayerMinuteDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.dao.model.ReplayStateChangeDomain;
 import com.ako.dbuff.service.constant.data.ItemConstant;
@@ -180,6 +181,27 @@ final class ItemTestData {
 
   static ActivitySegment farming(int from, int to) {
     return new ActivitySegment(from, to, Activity.LANE_FARM, Zone.Kind.LANE, null, null);
+  }
+
+  static ReplayPlayerMinuteDomain minute(int minute, long creepGold, long lostToDeath) {
+    return ReplayPlayerMinuteDomain.builder()
+        .gameMinute(minute)
+        .creepKillGold(creepGold)
+        .goldLostToDeath(lostToDeath)
+        .build();
+  }
+
+  static HeroInputs heroWith(HeroInputs base, MatchFacts match) {
+    return new HeroInputs(
+        base.slot(),
+        base.hero(),
+        base.changes(),
+        base.events(),
+        base.track(),
+        base.creepKills(),
+        base.activity(),
+        match,
+        0);
   }
 
   static HeroInputs hero(

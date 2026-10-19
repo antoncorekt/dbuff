@@ -11,5 +11,6 @@ public enum CombatEventKind {
   MODIFIER_ADD,
   MODIFIER_REMOVE,
   BUILDING_KILL,
-  BUYBACK
+  BUYBACK,
+  HEAL
 }

@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
+import com.ako.dbuff.service.replay.report.AlternativesWording;
 import com.ako.dbuff.service.replay.report.ItemWording;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -31,9 +32,10 @@ final class ItemLoopReport {
           + " farming items (Battle Fury, Maelstrom, Mjollnir) compare creep kills, creep gold and"
           + " camps per minute in the minutes before and after the first purchase, and add the"
           + " damage to enemy heroes: the item's own damage (chain lightning, cleave, static"
-          + " charge) and the rise of the hero's damage per minute from its stats, at a price per"
-          + " 1000 damage; the result gives the creeps part and the damage part of the ratio"
-          + " separately, then the total. \"Item details\" lists every use, payback and measured"
+          + " charge) and the rise of the hero's damage per minute from its stats, each valued by"
+          + " its share of the kills it helped (a small price for damage to an enemy who lived);"
+          + " the result gives the farm part and the fights part of the ratio separately, then"
+          + " the total. \"Item details\" lists every use, payback and measured"
           + " stretch. Times are the game clock (m:ss). Write OK or REJECT in the assistant and"
           + " owner columns.";
 
@@ -105,7 +107,9 @@ final class ItemLoopReport {
                   ReviewLoopReport.tableCell(label(d, r)),
                   LoopWording.clock(r.purchaseSeconds()),
                   wording.showsUses() ? String.valueOf(r.count()) : "-",
-                  ReviewLoopReport.tableCell(wording.result(r, d.itemNames())),
+                  ReviewLoopReport.tableCell(
+                      wording.result(r, d.itemNames())
+                          + AlternativesWording.suffix(r, d.itemNames())),
                   ItemWording.ratio(r.ratio())));
     }
     return out;

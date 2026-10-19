@@ -9,9 +9,9 @@ import java.util.OptionalInt;
 
 /**
  * How much health and mana a hero had, from what the replay stores: the track gives percentages
- * every few seconds, the damage entries give his exact health right after a hit. Max health is
- * never stored, so it is estimated where a hit lands next to a track sample (health after the hit
- * divided by the sample's percentage).
+ * every few seconds, the damage entries give his exact health right after a hit. Max health comes
+ * from the track when it holds it; otherwise it is estimated where a hit lands next to a track
+ * sample (health after the hit divided by the sample's percentage).
  */
 final class HeroHealth {
   private static final double SAMPLE_TOLERANCE_SECONDS = 1.0;
@@ -87,8 +87,18 @@ final class HeroHealth {
     return false;
   }
 
-  /** The median estimate within {@code windowSeconds} of the second; empty when there is none. */
+  /**
+   * His max health from the track sample at or before the second when the track holds it, else the
+   * median estimate within {@code windowSeconds}; empty when there is none.
+   */
   OptionalInt maxHealth(double second, double windowSeconds) {
+    int sample = sampleBefore(second);
+    if (sample >= 0
+        && track.getMaxHp() != null
+        && sample < track.getMaxHp().length
+        && track.getMaxHp()[sample] > 0) {
+      return OptionalInt.of(track.getMaxHp()[sample]);
+    }
     double[] near =
         estimates.stream()
             .filter(e -> Math.abs(e.second() - second) <= windowSeconds)

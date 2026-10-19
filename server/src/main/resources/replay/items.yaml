@@ -1,6 +1,12 @@
 # First guesses, tuned in the review loop (docs/replay-item-loop/README.md).
-prices: {}
-alternatives: {}
+prices:
+  killWindowSeconds: 10
+  xpWeight: 1
+  pokePrice: 0.02
+  disableShare: 0.25
+  trendMinutes: 8
+  respawnSeconds: 30
+alternatives: { altCostBand: 0.3, altTimeBand: 300, altMinGames: 5 }
 categories:
   farming: Farming
   sustain: Sustain and mana
@@ -13,7 +19,6 @@ entries:
       restorePerCharge: 15
       goldPerHp: 0.3
       goldPerMana: 0.3
-      saveGold: 300
       laningEndSeconds: 600
       lowHpFraction: 0.35
       lowHpAbsolute: 300
@@ -36,11 +41,49 @@ entries:
   - key: farming_items
     category: farming
     items: [bfury, maelstrom, mjollnir]
-    aspects: [farm-rate, item-damage, stat-uplift]
+    aspects: [farm-rate, item-damage, stat-uplift, alternatives]
     parameters:
       windowMinutes: 5
       minBeforeSeconds: 120
       minAfterSeconds: 60
       campGapSeconds: 30
-      damagePrice: 100
       damageWindowMinutes: 5
+  - key: radiance
+    category: farming
+    items: [radiance]
+    aspects: [farm-rate, item-damage, alternatives, saving-cost]
+    alternatives: [maelstrom, bfury, manta]
+    parameters:
+      windowMinutes: 5
+      minBeforeSeconds: 120
+      minAfterSeconds: 60
+      campGapSeconds: 30
+      damageWindowMinutes: 5
+      savingThreshold: 0.4
+      smallPurchase: 500
+  - key: octarine_core
+    category: farming
+    items: [octarine_core]
+    aspects: [cooldown, alternatives]
+    parameters:
+      damageSeconds: 3
+      toleranceSeconds: 0.5
+  - key: bottle
+    category: sustain
+    items: [bottle]
+    aspects: [bottle-runes, charge-restore]
+    parameters:
+      restoreFromConstants: 1
+      goldPerHp: 0.3
+      goldPerMana: 0.3
+      laningEndSeconds: 600
+      lowHpFraction: 0.35
+      lowHpAbsolute: 300
+      heavyDamageFraction: 0.3
+      heavyDamageAbsolute: 300
+      damageBeforeSeconds: 3
+      damageAfterSeconds: 3
+      surviveSeconds: 10
+      hpLookbackSeconds: 3
+      maxHpWindowSeconds: 120
+      healWindowSeconds: 4

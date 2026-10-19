@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.analysis.item;
 import com.ako.dbuff.dao.model.CreepKillDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.dao.model.ReplayStateChangeDomain;
+import com.ako.dbuff.dao.model.RunePickupDomain;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.StateChangeKind;
@@ -20,6 +21,9 @@ import java.util.OptionalInt;
  * @param events the combat log entries of or about the hero (item uses by him, damage to him, his
  *     deaths, his gold and experience), in log order
  * @param track null when the hero has none
+ * @param match what the worth model reads across heroes
+ * @param matchId the match the facts are of
+ * @param runes the runes the hero picked up
  */
 public record HeroInputs(
     long slot,
@@ -28,7 +32,34 @@ public record HeroInputs(
     List<CombatEvent> events,
     ReplayPlayerTrackDomain track,
     List<CreepKillDomain> creepKills,
-    List<ActivitySegment> activity) {
+    List<ActivitySegment> activity,
+    MatchFacts match,
+    long matchId,
+    List<RunePickupDomain> runes) {
+
+  public HeroInputs(
+      long slot,
+      String hero,
+      List<ReplayStateChangeDomain> changes,
+      List<CombatEvent> events,
+      ReplayPlayerTrackDomain track,
+      List<CreepKillDomain> creepKills,
+      List<ActivitySegment> activity,
+      MatchFacts match,
+      long matchId) {
+    this(slot, hero, changes, events, track, creepKills, activity, match, matchId, List.of());
+  }
+
+  public HeroInputs(
+      long slot,
+      String hero,
+      List<ReplayStateChangeDomain> changes,
+      List<CombatEvent> events,
+      ReplayPlayerTrackDomain track,
+      List<CreepKillDomain> creepKills,
+      List<ActivitySegment> activity) {
+    this(slot, hero, changes, events, track, creepKills, activity, MatchFacts.EMPTY, 0, List.of());
+  }
 
   public static final String ITEM_PREFIX = "item_";
 
@@ -57,6 +88,24 @@ public record HeroInputs(
         .filter(c -> names.contains(c.getName()))
         .mapToDouble(ReplayStateChangeDomain::getGameSeconds)
         .findFirst();
+  }
+
+  /** Whether the hero held at least one of the items at the second. */
+  public boolean holds(Collection<String> names, double second) {
+    int held = 0;
+    for (ReplayStateChangeDomain c : changes) {
+      if (c.getGameSeconds() > second) {
+        break;
+      }
+      if (names.contains(c.getName())) {
+        if (StateChangeKind.ITEM_ADDED.name().equals(c.getKind())) {
+          held++;
+        } else if (StateChangeKind.ITEM_REMOVED.name().equals(c.getKind())) {
+          held--;
+        }
+      }
+    }
+    return held > 0;
   }
 
   /** The second the hero last let go of every one of the items, or the game end if he kept one. */
@@ -127,6 +176,28 @@ public record HeroInputs(
   /** Damage the hero dealt to enemy heroes in {@code (from, to]}, from the combat log. */
   public double heroDamage(double from, double to) {
     return dealt(from, to, null);
+  }
+
+  /** Damage the hero dealt to enemy heroes in each game minute, from 0 to the last one. */
+  public double[] heroDamagePerMinute() {
+    int last =
+        events.stream()
+            .filter(e -> e.kind() == CombatEventKind.DAMAGE && hero.equals(e.attacker()))
+            .filter(e -> e.targetIsRealHero() && !hero.equals(e.target()))
+            .mapToInt(e -> MinuteSeries.minuteOf(e.gameSecond()))
+            .max()
+            .orElse(-1);
+    double[] series = new double[Math.max(0, last + 1)];
+    for (CombatEvent e : events) {
+      if (e.kind() == CombatEventKind.DAMAGE
+          && hero.equals(e.attacker())
+          && e.targetIsRealHero()
+          && !hero.equals(e.target())
+          && e.gameSecond() >= 0) {
+        series[MinuteSeries.minuteOf(e.gameSecond())] += e.value();
+      }
+    }
+    return series;
   }
 
   /** The part of it that came from the named items (their procs and cleave). */

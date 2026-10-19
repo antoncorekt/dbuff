@@ -11,6 +11,10 @@ public final class PlayerSlots {
     return playerIndex < TEAM_SIZE ? playerIndex : DIRE_FIRST_SLOT + playerIndex - TEAM_SIZE;
   }
 
+  public static boolean radiant(long slot) {
+    return slot < DIRE_FIRST_SLOT;
+  }
+
   public static int index(long slot) {
     return slot >= DIRE_FIRST_SLOT ? (int) (slot - DIRE_FIRST_SLOT) + TEAM_SIZE : (int) slot;
   }

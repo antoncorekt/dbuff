@@ -21,8 +21,15 @@ import org.springframework.stereotype.Component;
 public class FarmRateAspect implements ItemAspect {
   public static final String NAME = "farm-rate";
 
-  private static final Set<String> PARAMETERS =
-      Set.of("windowMinutes", "minBeforeSeconds", "minAfterSeconds", "campGapSeconds");
+  private static final Set<String> PARAMETERS = parameters();
+
+  private static Set<String> parameters() {
+    Set<String> names =
+        new java.util.HashSet<>(
+            Set.of("windowMinutes", "minBeforeSeconds", "minAfterSeconds", "campGapSeconds"));
+    names.addAll(WorthPrices.NAMES);
+    return Set.copyOf(names);
+  }
 
   @Override
   public String name() {
@@ -42,11 +49,13 @@ public class FarmRateAspect implements ItemAspect {
     double gain = 0;
     Double perMinute = null;
     if (windows.comparable()) {
-      double net = windows.after().goldPerMinute() - windows.before().goldPerMinute();
+      double expected = expectedGoldPerMinute(context, windows);
+      double net = windows.after().goldPerMinute() - expected;
       gain = net * windows.ownedMinutes();
       perMinute = net;
       figures.put("netGoldPerMinute", net);
       figures.put("creepGain", gain);
+      figures.put(DamageAspects.GAIN + NAME, gain);
     }
     figures.put("minutesOwned", windows.ownedMinutes());
     return new AspectPart(
@@ -58,6 +67,35 @@ public class FarmRateAspect implements ItemAspect {
         windows.after().kills().size(),
         null,
         perMinute);
+  }
+
+  /**
+   * What the hero's own trend of creep gold before the purchase expects over the after window; the
+   * before window's rate when the trend has too few minutes behind it.
+   */
+  private static double expectedGoldPerMinute(AspectContext context, FarmWindows windows) {
+    int from = MinuteSeries.minuteOf(windows.bought());
+    int to =
+        Math.max(from + 1, (int) Math.ceil(windows.after().to() / FarmWindows.SECONDS_PER_MINUTE));
+    TrendBaseline trend =
+        TrendBaseline.fit(
+            goldPerMinute(context.hero().creepKills(), from),
+            from,
+            (int) WorthPrices.of(context).trendMinutes());
+    return trend.trusted() ? trend.mean(from, to) : windows.before().goldPerMinute();
+  }
+
+  private static double[] goldPerMinute(List<CreepKillDomain> kills, int minutes) {
+    double[] series = new double[Math.max(minutes, 0)];
+    for (CreepKillDomain k : kills) {
+      if (k.getSeconds() != null && !Boolean.TRUE.equals(k.getDenied()) && k.getSeconds() >= 0) {
+        int minute = MinuteSeries.minuteOf(k.getSeconds());
+        if (minute < series.length) {
+          series[minute] += k.getGold() == null ? 0 : k.getGold();
+        }
+      }
+    }
+    return series;
   }
 
   private static Detail detail(Window w, double campGapSeconds) {

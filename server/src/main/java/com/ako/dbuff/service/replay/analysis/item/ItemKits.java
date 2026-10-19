@@ -24,4 +24,9 @@ public interface ItemKits {
   default OptionalLong cost(String key) {
     return item(key).map(ItemConstant::getCost).map(OptionalLong::of).orElse(OptionalLong.empty());
   }
+
+  /** The constants key of the item with this id; empty when the constants do not know it. */
+  default Optional<String> key(long id) {
+    return Optional.empty();
+  }
 }
