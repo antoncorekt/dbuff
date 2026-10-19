@@ -8,8 +8,9 @@ import java.util.Set;
  */
 public final class ModifierWhitelist {
   /*
-   * Unverified (not present in the fixtures): modifier_item_aeon_disk_buff, modifier_item_sphere,
-   * modifier_item_sphere_target, modifier_truesight, modifier_item_gem_of_true_sight.
+   * modifier_item_sphere_target is verified (Linken's Sphere, match 9044252857). Not yet seen in a
+   * fixture: modifier_item_sphere, modifier_item_aeon_disk_buff, modifier_truesight,
+   * modifier_item_gem_of_true_sight.
    */
   private static final Set<String> NAMES =
       Set.of(

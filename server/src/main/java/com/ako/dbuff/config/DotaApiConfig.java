@@ -50,19 +50,7 @@ public class DotaApiConfig {
         .getMapper()
         .addMixIn(GetConstantsByResource200Response.class, ConstantsResponseMixin.class);
 
-    // Only add API key filter if API key is provided
-    if (StringUtils.hasLength(dotaApiConfigurationProperties.getApiKey())) {
-      apiClient
-          .getHttpClient()
-          .register(
-              (ClientRequestFilter)
-                  requestContext -> {
-                    URI uri = requestContext.getUri();
-
-                    requestContext.setUri(
-                        buildUriWithApiKey(uri, dotaApiConfigurationProperties.getApiKey()));
-                  });
-    }
+    registerApiKey(apiClient, dotaApiConfigurationProperties.getApiKey());
 
     return apiClient;
   }
@@ -70,7 +58,19 @@ public class DotaApiConfig {
   @JsonDeserialize(using = ConstantsResponseDeserializer.class)
   private interface ConstantsResponseMixin {}
 
-  private URI buildUriWithApiKey(URI uri, String apiKey) {
+  /** Appends the key to every request of the client; nothing is registered for a blank key. */
+  public static void registerApiKey(ApiClient apiClient, String apiKey) {
+    if (StringUtils.hasLength(apiKey)) {
+      apiClient
+          .getHttpClient()
+          .register(
+              (ClientRequestFilter)
+                  requestContext ->
+                      requestContext.setUri(buildUriWithApiKey(requestContext.getUri(), apiKey)));
+    }
+  }
+
+  private static URI buildUriWithApiKey(URI uri, String apiKey) {
     return URI.create(uri.toString() + "?api_key=" + apiKey);
   }
 

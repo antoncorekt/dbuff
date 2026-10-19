@@ -179,6 +179,18 @@ class ItemsSectionTest {
   }
 
   @Test
+  void theStoredCategoryWinsOverTheCatalogAndRowsWithoutOneFallBack() {
+    add(stick(0, 200, 1.5, 2)).setCategory("farming");
+    add(midas(2, 600, 0.9));
+
+    assertThat(section.lines(filtered(List.of("farming"))))
+        .anyMatch(line -> line.contains("Magic Stick"))
+        .noneMatch(line -> line.contains("Hand Of Midas"));
+    assertThat(section.lines(filtered(List.of("sustain"))))
+        .noneMatch(line -> line.contains("Magic Stick"));
+  }
+
+  @Test
   void anEntryKeyFilterKeepsOnlyThatEntry() {
     add(midas(2, 600, 0.9));
     add(farming(1, 1500));

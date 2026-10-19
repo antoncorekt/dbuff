@@ -25,31 +25,35 @@ public class ItemEfficiencyConfig {
     this.itemConstantService = itemConstantService;
   }
 
+  /** Cached only when every group was built; otherwise the next call tries again. */
   public List<ItemGroup> getGroups() {
     List<ItemGroup> built = groups;
-    if (built == null) {
-      synchronized (this) {
-        if (groups == null) {
-          groups = build();
-        }
-        built = groups;
-      }
+    if (built != null) {
+      return built;
     }
-    return built;
-  }
-
-  private List<ItemGroup> build() {
-    Map<String, ItemConstant> constants = itemConstantService.getConstantMap();
-    List<ItemGroup> result = new ArrayList<>();
-    for (ItemEfficiencyEntry entry : file.entries()) {
-      for (List<String> keys : entry.winStats()) {
-        ItemGroup group = group(entry.key(), keys, constants);
-        if (group != null) {
-          result.add(group);
+    synchronized (this) {
+      if (groups != null) {
+        return groups;
+      }
+      Map<String, ItemConstant> constants = itemConstantService.getConstantMap();
+      List<ItemGroup> result = new ArrayList<>();
+      boolean complete = constants != null && !constants.isEmpty();
+      for (ItemEfficiencyEntry entry : file.entries()) {
+        for (List<String> keys : entry.winStats()) {
+          ItemGroup group = complete ? group(entry.key(), keys, constants) : null;
+          if (group == null) {
+            complete = false;
+          } else {
+            result.add(group);
+          }
         }
       }
+      List<ItemGroup> copy = List.copyOf(result);
+      if (complete) {
+        groups = copy;
+      }
+      return copy;
     }
-    return List.copyOf(result);
   }
 
   private static ItemGroup group(

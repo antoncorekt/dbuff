@@ -8,11 +8,14 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -42,6 +45,8 @@ public class AlternativeFinder {
    * @param minGames the games both sides need before the comparison is shown
    */
   public record Settings(double costBand, int timeBand, int minGames) {
+    public static final Set<String> NAMES = Set.of("altCostBand", "altTimeBand", "altMinGames");
+
     public static Settings of(Map<String, Double> values) {
       return new Settings(
           values.getOrDefault("altCostBand", DEFAULT_COST_BAND),
@@ -107,8 +112,8 @@ public class AlternativeFinder {
       Map<Long, PlayerMatchStatisticDomain> players, Map<Long, Integer> roles) {}
 
   private static <K, V> Map<K, V> lru() {
-    return java.util.Collections.synchronizedMap(
-        new java.util.LinkedHashMap<>(16, 0.75f, true) {
+    return Collections.synchronizedMap(
+        new LinkedHashMap<>(16, 0.75f, true) {
           @Override
           protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
             return size() > CACHED;
@@ -147,7 +152,7 @@ public class AlternativeFinder {
         Optional.ofNullable(facts.players().get(purchase.slot()));
     OptionalLong subjectId =
         kits.item(purchase.itemKey()).map(i -> i.getId()).stream()
-            .filter(java.util.Objects::nonNull)
+            .filter(Objects::nonNull)
             .mapToLong(Long::longValue)
             .findFirst();
     if (player.isEmpty() || player.get().getHeroId() == null || subjectId.isEmpty()) {

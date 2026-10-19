@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.analysis.item;
 import com.ako.dbuff.dotapi.invoker.ApiClient;
 import com.ako.dbuff.dotapi.invoker.ApiResponse;
 import com.ako.dbuff.service.replay.analysis.item.OpenDotaItemPopularity.Phase;
+import com.google.common.util.concurrent.RateLimiter;
 import jakarta.ws.rs.core.GenericType;
 import java.util.List;
 import java.util.Map;
@@ -15,11 +16,13 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class OpenDotaItemPopularityTest {
   private final ApiClient client = mock(ApiClient.class);
-  private final OpenDotaItemPopularity source = new OpenDotaItemPopularity(client);
+  private final RateLimiter limiter = mock(RateLimiter.class);
+  private final OpenDotaItemPopularity source = new OpenDotaItemPopularity(client, limiter);
 
   private void respond(Map<String, Map<String, Number>> body) throws Exception {
     when(client.<Map<String, Map<String, Number>>>invokeAPI(
@@ -52,6 +55,15 @@ class OpenDotaItemPopularityTest {
     assertThat(phases.get(Phase.LATE)).containsExactly(2L, 3L, 1L);
     assertThat(phases.get(Phase.EARLY)).isEmpty();
     assertThat(phases.get(Phase.MID)).isEmpty();
+  }
+
+  @Test
+  void aFetchTakesAPermitFromTheSharedLimiterFirst() throws Exception {
+    respond(Map.of());
+
+    source.fetch(74);
+
+    verify(limiter).acquire();
   }
 
   @Test

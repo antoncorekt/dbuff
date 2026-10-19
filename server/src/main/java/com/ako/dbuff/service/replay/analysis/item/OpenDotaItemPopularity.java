@@ -3,16 +3,15 @@ package com.ako.dbuff.service.replay.analysis.item;
 import com.ako.dbuff.config.DotaApiConfig;
 import com.ako.dbuff.dotapi.invoker.ApiClient;
 import com.ako.dbuff.dotapi.invoker.ApiException;
-import jakarta.ws.rs.client.ClientRequestFilter;
+import com.google.common.util.concurrent.RateLimiter;
 import jakarta.ws.rs.core.GenericType;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 /**
  * OpenDota {@code /heroes/{hero_id}/itemPopularity}. The generated response model keeps one number
@@ -24,14 +23,18 @@ public class OpenDotaItemPopularity {
   private static final int READ_TIMEOUT_MS = 5_000;
 
   private final ApiClient apiClient;
+  private final RateLimiter rateLimiter;
 
   @Autowired
-  public OpenDotaItemPopularity(DotaApiConfig.DotaApiConfigurationProperties properties) {
-    this(withTimeouts(properties));
+  public OpenDotaItemPopularity(
+      DotaApiConfig.DotaApiConfigurationProperties properties,
+      @Qualifier("dotaApiRateLimiter") RateLimiter rateLimiter) {
+    this(withTimeouts(properties), rateLimiter);
   }
 
-  OpenDotaItemPopularity(ApiClient apiClient) {
+  OpenDotaItemPopularity(ApiClient apiClient, RateLimiter rateLimiter) {
     this.apiClient = apiClient;
+    this.rateLimiter = rateLimiter;
   }
 
   /** A client of its own, so the timeouts do not change the other OpenDota callers. */
@@ -39,20 +42,13 @@ public class OpenDotaItemPopularity {
     ApiClient client = new ApiClient();
     client.setConnectTimeout(CONNECT_TIMEOUT_MS);
     client.setReadTimeout(READ_TIMEOUT_MS);
-    if (StringUtils.hasLength(properties.getApiKey())) {
-      client
-          .getHttpClient()
-          .register(
-              (ClientRequestFilter)
-                  context ->
-                      context.setUri(
-                          URI.create(context.getUri() + "?api_key=" + properties.getApiKey())));
-    }
+    DotaApiConfig.registerApiKey(client, properties.getApiKey());
     return client;
   }
 
   /** The item ids of each phase, most bought first. */
   public Map<Phase, List<Long>> fetch(long heroId) throws ApiException {
+    rateLimiter.acquire();
     Map<String, Map<String, Number>> response =
         apiClient
             .invokeAPI(

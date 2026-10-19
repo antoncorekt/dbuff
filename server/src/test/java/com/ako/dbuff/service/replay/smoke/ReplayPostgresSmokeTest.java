@@ -148,6 +148,13 @@ import static org.assertj.core.api.Assertions.within;
 class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
 
   private static final String[] MATCHES = {"9040889566", "9040892342"};
+
+  /**
+   * The heading, then a category heading and at most {@code max-item-lines} rows for each of four
+   * categories.
+   */
+  private static final int ITEMS_SECTION_MAX_LINES = 1 + 4 * (1 + 4);
+
   private static final String GRAPH_MATCH = "9044252857";
   private static final String[] INCOME_MATCHES = {GRAPH_MATCH, "9044256304"};
   private static final String[] ABILITY_DRAFT_MATCHES = {"9038725154", "9037038717"};
@@ -225,6 +232,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Commit
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   void aRealReplayGoesThroughEveryStageAndLandsInPostgres() throws Exception {
+    long doneBefore = doneRuns();
     for (String id : MATCHES) {
       MatchDomain match = seedMatch(id);
 
@@ -323,7 +331,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     ReplayStatus again = runService.process(seedMatch(MATCHES[0]));
     assertThat(again).as("a second run replaces the first").isEqualTo(ReplayStatus.DONE);
     assertThat(deathRepo.findByMatchId(Long.parseLong(MATCHES[0]))).hasSizeGreaterThan(40);
-    assertReplayMeters();
+    assertReplayMeters(doneBefore);
     dataService.deleteByMatchId(Long.parseLong(MATCHES[0]));
     assertThat(deathRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
     assertThat(reasonRepo.findByMatchId(Long.parseLong(MATCHES[0]))).isEmpty();
@@ -484,10 +492,10 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       List<String> lines = draftBoardSection.lines(input);
 
       assertThat(lines).as("%s: board", id).isNotEmpty();
-      assertThat(lines.stream().filter(l -> l.matches(".*(: |, )hero .*")))
+      assertThat(lines.stream().filter(l -> l.matches("\\d+\\. .*, picked by .*")))
           .as("%s: picks", id)
           .hasSizeGreaterThanOrEqualTo(8);
-      assertThat(lines).contains("**Picks in draft order**");
+      assertThat(lines).contains("**Hero picks**");
       out.add("## " + id);
       out.addAll(lines);
     }
@@ -566,11 +574,19 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     }
   }
 
-  private void assertReplayMeters() {
-    Timer timer = meterRegistry.get("dbuff.replay.run.duration").tag("status", "DONE").timer();
+  private long doneRuns() {
+    return meterRegistry.find("dbuff.replay.run.duration").tag("status", "DONE").timers().stream()
+        .mapToLong(Timer::count)
+        .sum();
+  }
+
+  /**
+   * The registry is shared by the test classes of the JVM, so only this test's runs are counted.
+   */
+  private void assertReplayMeters(long doneBefore) {
     double done = meterRegistry.get("dbuff.replay.runs").tag("status", "DONE").gauge().value();
-    assertThat(timer.count()).isEqualTo(MATCHES.length + 1);
-    assertThat(done).isEqualTo(MATCHES.length);
+    assertThat(doneRuns() - doneBefore).isEqualTo(MATCHES.length + 1);
+    assertThat(done).isGreaterThanOrEqualTo(MATCHES.length);
   }
 
   private void saveSwingKeyItems(String id, long matchId) {
@@ -849,7 +865,14 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                 Map.entry("ward_observer", "ward_observer"),
                 Map.entry("ward_sentry", "ward_sentry"),
                 Map.entry("dust", "dust"),
-                Map.entry("gem", "gem"))
+                Map.entry("gem", "gem"),
+                Map.entry("octarine_core", "octarine_core"),
+                Map.entry("soul_ring", "soul_ring"),
+                Map.entry("glimmer_cape", "glimmer_cape"),
+                Map.entry("force_staff", "force_staff"),
+                Map.entry("lotus_orb", "lotus_orb"),
+                Map.entry("cyclone", "euls_scepter"),
+                Map.entry("solar_crest", "solar_crest"))
             .entrySet()
             .stream()
             .filter(e -> c.getName().equals("item_" + e.getKey()))
@@ -937,6 +960,12 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                 assertThat(d.figures().get("savingGoldLost")).isGreaterThanOrEqualTo(0.0);
                 assertThat(r.figures().get("gain.saving-cost")).isLessThanOrEqualTo(0.0);
               });
+    }
+    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("cooldown")).toList()) {
+      assertThat(r.figures().get("extraCasts"))
+          .as("%s slot %d: extra casts are casts", id, r.slot())
+          .isLessThanOrEqualTo(r.figures().get("casts"));
+      assertThat(r.gain()).as("%s slot %d: cooldown gain", id, r.slot()).isGreaterThanOrEqualTo(0);
     }
     for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("bottle-runes")).toList()) {
       assertThat(r.figures().get("bottled"))
@@ -1076,7 +1105,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(endGameRepo.findByMatchId(matchId)).as("%s: end game row", id).hasSize(1);
     System.out.println("END GAME " + id + " " + endGameRepo.findByMatchId(matchId).getFirst());
     saveSection("endgame", endGameSection.lines(input), id, 2);
-    saveSection("items", itemsSection.lines(input), id, 5);
+    saveSection("items", itemsSection.lines(input), id, ITEMS_SECTION_MAX_LINES);
     saveSection("outliers", outliersSection.lines(input), id, 5);
     saveSection("opening", openingSection.lines(input), id, 4);
     saveSection("vision", visionSection.lines(input), id, 7);

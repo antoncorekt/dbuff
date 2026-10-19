@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.smoke;
 
+import com.ako.dbuff.config.DotaApiConfig;
 import com.ako.dbuff.dao.model.AbilityDomain;
 import com.ako.dbuff.dao.model.DeathEventDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
@@ -38,6 +39,7 @@ import com.ako.dbuff.service.replay.report.ConstantAbilityLabels;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.util.concurrent.RateLimiter;
 import com.sun.net.httpserver.HttpServer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
@@ -72,8 +74,24 @@ public abstract class ReplayPipelineFixture {
   private static HttpServer server;
 
   @DynamicPropertySource
-  static void replayServer(DynamicPropertyRegistry registry) throws IOException {
-    server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+  static synchronized void replayServer(DynamicPropertyRegistry registry) throws IOException {
+    if (server == null) {
+      server = startServer();
+    }
+    registry.add(
+        "replay.processing.url-template",
+        () -> "http://localhost:" + server.getAddress().getPort() + "/replay%d/570/%d_%d.dem.bz2");
+    registry.add(
+        "replay.processing.temp-dir", () -> System.getProperty("java.io.tmpdir") + "/smoke");
+  }
+
+  /**
+   * One server for the whole JVM: Spring caches the context of a test class together with this
+   * server's port, so a server stopped after one class leaves the next class downloading from a
+   * dead port.
+   */
+  private static HttpServer startServer() throws IOException {
+    HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
     server.createContext(
         "/",
         exchange -> {
@@ -85,16 +103,11 @@ public abstract class ReplayPipelineFixture {
           exchange.close();
         });
     server.start();
-    registry.add(
-        "replay.processing.url-template",
-        () -> "http://localhost:" + server.getAddress().getPort() + "/replay%d/570/%d_%d.dem.bz2");
-    registry.add(
-        "replay.processing.temp-dir", () -> System.getProperty("java.io.tmpdir") + "/smoke");
+    return server;
   }
 
   @AfterAll
   static void stop() throws IOException {
-    server.stop(0);
     Path dir = Path.of(System.getProperty("java.io.tmpdir"), "smoke");
     if (Files.isDirectory(dir)) {
       try (var files = Files.list(dir)) {
@@ -172,9 +185,39 @@ public abstract class ReplayPipelineFixture {
       ObjectMapper lenient =
           new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
       JsonNode items = constants("constants-items.json");
-      return key ->
-          Optional.ofNullable(items == null ? null : items.get(key))
+      Map<Long, String> keys = new HashMap<>();
+      if (items != null) {
+        items
+            .fields()
+            .forEachRemaining(
+                e -> {
+                  if (e.getValue().hasNonNull("id")) {
+                    keys.put(e.getValue().get("id").asLong(), e.getKey());
+                  }
+                });
+      }
+      return new ItemKits() {
+        @Override
+        public Optional<ItemConstant> item(String key) {
+          return Optional.ofNullable(items == null ? null : items.get(key))
               .map(n -> lenient.convertValue(n, ItemConstant.class));
+        }
+
+        @Override
+        public Optional<String> key(long id) {
+          return Optional.ofNullable(keys.get(id));
+        }
+      };
+    }
+
+    @Bean
+    DotaApiConfig.DotaApiConfigurationProperties dotaApiConfigurationProperties() {
+      return new DotaApiConfig.DotaApiConfigurationProperties();
+    }
+
+    @Bean
+    RateLimiter dotaApiRateLimiter() {
+      return RateLimiter.create(1_000);
     }
 
     /** The real label logic over the fixture's hero and ability constants. */
