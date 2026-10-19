@@ -5,14 +5,12 @@ import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /** Items cast on a hero: whom the casts saved and the kills they set up. */
 @Component
 public class TargetUseKindWording implements ItemKindWording {
-  private static final String HERO_PREFIX = "npc_dota_hero_";
   private static final String HIMSELF = "himself";
 
   @Override
@@ -54,20 +52,9 @@ public class TargetUseKindWording implements ItemKindWording {
             worth.isEmpty() ? "" : ", " + worth);
   }
 
-  /** The hero's name as the game writes it, in words. */
+  /** The hero's name in words; {@code himself} for the caster (no target). */
   public static String hero(String name) {
-    if (name == null) {
-      return HIMSELF;
-    }
-    String bare = name.startsWith(HERO_PREFIX) ? name.substring(HERO_PREFIX.length()) : name;
-    StringBuilder words = new StringBuilder();
-    for (String part : bare.split("_")) {
-      if (!part.isEmpty()) {
-        words.append(words.isEmpty() ? "" : " ");
-        words.append(part.substring(0, 1).toUpperCase(Locale.ROOT)).append(part.substring(1));
-      }
-    }
-    return words.toString();
+    return name == null ? HIMSELF : Prettify.unit(name);
   }
 
   private static String saved(ItemEfficiency row) {

@@ -33,6 +33,7 @@ record TargetUses(List<Cast> casts) {
 
   private static final String CAST = "CAST";
   private static final double EFFECT_SECONDS = 1.0;
+  private static final double EPSILON_SECONDS = 0.1;
 
   enum Who {
     SELF,
@@ -74,6 +75,7 @@ record TargetUses(List<Cast> casts) {
     KillShare killShare = new KillShare(hero, prices);
     DeathCost ownCost = new DeathCost(hero, prices);
     List<Cast> casts = new ArrayList<>();
+    Set<KillShare.Death> credited = new HashSet<>();
     for (CombatEvent use : hero.uses(context.names())) {
       String target = use.target() == null || use.target().isBlank() ? hero.hero() : use.target();
       Who who = who(hero, target);
@@ -98,12 +100,30 @@ record TargetUses(List<Cast> casts) {
                 cost != null && cost.estimated(),
                 0));
       } else {
-        double setUp =
-            effective && who == Who.ENEMY ? killShare.disableValue(target, use.gameSecond()) : 0;
+        double setUp = 0;
+        if (effective && who == Who.ENEMY) {
+          setUp = firstCastValue(killShare, prices, credited, target, use.gameSecond());
+        }
         casts.add(new Cast(use.gameSecond(), shown, who, effective, null, 0, false, setUp));
       }
     }
     return new TargetUses(List.copyOf(casts));
+  }
+
+  /** The share of the kill, for the first cast before each death only. */
+  private static double firstCastValue(
+      KillShare killShare,
+      WorthPrices prices,
+      Set<KillShare.Death> credited,
+      String victim,
+      double second) {
+    return killShare.deaths().stream()
+        .filter(d -> d.victim().equals(victim))
+        .filter(d -> d.second() >= second && d.second() - second <= prices.killWindowSeconds())
+        .findFirst()
+        .filter(credited::add)
+        .map(d -> killShare.disableValue(victim, second))
+        .orElse(0.0);
   }
 
   AspectPart main() {
@@ -191,7 +211,9 @@ record TargetUses(List<Cast> casts) {
                     e.kind() == CombatEventKind.MODIFIER_ADD
                         && modifier.equals(e.inflictor())
                         && target.equals(e.target())
-                        && Math.abs(e.gameSecond() - use.gameSecond()) <= EFFECT_SECONDS);
+                        && (e.attacker().isEmpty() || e.attacker().equals(hero.hero()))
+                        && e.gameSecond() >= use.gameSecond() - EPSILON_SECONDS
+                        && e.gameSecond() <= use.gameSecond() + EFFECT_SECONDS);
   }
 
   /** An ally as the judges read a hero: his damage and deaths from the whole match, his track. */

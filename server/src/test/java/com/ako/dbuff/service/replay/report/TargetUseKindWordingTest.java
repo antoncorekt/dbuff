@@ -63,5 +63,6 @@ class TargetUseKindWordingTest {
     assertThat(TargetUseKindWording.hero("npc_dota_hero_crystal_maiden"))
         .isEqualTo("Crystal Maiden");
     assertThat(TargetUseKindWording.hero(null)).isEqualTo("himself");
+    assertThat(TargetUseKindWording.hero("npc_dota_hero_queenofpain")).isEqualTo("Queenofpain");
   }
 }

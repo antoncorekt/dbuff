@@ -251,4 +251,52 @@ class TargetUsesTest {
     assertThat(result.figures()).containsEntry("effective", 0.0);
     assertThat(result.gain()).isZero();
   }
+
+  @Test
+  void aGlimmerModifierBeforeTheCastOrFromAnotherCasterIsNotItsEffect() {
+    CombatEvent early = modifier("modifier_item_glimmer_cape_fade", ALLY, 119.5);
+    CombatEvent foreign =
+        new CombatEvent(
+            CombatEventKind.MODIFIER_ADD,
+            121.2,
+            ENEMY,
+            ALLY,
+            "modifier_item_glimmer_cape_fade",
+            CombatEvent.TARGET_HERO,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+
+    ItemEfficiency result =
+        evaluate(
+            GLIMMER_ENTRY,
+            bought(GLIMMER),
+            List.of(use(121.0, GLIMMER, ALLY)),
+            ItemTestData.track(150),
+            match(List.of(early, foreign), Map.of(ALLY, lowAt120())));
+
+    assertThat(result.figures()).containsEntry("effective", 0.0);
+  }
+
+  @Test
+  void onlyTheFirstCastBeforeADeathEarnsTheControlShare() {
+    List<CombatEvent> all =
+        List.of(
+            new CombatEvent(CombatEventKind.DEATH, 135, ME, ENEMY, "", HEROES, 0, 0, 0, 0, 0, 0, 0),
+            paid(CombatEventKind.GOLD, 135, 400));
+
+    ItemEfficiency result =
+        evaluate(
+            FORCE_ENTRY,
+            bought(FORCE),
+            List.of(use(129.0, FORCE, ENEMY), use(131.0, FORCE, ENEMY)),
+            ItemTestData.track(150),
+            match(all, Map.of()));
+
+    assertThat(result.figures()).containsEntry("setUps", 1.0).containsEntry("controlGain", 100.0);
+  }
 }
