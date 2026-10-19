@@ -65,6 +65,9 @@ public final class ItemWording {
       case "NO_GOLD_TRACK" -> "the track has no gold, so the cost of saving up is not counted";
       case "NO_MINUTE_GOLD" ->
           "the match has no gold per minute for a death while saving, so its cost counts as 0";
+      case "NEVER_PLACED" -> "he bought it and never placed one";
+      case "DUST_UNUSED" -> "he bought dust and never used it";
+      case "DEWARDED_FAST" -> "an observer of his was destroyed within a minute";
       case "COST_UNKNOWN" -> "the item constants give no cost for it, so there is no ratio";
       case "BONUS_GOLD_UNKNOWN" -> "the constants give no bonus gold, so no gold is counted";
       case "USE_WITHOUT_GOLD" -> "a use had no gold entry in the log";

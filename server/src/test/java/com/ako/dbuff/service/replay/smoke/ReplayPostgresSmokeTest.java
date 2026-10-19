@@ -833,14 +833,18 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     for (ReplayStateChangeDomain c : stateRepo.findByMatchIdOrderByGameSeconds(matchId)) {
       changes.computeIfAbsent(c.getPlayerSlot(), k -> new ArrayList<>()).add(c);
       if (StateChangeKind.ITEM_ADDED.name().equals(c.getKind())) {
-        Map.of(
-                "magic_stick", "magic_stick",
-                "magic_wand", "magic_stick",
-                "hand_of_midas", "hand_of_midas",
-                "bfury", "farming_items",
-                "maelstrom", "farming_items",
-                "mjollnir", "farming_items",
-                "radiance", "radiance")
+        Map.ofEntries(
+                Map.entry("magic_stick", "magic_stick"),
+                Map.entry("magic_wand", "magic_stick"),
+                Map.entry("hand_of_midas", "hand_of_midas"),
+                Map.entry("bfury", "farming_items"),
+                Map.entry("maelstrom", "farming_items"),
+                Map.entry("mjollnir", "farming_items"),
+                Map.entry("radiance", "radiance"),
+                Map.entry("ward_observer", "ward_observer"),
+                Map.entry("ward_sentry", "ward_sentry"),
+                Map.entry("dust", "dust"),
+                Map.entry("gem", "gem"))
             .entrySet()
             .stream()
             .filter(e -> c.getName().equals("item_" + e.getKey()))
@@ -859,7 +863,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                 .as("%s: a row for every hero who held a %s item", id, entry)
                 .containsExactlyInAnyOrderElementsOf(slots));
     for (ItemEfficiency r : rows) {
-      assertThat(r.cost()).as("%s slot %d: cost from the constants", id, r.slot()).isPositive();
+      assertThat(r.cost())
+          .as("%s slot %d: cost from the constants", id, r.slot())
+          .isGreaterThanOrEqualTo(r.entryKey().equals("ward_observer") ? 0 : 1);
       if (r.ratio() != null) {
         assertThat(r.ratio()).isEqualTo(r.gain() / r.cost());
       }
@@ -917,6 +923,13 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                 assertThat(d.figures().get("savingGoldLost")).isGreaterThanOrEqualTo(0.0);
                 assertThat(r.figures().get("gain.saving-cost")).isLessThanOrEqualTo(0.0);
               });
+    }
+    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("vision")).toList()) {
+      assertThat(r.figures().get("visionBought")).as("%s: vision row bought", id).isPositive();
+      assertThat(r.gain()).isGreaterThanOrEqualTo(0.0);
+      if (r.ratio() != null) {
+        assertThat(r.cost()).as("no ratio under 300 gold of vision").isGreaterThanOrEqualTo(300);
+      }
     }
     System.out.printf(
         "ITEMS %s: %d rows (%d stick, %d midas, %d farming), %d stick uses, %.0f saves%n",

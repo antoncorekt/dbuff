@@ -15,14 +15,15 @@ import java.util.Set;
  * whitelist did not keep. A hero who owns a passive invisibility ability is invisible whenever he
  * is not attacking, so he counts as invisible in every fight he is in.
  */
-final class InvisibilityLog {
+public final class InvisibilityLog {
   static final String MODIFIER = "modifier_invisible";
 
   private final Map<Long, List<double[]>> spans = new HashMap<>();
   private final Map<Long, List<Double>> uses = new HashMap<>();
   private final InvisibleHeroes sources;
 
-  InvisibilityLog(List<CombatEvent> events, Map<String, Long> slotByHero, InvisibleHeroes sources) {
+  public InvisibilityLog(
+      List<CombatEvent> events, Map<String, Long> slotByHero, InvisibleHeroes sources) {
     this.sources = sources;
     Map<Long, Integer> depth = new HashMap<>();
     Map<Long, Double> since = new HashMap<>();
@@ -79,7 +80,7 @@ final class InvisibilityLog {
    *
    * @param abilitiesBySlot the abilities each hero owned at the start
    */
-  Set<Long> invisibleIn(
+  public Set<Long> invisibleIn(
       Set<Long> slots,
       double start,
       double end,

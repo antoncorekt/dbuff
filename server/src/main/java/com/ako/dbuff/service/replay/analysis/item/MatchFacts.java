@@ -14,13 +14,22 @@ import java.util.Map;
  *     log order
  * @param slots player slot by combat-log hero name
  * @param minutes the minute rows of each slot, in minute order
+ * @param vision the ward log, invisibility, detection and positions of the vision aspect
  */
 public record MatchFacts(
     List<CombatEvent> events,
     Map<String, Long> slots,
-    Map<Long, List<ReplayPlayerMinuteDomain>> minutes) {
+    Map<Long, List<ReplayPlayerMinuteDomain>> minutes,
+    VisionFacts vision) {
 
   public static final MatchFacts EMPTY = new MatchFacts(List.of(), Map.of(), Map.of());
+
+  public MatchFacts(
+      List<CombatEvent> events,
+      Map<String, Long> slots,
+      Map<Long, List<ReplayPlayerMinuteDomain>> minutes) {
+    this(events, slots, minutes, VisionFacts.EMPTY);
+  }
 
   /** Whether both heroes are known and play for different teams. */
   public boolean enemies(String hero, String other) {

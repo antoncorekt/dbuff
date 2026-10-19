@@ -10,6 +10,7 @@ import com.ako.dbuff.dao.repo.ReplayPlayerMinuteRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
+import com.ako.dbuff.dao.repo.WardEventRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.CombatHeroes;
@@ -18,6 +19,7 @@ import com.ako.dbuff.service.replay.GoldReason;
 import com.ako.dbuff.service.replay.XpReason;
 import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
 import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
+import com.ako.dbuff.service.replay.analysis.vision.InvisibleHeroes;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -45,6 +47,8 @@ public class ItemEfficiencyInputs {
   private final CreepKillRepo creepKillRepo;
   private final StoredActivity activity;
   private final CombatLogReader combatLog;
+  private final WardEventRepo wardRepo;
+  private final InvisibleHeroes invisibleHeroes;
 
   public MatchInputs load(long matchId) {
     List<CombatEvent> events = combatLog.events(matchId);
@@ -62,7 +66,7 @@ public class ItemEfficiencyInputs {
         .forEach(k -> kills.computeIfAbsent(k.getPlayerSlot(), s -> new ArrayList<>()).add(k));
     Map<Long, List<ActivitySegment>> segments = activity.bySlot(matchId);
     List<ReplayPlayerDomain> players = playerRepo.findByMatchId(matchId);
-    MatchFacts match = matchFacts(matchId, events, players, heroNames);
+    MatchFacts match = matchFacts(matchId, events, players, heroNames, changes, tracks);
     List<HeroInputs> heroes = new ArrayList<>();
     for (ReplayPlayerDomain player : players) {
       String hero = CombatHeroes.nameOf(player, heroNames);
@@ -88,7 +92,9 @@ public class ItemEfficiencyInputs {
       long matchId,
       List<CombatEvent> events,
       List<ReplayPlayerDomain> players,
-      Set<String> heroNames) {
+      Set<String> heroNames,
+      Map<Long, List<ReplayStateChangeDomain>> changes,
+      Map<Long, ReplayPlayerTrackDomain> tracks) {
     Map<String, Long> slots = new HashMap<>();
     for (ReplayPlayerDomain player : players) {
       String hero = CombatHeroes.nameOf(player, heroNames);
@@ -101,8 +107,19 @@ public class ItemEfficiencyInputs {
         .filter(m -> m.getPlayerSlot() != null && m.getGameMinute() != null)
         .sorted(Comparator.comparing(ReplayPlayerMinuteDomain::getGameMinute))
         .forEach(m -> minutes.computeIfAbsent(m.getPlayerSlot(), s -> new ArrayList<>()).add(m));
+    VisionFacts vision =
+        VisionFacts.of(
+            wardRepo.findByMatchId(matchId),
+            events,
+            slots,
+            changes.values().stream().flatMap(List::stream).toList(),
+            tracks,
+            invisibleHeroes);
     return new MatchFacts(
-        events.stream().filter(ItemEfficiencyInputs::acrossHeroes).toList(), slots, minutes);
+        events.stream().filter(ItemEfficiencyInputs::acrossHeroes).toList(),
+        slots,
+        minutes,
+        vision);
   }
 
   /** Damage to heroes by anyone, hero deaths, and the gold and experience of hero kills. */
