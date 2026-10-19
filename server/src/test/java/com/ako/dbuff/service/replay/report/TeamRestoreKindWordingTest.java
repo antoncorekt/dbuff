@@ -39,7 +39,7 @@ class TeamRestoreKindWordingTest {
         .isEqualTo("9 uses, 2.1k HP and 1.4k mana to 3 allies, 1 save");
     assertThat(wording.shortVerdict(row(9, 0), "Mekansm"))
         .startsWith("Mekansm: 9 uses, 2.1k HP and 1.4k mana to 3 allies, no saves");
-    assertThat(wording.longVerdict(row(9, 1))).contains("estimated from the item");
+    assertThat(wording.longVerdict(row(9, 1))).contains("amount capped by the missing mana");
     assertThat(wording.complete(row(9, 1))).isTrue();
   }
 

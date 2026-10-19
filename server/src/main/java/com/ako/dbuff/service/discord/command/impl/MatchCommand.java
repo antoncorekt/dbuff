@@ -143,6 +143,13 @@ public class MatchCommand implements DbuffCommand {
                             ReportCommandHandler.SECTION_OPTION,
                             "A section, or all = every section this channel posts automatically",
                             true)
+                        .setAutoComplete(true),
+                    new OptionData(
+                            OptionType.STRING,
+                            ReportCommandHandler.ITEMS_OPTION,
+                            "With section items: categories or items to list, instead of the"
+                                + " channel's choice",
+                            false)
                         .setAutoComplete(true)));
   }
 

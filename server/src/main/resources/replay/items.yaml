@@ -51,7 +51,7 @@ entries:
   - key: radiance
     category: farming
     items: [radiance]
-    aspects: [farm-rate, item-damage, alternatives]
+    aspects: [farm-rate, item-damage, alternatives, saving-cost]
     alternatives: [maelstrom, bfury, manta]
     parameters:
       windowMinutes: 5
@@ -59,6 +59,34 @@ entries:
       minAfterSeconds: 60
       campGapSeconds: 30
       damageWindowMinutes: 5
+      savingThreshold: 0.4
+      smallPurchase: 500
+  - key: octarine_core
+    category: farming
+    items: [octarine_core]
+    aspects: [cooldown, alternatives]
+    parameters:
+      damageSeconds: 3
+      toleranceSeconds: 0.5
+  - key: bottle
+    category: sustain
+    items: [bottle]
+    aspects: [bottle-runes, charge-restore]
+    parameters:
+      restoreFromConstants: 1
+      goldPerHp: 0.3
+      goldPerMana: 0.3
+      laningEndSeconds: 600
+      lowHpFraction: 0.35
+      lowHpAbsolute: 300
+      heavyDamageFraction: 0.3
+      heavyDamageAbsolute: 300
+      damageBeforeSeconds: 3
+      damageAfterSeconds: 3
+      surviveSeconds: 10
+      hpLookbackSeconds: 3
+      maxHpWindowSeconds: 120
+      healWindowSeconds: 4
   - key: arcane_boots
     category: sustain
     items: [arcane_boots]
