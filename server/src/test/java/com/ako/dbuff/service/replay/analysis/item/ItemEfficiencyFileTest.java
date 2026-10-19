@@ -30,6 +30,8 @@ class ItemEfficiencyFileTest {
                 List.of("farm-rate", "item-damage", "stat-uplift", "alternatives")),
             org.assertj.core.groups.Tuple.tuple(
                 "radiance", List.of("farm-rate", "item-damage", "alternatives", "saving-cost")),
+            org.assertj.core.groups.Tuple.tuple(
+                "octarine_core", List.of("cooldown", "alternatives")),
             org.assertj.core.groups.Tuple.tuple("ward_observer", List.of("vision")),
             org.assertj.core.groups.Tuple.tuple("ward_sentry", List.of("vision")),
             org.assertj.core.groups.Tuple.tuple("dust", List.of("vision")),
@@ -37,7 +39,8 @@ class ItemEfficiencyFileTest {
     assertThat(entries)
         .extracting(ItemEfficiencyEntry::category)
         .containsExactly(
-            "sustain", "farming", "farming", "farming", "vision", "vision", "vision", "vision");
+            "sustain", "farming", "farming", "farming", "farming", "vision", "vision", "vision",
+            "vision");
     assertThat(entries.get(0).items()).containsExactly("magic_stick", "magic_wand");
     assertThat(entries.get(2).items()).containsExactly("bfury", "maelstrom", "mjollnir");
   }
@@ -55,6 +58,7 @@ class ItemEfficiencyFileTest {
             new StatUpliftAspect(),
             new AlternativesAspect(null, null),
             new SavingCostAspect(),
+            new CooldownAspect(),
             new VisionAspect(new com.ako.dbuff.service.replay.analysis.vision.VisionProperties()));
 
     for (ItemEfficiencyEntry entry : entries) {

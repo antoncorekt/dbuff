@@ -15,6 +15,7 @@ interface Wording {
           "charge-restore", new StickWording(),
           "midas-uses", new MidasWording(),
           "farm-rate", new FarmingWording(),
+          "cooldown", new CooldownWording(),
           "vision", new VisionWording());
 
   static Wording of(String kind) {
