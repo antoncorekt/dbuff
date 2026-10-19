@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
+import com.ako.dbuff.dao.model.ReplayStateChangeDomain;
 import com.ako.dbuff.dao.model.WardEventDomain;
 import com.ako.dbuff.dao.model.WardKind;
 import com.ako.dbuff.dao.model.WardRemovalKind;
@@ -9,6 +10,7 @@ import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.analysis.vision.VisionProperties;
 import com.ako.dbuff.service.replay.analysis.vision.WardCoordinates;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,8 +23,9 @@ import org.springframework.stereotype.Component;
  * What the vision items gave: the facts of the hero's wards, sentries, dust or gem, and a gold
  * value of the invisible enemies killed where the item gave sight (a share of the kill, the same
  * fixed share a disable earns) and of the enemy wards his team removed while his sentry was up (the
- * deward bounty). Observers have no kill of their own: their facts and flags are the verdict. With
- * less than {@code minVisionGold} spent on the entry's items there is no ratio.
+ * deward bounty, paid to the one sentry placed latest among those covering the ward). Observers
+ * have no kill of their own: their facts and flags are the verdict. With less than {@code
+ * minVisionGold} spent on the entry's items there is no ratio.
  */
 @Component
 @RequiredArgsConstructor
@@ -39,6 +42,7 @@ public class VisionAspect implements ItemAspect {
   private static final String SENTRY = "item_ward_sentry";
   private static final String DUST = "item_dust";
   private static final String GEM = "item_gem";
+  private static final double RETURN_SECONDS = 15;
   private static final Set<String> PARAMETERS = parameters();
 
   private final VisionProperties properties;
@@ -109,8 +113,9 @@ public class VisionAspect implements ItemAspect {
     int kills = 0;
     int dewards = 0;
     if (!names.contains(OBSERVER)) {
-      KillShare shares = new KillShare(hero, WorthPrices.of(context));
-      double share = WorthPrices.of(context).disableShare();
+      WorthPrices prices = WorthPrices.of(context);
+      KillShare shares = new KillShare(hero, prices);
+      double share = prices.disableShare();
       for (KillShare.Death death : shares.deaths()) {
         if (revealed(context, names, placed, death)) {
           kills++;
@@ -126,7 +131,7 @@ public class VisionAspect implements ItemAspect {
     }
     if (names.contains(SENTRY)) {
       double each = context.entry().parameter("dewardBounty", 50);
-      for (WardEventDomain ward : dewardsWhileUp(hero, placed)) {
+      for (WardEventDomain ward : dewardsWhileUp(hero)) {
         dewards++;
         bounty += each;
         rows.add(
@@ -245,29 +250,44 @@ public class VisionAspect implements ItemAspect {
             <= context.entry().parameter("gemRadius", 900);
   }
 
-  /** Enemy wards the hero's team destroyed while one of his sentries covered them. */
-  private List<WardEventDomain> dewardsWhileUp(HeroInputs hero, List<WardEventDomain> sentries) {
+  /**
+   * Enemy wards the hero's team destroyed while a sentry of the team covered them. A ward pays its
+   * bounty to one sentry only, the one placed latest (the lower slot on a tie), and the hero gets
+   * it when that sentry is his.
+   */
+  private List<WardEventDomain> dewardsWhileUp(HeroInputs hero) {
     double reach = properties.getSentryRadius() + properties.getWardPositionTolerance();
     boolean radiant = PlayerSlots.radiant(hero.slot());
-    return hero.match().vision().wards().stream()
+    List<WardEventDomain> all = hero.match().vision().wards();
+    List<WardEventDomain> teamSentries =
+        all.stream()
+            .filter(w -> w.getWardKind() == WardKind.SENTRY && w.getPlayerSlot() != null)
+            .filter(w -> w.getX() != null && w.getY() != null)
+            .filter(w -> PlayerSlots.radiant(w.getPlayerSlot()) == radiant)
+            .toList();
+    return all.stream()
         .filter(w -> w.getPlayerSlot() != null && PlayerSlots.radiant(w.getPlayerSlot()) != radiant)
         .filter(w -> w.getRemovalKind() == WardRemovalKind.KILLED && w.getRemovedTime() != null)
         .filter(w -> w.getX() != null && w.getY() != null)
         .filter(w -> ownTeam(hero, w.getRemovedBy()))
         .filter(
             w ->
-                sentries.stream()
-                    .anyMatch(
+                teamSentries.stream()
+                    .filter(s -> alive(s, w.getRemovedTime()))
+                    .filter(
                         s ->
-                            alive(s, w.getRemovedTime())
-                                && s.getX() != null
-                                && s.getY() != null
-                                && WardCoordinates.distance(
-                                        w.getX(),
-                                        w.getY(),
-                                        WardCoordinates.toWorld(s.getX()),
-                                        WardCoordinates.toWorld(s.getY()))
-                                    <= reach))
+                            WardCoordinates.distance(
+                                    w.getX(),
+                                    w.getY(),
+                                    WardCoordinates.toWorld(s.getX()),
+                                    WardCoordinates.toWorld(s.getY()))
+                                <= reach)
+                    .min(
+                        Comparator.comparing(WardEventDomain::getPlacedTime)
+                            .reversed()
+                            .thenComparing(WardEventDomain::getPlayerSlot))
+                    .map(s -> s.getPlayerSlot() == hero.slot())
+                    .orElse(false))
         .toList();
   }
 
@@ -287,15 +307,43 @@ public class VisionAspect implements ItemAspect {
   }
 
   /**
-   * The adds of the items; a gem dropped at a death and picked up again is not bought twice, so a
+   * The wards, dust or gem he bought: an add starts a stack of one, every rise of the stack's
+   * charge count after it is one more bought. An add within {@code RETURN_SECONDS} of the removal
+   * of the same item gives it back, so it and the charge count that comes with it add nothing. A
    * gem counts once.
    */
   private static long purchases(HeroInputs hero, Set<String> names) {
-    long adds =
-        hero.changes().stream()
-            .filter(c -> StateChangeKind.ITEM_ADDED.name().equals(c.getKind()))
-            .filter(c -> names.contains(c.getName()))
-            .count();
-    return names.contains(GEM) ? Math.min(1, adds) : adds;
+    long bought = 0;
+    for (String name : names) {
+      long count = 0;
+      int stack = 0;
+      double removedAt = Double.NEGATIVE_INFINITY;
+      double returnedAt = Double.NEGATIVE_INFINITY;
+      for (ReplayStateChangeDomain c : hero.changes()) {
+        if (!name.equals(c.getName())) {
+          continue;
+        }
+        String kind = c.getKind();
+        if (StateChangeKind.ITEM_REMOVED.name().equals(kind)) {
+          removedAt = c.getGameSeconds();
+          stack = 0;
+        } else if (StateChangeKind.ITEM_ADDED.name().equals(kind)) {
+          if (c.getGameSeconds() - removedAt <= RETURN_SECONDS) {
+            returnedAt = c.getGameSeconds();
+            stack = 1;
+          } else {
+            count++;
+            stack = 1;
+          }
+        } else if (StateChangeKind.ITEM_CHARGES.name().equals(kind) && c.getCharges() != null) {
+          if (c.getCharges() > stack && c.getGameSeconds() - returnedAt > 1) {
+            count += c.getCharges() - stack;
+          }
+          stack = c.getCharges();
+        }
+      }
+      bought += name.equals(GEM) ? Math.min(1, count) : count;
+    }
+    return bought;
   }
 }

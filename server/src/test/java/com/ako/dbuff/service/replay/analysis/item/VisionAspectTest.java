@@ -348,4 +348,74 @@ class VisionAspectTest {
     assertThat(far.figures()).containsEntry("visionInvisibleKills", 0.0);
     assertThat(VisionKindWording.line(near)).startsWith("gem held, 1 Riki kill");
   }
+
+  @Test
+  void aStackBoughtIntoAnExistingStackAndAFirstStackOfTwoAreCounted() {
+    var changes =
+        List.of(
+            change(10, StateChangeKind.ITEM_ADDED, "item_ward_sentry"),
+            ItemTestData.charges(10, "item_ward_sentry", 2),
+            ItemTestData.charges(100, "item_ward_sentry", 1),
+            ItemTestData.charges(200, "item_ward_sentry", 3));
+
+    ItemEfficiency row =
+        judge(
+            "ward_sentry", changes, List.of(), List.of(), trackAt(0, 0), trackAt(0, 0), NO_SOURCES);
+
+    assertThat(row.figures()).containsEntry("visionBought", 4.0);
+    assertThat(row.cost()).isEqualTo(200);
+  }
+
+  @Test
+  void anItemPickedUpAgainSoonAfterLettingGoIsNotBoughtTwice() {
+    var changes =
+        List.of(
+            change(10, StateChangeKind.ITEM_ADDED, "item_ward_sentry"),
+            change(20, StateChangeKind.ITEM_REMOVED, "item_ward_sentry"),
+            change(25, StateChangeKind.ITEM_ADDED, "item_ward_sentry"),
+            ItemTestData.charges(25, "item_ward_sentry", 1),
+            change(300, StateChangeKind.ITEM_ADDED, "item_ward_sentry"));
+
+    ItemEfficiency row =
+        judge(
+            "ward_sentry", changes, List.of(), List.of(), trackAt(0, 0), trackAt(0, 0), NO_SOURCES);
+
+    assertThat(row.figures()).containsEntry("visionBought", 2.0);
+  }
+
+  @Test
+  void aDewardedWardPaysOnlyTheSentryPlacedLatest() {
+    List<WardEventDomain> wards =
+        List.of(
+            ward(0, WardKind.SENTRY, 50, null, WardRemovalKind.UNKNOWN, null),
+            ward(1, WardKind.SENTRY, 70, null, WardRemovalKind.UNKNOWN, null),
+            ward(128, WardKind.OBSERVER, 60, 200L, WardRemovalKind.KILLED, ME));
+
+    ItemEfficiency first =
+        judge(
+            "ward_sentry",
+            bought("item_ward_sentry", 8),
+            wards,
+            List.of(),
+            trackAt(0, 0),
+            trackAt(0, 0),
+            NO_SOURCES);
+
+    assertThat(first.figures()).containsEntry("visionDewards", 0.0);
+  }
+
+  @Test
+  void theLineSaysNothingOfPlacedWardsWithoutAWardLog() {
+    ItemEfficiency row =
+        judge(
+            "ward_sentry",
+            bought("item_ward_sentry", 2),
+            List.of(),
+            List.of(),
+            trackAt(0, 0),
+            trackAt(0, 0),
+            NO_SOURCES);
+
+    assertThat(VisionKindWording.line(row)).isEqualTo("2 sentries bought");
+  }
 }

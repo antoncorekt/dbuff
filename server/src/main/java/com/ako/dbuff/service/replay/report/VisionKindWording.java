@@ -45,8 +45,16 @@ public class VisionKindWording implements ItemKindWording {
     long bought = Math.round(ItemWording.figure(f, "visionBought"));
     long placed = Math.round(ItemWording.figure(f, "visionPlaced"));
     switch (row.entryKey()) {
-      case "ward_observer" -> parts.add(ItemWording.plural(placed, "observer") + " placed");
-      case "ward_sentry" -> parts.add(placed == 1 ? "1 sentry" : placed + " sentries");
+      case "ward_observer" ->
+          parts.add(
+              f.get("visionPlaced") == null
+                  ? ItemWording.plural(bought, "observer") + " bought"
+                  : ItemWording.plural(placed, "observer") + " placed");
+      case "ward_sentry" ->
+          parts.add(
+              f.get("visionPlaced") == null
+                  ? ItemWording.plural(bought, "sentry").replace("sentrys", "sentries") + " bought"
+                  : placed == 1 ? "1 sentry" : placed + " sentries");
       case "dust" ->
           parts.add(
               "%d dust bought, %d used"
