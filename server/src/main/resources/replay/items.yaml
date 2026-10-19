@@ -68,3 +68,22 @@ entries:
     parameters:
       damageSeconds: 3
       toleranceSeconds: 0.5
+  - key: bottle
+    category: sustain
+    items: [bottle]
+    aspects: [bottle-runes, charge-restore]
+    parameters:
+      restoreFromConstants: 1
+      goldPerHp: 0.3
+      goldPerMana: 0.3
+      laningEndSeconds: 600
+      lowHpFraction: 0.35
+      lowHpAbsolute: 300
+      heavyDamageFraction: 0.3
+      heavyDamageAbsolute: 300
+      damageBeforeSeconds: 3
+      damageAfterSeconds: 3
+      surviveSeconds: 10
+      hpLookbackSeconds: 3
+      maxHpWindowSeconds: 120
+      healWindowSeconds: 4

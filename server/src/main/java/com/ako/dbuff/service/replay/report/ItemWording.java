@@ -65,6 +65,15 @@ public final class ItemWording {
       case "NO_GOLD_TRACK" -> "the track has no gold, so the cost of saving up is not counted";
       case "NO_MINUTE_GOLD" ->
           "the match has no gold per minute for a death while saving, so its cost counts as 0";
+      case "HP_ESTIMATED" ->
+          "the log credits the bottle with no heal, so the health is the constants' amount capped"
+              + " by his missing health";
+      case "MANA_ESTIMATED" ->
+          "the log has no mana from the bottle, so the mana is the constants' amount capped by his"
+              + " missing mana";
+      case "RUNES_BOTTLED_ESTIMATED" ->
+          "a rune counts as bottled when no effect began on him at the pickup, and a regeneration"
+              + " or illusion rune never does";
       case "COST_UNKNOWN" -> "the item constants give no cost for it, so there is no ratio";
       case "BONUS_GOLD_UNKNOWN" -> "the constants give no bonus gold, so no gold is counted";
       case "COOLDOWN_NOT_SEEN" -> "a cast with no cooldown shown in the replay is not counted";

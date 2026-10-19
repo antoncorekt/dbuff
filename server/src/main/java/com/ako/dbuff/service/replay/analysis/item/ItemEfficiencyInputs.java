@@ -5,11 +5,13 @@ import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerMinuteDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.dao.model.ReplayStateChangeDomain;
+import com.ako.dbuff.dao.model.RunePickupDomain;
 import com.ako.dbuff.dao.repo.CreepKillRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerMinuteRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
+import com.ako.dbuff.dao.repo.RunePickupRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.CombatHeroes;
@@ -33,7 +35,11 @@ import org.springframework.stereotype.Component;
 public class ItemEfficiencyInputs {
   private static final Set<CombatEventKind> ABOUT_THE_TARGET =
       Set.of(
-          CombatEventKind.DAMAGE, CombatEventKind.DEATH, CombatEventKind.GOLD, CombatEventKind.XP);
+          CombatEventKind.DAMAGE,
+          CombatEventKind.DEATH,
+          CombatEventKind.GOLD,
+          CombatEventKind.XP,
+          CombatEventKind.HEAL);
 
   /** The heroes of the match and the last second the stored data reaches. */
   public record MatchInputs(int gameEndSeconds, List<HeroInputs> heroes) {}
@@ -43,6 +49,7 @@ public class ItemEfficiencyInputs {
   private final ReplayPlayerTrackRepo trackRepo;
   private final ReplayStateChangeRepo stateRepo;
   private final CreepKillRepo creepKillRepo;
+  private final RunePickupRepo runeRepo;
   private final StoredActivity activity;
   private final CombatLogReader combatLog;
 
@@ -60,6 +67,10 @@ public class ItemEfficiencyInputs {
         .filter(k -> k.getSeconds() != null)
         .sorted(Comparator.comparing(CreepKillDomain::getSeconds))
         .forEach(k -> kills.computeIfAbsent(k.getPlayerSlot(), s -> new ArrayList<>()).add(k));
+    Map<Long, List<RunePickupDomain>> runes = new HashMap<>();
+    runeRepo.findByMatchId(matchId).stream()
+        .filter(r -> r.getPlayerSlot() != null)
+        .forEach(r -> runes.computeIfAbsent(r.getPlayerSlot(), s -> new ArrayList<>()).add(r));
     Map<Long, List<ActivitySegment>> segments = activity.bySlot(matchId);
     List<ReplayPlayerDomain> players = playerRepo.findByMatchId(matchId);
     MatchFacts match = matchFacts(matchId, events, players, heroNames);
@@ -78,7 +89,8 @@ public class ItemEfficiencyInputs {
                 kills.getOrDefault(slot, List.of()),
                 segments.getOrDefault(slot, List.of()),
                 match,
-                matchId));
+                matchId,
+                runes.getOrDefault(slot, List.of())));
       }
     }
     return new MatchInputs(gameEnd(events, tracks.values()), heroes);
