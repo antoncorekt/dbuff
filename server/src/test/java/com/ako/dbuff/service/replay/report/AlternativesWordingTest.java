@@ -1,7 +1,7 @@
 package com.ako.dbuff.service.replay.report;
 
-import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
+import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -28,6 +28,17 @@ class AlternativesWordingTest {
 
   private static Detail alternative(String key, Map<String, Double> figures) {
     return new Detail("ALTERNATIVE", 1_500, key, figures);
+  }
+
+  @Test
+  void popularItemsAreNamedWithoutNumbers() {
+    ItemEfficiency row =
+        row(
+            new Detail("POPULAR", 1_500, "maelstrom", Map.of()),
+            new Detail("POPULAR", 1_500, "bfury", Map.of()));
+
+    assertThat(AlternativesWording.suffix(row, key -> "maelstrom".equals(key) ? "Maelstrom" : null))
+        .isEqualTo("; popular for this hero at this point: Maelstrom or bfury");
   }
 
   @Test

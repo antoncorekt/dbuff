@@ -23,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -64,8 +65,10 @@ class AlternativeFinderTest {
               .findFirst();
         }
       };
+  private final PopularItems popular = mock(PopularItems.class);
   private final AlternativeFinder finder =
-      new AlternativeFinder(itemRepo, statRepo, roleRepo, kits, Clock.fixed(NOW, ZoneOffset.UTC));
+      new AlternativeFinder(
+          itemRepo, statRepo, roleRepo, kits, popular, Clock.fixed(NOW, ZoneOffset.UTC));
 
   private static ItemConstant constant(long id, long cost) {
     return ItemConstant.builder().id(id).cost(cost).build();
@@ -238,8 +241,27 @@ class AlternativeFinderTest {
         .findHeroPurchases(any(), any(), any(), anyLong(), anyLong(), any(), any(), anyLong());
   }
 
+  @Test
+  @SuppressWarnings("unchecked")
+  void popularItemsAreOnlyAskedWhenNoCandidateHasEnoughGames() {
+    player(null);
+    role(1);
+    when(popular.near(eq(HERO), anyDouble(), eq(5_150L), eq(0.3), any()))
+        .thenReturn(List.of("manta"));
+    rowsOf(games(1, 10, 5, null), games(3, 2, 1, null));
+
+    Result few = finder.find(radiance(List.of()), SETTINGS);
+
+    assertThat(few.popular()).containsExactly("manta");
+
+    rowsOf(games(1, 10, 5, null), games(3, 8, 4, null));
+    Result enough = newFinder().find(radiance(List.of()), SETTINGS);
+
+    assertThat(enough.popular()).isEmpty();
+  }
+
   private AlternativeFinder newFinder() {
     return new AlternativeFinder(
-        itemRepo, statRepo, roleRepo, kits, Clock.fixed(NOW, ZoneOffset.UTC));
+        itemRepo, statRepo, roleRepo, kits, popular, Clock.fixed(NOW, ZoneOffset.UTC));
   }
 }
