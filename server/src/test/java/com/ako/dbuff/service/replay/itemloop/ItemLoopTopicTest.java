@@ -9,6 +9,6 @@ class ItemLoopTopicTest {
   @Test
   void theCommittedListHoldsTheTwoAbilityDraftFixtures() {
     assertThat(ReviewLoopMatchList.read(ItemLoopTopic.MATCH_LIST))
-        .containsExactly(9038725154L, 9037038717L);
+        .containsExactly(9038725154L, 9037038717L, 9040889566L, 9044252857L, 9044276097L);
   }
 }

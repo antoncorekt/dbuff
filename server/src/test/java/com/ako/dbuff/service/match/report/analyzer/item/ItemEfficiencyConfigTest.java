@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -49,14 +50,17 @@ class ItemEfficiencyConfigTest {
                 "hand_of_midas",
                 ItemConstant.builder().id(65L).dname("Hand of Midas").build(),
                 "octarine_core",
-                ItemConstant.builder().id(235L).dname("Octarine Core").build()));
+                ItemConstant.builder().id(235L).dname("Octarine Core").build(),
+                "missing",
+                ItemConstant.builder().id(1L).dname("Missing").build()));
+    clearInvocations(constants);
     ItemEfficiencyConfig config =
         new ItemEfficiencyConfig(
             new ItemEfficiencyFile("replay/items-winstats-test.yaml"), constants);
 
     assertThat(config.getGroups()).isEmpty();
-    assertThat(config.getGroups()).hasSize(2);
-    assertThat(config.getGroups()).hasSize(2);
+    assertThat(config.getGroups()).hasSize(3);
+    assertThat(config.getGroups()).hasSize(3);
     verify(constants, times(2)).getConstantMap();
   }
 
@@ -64,6 +68,7 @@ class ItemEfficiencyConfigTest {
   void aPartialResultIsNotCached() {
     when(constants.getConstantMap())
         .thenReturn(Map.of("hand_of_midas", ItemConstant.builder().id(65L).dname("Midas").build()));
+    clearInvocations(constants);
     ItemEfficiencyConfig config =
         new ItemEfficiencyConfig(
             new ItemEfficiencyFile("replay/items-winstats-test.yaml"), constants);

@@ -185,9 +185,8 @@ class ItemsSectionTest {
 
     assertThat(section.lines(filtered(List.of("farming"))))
         .anyMatch(line -> line.contains("Magic Stick"))
-        .noneMatch(line -> line.contains("Hand Of Midas"));
-    assertThat(section.lines(filtered(List.of("sustain"))))
-        .noneMatch(line -> line.contains("Magic Stick"));
+        .anyMatch(line -> line.contains("Hand Of Midas"));
+    assertThat(section.lines(filtered(List.of("sustain")))).isEmpty();
   }
 
   @Test
