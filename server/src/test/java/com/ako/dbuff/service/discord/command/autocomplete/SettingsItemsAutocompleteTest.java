@@ -20,7 +20,15 @@ class SettingsItemsAutocompleteTest {
   void offersCategoriesAndEntryKeysFromTheCatalog() {
     assertThat(provider.getChoices("", null))
         .extracting(c -> c.getAsString())
-        .contains("farming", "sustain", "vision", "magic_stick", "hand_of_midas", "ward_sentry");
+        .contains(
+            "farming",
+            "sustain",
+            "save",
+            "vision",
+            "magic_stick",
+            "hand_of_midas",
+            "glimmer_cape",
+            "ward_sentry");
   }
 
   @Test

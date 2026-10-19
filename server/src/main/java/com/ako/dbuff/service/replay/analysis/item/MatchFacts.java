@@ -5,21 +5,24 @@ import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.PlayerSlots;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * What the worth model reads across heroes: whole-match combat entries and the per-minute counters
  * of every player.
  *
- * @param events damage to heroes by anyone, hero deaths, and the hero-kill gold and experience, in
- *     log order
+ * @param events damage to heroes by anyone, hero deaths, the hero-kill gold and experience, and the
+ *     heals that items did to heroes, in log order
  * @param slots player slot by combat-log hero name
  * @param minutes the minute rows of each slot, in minute order
+ * @param roster every hero's inputs; a supplier because the inputs hold this record
  * @param vision the ward log, invisibility, detection and positions of the vision aspect
  */
 public record MatchFacts(
     List<CombatEvent> events,
     Map<String, Long> slots,
     Map<Long, List<ReplayPlayerMinuteDomain>> minutes,
+    Supplier<List<HeroInputs>> roster,
     VisionFacts vision) {
 
   public static final MatchFacts EMPTY = new MatchFacts(List.of(), Map.of(), Map.of());
@@ -28,7 +31,31 @@ public record MatchFacts(
       List<CombatEvent> events,
       Map<String, Long> slots,
       Map<Long, List<ReplayPlayerMinuteDomain>> minutes) {
-    this(events, slots, minutes, VisionFacts.EMPTY);
+    this(events, slots, minutes, List::of, VisionFacts.EMPTY);
+  }
+
+  public MatchFacts(
+      List<CombatEvent> events,
+      Map<String, Long> slots,
+      Map<Long, List<ReplayPlayerMinuteDomain>> minutes,
+      Supplier<List<HeroInputs>> roster) {
+    this(events, slots, minutes, roster, VisionFacts.EMPTY);
+  }
+
+  public MatchFacts(
+      List<CombatEvent> events,
+      Map<String, Long> slots,
+      Map<Long, List<ReplayPlayerMinuteDomain>> minutes,
+      VisionFacts vision) {
+    this(events, slots, minutes, List::of, vision);
+  }
+
+  /** The other heroes on the hero's team. */
+  public List<HeroInputs> allies(HeroInputs hero) {
+    return roster.get().stream()
+        .filter(other -> other.slot() != hero.slot())
+        .filter(other -> PlayerSlots.radiant(other.slot()) == PlayerSlots.radiant(hero.slot()))
+        .toList();
   }
 
   /** Whether both heroes are known and play for different teams. */

@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -14,6 +15,9 @@ import java.util.Set;
  * @param modelOverride the AI model a person asked for in an on-demand request, null for the
  *     default; only the AI sections read it
  * @param instance the channel the report is for, null when a caller has none
+ * @param itemFilter the item categories or entry keys a person asked for in an on-demand request,
+ *     null to follow the channel's setting, empty for every category; only the items section reads
+ *     it
  */
 public record ReplayReportInput(
     long matchId,
@@ -22,7 +26,19 @@ public record ReplayReportInput(
     Map<Long, String> namesBySlot,
     int maxFindings,
     String modelOverride,
-    DbufInstanceConfigDomain instance) {
+    DbufInstanceConfigDomain instance,
+    List<String> itemFilter) {
+
+  public ReplayReportInput(
+      long matchId,
+      MatchDomain match,
+      Set<Long> focusSlots,
+      Map<Long, String> namesBySlot,
+      int maxFindings,
+      String modelOverride,
+      DbufInstanceConfigDomain instance) {
+    this(matchId, match, focusSlots, namesBySlot, maxFindings, modelOverride, instance, null);
+  }
 
   public ReplayReportInput(
       long matchId,
@@ -31,7 +47,7 @@ public record ReplayReportInput(
       Map<Long, String> namesBySlot,
       int maxFindings,
       String modelOverride) {
-    this(matchId, match, focusSlots, namesBySlot, maxFindings, modelOverride, null);
+    this(matchId, match, focusSlots, namesBySlot, maxFindings, modelOverride, null, null);
   }
 
   public ReplayReportInput(
@@ -40,17 +56,22 @@ public record ReplayReportInput(
       Set<Long> focusSlots,
       Map<Long, String> namesBySlot,
       int maxFindings) {
-    this(matchId, match, focusSlots, namesBySlot, maxFindings, null, null);
+    this(matchId, match, focusSlots, namesBySlot, maxFindings, null, null, null);
   }
 
   public ReplayReportInput withModelOverride(String model) {
     return new ReplayReportInput(
-        matchId, match, focusSlots, namesBySlot, maxFindings, model, instance);
+        matchId, match, focusSlots, namesBySlot, maxFindings, model, instance, itemFilter);
   }
 
   public ReplayReportInput withInstance(DbufInstanceConfigDomain channel) {
     return new ReplayReportInput(
-        matchId, match, focusSlots, namesBySlot, maxFindings, modelOverride, channel);
+        matchId, match, focusSlots, namesBySlot, maxFindings, modelOverride, channel, itemFilter);
+  }
+
+  public ReplayReportInput withItemFilter(List<String> names) {
+    return new ReplayReportInput(
+        matchId, match, focusSlots, namesBySlot, maxFindings, modelOverride, instance, names);
   }
 
   /** The game mode of the match; null when the match or its mode is not known. */

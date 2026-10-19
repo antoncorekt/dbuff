@@ -841,6 +841,11 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                 Map.entry("maelstrom", "farming_items"),
                 Map.entry("mjollnir", "farming_items"),
                 Map.entry("radiance", "radiance"),
+                Map.entry("bottle", "bottle"),
+                Map.entry("arcane_boots", "arcane_boots"),
+                Map.entry("mekansm", "mekansm"),
+                Map.entry("guardian_greaves", "mekansm"),
+                Map.entry("holy_locket", "holy_locket"),
                 Map.entry("ward_observer", "ward_observer"),
                 Map.entry("ward_sentry", "ward_sentry"),
                 Map.entry("dust", "dust"),
@@ -900,6 +905,15 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(followed)
         .as("%s: uses with charges followed by a drop to half or less (E3 verified)", id)
         .isGreaterThanOrEqualTo(withCharges * 8 / 10);
+    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("self-harm")).toList()) {
+      assertThat(r.figures().get("mana"))
+          .as("%s slot %d: soul ring mana", id, r.slot())
+          .isNotNegative();
+      assertThat(r.figures().get("hp"))
+          .as("%s slot %d: soul ring health spent", id, r.slot())
+          .isLessThanOrEqualTo(0);
+      assertThat(r.figures().get("selfDeaths")).isLessThanOrEqualTo((double) r.count());
+    }
     for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("midas-uses")).toList()) {
       assertThat(r.figures().get("gold"))
           .as("%s slot %d: every use pays the bonus gold", id, r.slot())
@@ -923,6 +937,25 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                 assertThat(d.figures().get("savingGoldLost")).isGreaterThanOrEqualTo(0.0);
                 assertThat(r.figures().get("gain.saving-cost")).isLessThanOrEqualTo(0.0);
               });
+    }
+    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("bottle-runes")).toList()) {
+      assertThat(r.figures().get("bottled"))
+          .as("%s slot %d: bottled runes are among the runes taken", id, r.slot())
+          .isLessThanOrEqualTo(r.figures().get("runes"));
+      assertThat(r.figures().get("hp")).isGreaterThanOrEqualTo(0.0);
+      assertThat(r.figures().get("mana")).isLessThanOrEqualTo(r.count() * 60.0);
+    }
+    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("team-restore")).toList()) {
+      assertThat(r.figures().get("hp")).as("%s slot %d: hp", id, r.slot()).isNotNegative();
+      assertThat(r.figures().get("allies")).isLessThanOrEqualTo(4.0);
+      assertThat(r.rows().size()).isGreaterThanOrEqualTo(r.count());
+    }
+    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("target-use")).toList()) {
+      assertThat(r.figures().get("saves")).isLessThanOrEqualTo((double) r.count());
+      assertThat(r.figures().get("selfSaves") + r.figures().get("allySaves"))
+          .as("%s slot %d %s: saves are self or ally", id, r.slot(), r.entryKey())
+          .isEqualTo(r.figures().get("saves"));
+      assertThat(r.rows()).hasSizeGreaterThanOrEqualTo(r.count());
     }
     for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("vision")).toList()) {
       assertThat(r.figures().get("visionBought")).as("%s: vision row bought", id).isPositive();

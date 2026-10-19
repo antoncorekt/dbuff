@@ -1,0 +1,6 @@
+{
+  "arcane_boots": {"cost": 1500, "attrib": [{"key": "replenish_amount", "value": "150"}, {"key": "replenish_radius", "value": "1200"}]},
+  "mekansm": {"cost": 1775, "attrib": [{"key": "heal_amount", "value": "250"}, {"key": "heal_radius", "value": "1200"}]},
+  "guardian_greaves": {"cost": 4450, "attrib": [{"key": "replenish_health", "value": "325"}, {"key": "replenish_mana", "value": "200"}, {"key": "replenish_radius", "value": "1200"}]},
+  "holy_locket": {"cost": 2250, "attrib": [{"key": "charge_radius", "value": "1200"}, {"key": "health_restore_per_charge", "value": "17"}, {"key": "mana_restore_per_charge", "value": "15"}]}
+}

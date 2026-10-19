@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
 /**
@@ -157,6 +158,11 @@ final class HeroHealth {
         .filter(h -> h.second() > from && h.second() <= to)
         .mapToInt(Hit::amount)
         .sum();
+  }
+
+  /** The second of the first death in {@code (from, to]}; empty when he did not die. */
+  OptionalDouble deathBetween(double from, double to) {
+    return deaths.stream().filter(t -> t > from && t <= to).mapToDouble(t -> t).min();
   }
 
   boolean diedBetween(double from, double to) {

@@ -10,6 +10,7 @@ alternatives: { altCostBand: 0.3, altTimeBand: 300, altMinGames: 5 }
 categories:
   farming: Farming
   sustain: Sustain and mana
+  save: Saves
   vision: Vision
 entries:
   - key: magic_stick
@@ -69,6 +70,69 @@ entries:
     parameters:
       damageSeconds: 3
       toleranceSeconds: 0.5
+  - key: bottle
+    category: sustain
+    items: [bottle]
+    aspects: [bottle-runes, charge-restore]
+    parameters:
+      restoreFromConstants: 1
+      goldPerHp: 0.3
+      goldPerMana: 0.3
+      laningEndSeconds: 600
+      lowHpFraction: 0.35
+      lowHpAbsolute: 300
+      heavyDamageFraction: 0.3
+      heavyDamageAbsolute: 300
+      damageBeforeSeconds: 3
+      damageAfterSeconds: 3
+      surviveSeconds: 10
+      hpLookbackSeconds: 3
+      maxHpWindowSeconds: 120
+      healWindowSeconds: 4
+  - key: arcane_boots
+    category: sustain
+    items: [arcane_boots]
+    aspects: [team-restore]
+  - key: mekansm
+    category: sustain
+    items: [mekansm, guardian_greaves]
+    aspects: [team-restore, save]
+  - key: holy_locket
+    category: sustain
+    items: [holy_locket]
+    aspects: [team-restore, save]
+  - key: soul_ring
+    category: sustain
+    items: [soul_ring]
+    aspects: [self-harm, charge-restore]
+    parameters:
+      healthCost: 170
+      goldPerHp: 0.3
+      goldPerMana: 0.3
+      laningEndSeconds: 600
+      surviveSeconds: 10
+      hpLookbackSeconds: 3
+      maxHpWindowSeconds: 120
+  - key: glimmer_cape
+    category: save
+    items: [glimmer_cape]
+    aspects: [target-use, save]
+  - key: force_staff
+    category: save
+    items: [force_staff]
+    aspects: [target-use, save, control]
+  - key: lotus_orb
+    category: save
+    items: [lotus_orb]
+    aspects: [target-use, save]
+  - key: euls_scepter
+    category: save
+    items: [cyclone]
+    aspects: [target-use, save, control]
+  - key: solar_crest
+    category: save
+    items: [solar_crest]
+    aspects: [target-use, save, control]
   - key: ward_observer
     category: vision
     items: [ward_observer]

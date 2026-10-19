@@ -32,6 +32,21 @@ class ItemEfficiencyFileTest {
                 "radiance", List.of("farm-rate", "item-damage", "alternatives", "saving-cost")),
             org.assertj.core.groups.Tuple.tuple(
                 "octarine_core", List.of("cooldown", "alternatives")),
+            org.assertj.core.groups.Tuple.tuple(
+                "bottle", List.of("bottle-runes", "charge-restore")),
+            org.assertj.core.groups.Tuple.tuple("arcane_boots", List.of("team-restore")),
+            org.assertj.core.groups.Tuple.tuple("mekansm", List.of("team-restore", "save")),
+            org.assertj.core.groups.Tuple.tuple("holy_locket", List.of("team-restore", "save")),
+            org.assertj.core.groups.Tuple.tuple(
+                "soul_ring", List.of("self-harm", "charge-restore")),
+            org.assertj.core.groups.Tuple.tuple("glimmer_cape", List.of("target-use", "save")),
+            org.assertj.core.groups.Tuple.tuple(
+                "force_staff", List.of("target-use", "save", "control")),
+            org.assertj.core.groups.Tuple.tuple("lotus_orb", List.of("target-use", "save")),
+            org.assertj.core.groups.Tuple.tuple(
+                "euls_scepter", List.of("target-use", "save", "control")),
+            org.assertj.core.groups.Tuple.tuple(
+                "solar_crest", List.of("target-use", "save", "control")),
             org.assertj.core.groups.Tuple.tuple("ward_observer", List.of("vision")),
             org.assertj.core.groups.Tuple.tuple("ward_sentry", List.of("vision")),
             org.assertj.core.groups.Tuple.tuple("dust", List.of("vision")),
@@ -39,8 +54,9 @@ class ItemEfficiencyFileTest {
     assertThat(entries)
         .extracting(ItemEfficiencyEntry::category)
         .containsExactly(
-            "sustain", "farming", "farming", "farming", "farming", "vision", "vision", "vision",
-            "vision");
+            "sustain", "farming", "farming", "farming", "farming", "sustain", "sustain", "sustain",
+            "sustain", "sustain", "save", "save", "save", "save", "save", "vision", "vision",
+            "vision", "vision");
     assertThat(entries.get(0).items()).containsExactly("magic_stick", "magic_wand");
     assertThat(entries.get(2).items()).containsExactly("bfury", "maelstrom", "mjollnir");
   }
@@ -51,7 +67,9 @@ class ItemEfficiencyFileTest {
     var aspects =
         java.util.List.<ItemAspect>of(
             new ChargeRestoreAspect(),
+            new BottleRunesAspect(),
             new SaveAspect(),
+            new SelfHarmAspect(),
             new MidasUsesAspect(null),
             new FarmRateAspect(),
             new ItemDamageAspect(),
@@ -59,6 +77,9 @@ class ItemEfficiencyFileTest {
             new AlternativesAspect(null, null),
             new SavingCostAspect(),
             new CooldownAspect(),
+            new TeamRestoreAspect(),
+            new TargetUseAspect(),
+            new ControlAspect(),
             new VisionAspect(new com.ako.dbuff.service.replay.analysis.vision.VisionProperties()));
 
     for (ItemEfficiencyEntry entry : entries) {
@@ -198,7 +219,7 @@ class ItemEfficiencyFileTest {
   @Test
   void theShippedCategoriesAreListed() {
     assertThat(new ItemEfficiencyFile("replay/items.yaml").categories())
-        .containsKeys("farming", "sustain", "vision");
+        .containsKeys("farming", "sustain", "save", "vision");
   }
 
   @Test
