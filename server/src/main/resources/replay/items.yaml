@@ -61,3 +61,10 @@ entries:
       damageWindowMinutes: 5
       savingThreshold: 0.4
       smallPurchase: 500
+  - key: octarine_core
+    category: farming
+    items: [octarine_core]
+    aspects: [cooldown, alternatives]
+    parameters:
+      damageSeconds: 3
+      toleranceSeconds: 0.5
