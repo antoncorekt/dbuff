@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Component;
 public class OpenDotaItemPopularity {
   private static final int CONNECT_TIMEOUT_MS = 3_000;
   private static final int READ_TIMEOUT_MS = 5_000;
+  private static final long RATE_WAIT_SECONDS = 2;
 
   private final ApiClient apiClient;
   private final RateLimiter rateLimiter;
@@ -48,7 +50,9 @@ public class OpenDotaItemPopularity {
 
   /** The item ids of each phase, most bought first. */
   public Map<Phase, List<Long>> fetch(long heroId) throws ApiException {
-    rateLimiter.acquire();
+    if (!rateLimiter.tryAcquire(RATE_WAIT_SECONDS, TimeUnit.SECONDS)) {
+      throw new ApiException("No OpenDota request permit within " + RATE_WAIT_SECONDS + " s");
+    }
     Map<String, Map<String, Number>> response =
         apiClient
             .invokeAPI(

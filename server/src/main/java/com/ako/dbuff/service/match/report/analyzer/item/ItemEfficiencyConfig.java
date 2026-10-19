@@ -40,7 +40,7 @@ public class ItemEfficiencyConfig {
       boolean complete = constants != null && !constants.isEmpty();
       for (ItemEfficiencyEntry entry : file.entries()) {
         for (List<String> keys : entry.winStats()) {
-          ItemGroup group = complete ? group(entry.key(), keys, constants) : null;
+          ItemGroup group = constants == null ? null : group(entry.key(), keys, constants);
           if (group == null) {
             complete = false;
           } else {

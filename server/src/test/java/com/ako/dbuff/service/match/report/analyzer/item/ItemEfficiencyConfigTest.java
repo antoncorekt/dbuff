@@ -78,4 +78,23 @@ class ItemEfficiencyConfigTest {
 
     verify(constants, times(2)).getConstantMap();
   }
+
+  @Test
+  void anUnknownKeyInTheMiddleSkipsOnlyItsGroupAndTheResultIsNotCached() {
+    when(constants.getConstantMap())
+        .thenReturn(
+            Map.of(
+                "hand_of_midas",
+                ItemConstant.builder().id(65L).dname("Hand of Midas").build(),
+                "octarine_core",
+                ItemConstant.builder().id(235L).dname("Octarine Core").build()));
+    clearInvocations(constants);
+    ItemEfficiencyConfig config =
+        new ItemEfficiencyConfig(
+            new ItemEfficiencyFile("replay/items-winstats-test.yaml"), constants);
+
+    assertThat(config.getGroups()).hasSize(2);
+    assertThat(config.getGroups()).hasSize(2);
+    verify(constants, times(2)).getConstantMap();
+  }
 }
