@@ -38,7 +38,10 @@ final class BehaviourLines {
     return lines(header, pick(rows, byWorth, chronological, cap).listed(), maxLength, line);
   }
 
-  /** The header and one cut line for each of the rows already chosen; nothing for no rows. */
+  /**
+   * The header (none when null) and one cut line for each of the rows already chosen; nothing for
+   * no rows.
+   */
   static <T> List<String> lines(
       String header, List<T> listed, int maxLength, Function<T, String> line) {
     if (listed.isEmpty()) {
@@ -46,7 +49,9 @@ final class BehaviourLines {
     }
     int max = Math.max(LineText.ELLIPSIS.length() + 1, maxLength);
     List<String> lines = new ArrayList<>();
-    lines.add(header);
+    if (header != null) {
+      lines.add(header);
+    }
     listed.forEach(row -> lines.add(LineText.cut(line.apply(row), max)));
     return lines;
   }

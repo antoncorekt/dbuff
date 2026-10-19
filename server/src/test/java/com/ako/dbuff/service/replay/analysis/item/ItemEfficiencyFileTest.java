@@ -29,12 +29,21 @@ class ItemEfficiencyFileTest {
                 "farming_items",
                 List.of("farm-rate", "item-damage", "stat-uplift", "alternatives")),
             org.assertj.core.groups.Tuple.tuple(
-                "radiance", List.of("farm-rate", "item-damage", "alternatives")),
+                "radiance", List.of("farm-rate", "item-damage", "alternatives", "saving-cost")),
+            org.assertj.core.groups.Tuple.tuple(
+                "octarine_core", List.of("cooldown", "alternatives")),
+            org.assertj.core.groups.Tuple.tuple(
+                "bottle", List.of("bottle-runes", "charge-restore")),
+            org.assertj.core.groups.Tuple.tuple("arcane_boots", List.of("team-restore")),
+            org.assertj.core.groups.Tuple.tuple("mekansm", List.of("team-restore", "save")),
+            org.assertj.core.groups.Tuple.tuple("holy_locket", List.of("team-restore", "save")),
             org.assertj.core.groups.Tuple.tuple(
                 "soul_ring", List.of("self-harm", "charge-restore")));
     assertThat(entries)
         .extracting(ItemEfficiencyEntry::category)
-        .containsExactly("sustain", "farming", "farming", "farming", "sustain");
+        .containsExactly(
+            "sustain", "farming", "farming", "farming", "farming", "sustain", "sustain", "sustain",
+            "sustain", "sustain");
     assertThat(entries.get(0).items()).containsExactly("magic_stick", "magic_wand");
     assertThat(entries.get(2).items()).containsExactly("bfury", "maelstrom", "mjollnir");
   }
@@ -45,13 +54,17 @@ class ItemEfficiencyFileTest {
     var aspects =
         java.util.List.<ItemAspect>of(
             new ChargeRestoreAspect(),
+            new BottleRunesAspect(),
             new SaveAspect(),
             new SelfHarmAspect(),
             new MidasUsesAspect(null),
             new FarmRateAspect(),
             new ItemDamageAspect(),
             new StatUpliftAspect(),
-            new AlternativesAspect(null, null));
+            new AlternativesAspect(null, null),
+            new SavingCostAspect(),
+            new CooldownAspect(),
+            new TeamRestoreAspect());
 
     for (ItemEfficiencyEntry entry : entries) {
       var own =

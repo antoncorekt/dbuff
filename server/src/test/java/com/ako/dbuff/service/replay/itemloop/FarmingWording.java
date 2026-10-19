@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
 import com.ako.dbuff.service.replay.report.FarmingKindWording;
 import com.ako.dbuff.service.replay.report.ItemWording;
+import com.ako.dbuff.service.replay.report.SavingCostLine;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -37,6 +38,9 @@ final class FarmingWording implements Wording {
     if ("DAMAGE".equals(detail.label())) {
       return damageDetail(detail);
     }
+    if (SavingCostLine.LABEL.equals(detail.label())) {
+      return savingDetail(row, detail);
+    }
     return new String[] {
       LoopWording.clock(detail.seconds()),
       "-",
@@ -53,6 +57,23 @@ final class FarmingWording implements Wording {
     };
   }
 
+  private static String[] savingDetail(ItemEfficiency row, Detail detail) {
+    Map<String, Double> f = detail.figures();
+    return new String[] {
+      LoopWording.clock(detail.seconds()),
+      "-",
+      SavingCostLine.of(row).orElse("-"),
+      ("damage per min %s (%s in the window before), kill participation per min %s (%s before);"
+              + " gold gain %s")
+          .formatted(
+              LoopWording.gold(f.get("damagePerMinute")),
+              LoopWording.gold(f.get("damagePerMinuteBefore")),
+              ItemWording.number(f.get("participationPerMinute")),
+              ItemWording.number(f.get("participationPerMinuteBefore")),
+              LoopWording.gold(f.get("gain.saving-cost")))
+    };
+  }
+
   private static String[] damageDetail(Detail detail) {
     Map<String, Double> f = detail.figures();
     String stats =
@@ -65,13 +86,13 @@ final class FarmingWording implements Wording {
     return new String[] {
       LoopWording.clock(detail.seconds()),
       "enemy heroes",
-      ("%s damage from the item's own effects and %s more from its stats, worth %s gold at %s per"
-              + " 1k damage")
+      ("%s damage from the item's own effects and %s more from its stats, worth %s gold by kill"
+              + " share, the item's own damage helped %s kills")
           .formatted(
               LoopWording.gold(f.get("procDamage")),
               LoopWording.gold(f.get("passiveDamage")),
               LoopWording.gold(f.get("damageValue")),
-              LoopWording.gold(f.get("damagePrice"))),
+              LoopWording.gold(f.getOrDefault("killsHelped", 0.0))),
       ("hero damage per min %s before the purchase and %s after (the stage of the game also raises"
               + " it)%s")
           .formatted(

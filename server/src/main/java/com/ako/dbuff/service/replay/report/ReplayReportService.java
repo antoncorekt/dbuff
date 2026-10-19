@@ -173,6 +173,19 @@ public class ReplayReportService {
    */
   public ReportDelivery deliverSection(
       long matchId, String instanceId, String sectionName, String modelOverride) {
+    return deliverSection(matchId, instanceId, sectionName, modelOverride, null);
+  }
+
+  /**
+   * The same, with the item categories or entry keys a person chose for this request; the items
+   * section lists those instead of the channel's choice.
+   */
+  public ReportDelivery deliverSection(
+      long matchId,
+      String instanceId,
+      String sectionName,
+      String modelOverride,
+      List<String> itemFilter) {
     try {
       if (!hasStoredAnalysis(matchId)) {
         return logSkipped(matchId, ReportDelivery.NOT_STORED);
@@ -200,7 +213,9 @@ public class ReplayReportService {
               () ->
                   render(
                       List.of(section),
-                      input(match, stats, instance).withModelOverride(modelOverride)),
+                      input(match, stats, instance)
+                          .withModelOverride(modelOverride)
+                          .withItemFilter(itemFilter)),
               ReportDelivery.SECTION_EMPTY,
               false));
     } catch (RuntimeException e) {
