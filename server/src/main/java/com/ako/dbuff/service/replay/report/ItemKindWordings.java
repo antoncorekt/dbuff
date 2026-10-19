@@ -33,6 +33,10 @@ public class ItemKindWordings {
             new StickKindWording(),
             new MidasKindWording(),
             new FarmingKindWording(),
+            new CooldownKindWording(),
+            new BottleKindWording(),
+            new TeamRestoreKindWording(),
+            new SoulRingKindWording(),
             new TargetUseKindWording()));
   }
 

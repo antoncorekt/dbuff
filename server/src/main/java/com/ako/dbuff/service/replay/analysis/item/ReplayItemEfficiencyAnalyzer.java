@@ -40,7 +40,7 @@ public class ReplayItemEfficiencyAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 5;
+    return 10;
   }
 
   @Override

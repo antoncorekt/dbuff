@@ -5,13 +5,17 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
 import com.ako.dbuff.service.replay.analysis.item.HeroInputs;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
+import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyEntry;
+import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyFile;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyJson;
 import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.SectionView;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -20,18 +24,19 @@ import org.springframework.stereotype.Component;
 
 /**
  * What the whitelisted items (Magic Stick and Wand, Hand of Midas, the farming group) gave their
- * heroes, one short sentence each, verdict first, in the words of the item's {@link
- * ItemKindWording}. The tracked players' rows come first, then the rows furthest from paying
- * exactly their cost (the best and the worst); at most {@code max-item-lines} are listed, those
- * bought before the horn first, then in time order. A row of an unknown kind is skipped quietly, a
- * row that lacks figures its wording needs with one WARN line; a match with no usable row prints
- * nothing. It reads {@code item_efficiency} only, so it is independent of other sections.
+ * heroes, one short sentence each under the heading of its catalog category, verdict first, in the
+ * words of the item's {@link ItemKindWording}. The tracked players' rows come first, then the rows
+ * furthest from paying exactly their cost (the best and the worst); at most {@code max-item-lines}
+ * per category are listed, those bought before the horn first, then in time order. A row of an
+ * unknown kind is skipped quietly, a row that lacks figures its wording needs with one WARN line; a
+ * match with no usable row prints nothing. It reads {@code item_efficiency} only, so it is
+ * independent of other sections.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ItemsSection implements ReplayReportSection {
-  private record Entry(Long id, ItemEfficiency row, ItemKindWording wording) {}
+  private record Entry(Long id, ItemEfficiency row, ItemKindWording wording, String category) {}
 
   private static final Comparator<Entry> CHRONOLOGICAL =
       Comparator.comparing(
@@ -44,6 +49,7 @@ public class ItemsSection implements ReplayReportSection {
   private final ItemEfficiencyRepo itemRepo;
   private final ReportHeroNames heroNames;
   private final ItemKindWordings wordings;
+  private final ItemEfficiencyFile catalog;
   private final AbilityLabels labels;
   private final ReplayReportProperties properties;
 
@@ -81,10 +87,36 @@ public class ItemsSection implements ReplayReportSection {
     if (stored == null) {
       return List.of();
     }
+    Optional<List<String>> wanted = wanted(input);
     return stored.stream()
         .map(row -> usable(input.matchId(), row))
         .flatMap(Optional::stream)
+        .filter(entry -> wanted.map(names -> isWanted(entry, names)).orElse(true))
         .toList();
+  }
+
+  private static Optional<List<String>> wanted(ReplayReportInput input) {
+    if (input.itemFilter() != null) {
+      return input.itemFilter().isEmpty() ? Optional.empty() : Optional.of(input.itemFilter());
+    }
+    return input.instance() == null
+        ? Optional.empty()
+        : input.instance().effectiveSettings().itemCategoryNames();
+  }
+
+  private static boolean isWanted(Entry entry, List<String> names) {
+    return names.contains(entry.category()) || names.contains(entry.row().entryKey());
+  }
+
+  private String categoryOf(ItemEfficiency row) {
+    return catalog.entries().stream()
+        .filter(
+            e ->
+                e.key().equals(row.entryKey())
+                    || (row.entryKey() == null && e.items().contains(row.itemKey())))
+        .map(ItemEfficiencyEntry::category)
+        .findFirst()
+        .orElse(null);
   }
 
   private Verdict paidBack(ReplayReportInput input, List<Entry> rows) {
@@ -114,17 +146,34 @@ public class ItemsSection implements ReplayReportSection {
         Comparator.comparingInt((Entry e) -> focus.contains(e.row().slot()) ? 0 : 1)
             .thenComparing(ItemsSection::distanceFromCost, Comparator.reverseOrder())
             .thenComparing(CHRONOLOGICAL);
-    List<Entry> shown =
-        BehaviourLines.pick(rows, byWorth, CHRONOLOGICAL, properties.getMaxItemLines()).listed();
-    return new Rendered(
-        shown,
-        BehaviourLines.lines(
-            "**Items**",
-            shown,
-            properties.getMaxBehaviourLineLength(),
-            entry ->
-                entry.wording().shortVerdict(entry.row(), subject(entry.row(), heroes))
-                    + AlternativesWording.suffix(entry.row(), this::itemLabel)));
+    Map<String, String> names = catalog.categories();
+    List<String> order = new ArrayList<>(names.keySet());
+    order.add(null);
+    List<Entry> shown = new ArrayList<>();
+    List<String> lines = new ArrayList<>();
+    for (String category : order) {
+      List<Entry> inCategory =
+          BehaviourLines.pick(
+                  rows.stream().filter(e -> Objects.equals(e.category(), category)).toList(),
+                  byWorth,
+                  CHRONOLOGICAL,
+                  properties.getMaxItemLines())
+              .listed();
+      shown.addAll(inCategory);
+      lines.addAll(
+          BehaviourLines.lines(
+              names.containsKey(category) ? "**" + names.get(category) + "**" : null,
+              inCategory,
+              properties.getMaxBehaviourLineLength(),
+              entry ->
+                  entry.wording().shortVerdict(entry.row(), subject(entry.row(), heroes))
+                      + AlternativesWording.suffix(entry.row(), this::itemLabel)));
+    }
+    if (shown.isEmpty()) {
+      return new Rendered(List.of(), List.of());
+    }
+    lines.add(0, "**Items**");
+    return new Rendered(shown, lines);
   }
 
   private Optional<Entry> usable(long matchId, ItemEfficiencyDomain stored) {
@@ -138,7 +187,7 @@ public class ItemsSection implements ReplayReportSection {
     try {
       ItemEfficiency row = ItemEfficiencyJson.fromRow(stored);
       if (row.purchaseSeconds() != null && wording.get().complete(row)) {
-        return Optional.of(new Entry(stored.getId(), row, wording.get()));
+        return Optional.of(new Entry(stored.getId(), row, wording.get(), categoryOf(row)));
       }
       log.warn(
           "Items section skips row {} of match {}: figures missing", stored.getEntryKey(), matchId);

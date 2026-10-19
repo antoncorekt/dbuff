@@ -62,8 +62,29 @@ public final class ItemWording {
               + " item's own damage counts";
       case "DEATH_COST_ESTIMATED" ->
           "the gold lost or the respawn time of the saved death is estimated";
+      case "SOUL_RING_DEATH" ->
+          "a death within 10 s of a use counts as caused by it when the enemy damage since the use"
+              + " was less than the health he had before it";
+      case "SOUL_RING_HP_UNKNOWN" ->
+          "his health before some uses is unknown, so a death after them is not counted as caused";
+      case "NO_GOLD_TRACK" -> "the track has no gold, so the cost of saving up is not counted";
+      case "NO_MINUTE_GOLD" ->
+          "the match has no gold per minute for a death while saving, so its cost counts as 0";
+      case "HP_ESTIMATED" ->
+          "the log credits the bottle with no heal, so the health is the constants' amount capped"
+              + " by his missing health";
+      case "MANA_ESTIMATED" ->
+          "the log has no mana from the item, so the mana is the constants' amount capped by the"
+              + " missing mana of whoever got it";
+      case "RUNES_BOTTLED_ESTIMATED" ->
+          "a rune counts as bottled when no effect began on him at the pickup, and a regeneration"
+              + " or illusion rune never does";
+      case "RADIUS_ASSUMED" -> "the constants give no radius for it, so 1200 is assumed";
       case "COST_UNKNOWN" -> "the item constants give no cost for it, so there is no ratio";
       case "BONUS_GOLD_UNKNOWN" -> "the constants give no bonus gold, so no gold is counted";
+      case "COOLDOWN_NOT_SEEN" -> "a cast with no cooldown shown in the replay is not counted";
+      case "CHARGES_SKIPPED" -> "abilities with charges are not counted";
+      case "REDUCTION_UNKNOWN" -> "the constants give no cooldown reduction, so no cast is counted";
       case "USE_WITHOUT_GOLD" -> "a use had no gold entry in the log";
       case "NO_BEFORE_WINDOW" -> "bought too early for a before window, not compared";
       case "SHORT_AFTER_WINDOW" -> "bought too late for an after window, not compared";

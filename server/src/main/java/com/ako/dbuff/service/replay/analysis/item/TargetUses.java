@@ -199,7 +199,12 @@ record TargetUses(List<Cast> casts) {
     if (!hero.match().slots().containsKey(target)) {
       return Who.UNKNOWN;
     }
-    return hero.match().enemies(hero.hero(), target) ? Who.ENEMY : Who.ALLY;
+    if (hero.match().enemies(hero.hero(), target)) {
+      return Who.ENEMY;
+    }
+    return hero.match().roster().get().stream().anyMatch(o -> target.equals(o.hero()))
+        ? Who.ALLY
+        : Who.UNKNOWN;
   }
 
   private static boolean effective(HeroInputs hero, CombatEvent use, String target) {
@@ -216,24 +221,11 @@ record TargetUses(List<Cast> casts) {
                         && e.gameSecond() <= use.gameSecond() + EFFECT_SECONDS);
   }
 
-  /** An ally as the judges read a hero: his damage and deaths from the whole match, his track. */
+  /** An ally as the judges read a hero: the roster's inputs of that hero. */
   private static HeroInputs ally(HeroInputs hero, String name) {
-    MatchFacts match = hero.match();
-    Set<CombatEventKind> kinds =
-        new HashSet<>(List.of(CombatEventKind.DAMAGE, CombatEventKind.DEATH));
-    List<CombatEvent> events =
-        match.events().stream()
-            .filter(e -> kinds.contains(e.kind()) && name.equals(e.target()))
-            .toList();
-    return new HeroInputs(
-        match.slots().get(name),
-        name,
-        List.of(),
-        events,
-        match.tracks().get(name),
-        List.of(),
-        List.of(),
-        match,
-        hero.matchId());
+    return hero.match().roster().get().stream()
+        .filter(other -> name.equals(other.hero()))
+        .findFirst()
+        .orElseThrow();
   }
 }

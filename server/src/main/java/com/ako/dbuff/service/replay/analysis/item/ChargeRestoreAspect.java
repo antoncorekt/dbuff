@@ -12,7 +12,10 @@ import org.springframework.stereotype.Component;
 
 /**
  * Magic Stick and its upgrade Magic Wand, which are one chain: what the charges restored, health
- * and mana capped by what was missing when that is known, at a price per point.
+ * and mana capped by what was missing when that is known, at a price per point. A bottle (entry
+ * parameter {@code restoreFromConstants}) restores a fixed amount per sip, see {@link BottleSips}.
+ * An item that spends health for mana (entry parameter {@code healthCost}) restores a negative
+ * amount of health, see {@link SoulRingUses}.
  */
 @Component
 public class ChargeRestoreAspect implements ItemAspect {
@@ -21,13 +24,16 @@ public class ChargeRestoreAspect implements ItemAspect {
   static final String HP_UNCAPPED = "HP_UNCAPPED";
   static final String MANA_UNCAPPED = "MANA_UNCAPPED";
   static final String NO_CHARGES_SEEN = "NO_CHARGES_SEEN";
+  static final String HP_ESTIMATED = "HP_ESTIMATED";
+  static final String MANA_ESTIMATED = "MANA_ESTIMATED";
 
   private static final String USE = "USE";
   private static final Set<String> PARAMETERS = parameters();
 
   private static Set<String> parameters() {
     Set<String> names = new HashSet<>(StickUses.PARAMETERS);
-    names.addAll(Set.of("goldPerHp", "goldPerMana"));
+    names.addAll(BottleSips.PARAMETERS);
+    names.addAll(Set.of("goldPerHp", "goldPerMana", SoulRingUses.HEALTH_COST));
     return Set.copyOf(names);
   }
 
@@ -44,7 +50,13 @@ public class ChargeRestoreAspect implements ItemAspect {
   @Override
   public AspectPart measure(AspectContext context) {
     ItemEfficiencyEntry entry = context.entry();
-    List<Use> uses = StickUses.of(context).uses();
+    boolean bottle = entry.parameter("restoreFromConstants", 0) > 0;
+    boolean spendsHealth = entry.parameter(SoulRingUses.HEALTH_COST, 0) > 0;
+    BottleSips sips = bottle ? BottleSips.of(context) : null;
+    List<Use> uses =
+        bottle
+            ? sips.uses()
+            : spendsHealth ? SoulRingUses.of(context) : StickUses.of(context).uses();
     double hp = uses.stream().mapToDouble(Use::hp).sum();
     double mana = uses.stream().mapToDouble(Use::mana).sum();
     Map<String, Double> totals = new LinkedHashMap<>();
@@ -53,13 +65,20 @@ public class ChargeRestoreAspect implements ItemAspect {
     totals.put("mana", mana);
     totals.put("laningUses", uses.stream().filter(Use::laning).count() * 1.0);
     List<String> flags = new ArrayList<>();
-    if (uses.stream().anyMatch(u -> !u.hpKnown())) {
+    if (bottle) {
+      if (sips.healthEstimated() && !uses.isEmpty()) {
+        flags.add(HP_ESTIMATED);
+      }
+      if (!uses.isEmpty()) {
+        flags.add(MANA_ESTIMATED);
+      }
+    } else if (!spendsHealth && uses.stream().anyMatch(u -> !u.hpKnown())) {
       flags.add(HP_UNCAPPED);
     }
-    if (uses.stream().anyMatch(u -> !u.manaKnown())) {
+    if (!bottle && uses.stream().anyMatch(u -> !u.manaKnown())) {
       flags.add(MANA_UNCAPPED);
     }
-    if (uses.stream().anyMatch(u -> !u.chargesSeen())) {
+    if (!bottle && uses.stream().anyMatch(u -> !u.chargesSeen())) {
       flags.add(NO_CHARGES_SEEN);
     }
     double gain =

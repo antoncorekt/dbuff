@@ -5,11 +5,13 @@ import com.ako.dbuff.dao.model.ReplayPlayerDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerMinuteDomain;
 import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.dao.model.ReplayStateChangeDomain;
+import com.ako.dbuff.dao.model.RunePickupDomain;
 import com.ako.dbuff.dao.repo.CreepKillRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerMinuteRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
+import com.ako.dbuff.dao.repo.RunePickupRepo;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.CombatHeroes;
@@ -24,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -33,7 +36,11 @@ import org.springframework.stereotype.Component;
 public class ItemEfficiencyInputs {
   private static final Set<CombatEventKind> ABOUT_THE_TARGET =
       Set.of(
-          CombatEventKind.DAMAGE, CombatEventKind.DEATH, CombatEventKind.GOLD, CombatEventKind.XP);
+          CombatEventKind.DAMAGE,
+          CombatEventKind.DEATH,
+          CombatEventKind.GOLD,
+          CombatEventKind.XP,
+          CombatEventKind.HEAL);
 
   /** The heroes of the match and the last second the stored data reaches. */
   public record MatchInputs(int gameEndSeconds, List<HeroInputs> heroes) {}
@@ -43,6 +50,7 @@ public class ItemEfficiencyInputs {
   private final ReplayPlayerTrackRepo trackRepo;
   private final ReplayStateChangeRepo stateRepo;
   private final CreepKillRepo creepKillRepo;
+  private final RunePickupRepo runeRepo;
   private final StoredActivity activity;
   private final CombatLogReader combatLog;
 
@@ -60,10 +68,14 @@ public class ItemEfficiencyInputs {
         .filter(k -> k.getSeconds() != null)
         .sorted(Comparator.comparing(CreepKillDomain::getSeconds))
         .forEach(k -> kills.computeIfAbsent(k.getPlayerSlot(), s -> new ArrayList<>()).add(k));
+    Map<Long, List<RunePickupDomain>> runes = new HashMap<>();
+    runeRepo.findByMatchId(matchId).stream()
+        .filter(r -> r.getPlayerSlot() != null)
+        .forEach(r -> runes.computeIfAbsent(r.getPlayerSlot(), s -> new ArrayList<>()).add(r));
     Map<Long, List<ActivitySegment>> segments = activity.bySlot(matchId);
     List<ReplayPlayerDomain> players = playerRepo.findByMatchId(matchId);
-    MatchFacts match = matchFacts(matchId, events, players, heroNames, tracks);
     List<HeroInputs> heroes = new ArrayList<>();
+    MatchFacts match = matchFacts(matchId, events, players, heroNames, () -> heroes);
     for (ReplayPlayerDomain player : players) {
       String hero = CombatHeroes.nameOf(player, heroNames);
       Long slot = player.getPlayerSlot();
@@ -78,7 +90,8 @@ public class ItemEfficiencyInputs {
                 kills.getOrDefault(slot, List.of()),
                 segments.getOrDefault(slot, List.of()),
                 match,
-                matchId));
+                matchId,
+                runes.getOrDefault(slot, List.of())));
       }
     }
     return new MatchInputs(gameEnd(events, tracks.values()), heroes);
@@ -89,16 +102,12 @@ public class ItemEfficiencyInputs {
       List<CombatEvent> events,
       List<ReplayPlayerDomain> players,
       Set<String> heroNames,
-      Map<Long, ReplayPlayerTrackDomain> tracks) {
+      Supplier<List<HeroInputs>> roster) {
     Map<String, Long> slots = new HashMap<>();
-    Map<String, ReplayPlayerTrackDomain> tracksByHero = new HashMap<>();
     for (ReplayPlayerDomain player : players) {
       String hero = CombatHeroes.nameOf(player, heroNames);
       if (hero != null && player.getPlayerSlot() != null) {
         slots.put(hero, player.getPlayerSlot());
-        if (tracks.containsKey(player.getPlayerSlot())) {
-          tracksByHero.put(hero, tracks.get(player.getPlayerSlot()));
-        }
       }
     }
     Map<Long, List<ReplayPlayerMinuteDomain>> minutes = new HashMap<>();
@@ -110,12 +119,12 @@ public class ItemEfficiencyInputs {
         events.stream().filter(ItemEfficiencyInputs::acrossHeroes).toList(),
         slots,
         minutes,
-        tracksByHero);
+        roster);
   }
 
   /**
-   * Damage to heroes by anyone, hero deaths, the gold and experience of hero kills and the effect
-   * modifiers of targeted items.
+   * Damage to heroes by anyone, hero deaths, the gold and experience of hero kills, heals that
+   * items did to heroes and the effect modifiers of targeted items.
    */
   private static boolean acrossHeroes(CombatEvent e) {
     return switch (e.kind()) {
@@ -123,6 +132,7 @@ public class ItemEfficiencyInputs {
       case GOLD -> e.goldReason() == GoldReason.HERO_KILL;
       case XP -> e.xpReason() == XpReason.HERO_KILL;
       case MODIFIER_ADD -> TargetUses.EFFECT_MODIFIERS.contains(e.inflictor());
+      case HEAL -> e.targetIsRealHero() && e.inflictor().startsWith(HeroInputs.ITEM_PREFIX);
       default -> false;
     };
   }
@@ -131,7 +141,7 @@ public class ItemEfficiencyInputs {
     return events.stream()
         .filter(
             e ->
-                e.kind() == CombatEventKind.ITEM
+                e.kind() == CombatEventKind.ITEM || e.kind() == CombatEventKind.ABILITY
                     ? hero.equals(e.attacker())
                     : e.kind() == CombatEventKind.DAMAGE && hero.equals(e.attacker())
                         ? e.targetIsRealHero()

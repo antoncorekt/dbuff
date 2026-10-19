@@ -90,10 +90,9 @@ class TargetUsesTest {
   }
 
   private static MatchFacts match(
-      List<CombatEvent> events, Map<String, ReplayPlayerTrackDomain> t) {
-    return new MatchFacts(
-        events,
-        SLOTS,
+      List<CombatEvent> events, Map<String, ReplayPlayerTrackDomain> tracks) {
+    List<MatchFacts> self = new ArrayList<>();
+    var minutes =
         Map.of(
             0L,
             List.of(
@@ -104,8 +103,31 @@ class TargetUsesTest {
             List.of(
                 ItemTestData.minute(1, 600, 0),
                 ItemTestData.minute(2, 1200, 0),
-                ItemTestData.minute(3, 1800, 0))),
-        t);
+                ItemTestData.minute(3, 1800, 0)));
+    MatchFacts match =
+        new MatchFacts(
+            events,
+            SLOTS,
+            minutes,
+            () ->
+                tracks.entrySet().stream()
+                    .map(
+                        e ->
+                            new HeroInputs(
+                                SLOTS.get(e.getKey()),
+                                e.getKey(),
+                                List.of(),
+                                events.stream()
+                                    .filter(ev -> e.getKey().equals(ev.target()))
+                                    .toList(),
+                                e.getValue(),
+                                List.of(),
+                                List.of(),
+                                self.getFirst(),
+                                0))
+                    .toList());
+    self.add(match);
+    return match;
   }
 
   private static List<ReplayStateChangeDomain> bought(String item) {

@@ -38,7 +38,6 @@ public class InstanceSettingsApplier {
   private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("H:mm");
 
   private static final String NONE = "none";
-  private static final String ALL = "all";
   private static final int MAX_LANGUAGE_LENGTH = 40;
   private static final Pattern LANGUAGE = Pattern.compile("^\\p{L}[\\p{L} \\-]*$");
 
@@ -128,28 +127,7 @@ public class InstanceSettingsApplier {
 
   /** Canonical comma-separated names, null for every category. */
   private String parseItemCategories(String raw) {
-    String trimmed = raw.trim();
-    if (trimmed.isEmpty() || ALL.equalsIgnoreCase(trimmed) || DEFAULT.equalsIgnoreCase(trimmed)) {
-      return null;
-    }
-    Set<String> valid = itemCatalog.selectableNames();
-    Set<String> names = new LinkedHashSet<>();
-    for (String token : trimmed.split("[,\\s]+")) {
-      if (token.isEmpty()) {
-        continue;
-      }
-      String name = token.toLowerCase(Locale.ROOT).replace('-', '_');
-      if (!valid.contains(name)) {
-        throw new IllegalArgumentException(
-            "Unknown item category `"
-                + token
-                + "`. Valid categories and items: "
-                + String.join(", ", valid)
-                + ". Use `all` for every category.");
-      }
-      names.add(name);
-    }
-    return names.isEmpty() ? null : String.join(",", names);
+    return itemCatalog.parseSelection(raw).map(names -> String.join(",", names)).orElse(null);
   }
 
   private String parseLanguage(String raw) {

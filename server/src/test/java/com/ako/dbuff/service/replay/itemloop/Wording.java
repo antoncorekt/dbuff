@@ -15,6 +15,10 @@ interface Wording {
           "charge-restore", new StickWording(),
           "midas-uses", new MidasWording(),
           "farm-rate", new FarmingWording(),
+          "cooldown", new CooldownWording(),
+          "bottle-runes", new BottleWording(),
+          "team-restore", new TeamRestoreWording(),
+          "self-harm", new SoulRingWording(),
           "target-use", new TargetUseWording());
 
   static Wording of(String kind) {
