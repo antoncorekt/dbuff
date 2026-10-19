@@ -1,7 +1,7 @@
 package com.ako.dbuff.service.replay.report;
 
-import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
+import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

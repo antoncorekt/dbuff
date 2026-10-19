@@ -23,6 +23,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class PopularItems {
   static final Duration TTL = Duration.ofHours(24);
+  static final Duration FAILURE_TTL = Duration.ofMinutes(10);
   private static final int SHOWN = 2;
 
   private record Cached(Instant expires, Map<Phase, List<Long>> phases) {}
@@ -72,6 +73,7 @@ public class PopularItems {
       return fetched;
     } catch (ApiException | RuntimeException e) {
       log.warn("OpenDota item popularity for hero {} failed: {}", heroId, e.toString());
+      cache.put(heroId, new Cached(now.plus(FAILURE_TTL), Map.of()));
       return Map.of();
     }
   }

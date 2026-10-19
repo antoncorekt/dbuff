@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -56,7 +57,7 @@ class PopularItemsTest {
   }
 
   private void late(Long... ids) throws ApiException {
-    when(source.fetch(HERO)).thenReturn(Map.of(Phase.LATE, List.of(ids), Phase.MID, List.of(5L)));
+    doReturn(Map.of(Phase.LATE, List.of(ids), Phase.MID, List.of(5L))).when(source).fetch(HERO);
   }
 
   @Test
@@ -89,11 +90,16 @@ class PopularItemsTest {
   }
 
   @Test
-  void aFailureGivesNoFallbackAndIsNotCached() throws Exception {
+  void aFailureGivesNoFallbackAndIsNotRetriedWithinTheWindow() throws Exception {
     when(source.fetch(anyLong())).thenThrow(new ApiException(503, "down"));
 
     assertThat(popular.near(HERO, 2_400, 5_150, 0.3, Set.of())).isEmpty();
     assertThat(popular.near(HERO, 2_400, 5_150, 0.3, Set.of())).isEmpty();
+    verify(source, times(1)).fetch(HERO);
+
+    clock.now = NOW.plus(Duration.ofMinutes(11));
+    late(3L);
+    assertThat(popular.near(HERO, 2_400, 5_150, 0.3, Set.of())).containsExactly("manta");
     verify(source, times(2)).fetch(HERO);
   }
 
