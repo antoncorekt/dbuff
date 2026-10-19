@@ -12,6 +12,7 @@ import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.change;
 import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.hero;
 import static com.ako.dbuff.service.replay.analysis.item.ItemTestData.kill;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class FarmingAspectsTest {
   private static final String CAMP_CREEP = "npc_dota_neutral_kobold";
@@ -31,6 +32,10 @@ class FarmingAspectsTest {
     return ItemTestData.judge(ENTRY, aspects, KITS, gameEnd, List.of(hero)).getFirst();
   }
 
+  private static List<CreepKillDomain> history() {
+    return kills(16, 120, 600, 30);
+  }
+
   private static List<CreepKillDomain> kills(int count, double from, double to, int gold) {
     List<CreepKillDomain> kills = new ArrayList<>();
     for (int i = 0; i < count; i++) {
@@ -42,7 +47,7 @@ class FarmingAspectsTest {
   @Test
   void theRatesBeforeAndAfterTheFirstItemGiveTheNetGainAndThePayback() {
     List<CreepKillDomain> kills = new ArrayList<>();
-    kills.addAll(kills(10, 300, 600, 30));
+    kills.addAll(history());
     kills.addAll(kills(20, 600, 900, 30));
     kills.add(kill(610, CAMP_CREEP, 10, 3));
     kills.add(kill(615, CAMP_CREEP, 10, 3));
@@ -121,7 +126,7 @@ class FarmingAspectsTest {
   @Test
   void theGainStopsWhenTheHeroNoLongerOwnsTheItem() {
     List<CreepKillDomain> kills = new ArrayList<>();
-    kills.addAll(kills(10, 300, 600, 30));
+    kills.addAll(history());
     kills.addAll(kills(20, 600, 900, 30));
     var changes =
         List.of(
@@ -154,7 +159,7 @@ class FarmingAspectsTest {
     CreepKillDomain nameless = kill(0, "npc_dota_creep_goodguys_melee", 30, null);
     nameless.setSeconds(null);
     var changes = List.of(change(600, StateChangeKind.ITEM_ADDED, "item_bfury"));
-    List<CreepKillDomain> kills = new ArrayList<>(kills(10, 300, 600, 30));
+    List<CreepKillDomain> kills = new ArrayList<>(history());
     kills.add(nameless);
 
     ItemEfficiency result = evaluate(hero(changes, List.of(), null, kills, List.of()), 1500);
@@ -165,7 +170,7 @@ class FarmingAspectsTest {
   @Test
   void aCostTheConstantsLackGivesAFlagAndNoRatio() {
     var changes = List.of(change(600, StateChangeKind.ITEM_ADDED, "item_bfury"));
-    List<CreepKillDomain> kills = kills(10, 300, 600, 30);
+    List<CreepKillDomain> kills = history();
 
     ItemEfficiency result =
         ItemTestData.judge(
@@ -182,87 +187,46 @@ class FarmingAspectsTest {
     assertThat(result.flags()).contains(AspectSum.COST_UNKNOWN);
   }
 
-  private static ItemEfficiencyEntry withDamage() {
-    return ItemTestData.entry(
-        "farming_items",
-        List.of(FarmRateAspect.NAME, ItemDamageAspect.NAME, StatUpliftAspect.NAME),
-        List.of("bfury", "maelstrom", "mjollnir"),
-        Map.of("damagePrice", 100.0, "damageWindowMinutes", 5.0));
-  }
-
-  private static List<CombatEvent> damageEvents() {
-    return List.of(
-        ItemTestData.dealt(350, 1000, ""),
-        ItemTestData.dealt(450, 1000, ""),
-        ItemTestData.dealt(550, 1000, ""),
-        ItemTestData.dealt(650, 1500, ""),
-        ItemTestData.dealt(700, 750, "item_maelstrom"),
-        ItemTestData.dealt(750, 1500, ""),
-        ItemTestData.dealt(800, 750, "item_maelstrom"),
-        ItemTestData.dealt(850, 1500, ""));
-  }
-
   @Test
-  void theDamagePartAddsTheItemsOwnDamageAndTheUpliftOfItsStatsToTheGoldPart() {
+  void theGainIsOnlyWhatComesAboveTheTrendOfTheHerosOwnCreepGold() {
     List<CreepKillDomain> kills = new ArrayList<>();
-    kills.addAll(kills(10, 300, 600, 30));
-    kills.addAll(kills(20, 600, 900, 30));
-    var changes = List.of(change(600, StateChangeKind.ITEM_ADDED, "item_maelstrom"));
+    for (int m = 2; m < 10; m++) {
+      kills.add(kill(m * 60 + 10, "npc_dota_creep_goodguys_melee", 10 * m, null));
+      kills.add(kill(m * 60 + 20, "npc_dota_creep_goodguys_melee", 10 * m, null));
+    }
+    for (int m = 10; m < 15; m++) {
+      for (int i = 1; i <= 3; i++) {
+        kills.add(kill(m * 60 + 10 * i, "npc_dota_creep_goodguys_melee", 90, null));
+      }
+    }
+    var changes = List.of(change(600, StateChangeKind.ITEM_ADDED, "item_bfury"));
 
-    ItemEfficiency result =
-        ItemTestData.judge(
-                withDamage(),
-                aspects,
-                KITS,
-                1500,
-                List.of(hero(changes, damageEvents(), null, kills, List.of())))
-            .getFirst();
+    ItemEfficiency result = evaluate(hero(changes, List.of(), null, kills, List.of()), 1500);
 
-    assertThat(result.figures())
-        .containsEntry("procDamage", 1500.0)
-        .containsEntry("passiveDamage", 4500.0)
-        .containsEntry("damageValue", 600.0)
-        .containsEntry("creepGain", 60.0 * 15);
-    assertThat(result.gain()).isEqualTo(60.0 * 15 + 600);
-    assertThat(result.ratio()).isEqualTo((60.0 * 15 + 600) / 500);
-    ItemEfficiency.Detail damage =
-        result.rows().stream().filter(d -> d.label().equals("DAMAGE")).findFirst().orElseThrow();
-    assertThat(damage.figures())
-        .containsEntry("beforePerMinute", 600.0)
-        .containsEntry("afterPerMinute", 1200.0)
-        .containsEntry("damagePrice", 100.0)
-        .containsEntry("bonusDamage", 25.0);
-    assertThat(result.paybackSeconds()).isEqualTo(600 + 500 / ((60.0 * 15 + 600) / 15) * 60);
-  }
-
-  @Test
-  void withoutTheParameterTheDamagePartIsOffAndTheResultIsTheGoldOnly() {
-    List<CreepKillDomain> kills = new ArrayList<>();
-    kills.addAll(kills(10, 300, 600, 30));
-    kills.addAll(kills(20, 600, 900, 30));
-    var changes = List.of(change(600, StateChangeKind.ITEM_ADDED, "item_maelstrom"));
-
-    ItemEfficiency result = evaluate(hero(changes, damageEvents(), null, kills, List.of()), 1500);
-
-    assertThat(result.figures()).doesNotContainKey("damageValue");
-    assertThat(result.gain()).isEqualTo(60.0 * 15);
+    assertThat(result.figures().get("netGoldPerMinute")).isCloseTo(30.0, within(1e-6));
+    assertThat(result.figures().get("gain.farm-rate")).isCloseTo(30.0 * 15, within(1e-6));
+    assertThat(result.rows().get(0).figures().get("goldPerMinute")).isCloseTo(140.0, within(1e-6));
   }
 
   @Test
   void anItemBoughtBeforeTheHornCountsItsOwnDamageButNoUplift() {
     var changes = List.of(change(-70, StateChangeKind.ITEM_ADDED, "item_maelstrom"));
+    List<CombatEvent> events = List.of(ItemTestData.dealt(100, 500, "item_maelstrom"));
+
+    ItemEfficiencyEntry all =
+        ItemTestData.entry(
+            "farming_items",
+            List.of(FarmRateAspect.NAME, ItemDamageAspect.NAME, StatUpliftAspect.NAME),
+            List.of("bfury", "maelstrom", "mjollnir"),
+            Map.of());
 
     ItemEfficiency result =
         ItemTestData.judge(
-                withDamage(),
-                aspects,
-                KITS,
-                900,
-                List.of(hero(changes, damageEvents(), null, List.of(), List.of())))
+                all, aspects, KITS, 900, List.of(hero(changes, events, null, List.of(), List.of())))
             .getFirst();
 
     assertThat(result.figures())
-        .containsEntry("procDamage", 1500.0)
+        .containsEntry("procDamage", 500.0)
         .containsEntry("passiveDamage", 0.0);
     assertThat(result.flags()).contains(StatUpliftAspect.NO_DAMAGE_COMPARISON);
     assertThat(result.ratio()).isNull();

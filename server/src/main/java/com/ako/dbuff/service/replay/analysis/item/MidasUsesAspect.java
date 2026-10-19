@@ -53,7 +53,7 @@ public class MidasUsesAspect implements ItemAspect {
     return PARAMETERS;
   }
 
-  private record Use(CombatEvent event, int gold, int xp) {}
+  record Use(CombatEvent event, int gold, int xp) {}
 
   @Override
   public AspectPart measure(AspectContext context) {
@@ -150,7 +150,7 @@ public class MidasUsesAspect implements ItemAspect {
    * claimed when the constants give no bonus) and the experience entry for a creep kill nearest in
    * time, each entry claimed once.
    */
-  private List<Use> pairedUses(HeroInputs hero, List<String> names, int bonus) {
+  static List<Use> pairedUses(HeroInputs hero, List<String> names, int bonus) {
     List<CombatEvent> events = hero.events();
     Set<Integer> taken = new HashSet<>();
     List<Use> uses = new ArrayList<>();
@@ -216,7 +216,7 @@ public class MidasUsesAspect implements ItemAspect {
     return !taken.contains(j) && wanted.test(e) && nearer ? j : best;
   }
 
-  private static int bonusGold(ItemKits kits, String key) {
+  static int bonusGold(ItemKits kits, String key) {
     return kits.item(key).map(ItemConstant::getAttrib).stream()
         .flatMap(List::stream)
         .filter(a -> BONUS_GOLD.equals(a.get("key")))

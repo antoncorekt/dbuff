@@ -840,6 +840,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                 "bfury", "farming_items",
                 "maelstrom", "farming_items",
                 "mjollnir", "farming_items",
+                "radiance", "radiance",
                 "bottle", "bottle")
             .entrySet()
             .stream()
@@ -906,6 +907,17 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertThat(r.rows()).extracting(d -> d.label()).startsWith("BEFORE", "AFTER", "DAMAGE");
       assertThat(r.figures().get("procDamage")).as("damage of the item's own effects").isPositive();
       assertThat(r.figures().get("damageValue")).isGreaterThanOrEqualTo(0.0);
+    }
+    for (ItemEfficiency r : rows.stream().filter(r -> r.entryKey().equals("radiance")).toList()) {
+      r.rows().stream()
+          .filter(d -> "SAVING".equals(d.label()))
+          .forEach(
+              d -> {
+                assertThat(d.figures().get("savingSeconds")).isPositive();
+                assertThat(d.figures().get("savingPeakGold")).isPositive();
+                assertThat(d.figures().get("savingGoldLost")).isGreaterThanOrEqualTo(0.0);
+                assertThat(r.figures().get("gain.saving-cost")).isLessThanOrEqualTo(0.0);
+              });
     }
     for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("bottle-runes")).toList()) {
       assertThat(r.figures().get("bottled"))

@@ -47,20 +47,27 @@ entries:
       minBeforeSeconds: 120
       minAfterSeconds: 60
       campGapSeconds: 30
-      damagePrice: 100
       damageWindowMinutes: 5
   - key: radiance
     category: farming
     items: [radiance]
-    aspects: [farm-rate, item-damage, alternatives]
+    aspects: [farm-rate, item-damage, alternatives, saving-cost]
     alternatives: [maelstrom, bfury, manta]
     parameters:
       windowMinutes: 5
       minBeforeSeconds: 120
       minAfterSeconds: 60
       campGapSeconds: 30
-      damagePrice: 100
       damageWindowMinutes: 5
+      savingThreshold: 0.4
+      smallPurchase: 500
+  - key: octarine_core
+    category: farming
+    items: [octarine_core]
+    aspects: [cooldown, alternatives]
+    parameters:
+      damageSeconds: 3
+      toleranceSeconds: 0.5
   - key: bottle
     category: sustain
     items: [bottle]

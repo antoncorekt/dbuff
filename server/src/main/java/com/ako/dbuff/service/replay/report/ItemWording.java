@@ -62,6 +62,9 @@ public final class ItemWording {
               + " item's own damage counts";
       case "DEATH_COST_ESTIMATED" ->
           "the gold lost or the respawn time of the saved death is estimated";
+      case "NO_GOLD_TRACK" -> "the track has no gold, so the cost of saving up is not counted";
+      case "NO_MINUTE_GOLD" ->
+          "the match has no gold per minute for a death while saving, so its cost counts as 0";
       case "HP_ESTIMATED" ->
           "the log credits the bottle with no heal, so the health is the constants' amount capped"
               + " by his missing health";
@@ -73,6 +76,9 @@ public final class ItemWording {
               + " or illusion rune never does";
       case "COST_UNKNOWN" -> "the item constants give no cost for it, so there is no ratio";
       case "BONUS_GOLD_UNKNOWN" -> "the constants give no bonus gold, so no gold is counted";
+      case "COOLDOWN_NOT_SEEN" -> "a cast with no cooldown shown in the replay is not counted";
+      case "CHARGES_SKIPPED" -> "abilities with charges are not counted";
+      case "REDUCTION_UNKNOWN" -> "the constants give no cooldown reduction, so no cast is counted";
       case "USE_WITHOUT_GOLD" -> "a use had no gold entry in the log";
       case "NO_BEFORE_WINDOW" -> "bought too early for a before window, not compared";
       case "SHORT_AFTER_WINDOW" -> "bought too late for an after window, not compared";

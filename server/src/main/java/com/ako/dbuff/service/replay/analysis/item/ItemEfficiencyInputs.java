@@ -131,7 +131,7 @@ public class ItemEfficiencyInputs {
     return events.stream()
         .filter(
             e ->
-                e.kind() == CombatEventKind.ITEM
+                e.kind() == CombatEventKind.ITEM || e.kind() == CombatEventKind.ABILITY
                     ? hero.equals(e.attacker())
                     : e.kind() == CombatEventKind.DAMAGE && hero.equals(e.attacker())
                         ? e.targetIsRealHero()
