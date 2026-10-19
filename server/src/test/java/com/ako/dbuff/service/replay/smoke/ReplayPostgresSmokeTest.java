@@ -899,6 +899,15 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(followed)
         .as("%s: uses with charges followed by a drop to half or less (E3 verified)", id)
         .isGreaterThanOrEqualTo(withCharges * 8 / 10);
+    for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("self-harm")).toList()) {
+      assertThat(r.figures().get("mana"))
+          .as("%s slot %d: soul ring mana", id, r.slot())
+          .isNotNegative();
+      assertThat(r.figures().get("hp"))
+          .as("%s slot %d: soul ring health spent", id, r.slot())
+          .isLessThanOrEqualTo(0);
+      assertThat(r.figures().get("selfDeaths")).isLessThanOrEqualTo((double) r.count());
+    }
     for (ItemEfficiency r : rows.stream().filter(r -> r.kind().equals("midas-uses")).toList()) {
       assertThat(r.figures().get("gold"))
           .as("%s slot %d: every use pays the bonus gold", id, r.slot())

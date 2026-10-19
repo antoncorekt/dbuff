@@ -14,6 +14,8 @@ import org.springframework.stereotype.Component;
  * Magic Stick and its upgrade Magic Wand, which are one chain: what the charges restored, health
  * and mana capped by what was missing when that is known, at a price per point. A bottle (entry
  * parameter {@code restoreFromConstants}) restores a fixed amount per sip, see {@link BottleSips}.
+ * An item that spends health for mana (entry parameter {@code healthCost}) restores a negative
+ * amount of health, see {@link SoulRingUses}.
  */
 @Component
 public class ChargeRestoreAspect implements ItemAspect {
@@ -31,7 +33,7 @@ public class ChargeRestoreAspect implements ItemAspect {
   private static Set<String> parameters() {
     Set<String> names = new HashSet<>(StickUses.PARAMETERS);
     names.addAll(BottleSips.PARAMETERS);
-    names.addAll(Set.of("goldPerHp", "goldPerMana"));
+    names.addAll(Set.of("goldPerHp", "goldPerMana", SoulRingUses.HEALTH_COST));
     return Set.copyOf(names);
   }
 
@@ -49,8 +51,12 @@ public class ChargeRestoreAspect implements ItemAspect {
   public AspectPart measure(AspectContext context) {
     ItemEfficiencyEntry entry = context.entry();
     boolean bottle = entry.parameter("restoreFromConstants", 0) > 0;
+    boolean spendsHealth = entry.parameter(SoulRingUses.HEALTH_COST, 0) > 0;
     BottleSips sips = bottle ? BottleSips.of(context) : null;
-    List<Use> uses = bottle ? sips.uses() : StickUses.of(context).uses();
+    List<Use> uses =
+        bottle
+            ? sips.uses()
+            : spendsHealth ? SoulRingUses.of(context) : StickUses.of(context).uses();
     double hp = uses.stream().mapToDouble(Use::hp).sum();
     double mana = uses.stream().mapToDouble(Use::mana).sum();
     Map<String, Double> totals = new LinkedHashMap<>();
@@ -66,7 +72,7 @@ public class ChargeRestoreAspect implements ItemAspect {
       if (!uses.isEmpty()) {
         flags.add(MANA_ESTIMATED);
       }
-    } else if (uses.stream().anyMatch(u -> !u.hpKnown())) {
+    } else if (!spendsHealth && uses.stream().anyMatch(u -> !u.hpKnown())) {
       flags.add(HP_UNCAPPED);
     }
     if (!bottle && uses.stream().anyMatch(u -> !u.manaKnown())) {

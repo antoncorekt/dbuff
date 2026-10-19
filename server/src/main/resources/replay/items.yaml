@@ -99,3 +99,15 @@ entries:
     category: sustain
     items: [holy_locket]
     aspects: [team-restore, save]
+  - key: soul_ring
+    category: sustain
+    items: [soul_ring]
+    aspects: [self-harm, charge-restore]
+    parameters:
+      healthCost: 170
+      goldPerHp: 0.3
+      goldPerMana: 0.3
+      laningEndSeconds: 600
+      surviveSeconds: 10
+      hpLookbackSeconds: 3
+      maxHpWindowSeconds: 120

@@ -62,6 +62,11 @@ public final class ItemWording {
               + " item's own damage counts";
       case "DEATH_COST_ESTIMATED" ->
           "the gold lost or the respawn time of the saved death is estimated";
+      case "SOUL_RING_DEATH" ->
+          "a death within 10 s of a use counts as caused by it when the enemy damage since the use"
+              + " was less than the health he had before it";
+      case "SOUL_RING_HP_UNKNOWN" ->
+          "his health before some uses is unknown, so a death after them is not counted as caused";
       case "NO_GOLD_TRACK" -> "the track has no gold, so the cost of saving up is not counted";
       case "NO_MINUTE_GOLD" ->
           "the match has no gold per minute for a death while saving, so its cost counts as 0";

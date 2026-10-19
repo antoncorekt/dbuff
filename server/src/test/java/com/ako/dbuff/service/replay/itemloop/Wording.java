@@ -17,7 +17,8 @@ interface Wording {
           "farm-rate", new FarmingWording(),
           "cooldown", new CooldownWording(),
           "bottle-runes", new BottleWording(),
-          "team-restore", new TeamRestoreWording());
+          "team-restore", new TeamRestoreWording(),
+          "self-harm", new SoulRingWording());
 
   static Wording of(String kind) {
     return FOR_KIND.getOrDefault(kind, new GenericWording());
