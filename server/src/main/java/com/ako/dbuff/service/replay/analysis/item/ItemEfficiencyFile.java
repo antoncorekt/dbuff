@@ -7,7 +7,9 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -153,6 +155,12 @@ public class ItemEfficiencyFile {
           .forEach(name -> problems.add("prices has unknown price '" + name + "'"));
     }
     checkNumbers("alternatives", content.alternatives(), problems);
+    if (content.alternatives() != null) {
+      content.alternatives().keySet().stream()
+          .filter(name -> !AlternativeFinder.Settings.NAMES.contains(name))
+          .sorted()
+          .forEach(name -> problems.add("alternatives has unknown setting '" + name + "'"));
+    }
     Set<String> keys = new HashSet<>();
     List<ItemEfficiencyEntry> checked = new ArrayList<>();
     for (Entry entry : content.entries()) {
@@ -245,7 +253,7 @@ public class ItemEfficiencyFile {
   }
 
   private static <V> Map<String, V> ordered(Map<String, V> map) {
-    return java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(map));
+    return Collections.unmodifiableMap(new LinkedHashMap<>(map));
   }
 
   private static List<String> copy(List<String> list) {

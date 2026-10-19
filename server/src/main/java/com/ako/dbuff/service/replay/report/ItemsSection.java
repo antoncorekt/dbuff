@@ -23,14 +23,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * What the whitelisted items (Magic Stick and Wand, Hand of Midas, the farming group) gave their
- * heroes, one short sentence each under the heading of its catalog category, verdict first, in the
- * words of the item's {@link ItemKindWording}. The tracked players' rows come first, then the rows
- * furthest from paying exactly their cost (the best and the worst); at most {@code max-item-lines}
- * per category are listed, those bought before the horn first, then in time order. A row of an
- * unknown kind is skipped quietly, a row that lacks figures its wording needs with one WARN line; a
- * match with no usable row prints nothing. It reads {@code item_efficiency} only, so it is
- * independent of other sections.
+ * What the catalog items gave their heroes, one short sentence each under the heading of its
+ * category (the stored one, else the catalog's), verdict first, in the words of the item's {@link
+ * ItemKindWording}. The tracked players' rows come first, then the rows furthest from paying
+ * exactly their cost (the best and the worst); at most {@code max-item-lines} per category are
+ * listed, those bought before the horn first, then in time order. A row of an unknown kind is
+ * skipped quietly, a row that lacks figures its wording needs with one WARN line; a match with no
+ * usable row prints nothing. It reads {@code item_efficiency} only, so it is independent of other
+ * sections.
  */
 @Slf4j
 @Component
@@ -108,7 +108,10 @@ public class ItemsSection implements ReplayReportSection {
     return names.contains(entry.category()) || names.contains(entry.row().entryKey());
   }
 
-  private String categoryOf(ItemEfficiency row) {
+  private String categoryOf(ItemEfficiencyDomain stored, ItemEfficiency row) {
+    if (stored.getCategory() != null) {
+      return stored.getCategory();
+    }
     return catalog.entries().stream()
         .filter(
             e ->
@@ -187,7 +190,7 @@ public class ItemsSection implements ReplayReportSection {
     try {
       ItemEfficiency row = ItemEfficiencyJson.fromRow(stored);
       if (row.purchaseSeconds() != null && wording.get().complete(row)) {
-        return Optional.of(new Entry(stored.getId(), row, wording.get(), categoryOf(row)));
+        return Optional.of(new Entry(stored.getId(), row, wording.get(), categoryOf(stored, row)));
       }
       log.warn(
           "Items section skips row {} of match {}: figures missing", stored.getEntryKey(), matchId);

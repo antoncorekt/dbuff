@@ -15,8 +15,8 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 /**
- * The items learning loop: what the whitelisted items (Magic Stick, Hand of Midas, the farming
- * group) gave each hero, and each use or payback behind it.
+ * The items learning loop: what the catalog items gave each hero, and each use or payback behind
+ * it.
  */
 @Component
 class ItemLoopTopic implements ReviewLoopTopic {

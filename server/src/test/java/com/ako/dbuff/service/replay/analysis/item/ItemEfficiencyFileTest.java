@@ -17,7 +17,7 @@ class ItemEfficiencyFileTest {
   }
 
   @Test
-  void theShippedFileHoldsTheStickTheMidasAndTheFarmingGroup() {
+  void theShippedFileHoldsAllNineteenEntries() {
     var entries = new ItemEfficiencyFile("replay/items.yaml").entries();
 
     assertThat(entries)
@@ -257,5 +257,22 @@ class ItemEfficiencyFileTest {
         .containsExactly("q", "b", "m");
     assertThat(ordered.selectableNames())
         .containsExactly("zeta", "alpha", "mid", "beta", "q", "b", "m");
+  }
+
+  @Test
+  void anUnknownAlternativesSettingFailsAndIsNamed() {
+    ItemEfficiencyFile bad =
+        file(
+            """
+            alternatives: {altMinGame: 3, altMinGames: 5}
+            categories: {c: C}
+            entries:
+              - {key: a, category: c, items: [x], aspects: [save]}
+            """);
+
+    assertThatThrownBy(bad::entries)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("unknown setting 'altMinGame'")
+        .hasMessageNotContaining("'altMinGames'");
   }
 }

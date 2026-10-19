@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.repo.ItemEfficiencyRepo;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyInputs.MatchInputs;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -99,7 +100,7 @@ public class ReplayItemEfficiencyAnalyzer implements ReplayAnalyzer {
     List<List<ItemAspect>> chosen = new ArrayList<>();
     for (ItemEfficiencyEntry entry : entries) {
       List<ItemAspect> own = new ArrayList<>();
-      Set<String> listed = new java.util.HashSet<>();
+      Set<String> listed = new HashSet<>();
       for (String name : entry.aspects()) {
         ItemAspect aspect = byName.get(name);
         if (!listed.add(name)) {

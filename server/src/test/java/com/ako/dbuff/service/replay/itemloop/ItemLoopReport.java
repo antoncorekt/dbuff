@@ -128,7 +128,10 @@ final class ItemLoopReport {
       int number = 0;
       for (Detail detail : r.rows()) {
         number += "USE".equals(detail.label()) ? 1 : 0;
-        String[] cells = wording.detail(r, detail);
+        String[] cells =
+            AlternativeDetail.handles(detail)
+                ? AlternativeDetail.cells(detail)
+                : wording.detail(r, detail);
         out.add(
             "| %s | %s | %s | %s | %s | | |"
                 .formatted(

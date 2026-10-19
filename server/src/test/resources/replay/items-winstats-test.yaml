@@ -4,4 +4,4 @@ entries:
     category: farming
     items: [hand_of_midas]
     aspects: [midas-uses]
-    winStats: [[hand_of_midas], [hand_of_midas, octarine_core], [hand_of_midas, missing]]
+    winStats: [[hand_of_midas], [hand_of_midas, missing], [hand_of_midas, octarine_core]]
