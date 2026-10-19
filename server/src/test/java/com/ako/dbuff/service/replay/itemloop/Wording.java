@@ -18,7 +18,8 @@ interface Wording {
           "cooldown", new CooldownWording(),
           "bottle-runes", new BottleWording(),
           "team-restore", new TeamRestoreWording(),
-          "self-harm", new SoulRingWording());
+          "self-harm", new SoulRingWording(),
+          "target-use", new TargetUseWording());
 
   static Wording of(String kind) {
     return FOR_KIND.getOrDefault(kind, new GenericWording());

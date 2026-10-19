@@ -13,7 +13,7 @@ public final class Prettify {
   private Prettify() {}
 
   /** {@code npc_dota_hero_faceless_void} to {@code Faceless Void}; other names get the same. */
-  static String unit(String internal) {
+  public static String unit(String internal) {
     if (internal == null || internal.isBlank()) {
       return "";
     }

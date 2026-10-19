@@ -19,6 +19,7 @@ class ItemKindWordingsTest {
     assertThat(wordings.find("cooldown")).containsInstanceOf(CooldownKindWording.class);
     assertThat(wordings.find("team-restore")).containsInstanceOf(TeamRestoreKindWording.class);
     assertThat(wordings.find("self-harm")).containsInstanceOf(SoulRingKindWording.class);
+    assertThat(wordings.find("target-use")).containsInstanceOf(TargetUseKindWording.class);
   }
 
   @Test

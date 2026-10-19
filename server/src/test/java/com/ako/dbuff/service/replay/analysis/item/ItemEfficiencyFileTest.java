@@ -38,12 +38,20 @@ class ItemEfficiencyFileTest {
             org.assertj.core.groups.Tuple.tuple("mekansm", List.of("team-restore", "save")),
             org.assertj.core.groups.Tuple.tuple("holy_locket", List.of("team-restore", "save")),
             org.assertj.core.groups.Tuple.tuple(
-                "soul_ring", List.of("self-harm", "charge-restore")));
+                "soul_ring", List.of("self-harm", "charge-restore")),
+            org.assertj.core.groups.Tuple.tuple("glimmer_cape", List.of("target-use", "save")),
+            org.assertj.core.groups.Tuple.tuple(
+                "force_staff", List.of("target-use", "save", "control")),
+            org.assertj.core.groups.Tuple.tuple("lotus_orb", List.of("target-use", "save")),
+            org.assertj.core.groups.Tuple.tuple(
+                "euls_scepter", List.of("target-use", "save", "control")),
+            org.assertj.core.groups.Tuple.tuple(
+                "solar_crest", List.of("target-use", "save", "control")));
     assertThat(entries)
         .extracting(ItemEfficiencyEntry::category)
         .containsExactly(
             "sustain", "farming", "farming", "farming", "farming", "sustain", "sustain", "sustain",
-            "sustain", "sustain");
+            "sustain", "sustain", "save", "save", "save", "save", "save");
     assertThat(entries.get(0).items()).containsExactly("magic_stick", "magic_wand");
     assertThat(entries.get(2).items()).containsExactly("bfury", "maelstrom", "mjollnir");
   }
@@ -64,7 +72,9 @@ class ItemEfficiencyFileTest {
             new AlternativesAspect(null, null),
             new SavingCostAspect(),
             new CooldownAspect(),
-            new TeamRestoreAspect());
+            new TeamRestoreAspect(),
+            new TargetUseAspect(),
+            new ControlAspect());
 
     for (ItemEfficiencyEntry entry : entries) {
       var own =
@@ -203,7 +213,7 @@ class ItemEfficiencyFileTest {
   @Test
   void theShippedCategoriesAreListed() {
     assertThat(new ItemEfficiencyFile("replay/items.yaml").categories())
-        .containsKeys("farming", "sustain");
+        .containsKeys("farming", "sustain", "save");
   }
 
   @Test

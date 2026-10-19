@@ -28,6 +28,7 @@ public class SaveAspect implements ItemAspect {
     Set<String> names = new HashSet<>(StickUses.PARAMETERS);
     names.addAll(TeamUses.PARAMETERS);
     names.addAll(WorthPrices.NAMES);
+    names.addAll(TargetUses.PARAMETERS);
     return Set.copyOf(names);
   }
 
@@ -43,6 +44,9 @@ public class SaveAspect implements ItemAspect {
 
   @Override
   public AspectPart measure(AspectContext context) {
+    if (TargetUses.applies(context)) {
+      return TargetUses.of(context).save();
+    }
     return context.entry().aspects().contains(TeamRestoreAspect.NAME)
         ? measureAllies(context)
         : measureSelf(context);

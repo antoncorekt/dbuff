@@ -123,14 +123,15 @@ public class ItemEfficiencyInputs {
   }
 
   /**
-   * Damage to heroes by anyone, hero deaths, the gold and experience of hero kills, and heals that
-   * items did to heroes.
+   * Damage to heroes by anyone, hero deaths, the gold and experience of hero kills, heals that
+   * items did to heroes and the effect modifiers of targeted items.
    */
   private static boolean acrossHeroes(CombatEvent e) {
     return switch (e.kind()) {
       case DAMAGE, DEATH -> e.targetIsRealHero();
       case GOLD -> e.goldReason() == GoldReason.HERO_KILL;
       case XP -> e.xpReason() == XpReason.HERO_KILL;
+      case MODIFIER_ADD -> TargetUses.EFFECT_MODIFIERS.contains(e.inflictor());
       case HEAL -> e.targetIsRealHero() && e.inflictor().startsWith(HeroInputs.ITEM_PREFIX);
       default -> false;
     };
