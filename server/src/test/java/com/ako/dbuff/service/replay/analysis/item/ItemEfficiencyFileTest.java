@@ -29,7 +29,7 @@ class ItemEfficiencyFileTest {
                 "farming_items",
                 List.of("farm-rate", "item-damage", "stat-uplift", "alternatives")),
             org.assertj.core.groups.Tuple.tuple(
-                "radiance", List.of("farm-rate", "item-damage", "alternatives")),
+                "radiance", List.of("farm-rate", "item-damage", "alternatives", "saving-cost")),
             org.assertj.core.groups.Tuple.tuple(
                 "octarine_core", List.of("cooldown", "alternatives")));
     assertThat(entries)
@@ -51,6 +51,7 @@ class ItemEfficiencyFileTest {
             new ItemDamageAspect(),
             new StatUpliftAspect(),
             new AlternativesAspect(null, null),
+            new SavingCostAspect(),
             new CooldownAspect());
 
     for (ItemEfficiencyEntry entry : entries) {

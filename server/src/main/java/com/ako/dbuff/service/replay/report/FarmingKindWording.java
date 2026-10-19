@@ -29,6 +29,10 @@ public class FarmingKindWording implements ItemKindWording {
 
   @Override
   public String longVerdict(ItemEfficiency row) {
+    return farmVerdict(row) + SavingCostLine.of(row).map(line -> "; " + line).orElse("");
+  }
+
+  private String farmVerdict(ItemEfficiency row) {
     Map<String, Double> before = window(row, "BEFORE").orElse(Map.of());
     Map<String, Double> after = window(row, "AFTER").orElse(Map.of());
     String rates =
@@ -89,6 +93,10 @@ public class FarmingKindWording implements ItemKindWording {
 
   @Override
   public String shortVerdict(ItemEfficiency row, String subject) {
+    return farmShort(row, subject) + SavingCostLine.of(row).map(line -> "; " + line).orElse("");
+  }
+
+  private String farmShort(ItemEfficiency row, String subject) {
     Map<String, Double> before = window(row, "BEFORE").orElse(Map.of());
     Map<String, Double> after = window(row, "AFTER").orElse(Map.of());
     double was = ItemWording.figure(before, "goldPerMinute");

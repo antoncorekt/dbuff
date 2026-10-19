@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.looprunner.LoopWording;
 import com.ako.dbuff.service.replay.report.FarmingKindWording;
 import com.ako.dbuff.service.replay.report.ItemWording;
+import com.ako.dbuff.service.replay.report.SavingCostLine;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -37,6 +38,9 @@ final class FarmingWording implements Wording {
     if ("DAMAGE".equals(detail.label())) {
       return damageDetail(detail);
     }
+    if (SavingCostLine.LABEL.equals(detail.label())) {
+      return savingDetail(row, detail);
+    }
     return new String[] {
       LoopWording.clock(detail.seconds()),
       "-",
@@ -50,6 +54,23 @@ final class FarmingWording implements Wording {
           .formatted(
               ItemWording.number(f.get("minutes")),
               "BEFORE".equals(detail.label()) ? "before" : "after")
+    };
+  }
+
+  private static String[] savingDetail(ItemEfficiency row, Detail detail) {
+    Map<String, Double> f = detail.figures();
+    return new String[] {
+      LoopWording.clock(detail.seconds()),
+      "-",
+      SavingCostLine.of(row).orElse("-"),
+      ("damage per min %s (%s in the window before), kill participation per min %s (%s before);"
+              + " gold gain %s")
+          .formatted(
+              LoopWording.gold(f.get("damagePerMinute")),
+              LoopWording.gold(f.get("damagePerMinuteBefore")),
+              ItemWording.number(f.get("participationPerMinute")),
+              ItemWording.number(f.get("participationPerMinuteBefore")),
+              LoopWording.gold(f.get("gain.saving-cost")))
     };
   }
 
