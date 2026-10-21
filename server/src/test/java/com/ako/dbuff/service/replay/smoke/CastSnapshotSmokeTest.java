@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.ReplayCastSnapshotDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.repo.ReplayCastSnapshotRepo;
+import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.service.replay.CastSnapshot;
 import com.ako.dbuff.service.replay.CastSnapshotCodec;
 import com.ako.dbuff.service.replay.ReplayRunService;
@@ -34,14 +35,20 @@ class CastSnapshotSmokeTest extends ReplayPipelineFixture {
 
   @Autowired private ReplayRunService runService;
   @Autowired private ReplayCastSnapshotRepo repo;
+  @Autowired private ReplayParseRunRepo runRepo;
 
   @Test
   @Commit
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   void hookShardAndPromiseCastsAreSnapshotted() throws IOException {
-    assertThat(castsOf("9040889566", "pudge_meat_hook")).hasSizeGreaterThanOrEqualTo(30);
-    assertThat(castsOf("9037038717", "tusk_ice_shards")).hasSizeGreaterThanOrEqualTo(20);
-    assertThat(castsOf("9038725154", "oracle_false_promise")).hasSize(10);
+    try {
+      assertThat(castsOf("9040889566", "pudge_meat_hook")).hasSizeGreaterThanOrEqualTo(30);
+      assertThat(castsOf("9037038717", "tusk_ice_shards")).hasSizeGreaterThanOrEqualTo(20);
+      assertThat(castsOf("9038725154", "oracle_false_promise")).hasSize(10);
+    } finally {
+      // ReplayLoadTest needs an empty replay_parse_run and may run after this class.
+      runRepo.deleteAll();
+    }
   }
 
   private List<CastSnapshot> castsOf(String id, String ability) throws IOException {
