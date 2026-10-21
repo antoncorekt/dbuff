@@ -44,7 +44,6 @@ public class TrapAspect implements SkillAspect {
   private static final String STAY_SHARE = "trapStayShare";
   private static final String RETREAT_DEGREES = "trapRetreatDegrees";
   private static final String KILL_SECONDS = "trapKillSeconds";
-  private static final double SNAPSHOT_MATCH_SECONDS = 0.05;
 
   private static final Set<String> PARAMETERS =
       Set.of(
@@ -82,32 +81,23 @@ public class TrapAspect implements SkillAspect {
   @Override
   public List<Outcome> judge(SkillContext context) {
     List<CastSnapshot> snapshots = context.match().snapshots().get();
+    SnapshotView view = new SnapshotView(context);
     List<Outcome> out = new ArrayList<>();
     for (Cast cast : context.casts().casts()) {
-      out.add(judgeCast(context, cast, frames(snapshots, context.caster(), cast)));
+      out.add(judgeCast(context, view, cast, view.framesOf(snapshots, cast)));
     }
     return out;
   }
 
   private record Ring(double x, double y, double radius, double formSecond, double endSecond) {}
 
-  private static List<CastSnapshot> frames(List<CastSnapshot> snapshots, Hero caster, Cast cast) {
-    return snapshots.stream()
-        .filter(
-            s ->
-                s.ability().equals(cast.ability())
-                    && s.casterId() == caster.playerId()
-                    && Math.abs(s.castSecond() - cast.second()) <= SNAPSHOT_MATCH_SECONDS)
-        .sorted(Comparator.comparingDouble(CastSnapshot::second))
-        .toList();
-  }
-
-  private Outcome judgeCast(SkillContext context, Cast cast, List<CastSnapshot> frames) {
+  private Outcome judgeCast(
+      SkillContext context, SnapshotView view, Cast cast, List<CastSnapshot> frames) {
     Hero caster = context.caster();
     Map<String, Double> numbers = new LinkedHashMap<>();
     numbers.put("level", (double) cast.level());
     Optional<HeroPoint> from =
-        frames.isEmpty() ? Optional.empty() : point(frames.getFirst(), caster.playerId());
+        frames.isEmpty() ? Optional.empty() : view.point(frames.getFirst(), caster.playerId());
     int facing = frames.isEmpty() ? CastSnapshot.NO_FACING : frames.getFirst().facing();
     if (from.isEmpty() || facing == CastSnapshot.NO_FACING) {
       numbers.put("noSnapshot", 1.0);
@@ -116,14 +106,14 @@ public class TrapAspect implements SkillAspect {
     Ring ring = ring(context, cast, from.get(), facing);
     numbers.put("radius", ring.radius());
 
-    List<HeroPoint> trapped = trapped(context, frames, from.get(), ring);
+    List<HeroPoint> trapped = trapped(context, view, frames, from.get(), ring);
     if (!trapped.isEmpty()) {
-      List<String> names = trapped.stream().map(h -> nameOf(context, h)).toList();
+      List<String> names = trapped.stream().map(h -> view.nameOf(h)).toList();
       numbers.put("trapped", (double) trapped.size());
       numbers.put("killed", (double) kills(context, names, ring));
       return new Outcome(cast.second(), String.join(", ", names), TRAP, true, numbers);
     }
-    Optional<Hero> near = seenNear(context, frames.getFirst(), from.get(), ring, numbers);
+    Optional<Hero> near = seenNear(context, view, frames.getFirst(), from.get(), ring, numbers);
     return near.map(h -> new Outcome(cast.second(), h.name(), MISS, true, numbers))
         .orElseGet(() -> new Outcome(cast.second(), "", NOT_COUNTED, true, numbers));
   }
@@ -156,7 +146,11 @@ public class TrapAspect implements SkillAspect {
   }
 
   private List<HeroPoint> trapped(
-      SkillContext context, List<CastSnapshot> frames, HeroPoint caster, Ring ring) {
+      SkillContext context,
+      SnapshotView view,
+      List<CastSnapshot> frames,
+      HeroPoint caster,
+      Ring ring) {
     List<CastSnapshot> window =
         frames.stream()
             .filter(f -> f.second() >= ring.formSecond() && f.second() <= ring.endSecond())
@@ -167,14 +161,15 @@ public class TrapAspect implements SkillAspect {
     double enter = ring.radius() + context.parameter(ENTER_MARGIN, 100);
     double stay = ring.radius() + context.parameter(STAY_MARGIN, 150);
     return window.getFirst().heroes().stream()
-        .filter(h -> h.alive() && isEnemy(context, h))
+        .filter(h -> h.alive() && view.isEnemy(h))
         .filter(h -> distance(h, ring.x(), ring.y()) <= enter)
-        .filter(h -> held(context, window, h, caster, ring, stay))
+        .filter(h -> held(context, view, window, h, caster, ring, stay))
         .toList();
   }
 
   private boolean held(
       SkillContext context,
+      SnapshotView view,
       List<CastSnapshot> window,
       HeroPoint start,
       HeroPoint caster,
@@ -184,7 +179,7 @@ public class TrapAspect implements SkillAspect {
     int known = 0;
     boolean onlyBack = true;
     for (CastSnapshot frame : window) {
-      Optional<HeroPoint> now = point(frame, start.playerId()).filter(HeroPoint::alive);
+      Optional<HeroPoint> now = view.point(frame, start.playerId()).filter(HeroPoint::alive);
       if (now.isEmpty()) {
         continue;
       }
@@ -228,6 +223,7 @@ public class TrapAspect implements SkillAspect {
 
   private Optional<Hero> seenNear(
       SkillContext context,
+      SnapshotView view,
       CastSnapshot frame,
       HeroPoint caster,
       Ring ring,
@@ -238,51 +234,21 @@ public class TrapAspect implements SkillAspect {
         distance(caster, ring.x(), ring.y()) + ring.radius() + context.parameter(ENTER_MARGIN, 100);
     List<HeroPoint> witnesses =
         frame.heroes().stream()
-            .filter(
-                h -> h.alive() && h.playerId() != caster.playerId() && teamOf(context, h) == team)
+            .filter(h -> h.alive() && h.playerId() != caster.playerId() && view.teamOf(h) == team)
             .toList();
     List<HeroPoint> seen =
         frame.heroes().stream()
-            .filter(h -> h.alive() && isEnemy(context, h))
+            .filter(h -> h.alive() && view.isEnemy(h))
             .filter(h -> distance(h, caster.x(), caster.y()) <= reach)
             .filter(h -> witnesses.stream().anyMatch(w -> distance(h, w.x(), w.y()) <= seenRange))
             .toList();
     numbers.put("seenEnemies", (double) seen.size());
     return seen.stream()
         .min(Comparator.comparingDouble(h -> distance(h, caster.x(), caster.y())))
-        .flatMap(
-            h ->
-                context.match().heroes().stream()
-                    .filter(x -> x.playerId() == h.playerId())
-                    .findFirst());
-  }
-
-  private static Optional<HeroPoint> point(CastSnapshot frame, int playerId) {
-    return frame.heroes().stream().filter(h -> h.playerId() == playerId).findFirst();
+        .flatMap(h -> view.hero(h.playerId()));
   }
 
   private static double distance(HeroPoint h, double x, double y) {
     return Math.hypot(h.x() - x, h.y() - y);
-  }
-
-  private static int teamOf(SkillContext context, HeroPoint point) {
-    return context.match().heroes().stream()
-        .filter(h -> h.playerId() == point.playerId())
-        .mapToInt(Hero::team)
-        .findFirst()
-        .orElse(0);
-  }
-
-  private static boolean isEnemy(SkillContext context, HeroPoint point) {
-    int team = teamOf(context, point);
-    return team != 0 && team != context.caster().team();
-  }
-
-  private static String nameOf(SkillContext context, HeroPoint point) {
-    return context.match().heroes().stream()
-        .filter(h -> h.playerId() == point.playerId())
-        .map(Hero::name)
-        .findFirst()
-        .orElse("");
   }
 }
