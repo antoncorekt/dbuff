@@ -11,7 +11,6 @@ import com.ako.dbuff.service.replay.analysis.vision.VisionProperties;
 import com.ako.dbuff.service.replay.analysis.vision.WardCoordinates;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,8 +47,7 @@ public class VisionAspect implements ItemAspect {
   private final VisionProperties properties;
 
   private static Set<String> parameters() {
-    Set<String> names = new HashSet<>(WorthPrices.NAMES);
-    names.addAll(
+    return ParameterNames.withPrices(
         Set.of(
             "dewardBounty",
             "dewardFastSeconds",
@@ -58,7 +56,6 @@ public class VisionAspect implements ItemAspect {
             "dustSeconds",
             "dustRadius",
             "gemRadius"));
-    return Set.copyOf(names);
   }
 
   @Override

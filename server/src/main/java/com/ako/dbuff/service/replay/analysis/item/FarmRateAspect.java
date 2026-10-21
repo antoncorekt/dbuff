@@ -24,11 +24,8 @@ public class FarmRateAspect implements ItemAspect {
   private static final Set<String> PARAMETERS = parameters();
 
   private static Set<String> parameters() {
-    Set<String> names =
-        new java.util.HashSet<>(
-            Set.of("windowMinutes", "minBeforeSeconds", "minAfterSeconds", "campGapSeconds"));
-    names.addAll(WorthPrices.NAMES);
-    return Set.copyOf(names);
+    return ParameterNames.withPrices(
+        Set.of("windowMinutes", "minBeforeSeconds", "minAfterSeconds", "campGapSeconds"));
   }
 
   @Override

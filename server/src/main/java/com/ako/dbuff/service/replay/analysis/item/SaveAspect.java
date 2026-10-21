@@ -4,7 +4,6 @@ import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.analysis.item.StickUses.Use;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,11 +24,8 @@ public class SaveAspect implements ItemAspect {
   private static final Set<String> PARAMETERS = parameters();
 
   private static Set<String> parameters() {
-    Set<String> names = new HashSet<>(StickUses.PARAMETERS);
-    names.addAll(TeamUses.PARAMETERS);
-    names.addAll(WorthPrices.NAMES);
-    names.addAll(TargetUses.PARAMETERS);
-    return Set.copyOf(names);
+    return ParameterNames.withPrices(
+        StickUses.PARAMETERS, TeamUses.PARAMETERS, TargetUses.PARAMETERS);
   }
 
   @Override

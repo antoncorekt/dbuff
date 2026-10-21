@@ -2,7 +2,6 @@ package com.ako.dbuff.service.replay.analysis.item;
 
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,16 +16,13 @@ final class DamageAspects {
   private DamageAspects() {}
 
   private static Set<String> parameters() {
-    Set<String> names =
-        new HashSet<>(
-            Set.of(
-                "damageWindowMinutes",
-                "windowMinutes",
-                "minBeforeSeconds",
-                "minAfterSeconds",
-                "statShareSeconds"));
-    names.addAll(WorthPrices.NAMES);
-    return Set.copyOf(names);
+    return ParameterNames.withPrices(
+        Set.of(
+            "damageWindowMinutes",
+            "windowMinutes",
+            "minBeforeSeconds",
+            "minAfterSeconds",
+            "statShareSeconds"));
   }
 
   static DamageComponent estimate(AspectContext context, FarmWindows windows) {
