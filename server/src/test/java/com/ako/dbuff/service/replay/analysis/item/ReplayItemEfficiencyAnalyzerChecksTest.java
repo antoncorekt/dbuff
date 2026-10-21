@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -17,8 +19,18 @@ class ReplayItemEfficiencyAnalyzerChecksTest {
   private final ItemEfficiencyInputs inputs = mock(ItemEfficiencyInputs.class);
   private final ItemEfficiencyRepo repo = mock(ItemEfficiencyRepo.class);
 
+  private final org.springframework.transaction.support.TransactionTemplate transaction =
+      mock(org.springframework.transaction.support.TransactionTemplate.class);
+
   private ReplayItemEfficiencyAnalyzer analyzer(String entries) {
     String json = "{\"categories\": {\"farming\": \"F\"}, \"entries\": [" + entries + "]}";
+    doAnswer(
+            call -> {
+              call.<java.util.function.Consumer<Object>>getArgument(0).accept(null);
+              return null;
+            })
+        .when(transaction)
+        .executeWithoutResult(any());
     when(inputs.load(1)).thenReturn(new MatchInputs(100, List.of()));
     return new ReplayItemEfficiencyAnalyzer(
         new ItemEfficiencyFile(
@@ -26,7 +38,8 @@ class ReplayItemEfficiencyAnalyzerChecksTest {
         List.of(new SaveAspect()),
         inputs,
         key -> java.util.Optional.empty(),
-        repo);
+        repo,
+        transaction);
   }
 
   @Test
