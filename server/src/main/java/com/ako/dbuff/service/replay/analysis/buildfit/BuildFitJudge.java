@@ -14,8 +14,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Compares the functions of a drafted build with what its role needs. A function the build does not
- * know is never missing; a missing function is only a stated gap where the match backs it: no
- * escape and deaths alone, no farm skill and a low net worth place.
+ * know is reported as unknown, never as fitting; a missing function is only a stated gap where the
+ * match backs it: no escape and deaths alone, no farm skill and a low net worth place.
  */
 @Component
 @RequiredArgsConstructor
@@ -34,8 +34,17 @@ public class BuildFitJudge {
   /**
    * @param missing every need the build lacks
    * @param gaps the missing functions the match backs
+   * @param unknown the wanted functions the build has no value for
    */
-  public record Verdict(List<RoleFunction> missing, List<BuildGap> gaps) {}
+  public record Verdict(
+      List<RoleFunction> missing, List<BuildGap> gaps, List<RoleFunction> unknown) {
+    public BuildFitVerdict level() {
+      if (!gaps.isEmpty()) {
+        return BuildFitVerdict.GAP;
+      }
+      return missing.isEmpty() ? BuildFitVerdict.FIT : BuildFitVerdict.GAPS_NOT_SHOWN;
+    }
+  }
 
   /**
    * The escape minimum comes from {@link BuildFitProperties#getEscapeBonusMinimum()} for every role
@@ -61,16 +70,21 @@ public class BuildFitJudge {
     wanted.putAll(needs.forRole(role));
     List<RoleFunction> missing = new ArrayList<>();
     List<BuildGap> gaps = new ArrayList<>();
+    List<RoleFunction> unknown = new ArrayList<>();
     wanted.forEach(
         (function, minimum) -> {
           Double value = build.of(function);
-          if (value == null || value >= minimum) {
+          if (value == null) {
+            unknown.add(function);
+            return;
+          }
+          if (value >= minimum) {
             return;
           }
           missing.add(function);
           backed(function, value == 0, evidence).ifPresent(gaps::add);
         });
-    return new Verdict(missing, gaps);
+    return new Verdict(missing, gaps, unknown);
   }
 
   private Optional<BuildGap> backed(RoleFunction function, boolean none, Evidence evidence) {

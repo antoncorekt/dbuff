@@ -375,7 +375,14 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertRoleAwareReasons(id, match.getId());
       assertThat(buildFitRepo.findByMatchId(match.getId()))
           .as("%s: a build verdict for each player, two when the roles differ", id)
-          .hasSizeBetween(10, 20);
+          .hasSizeBetween(10, 20)
+          .allSatisfy(
+              r -> {
+                assertThat(r.getVerdict()).as("%s: build fit verdict", id).isNotNull();
+                if (r.getMissing() != null && !r.getMissing().isBlank()) {
+                  assertThat(r.getVerdict()).as("%s: missing is never FIT", id).isNotEqualTo("FIT");
+                }
+              });
       buildFitReport().write(id, match.getId(), "Ability Draft");
       assertCreepKills(id, match.getId());
       assertRunes(id, match.getId());

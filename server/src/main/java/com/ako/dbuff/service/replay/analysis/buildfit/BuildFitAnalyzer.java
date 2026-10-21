@@ -59,7 +59,7 @@ public class BuildFitAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 1;
+    return 2;
   }
 
   @Override
@@ -141,9 +141,11 @@ public class BuildFitAnalyzer implements ReplayAnalyzer {
         .role(role)
         .missing(names(verdict.missing().stream().map(Enum::name).toList()))
         .stated(names(verdict.gaps().stream().map(g -> g.function().name()).toList()))
+        .verdict(verdict.level().name())
+        .unknown(names(verdict.unknown().stream().map(Enum::name).toList()))
         .evidence(
             cut(
-                BuildFitWording.verdict(hero, stage, role, verdict.gaps()),
+                BuildFitWording.verdict(hero, stage, role, verdict),
                 BuildFitDomain.EVIDENCE_LENGTH))
         .analysisVersion(version())
         .build();
