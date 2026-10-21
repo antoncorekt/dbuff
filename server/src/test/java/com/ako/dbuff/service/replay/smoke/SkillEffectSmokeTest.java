@@ -117,8 +117,13 @@ class SkillEffectSmokeTest extends ReplayPipelineFixture {
 
       System.out.println("SKILL EFFECTS 9037038717 doom: " + doom.getFigures());
       assertThat(doom.getCastCount()).isGreaterThanOrEqualTo(DOOM_MIN_CASTS);
+      int judged =
+          figures.get("TRAP").asInt()
+              + figures.get("MISS").asInt()
+              + figures.get("NOT_COUNTED").asInt();
       assertThat(figures.get("TRAP").asInt() + figures.get("MISS").asInt())
           .isGreaterThanOrEqualTo(1);
+      assertThat(judged).isEqualTo(doom.getCastCount());
     } finally {
       runRepo.deleteAll();
     }

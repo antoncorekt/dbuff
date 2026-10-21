@@ -33,6 +33,7 @@ class TrapAspectTest {
   private static final double CAST = 100;
   private static final double FORM = 101;
   private static final int CENTRE_X = 1200;
+  private static final int FAR_X = 2000;
 
   private final List<CombatEvent> events = new ArrayList<>();
   private final List<CastSnapshot> snapshots = new ArrayList<>();
@@ -246,5 +247,65 @@ class TrapAspectTest {
     frame(FORM, 0, at(TUSK_ID, 0, 0), new HeroPoint(ENEMY_ID, CENTRE_X, 0, false));
 
     assertThat(outcomes()).containsExactly(TrapAspect.NOT_COUNTED);
+  }
+
+  private void shardDamage(double second) {
+    events.add(
+        new CombatEvent(
+            CombatEventKind.DAMAGE, second, TUSK, ENEMY, SKILL, HEROES, 80, 500, 0, 0, 0, 0, 0));
+  }
+
+  @Test
+  void theCentreMovesToTheEnemyTheShardsHurt() {
+    cast();
+    shardDamage(FORM + 0.2);
+    start(at(ENEMY_ID, FAR_X, 0));
+    for (int i = 0; i < 10; i++) {
+      enemyAt(FORM + i * 0.4, FAR_X, 0);
+    }
+
+    List<Outcome> result = judge();
+
+    assertThat(result).extracting(Outcome::outcome).containsExactly(TrapAspect.TRAP);
+    assertThat(result.getFirst().numbers()).containsEntry("centreFromDamage", 1.0);
+  }
+
+  @Test
+  void withoutShardDamageTheCentreStaysTheOldEstimate() {
+    cast();
+    start(at(ENEMY_ID, FAR_X, 0));
+    for (int i = 0; i < 10; i++) {
+      enemyAt(FORM + i * 0.4, FAR_X, 0);
+    }
+
+    List<Outcome> result = judge();
+
+    assertThat(result).extracting(Outcome::outcome).containsExactly(TrapAspect.NOT_COUNTED);
+    assertThat(result.getFirst().numbers()).doesNotContainKey("centreFromDamage");
+  }
+
+  @Test
+  void shardDamageFarFromTheFormingSecondIsIgnored() {
+    cast();
+    shardDamage(FORM + 3);
+    start(at(ENEMY_ID, FAR_X, 0));
+    for (int i = 0; i < 10; i++) {
+      enemyAt(FORM + i * 0.4, FAR_X, 0);
+    }
+
+    assertThat(outcomes()).containsExactly(TrapAspect.NOT_COUNTED);
+  }
+
+  @Test
+  void anEnemyTheShardsHurtButWhoLeavesIsNotTrapped() {
+    cast();
+    shardDamage(FORM);
+    start(at(ENEMY_ID, FAR_X, 0), at(ALLY_ID, 1000, 0));
+    enemyAt(FORM, FAR_X, 0);
+    for (int i = 1; i < 10; i++) {
+      enemyAt(FORM + i * 0.4, FAR_X + 1500, 900);
+    }
+
+    assertThat(outcomes()).doesNotContain(TrapAspect.TRAP);
   }
 }
