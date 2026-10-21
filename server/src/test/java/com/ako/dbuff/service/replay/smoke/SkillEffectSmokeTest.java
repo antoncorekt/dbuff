@@ -19,7 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Runs the fixtures where Sniper has False Promise and Pudge has Meat Hook and checks the rows. */
+/**
+ * Runs the fixtures where Sniper has False Promise, Pudge has Meat Hook and Doom has Ice Shards and
+ * checks the rows.
+ */
 @Tag("replay")
 @EnabledIfEnvironmentVariable(named = "SMOKE_PG_URL", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "REPLAY_FIXTURE_DIR", matches = ".+")
@@ -33,6 +36,9 @@ class SkillEffectSmokeTest extends ReplayPipelineFixture {
   private static final long RUBICK_SLOT = 1;
   private static final int PUDGE_MIN_CASTS = 30;
   private static final int RUBICK_CASTS = 2;
+  private static final String SHARDS = "ice_shards";
+  private static final long DOOM_SLOT = 131;
+  private static final int DOOM_MIN_CASTS = 20;
 
   @Autowired private ReplayRunService runService;
   @Autowired private SkillEffectRepo repo;
@@ -82,6 +88,30 @@ class SkillEffectSmokeTest extends ReplayPipelineFixture {
       assertThat(figures.get("SEEN_HIT").asInt() + figures.get("DARK_HIT").asInt())
           .isGreaterThanOrEqualTo(1);
       assertThat(hookRow(match, RUBICK_SLOT).getCastCount()).isEqualTo(RUBICK_CASTS);
+    } finally {
+      runRepo.deleteAll();
+    }
+  }
+
+  @Test
+  @Commit
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void doomShardsAreJudged() throws IOException {
+    try {
+      MatchDomain match = seedMatch("9037038717");
+      assertThat(runService.process(match)).isEqualTo(ReplayStatus.DONE);
+
+      SkillEffectDomain doom =
+          repo.findByMatchId(match.getId()).stream()
+              .filter(r -> r.getPlayerSlot() == DOOM_SLOT && SHARDS.equals(r.getEntryKey()))
+              .findFirst()
+              .orElseThrow();
+      JsonNode figures = new ObjectMapper().readTree(doom.getFigures());
+
+      System.out.println("SKILL EFFECTS 9037038717 doom: " + doom.getFigures());
+      assertThat(doom.getCastCount()).isGreaterThanOrEqualTo(DOOM_MIN_CASTS);
+      assertThat(figures.get("TRAP").asInt() + figures.get("MISS").asInt())
+          .isGreaterThanOrEqualTo(1);
     } finally {
       runRepo.deleteAll();
     }

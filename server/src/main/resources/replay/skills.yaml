@@ -18,6 +18,15 @@ parameters:
   saveHeavyShare: 0.3
   saveBeforeSeconds: 3
   saveSurviveSeconds: 10
+  fallbackShardRange: 1200
+  fallbackShardRadius: 200
+  fallbackShardSpeed: 1200
+  fallbackShardSeconds: 7
+  trapEnterMargin: 100
+  trapStayMargin: 150
+  trapStayShare: 0.6
+  trapRetreatDegrees: 120
+  trapKillSeconds: 5
 entries:
   - key: false_promise
     abilities: [oracle_false_promise]
@@ -25,3 +34,6 @@ entries:
   - key: meat_hook
     abilities: [pudge_meat_hook]
     aspects: [hook]
+  - key: ice_shards
+    abilities: [tusk_ice_shards]
+    aspects: [trap]
