@@ -228,19 +228,15 @@ public class TrapAspect implements SkillAspect {
       HeroPoint caster,
       Ring ring,
       Map<String, Double> numbers) {
-    int team = context.caster().team();
     double seenRange = context.parameter(SEEN_RANGE, 1600);
     double reach =
         distance(caster, ring.x(), ring.y()) + ring.radius() + context.parameter(ENTER_MARGIN, 100);
-    List<HeroPoint> witnesses =
-        frame.heroes().stream()
-            .filter(h -> h.alive() && h.playerId() != caster.playerId() && view.teamOf(h) == team)
-            .toList();
+    List<HeroPoint> witnesses = view.witnesses(frame);
     List<HeroPoint> seen =
         frame.heroes().stream()
             .filter(h -> h.alive() && view.isEnemy(h))
             .filter(h -> distance(h, caster.x(), caster.y()) <= reach)
-            .filter(h -> witnesses.stream().anyMatch(w -> distance(h, w.x(), w.y()) <= seenRange))
+            .filter(h -> view.seenBy(h, witnesses, seenRange))
             .toList();
     numbers.put("seenEnemies", (double) seen.size());
     return seen.stream()
