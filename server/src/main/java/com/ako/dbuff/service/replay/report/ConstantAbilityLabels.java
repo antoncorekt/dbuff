@@ -25,6 +25,8 @@ import org.springframework.stereotype.Component;
 public class ConstantAbilityLabels implements AbilityLabels {
   private static final String HERO_PREFIX = "npc_dota_hero_";
   private static final String ITEM_PREFIX = "item_";
+  private static final String AD_SUFFIX = "_ad";
+  private static final String AD_LABEL_SUFFIX = " (AD)";
 
   private final ConstantsManagers constants;
   private final IconService icons;
@@ -94,9 +96,22 @@ public class ConstantAbilityLabels implements AbilityLabels {
       }
       AbilityConstant ability = abilities.get(internalName);
       if (ability != null && usable(ability.getDname())) {
-        return ability.getDname();
+        return withoutAdSuffix(ability.getDname());
+      }
+      if (internalName.endsWith(AD_SUFFIX)) {
+        AbilityConstant base =
+            abilities.get(internalName.substring(0, internalName.length() - AD_SUFFIX.length()));
+        if (base != null && usable(base.getDname())) {
+          return withoutAdSuffix(base.getDname());
+        }
       }
       return Prettify.ability(withoutHeroToken(internalName));
+    }
+
+    private static String withoutAdSuffix(String dname) {
+      return dname.endsWith(AD_LABEL_SUFFIX)
+          ? dname.substring(0, dname.length() - AD_LABEL_SUFFIX.length())
+          : dname;
     }
 
     private String itemDname(String key) {
