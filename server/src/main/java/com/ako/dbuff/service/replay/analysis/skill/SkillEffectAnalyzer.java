@@ -72,7 +72,7 @@ public class SkillEffectAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 2;
+    return 3;
   }
 
   @Override

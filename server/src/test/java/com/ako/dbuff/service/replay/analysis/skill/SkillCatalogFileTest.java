@@ -41,7 +41,7 @@ class SkillCatalogFileTest {
 
     assertThat(file.entries())
         .extracting(SkillCatalogEntry::key)
-        .containsExactly("false_promise", "meat_hook");
+        .containsExactly("false_promise", "meat_hook", "ice_shards");
     assertThat(file.entries().getFirst().abilities()).containsExactly("oracle_false_promise");
   }
 
