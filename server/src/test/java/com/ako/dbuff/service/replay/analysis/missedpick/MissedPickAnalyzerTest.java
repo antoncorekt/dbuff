@@ -10,12 +10,14 @@ import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.FightAbilityUseRepo;
 import com.ako.dbuff.dao.repo.FightImportanceRepo;
 import com.ako.dbuff.dao.repo.MissedPickRepo;
+import com.ako.dbuff.service.replay.analysis.role.SkillFunctions;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.AllPickProfile;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -33,6 +35,7 @@ class MissedPickAnalyzerTest {
   @Autowired private FightImportanceRepo importanceRepo;
   @Autowired private FightAbilityUseRepo useRepo;
   @Autowired private MissedPickRepo missedPickRepo;
+  @MockBean private SkillFunctions skillFunctions;
 
   private void pick(int order, Integer turn, long slot, long id) {
     pickRepo.save(

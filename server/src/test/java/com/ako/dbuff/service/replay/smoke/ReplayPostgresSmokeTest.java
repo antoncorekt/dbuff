@@ -385,6 +385,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertFightExplanations(id, match.getId());
       saveSwingKeyItems(id, match.getId());
       assertAnalysisDocument(id, match.getId());
+      assertMissedPicksLikeWithLike(id, match.getId());
       missedPickDocument.addAll(renderMissedPicks(id, match.getId()));
       printAbilityDraft(id, match.getId(), profiles);
       System.out.println(
@@ -416,11 +417,30 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
 
   private static final int MISSED_PICK_LINES_PER_PLAYER = 3;
 
+  private static final Map<String, Integer> MISSED_PICK_BASELINE =
+      Map.of("9038725154", 22, "9037038717", 13);
+
+  private void assertMissedPicksLikeWithLike(String id, long matchId) {
+    List<MissedPickDomain> rows = missedPickRepo.findByMatchId(matchId);
+    System.out.println("MISSED PICK FLAGS " + id + " " + rows.size());
+    assertThat(
+            rows.stream()
+                .map(
+                    r -> TeamSide.ofSlot(r.getCandidateOwnerSlot()) + "/" + r.getCandidateAbility())
+                .toList())
+        .as("%s: an enemy skill is flagged once per team", id)
+        .doesNotHaveDuplicates();
+    Integer baseline = MISSED_PICK_BASELINE.get(id);
+    if (baseline != null) {
+      assertThat(rows).as("%s: below the baseline of %d", id, baseline).hasSizeLessThan(baseline);
+    }
+  }
+
   /** Damage gaps by ratio, then gaps against a skill with no damage, then fight-only pairs. */
   private static final Comparator<MissedPickDomain> MISSED_PICK_STRENGTH =
       Comparator.comparing(
               (MissedPickDomain r) ->
-                  "FIGHTS".equals(r.getBasis()) ? 2 : r.getRatio() == null ? 1 : 0)
+                  r.getBasis().startsWith("FIGHTS") ? 2 : r.getRatio() == null ? 1 : 0)
           .thenComparing(r -> r.getRatio() == null ? 0.0 : -r.getRatio())
           .thenComparing(r -> -r.getCandidateDamage());
 
@@ -450,7 +470,8 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
         rows.size()
             + " flagged pairs (a skill a player took, a later enemy skill of the same slot kind"
             + " that did more than 10% more total damage and was cast in an important fight its"
-            + " team won; for skills with no damage on both sides, more won fights). Three per"
+            + " team won, when both did damage; for skills with no damage on both sides, only"
+            + " those with the same main function, by won fights; passives are left out). Three per"
             + " player are shown, damage gaps first. The candidate's own 12-month average is left"
             + " out: it is not stored yet.");
     out.add("");
