@@ -35,5 +35,10 @@ public interface SkillAspect {
     return false;
   }
 
+  /** Extra figures derived from the outcome counts of one hero and entry, e.g. an accuracy. */
+  default Map<String, Integer> derivedFigures(Map<String, Integer> counts) {
+    return Map.of();
+  }
+
   List<Outcome> judge(SkillContext context);
 }
