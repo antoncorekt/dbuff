@@ -48,7 +48,6 @@ public class HookAspect implements SkillAspect {
   private static final String SURVIVE_SECONDS = "saveSurviveSeconds";
   private static final String SPEED = "hook_speed";
   private static final String RANGE = "abilitycastrange";
-  private static final double SNAPSHOT_MATCH_SECONDS = 0.05;
   private static final double HP_LOOKBACK_SECONDS = 3;
   private static final double MAX_HP_WINDOW_SECONDS = 120;
   private static final double ABSOLUTE_LOW = 300;
@@ -100,16 +99,18 @@ public class HookAspect implements SkillAspect {
   @Override
   public List<Outcome> judge(SkillContext context) {
     List<CastSnapshot> snapshots = context.match().snapshots().get();
+    SnapshotView view = new SnapshotView(context);
     List<Outcome> out = new ArrayList<>();
     for (Cast cast : context.casts().casts()) {
-      out.add(judgeCast(context, cast, snapshots));
+      out.add(judgeCast(context, view, cast, snapshots));
     }
     return out;
   }
 
   private record Frame(CastSnapshot snapshot, Optional<HeroPoint> caster) {}
 
-  private Outcome judgeCast(SkillContext context, Cast cast, List<CastSnapshot> snapshots) {
+  private Outcome judgeCast(
+      SkillContext context, SnapshotView view, Cast cast, List<CastSnapshot> snapshots) {
     Hero caster = context.caster();
     double range =
         context.attribute(cast.ability(), RANGE, cast.level()).orElse(fallbackRange(context));
@@ -118,8 +119,8 @@ public class HookAspect implements SkillAspect {
     numbers.put("level", (double) cast.level());
     numbers.put("range", range);
     Optional<CombatEvent> hit = firstHit(context, cast, window);
-    Optional<Frame> frame = frameAt(snapshots, caster, cast);
-    Set<Integer> seen = frame.map(f -> seenEnemies(context, f.snapshot())).orElse(Set.of());
+    Optional<Frame> frame = frameAt(view, snapshots, caster, cast);
+    Set<Integer> seen = frame.map(f -> seenEnemies(context, view, f.snapshot())).orElse(Set.of());
     numbers.put("seenEnemies", (double) seen.size());
     if (frame.isEmpty()) {
       numbers.put("noSnapshot", 1.0);
@@ -137,7 +138,7 @@ public class HookAspect implements SkillAspect {
       return new Outcome(
           cast.second(), target.name(), save ? ALLY_SAVE : NOT_COUNTED, true, numbers);
     }
-    Optional<Hero> aimed = frame.flatMap(f -> aimedAt(context, f, seen, range, numbers));
+    Optional<Hero> aimed = frame.flatMap(f -> aimedAt(context, view, f, seen, range, numbers));
     return aimed
         .map(h -> new Outcome(cast.second(), h.name(), SEEN_MISS, true, numbers))
         .orElseGet(() -> new Outcome(cast.second(), "", NOT_COUNTED, true, numbers));
@@ -149,11 +150,9 @@ public class HookAspect implements SkillAspect {
 
   private static double window(SkillContext context, Cast cast, double range) {
     OptionalDouble speed = context.attribute(cast.ability(), SPEED, cast.level());
-    double flight =
-        speed.isPresent() && speed.getAsDouble() > 0
-            ? range / speed.getAsDouble() + context.parameter(EXTRA_SECONDS, 0.3)
-            : context.parameter(FALLBACK_SECONDS, 1.5);
-    return flight;
+    return speed.isPresent() && speed.getAsDouble() > 0
+        ? range / speed.getAsDouble() + context.parameter(EXTRA_SECONDS, 0.3)
+        : context.parameter(FALLBACK_SECONDS, 1.5);
   }
 
   private static Optional<CombatEvent> firstHit(SkillContext context, Cast cast, double window) {
@@ -175,46 +174,30 @@ public class HookAspect implements SkillAspect {
         || e.kind() == CombatEventKind.DAMAGE && cast.ability().equals(e.inflictor());
   }
 
-  private static Optional<Frame> frameAt(List<CastSnapshot> snapshots, Hero caster, Cast cast) {
-    return snapshots.stream()
-        .filter(
-            s ->
-                s.ability().equals(cast.ability())
-                    && s.casterId() == caster.playerId()
-                    && Math.abs(s.castSecond() - cast.second()) <= SNAPSHOT_MATCH_SECONDS)
-        .min(Comparator.comparingDouble(CastSnapshot::second))
-        .map(
-            s ->
-                new Frame(
-                    s,
-                    s.heroes().stream()
-                        .filter(h -> h.playerId() == caster.playerId())
-                        .findFirst()));
+  private static Optional<Frame> frameAt(
+      SnapshotView view, List<CastSnapshot> snapshots, Hero caster, Cast cast) {
+    return view.framesOf(snapshots, cast).stream()
+        .findFirst()
+        .map(s -> new Frame(s, view.point(s, caster.playerId())));
   }
 
-  private static Set<Integer> seenEnemies(SkillContext context, CastSnapshot frame) {
+  private static Set<Integer> seenEnemies(
+      SkillContext context, SnapshotView view, CastSnapshot frame) {
     int team = context.caster().team();
     List<HeroPoint> allies =
-        frame.heroes().stream().filter(h -> h.alive() && teamOf(context, h) == team).toList();
+        frame.heroes().stream().filter(h -> h.alive() && view.teamOf(h) == team).toList();
     double reach = context.parameter(SEEN_RANGE, 1600);
     return frame.heroes().stream()
-        .filter(h -> h.alive() && teamOf(context, h) != team && teamOf(context, h) != 0)
+        .filter(h -> h.alive() && view.teamOf(h) != team && view.teamOf(h) != 0)
         .filter(
             e -> allies.stream().anyMatch(a -> Math.hypot(a.x() - e.x(), a.y() - e.y()) <= reach))
         .map(HeroPoint::playerId)
         .collect(java.util.stream.Collectors.toSet());
   }
 
-  private static int teamOf(SkillContext context, HeroPoint point) {
-    return context.match().heroes().stream()
-        .filter(h -> h.playerId() == point.playerId())
-        .mapToInt(Hero::team)
-        .findFirst()
-        .orElse(0);
-  }
-
   private Optional<Hero> aimedAt(
       SkillContext context,
+      SnapshotView view,
       Frame frame,
       Set<Integer> seen,
       double range,
@@ -235,9 +218,7 @@ public class HookAspect implements SkillAspect {
         .flatMap(
             e -> {
               numbers.put("aimAngle", (double) Math.round(e.getValue()));
-              return context.match().heroes().stream()
-                  .filter(h -> h.playerId() == e.getKey().playerId())
-                  .findFirst();
+              return view.hero(e.getKey().playerId());
             });
   }
 
