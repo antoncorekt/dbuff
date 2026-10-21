@@ -106,6 +106,33 @@ class SkillLoopReportTest {
   }
 
   @Test
+  void printsTheLineTheMatchReportWouldSayAboveTheDetailsAndNoneForNothingToSay() {
+    SkillEffectDomain said =
+        SkillEffectDomain.builder()
+            .playerSlot(0L)
+            .entryKey("false_promise")
+            .castCount(5)
+            .figures("{\"SAVE\":3,\"IMPACT\":2,\"MISSED\":2}")
+            .build();
+    SkillEffectDomain silent =
+        SkillEffectDomain.builder()
+            .playerSlot(0L)
+            .entryKey("ice_shards")
+            .castCount(5)
+            .figures("{\"NOT_COUNTED\":5}")
+            .build();
+
+    String report =
+        SkillLoopReport.render(data("All Pick", List.of(), List.of(), List.of(said, silent)));
+
+    assertThat(report)
+        .contains(
+            "  - Report line: Windrunner's False Promise saved 3 allies, 2 more died but dealt"
+                + " damage; 2 chances missed.");
+    assertThat(report.split("Report line:", -1)).hasSize(2);
+  }
+
+  @Test
   void saysNothingWasCastWhenThereAreNoSkillEffects() {
     assertThat(SkillLoopReport.render(data("All Pick", List.of(), List.of(), List.of())))
         .contains("## Skill effects", "No catalogued skill was cast or learned.");
