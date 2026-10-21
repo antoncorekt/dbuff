@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -121,12 +122,15 @@ public class MissedPickAnalyzer implements ReplayAnalyzer {
                 (slot, abilityId) -> damageOf(damage, byName, picks, slot, abilityId),
                 casts,
                 version());
-    addPatchAverages(matchId, picks, rows);
+    addPatchAverages(matchId, picks, abilities, rows);
     missedPickRepo.saveAll(rows);
   }
 
   private void addPatchAverages(
-      long matchId, List<AbilityDraftPickDomain> picks, List<MissedPickDomain> rows) {
+      long matchId,
+      List<AbilityDraftPickDomain> picks,
+      List<AbilityDomain> abilities,
+      List<MissedPickDomain> rows) {
     MatchDomain match = matchRepo.findById(matchId).orElse(null);
     if (rows.isEmpty()
         || match == null
@@ -135,7 +139,7 @@ public class MissedPickAnalyzer implements ReplayAnalyzer {
       return;
     }
     Map<String, Long> ids = new HashMap<>();
-    picks.forEach(p -> ids.putIfAbsent(p.getAbilityName(), p.getAbilityId()));
+    picks.forEach(p -> ids.putIfAbsent(p.getAbilityName(), damageAbilityId(p, abilities)));
     Set<Long> wanted = new HashSet<>();
     rows.forEach(
         r -> {
@@ -161,6 +165,23 @@ public class MissedPickAnalyzer implements ReplayAnalyzer {
   @Transactional
   public void deleteByMatchId(long matchId) {
     missedPickRepo.deleteByMatchId(matchId);
+  }
+
+  /** The id the damage rows use: an {@code _ad} pick's damage is stored under its base skill. */
+  private static Long damageAbilityId(AbilityDraftPickDomain pick, List<AbilityDomain> abilities) {
+    String name = pick.getAbilityName();
+    if (name == null
+        || !name.endsWith(AD_SUFFIX)
+        || abilities.stream()
+            .anyMatch(a -> Objects.equals(a.getAbilityId(), pick.getAbilityId()))) {
+      return pick.getAbilityId();
+    }
+    String base = name.substring(0, name.length() - AD_SUFFIX.length());
+    return abilities.stream()
+        .filter(a -> base.equals(a.getName()))
+        .map(AbilityDomain::getAbilityId)
+        .findFirst()
+        .orElse(pick.getAbilityId());
   }
 
   private static long damageOf(

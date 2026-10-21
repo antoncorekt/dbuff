@@ -197,6 +197,36 @@ class MissedPickAnalyzerTest {
   }
 
   @Test
+  void anAdPickIsAveragedUnderItsBaseSkillId() {
+    draft(3);
+    pickRepo.findByMatchId(MATCH).stream()
+        .filter(p -> p.getAbilityId() == 20L)
+        .forEach(
+            p -> {
+              p.setAbilityName("skill_20_ad");
+              pickRepo.save(p);
+            });
+    abilityRepo.deleteAll(
+        abilityRepo.findAllByMatchId(MATCH).stream().filter(a -> a.getAbilityId() == 20L).toList());
+    useRepo.findAll().forEach(u -> u.setAbilityName("skill_20_ad"));
+    abilityRepo.save(
+        AbilityDomain.builder()
+            .matchId(MATCH)
+            .playerSlot(128L)
+            .abilityId(99L)
+            .name("skill_20")
+            .damageDealt(1500L)
+            .build());
+    patch(Map.of(99L, new DamageAverage(12, 700)));
+
+    analyzer.analyze(MATCH);
+
+    MissedPickDomain row = missedPickRepo.findByMatchId(MATCH).getFirst();
+    assertThat(row.getCandidatePatchGames()).isEqualTo(12);
+    assertThat(row.getCandidatePatchAverage()).isEqualTo(700);
+  }
+
+  @Test
   void aPickWithoutATurnNumberIsSkippedOnItsOwn() {
     draft(3);
     pick(3, null, 128, 21);
