@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.analysis.item;
 
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
+import com.ako.dbuff.service.replay.analysis.health.HeroHealth;
 import com.ako.dbuff.service.replay.analysis.item.StickUses.Use;
 import java.util.ArrayList;
 import java.util.List;

@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.analysis.item;
 
 import com.ako.dbuff.service.replay.CombatEvent;
+import com.ako.dbuff.service.replay.analysis.health.HeroHealth;
 import java.util.List;
 import java.util.OptionalInt;
 import java.util.Set;

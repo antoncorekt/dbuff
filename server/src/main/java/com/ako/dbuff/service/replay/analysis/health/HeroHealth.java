@@ -1,4 +1,4 @@
-package com.ako.dbuff.service.replay.analysis.item;
+package com.ako.dbuff.service.replay.analysis.health;
 
 import com.ako.dbuff.dao.model.ReplayPlayerTrackDomain;
 import com.ako.dbuff.service.replay.CombatEvent;
@@ -14,7 +14,7 @@ import java.util.OptionalInt;
  * from the track when it holds it; otherwise it is estimated where a hit lands next to a track
  * sample (health after the hit divided by the sample's percentage).
  */
-final class HeroHealth {
+public final class HeroHealth {
   private static final double SAMPLE_TOLERANCE_SECONDS = 1.0;
   private static final int LOWEST_USABLE_PERCENT = 15;
   private static final int FULL_PERCENT = 100;
@@ -27,8 +27,8 @@ final class HeroHealth {
   private record Estimate(double second, double maxHealth) {}
 
   /** Mana at a track sample and the most the hero could hold then. */
-  record Mana(int current, int max) {
-    int missing() {
+  public record Mana(int current, int max) {
+    public int missing() {
       return Math.max(0, max - current);
     }
   }
@@ -38,7 +38,7 @@ final class HeroHealth {
   private final List<Double> deaths = new ArrayList<>();
   private final List<Estimate> estimates = new ArrayList<>();
 
-  HeroHealth(String hero, List<CombatEvent> events, ReplayPlayerTrackDomain track) {
+  public HeroHealth(String hero, List<CombatEvent> events, ReplayPlayerTrackDomain track) {
     this.track = track;
     for (CombatEvent e : events) {
       if (e.kind() == CombatEventKind.DAMAGE && hero.equals(e.target()) && e.targetIsRealHero()) {
@@ -92,7 +92,7 @@ final class HeroHealth {
    * His max health from the track sample at or before the second when the track holds it, else the
    * median estimate within {@code windowSeconds}; empty when there is none.
    */
-  OptionalInt maxHealth(double second, double windowSeconds) {
+  public OptionalInt maxHealth(double second, double windowSeconds) {
     int sample = sampleBefore(second);
     if (sample >= 0
         && track.getMaxHp() != null
@@ -113,7 +113,7 @@ final class HeroHealth {
    * His health at the second: the one the last hit left when it was at most {@code lookbackSeconds}
    * ago, else the track percentage of the sample before times his max health.
    */
-  OptionalInt health(double second, double lookbackSeconds, double maxHealthWindowSeconds) {
+  public OptionalInt health(double second, double lookbackSeconds, double maxHealthWindowSeconds) {
     Hit last = null;
     for (Hit hit : hits) {
       if (hit.second() > second) {
@@ -136,7 +136,7 @@ final class HeroHealth {
   }
 
   /** The mana of the track sample at or before the second; null when the track has no mana. */
-  Mana mana(double second) {
+  public Mana mana(double second) {
     int index = sampleBefore(second);
     if (index < 0
         || track.getMana() == null
@@ -153,7 +153,7 @@ final class HeroHealth {
   }
 
   /** Damage the hero took from others in {@code (from, to]}. */
-  int damage(double from, double to) {
+  public int damage(double from, double to) {
     return hits.stream()
         .filter(h -> h.second() > from && h.second() <= to)
         .mapToInt(Hit::amount)
@@ -161,11 +161,11 @@ final class HeroHealth {
   }
 
   /** The second of the first death in {@code (from, to]}; empty when he did not die. */
-  OptionalDouble deathBetween(double from, double to) {
+  public OptionalDouble deathBetween(double from, double to) {
     return deaths.stream().filter(t -> t > from && t <= to).mapToDouble(t -> t).min();
   }
 
-  boolean diedBetween(double from, double to) {
+  public boolean diedBetween(double from, double to) {
     return deaths.stream().anyMatch(t -> t > from && t <= to);
   }
 
