@@ -4,16 +4,22 @@ import com.ako.dbuff.dao.model.AbilityDomain;
 import com.ako.dbuff.dao.model.AbilityDraftPickDomain;
 import com.ako.dbuff.dao.model.FightAbilityUseDomain;
 import com.ako.dbuff.dao.model.FightImportanceDomain;
+import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.MissedPickDomain;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.FightAbilityUseRepo;
 import com.ako.dbuff.dao.repo.FightImportanceRepo;
+import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.MissedPickRepo;
+import com.ako.dbuff.dao.repo.SkillCountRepository;
+import com.ako.dbuff.dao.repo.SkillCountRepository.DamageAverage;
 import com.ako.dbuff.service.replay.analysis.role.SkillFunctions;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.AllPickProfile;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -22,6 +28,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -36,6 +45,8 @@ class MissedPickAnalyzerTest {
   @Autowired private FightAbilityUseRepo useRepo;
   @Autowired private MissedPickRepo missedPickRepo;
   @MockBean private SkillFunctions skillFunctions;
+  @MockBean private MatchRepo matchRepo;
+  @MockBean private SkillCountRepository countRepository;
 
   private void pick(int order, Integer turn, long slot, long id) {
     pickRepo.save(
@@ -101,6 +112,63 @@ class MissedPickAnalyzerTest {
     assertThat(rows.getFirst().getAnalysisVersion()).isEqualTo(analyzer.version());
   }
 
+  private void patch(Map<Long, DamageAverage> averages) {
+    when(matchRepo.findById(MATCH))
+        .thenReturn(
+            Optional.of(MatchDomain.builder().id(MATCH).patch(60L).startTime(5000L).build()));
+    when(countRepository.averageDamage(any(), anyLong(), any())).thenReturn(averages);
+  }
+
+  @Test
+  void storesThePatchAveragesAndMarksACandidateFarAboveItsOwnAsCarried() {
+    draft(3);
+    patch(Map.of(10L, new DamageAverage(8, 900), 20L, new DamageAverage(23, 600)));
+
+    analyzer.analyze(MATCH);
+
+    MissedPickDomain row = missedPickRepo.findByMatchId(MATCH).getFirst();
+    assertThat(row.getTakenPatchAverage()).isEqualTo(900);
+    assertThat(row.getCandidatePatchAverage()).isEqualTo(600);
+    assertThat(row.getCandidatePatchGames()).isEqualTo(23);
+    assertThat(row.getCarried()).isTrue();
+  }
+
+  @Test
+  void aCandidateNearItsPatchAverageIsNotCarried() {
+    draft(3);
+    patch(Map.of(20L, new DamageAverage(23, 1400)));
+
+    analyzer.analyze(MATCH);
+
+    MissedPickDomain row = missedPickRepo.findByMatchId(MATCH).getFirst();
+    assertThat(row.getTakenPatchAverage()).isNull();
+    assertThat(row.getCarried()).isFalse();
+  }
+
+  @Test
+  void aSkillWithNoGamesOnThePatchHasZeroGamesAndIsNotCarried() {
+    draft(3);
+    patch(Map.of());
+
+    analyzer.analyze(MATCH);
+
+    MissedPickDomain row = missedPickRepo.findByMatchId(MATCH).getFirst();
+    assertThat(row.getCandidatePatchGames()).isZero();
+    assertThat(row.getCandidatePatchAverage()).isNull();
+    assertThat(row.getCarried()).isFalse();
+  }
+
+  @Test
+  void aMatchWithoutAPatchStoresNoAverage() {
+    draft(3);
+
+    analyzer.analyze(MATCH);
+
+    MissedPickDomain row = missedPickRepo.findByMatchId(MATCH).getFirst();
+    assertThat(row.getCandidatePatchGames()).isNull();
+    assertThat(row.getCarried()).isNull();
+  }
+
   @Test
   void anAdPickTakesTheDamageOfTheBaseRowInItsSlot() {
     draft(3);
@@ -126,6 +194,36 @@ class MissedPickAnalyzerTest {
     analyzer.analyze(MATCH);
 
     assertThat(missedPickRepo.findByMatchId(MATCH)).hasSize(1);
+  }
+
+  @Test
+  void anAdPickIsAveragedUnderItsBaseSkillId() {
+    draft(3);
+    pickRepo.findByMatchId(MATCH).stream()
+        .filter(p -> p.getAbilityId() == 20L)
+        .forEach(
+            p -> {
+              p.setAbilityName("skill_20_ad");
+              pickRepo.save(p);
+            });
+    abilityRepo.deleteAll(
+        abilityRepo.findAllByMatchId(MATCH).stream().filter(a -> a.getAbilityId() == 20L).toList());
+    useRepo.findAll().forEach(u -> u.setAbilityName("skill_20_ad"));
+    abilityRepo.save(
+        AbilityDomain.builder()
+            .matchId(MATCH)
+            .playerSlot(128L)
+            .abilityId(99L)
+            .name("skill_20")
+            .damageDealt(1500L)
+            .build());
+    patch(Map.of(99L, new DamageAverage(12, 700)));
+
+    analyzer.analyze(MATCH);
+
+    MissedPickDomain row = missedPickRepo.findByMatchId(MATCH).getFirst();
+    assertThat(row.getCandidatePatchGames()).isEqualTo(12);
+    assertThat(row.getCandidatePatchAverage()).isEqualTo(700);
   }
 
   @Test

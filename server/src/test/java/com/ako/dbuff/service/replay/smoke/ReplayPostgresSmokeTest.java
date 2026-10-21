@@ -350,6 +350,8 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     for (String id : ABILITY_DRAFT_MATCHES) {
       Assumptions.assumeTrue(hasFixture(id), id + " is not in the fixture directory");
       MatchDomain match = seedMatch(id);
+      match.setPatch(60L);
+      matchRepo.save(match);
 
       ReplayStatus status = runService.process(match);
 
@@ -430,6 +432,11 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                 .toList())
         .as("%s: an enemy skill is flagged once per team", id)
         .doesNotHaveDuplicates();
+    if ("9038725154".equals(id)) {
+      assertThat(rows)
+          .as("%s: the patch average is stored (0 games allowed)", id)
+          .allSatisfy(r -> assertThat(r.getCandidatePatchGames()).isNotNull());
+    }
     Integer baseline = MISSED_PICK_BASELINE.get(id);
     if (baseline != null) {
       assertThat(rows).as("%s: below the baseline of %d", id, baseline).hasSizeLessThan(baseline);

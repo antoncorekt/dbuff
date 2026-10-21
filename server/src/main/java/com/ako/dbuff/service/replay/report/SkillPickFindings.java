@@ -31,9 +31,13 @@ public class SkillPickFindings {
   /** A skill that did at least this many times the damage is a clear miss whatever the fights. */
   static final double CLEAR_RATIO = 1.5;
 
-  /** Greatest is the best missed pick: a clear damage gap, then won fights, then the ratio. */
+  /**
+   * Greatest is the best missed pick: not carried by a fed hero, then a clear damage gap, then won
+   * fights, then the ratio.
+   */
   static final Comparator<MissedPickDomain> MISSED_ORDER =
-      Comparator.comparing(
+      Comparator.comparing((MissedPickDomain m) -> !Boolean.TRUE.equals(m.getCarried()))
+          .thenComparing(
               (MissedPickDomain m) -> m.getRatio() != null && m.getRatio() >= CLEAR_RATIO)
           .thenComparing(m -> orZero(m.getCandidateWonFights()))
           .thenComparing(m -> m.getRatio() == null ? 0 : m.getRatio())

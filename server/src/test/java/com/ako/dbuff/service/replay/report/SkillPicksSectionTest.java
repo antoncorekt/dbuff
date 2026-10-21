@@ -253,6 +253,14 @@ class SkillPicksSectionTest {
     assertThat(
             java.util.stream.Stream.of(fights, modest, clear).max(SkillPickFindings.MISSED_ORDER))
         .containsSame(clear);
+    MissedPickDomain carried = missed(0, 3.0);
+    carried.setCandidateWonFights(5);
+    carried.setCarried(true);
+    assertThat(
+            java.util.stream.Stream.of(carried, modest, fights).max(SkillPickFindings.MISSED_ORDER))
+        .containsSame(fights);
+    assertThat(java.util.stream.Stream.of(carried, modest).max(SkillPickFindings.MISSED_ORDER))
+        .containsSame(modest);
     assertThat(java.util.stream.Stream.of(modest, fights).max(SkillPickFindings.MISSED_ORDER))
         .containsSame(fights);
     MissedPickDomain twin = missed(0, 1.2);
