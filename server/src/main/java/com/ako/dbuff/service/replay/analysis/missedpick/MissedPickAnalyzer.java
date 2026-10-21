@@ -32,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class MissedPickAnalyzer implements ReplayAnalyzer {
+  private static final String AD_SUFFIX = "_ad";
+
   private final AbilityDraftPickRepo pickRepo;
   private final AbilityRepo abilityRepo;
   private final FightImportanceRepo importanceRepo;
@@ -47,7 +49,7 @@ public class MissedPickAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 1;
+    return 2;
   }
 
   @Override
@@ -86,6 +88,15 @@ public class MissedPickAnalyzer implements ReplayAnalyzer {
         a ->
             damage.merge(
                 key(a.getPlayerSlot(), a.getAbilityId()), orZero(a.getDamageDealt()), Long::sum));
+    Map<String, Long> byName = new HashMap<>();
+    abilities.stream()
+        .filter(a -> a.getName() != null)
+        .forEach(
+            a ->
+                byName.merge(
+                    nameKey(a.getPlayerSlot(), a.getName()),
+                    orZero(a.getDamageDealt()),
+                    Long::sum));
     WonFightCasts casts =
         new WonFightCasts(
             importanceRepo.findByMatchId(matchId), abilityUseRepo.findByMatchId(matchId));
@@ -94,7 +105,7 @@ public class MissedPickAnalyzer implements ReplayAnalyzer {
             .find(
                 matchId,
                 picks,
-                (slot, abilityId) -> damage.getOrDefault(key(slot, abilityId), 0L),
+                (slot, abilityId) -> damageOf(damage, byName, picks, slot, abilityId),
                 casts,
                 version()));
   }
@@ -103,6 +114,30 @@ public class MissedPickAnalyzer implements ReplayAnalyzer {
   @Transactional
   public void deleteByMatchId(long matchId) {
     missedPickRepo.deleteByMatchId(matchId);
+  }
+
+  private static long damageOf(
+      Map<String, Long> damage,
+      Map<String, Long> byName,
+      List<AbilityDraftPickDomain> picks,
+      long slot,
+      long abilityId) {
+    Long own = damage.get(key(slot, abilityId));
+    if (own != null) {
+      return own;
+    }
+    return picks.stream()
+        .filter(p -> p.getAbilityId() != null && p.getAbilityId() == abilityId)
+        .map(AbilityDraftPickDomain::getAbilityName)
+        .filter(n -> n != null && n.endsWith(AD_SUFFIX))
+        .findFirst()
+        .map(n -> n.substring(0, n.length() - AD_SUFFIX.length()))
+        .map(base -> byName.getOrDefault(nameKey(slot, base), 0L))
+        .orElse(0L);
+  }
+
+  private static String nameKey(Long slot, String name) {
+    return slot + "/" + name;
   }
 
   private static String key(Long slot, Long abilityId) {

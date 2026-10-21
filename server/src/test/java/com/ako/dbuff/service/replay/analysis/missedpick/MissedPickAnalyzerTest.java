@@ -99,6 +99,33 @@ class MissedPickAnalyzerTest {
   }
 
   @Test
+  void anAdPickTakesTheDamageOfTheBaseRowInItsSlot() {
+    draft(3);
+    pickRepo.findByMatchId(MATCH).stream()
+        .filter(p -> p.getAbilityId() == 20L)
+        .forEach(
+            p -> {
+              p.setAbilityName("skill_20_ad");
+              pickRepo.save(p);
+            });
+    abilityRepo.deleteAll(
+        abilityRepo.findAllByMatchId(MATCH).stream().filter(a -> a.getAbilityId() == 20L).toList());
+    useRepo.findAll().forEach(u -> u.setAbilityName("skill_20_ad"));
+    abilityRepo.save(
+        AbilityDomain.builder()
+            .matchId(MATCH)
+            .playerSlot(128L)
+            .abilityId(99L)
+            .name("skill_20")
+            .damageDealt(1500L)
+            .build());
+
+    analyzer.analyze(MATCH);
+
+    assertThat(missedPickRepo.findByMatchId(MATCH)).hasSize(1);
+  }
+
+  @Test
   void aPickWithoutATurnNumberIsSkippedOnItsOwn() {
     draft(3);
     pick(3, null, 128, 21);
