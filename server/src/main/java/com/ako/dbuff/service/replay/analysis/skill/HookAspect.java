@@ -21,8 +21,9 @@ import org.springframework.stereotype.Component;
 /**
  * Judges a skill that pulls the first unit in a line (Meat Hook). The replay says no team sees a
  * hero, so an enemy counts as seen when he stood within {@code seenRange} of a living allied hero
- * at the cast. An enemy hit is a seen or a dark hit; a miss counts only when a seen enemy was aimed
- * at; an ally hit counts only as a save; creep and farming hooks are not counted.
+ * other than the caster at the cast; a hit without a frame or without the target in it is not
+ * counted. An enemy hit is a seen or a dark hit; a miss counts only when a seen enemy was aimed at;
+ * an ally hit counts only as a save; creep and farming hooks are not counted.
  */
 @Component
 public class HookAspect implements SkillAspect {
@@ -130,9 +131,8 @@ public class HookAspect implements SkillAspect {
       Hero target = context.match().hero(hit.get().target()).orElseThrow();
       numbers.put("hitAfter", hit.get().gameSecond() - cast.second());
       if (target.team() != caster.team()) {
-        boolean wasSeen = seen.contains(target.playerId());
-        return new Outcome(
-            cast.second(), target.name(), wasSeen ? SEEN_HIT : DARK_HIT, true, numbers);
+        String verdict = enemyHitVerdict(view, frame, seen, target);
+        return new Outcome(cast.second(), target.name(), verdict, true, numbers);
       }
       boolean save = isSave(context, target, hit.get().gameSecond(), numbers);
       return new Outcome(
@@ -142,6 +142,14 @@ public class HookAspect implements SkillAspect {
     return aimed
         .map(h -> new Outcome(cast.second(), h.name(), SEEN_MISS, true, numbers))
         .orElseGet(() -> new Outcome(cast.second(), "", NOT_COUNTED, true, numbers));
+  }
+
+  private static String enemyHitVerdict(
+      SnapshotView view, Optional<Frame> frame, Set<Integer> seen, Hero target) {
+    if (frame.isEmpty() || view.point(frame.get().snapshot(), target.playerId()).isEmpty()) {
+      return NOT_COUNTED;
+    }
+    return seen.contains(target.playerId()) ? SEEN_HIT : DARK_HIT;
   }
 
   private static double fallbackRange(SkillContext context) {
@@ -183,14 +191,11 @@ public class HookAspect implements SkillAspect {
 
   private static Set<Integer> seenEnemies(
       SkillContext context, SnapshotView view, CastSnapshot frame) {
-    int team = context.caster().team();
-    List<HeroPoint> allies =
-        frame.heroes().stream().filter(h -> h.alive() && view.teamOf(h) == team).toList();
+    List<HeroPoint> witnesses = view.witnesses(frame);
     double reach = context.parameter(SEEN_RANGE, 1600);
     return frame.heroes().stream()
-        .filter(h -> h.alive() && view.teamOf(h) != team && view.teamOf(h) != 0)
-        .filter(
-            e -> allies.stream().anyMatch(a -> Math.hypot(a.x() - e.x(), a.y() - e.y()) <= reach))
+        .filter(h -> h.alive() && view.isEnemy(h))
+        .filter(h -> view.seenBy(h, witnesses, reach))
         .map(HeroPoint::playerId)
         .collect(java.util.stream.Collectors.toSet());
   }

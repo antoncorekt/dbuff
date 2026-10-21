@@ -35,6 +35,19 @@ final class SnapshotView {
     return team != 0 && team != context.caster().team();
   }
 
+  List<HeroPoint> witnesses(CastSnapshot frame) {
+    int casterId = context.caster().playerId();
+    int team = context.caster().team();
+    return frame.heroes().stream()
+        .filter(h -> h.alive() && h.playerId() != casterId && teamOf(h) == team)
+        .toList();
+  }
+
+  boolean seenBy(HeroPoint enemy, List<HeroPoint> witnesses, double seenRange) {
+    return witnesses.stream()
+        .anyMatch(w -> Math.hypot(w.x() - enemy.x(), w.y() - enemy.y()) <= seenRange);
+  }
+
   Optional<Hero> hero(int playerId) {
     return Optional.ofNullable(roster.get(playerId));
   }
