@@ -8,6 +8,16 @@ parameters:
   rangeBonus: 300
   fallbackDurationSeconds: 8.5
   fallbackCastRange: 800
+  seenRange: 1600
+  aimRangeBonus: 150
+  aimAngleDegrees: 15
+  hitExtraSeconds: 0.3
+  fallbackWindowSeconds: 1.5
+  fallbackHookRange: 1300
+  saveLowShare: 0.35
+  saveHeavyShare: 0.3
+  saveBeforeSeconds: 3
+  saveSurviveSeconds: 10
 entries:
   - key: false_promise
     abilities: [oracle_false_promise]
