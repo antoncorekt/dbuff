@@ -140,7 +140,7 @@ class HookAspectTest {
   void aHitOnAnEnemyTheTeamSawIsASeenHit() {
     cast();
     hookHit(ENEMY, 0.5);
-    frame(0, at(PUDGE_ID, 0, 0), at(ENEMY_ID, 900, 0));
+    frame(0, at(PUDGE_ID, 0, 0), at(ALLY_ID, 0, 100), at(ENEMY_ID, 900, 0));
 
     assertThat(outcomes()).containsExactly(HookAspect.SEEN_HIT);
   }
@@ -155,20 +155,20 @@ class HookAspectTest {
   }
 
   @Test
-  void aHitWithoutSnapshotsIsADarkHit() {
+  void aHitWithoutSnapshotsIsNotCounted() {
     cast();
     hookHit(ENEMY, 0.5);
 
     List<Outcome> result = judge();
 
-    assertThat(result).extracting(Outcome::outcome).containsExactly(HookAspect.DARK_HIT);
+    assertThat(result).extracting(Outcome::outcome).containsExactly(HookAspect.NOT_COUNTED);
     assertThat(result.getFirst().numbers()).containsEntry("noSnapshot", 1.0);
   }
 
   @Test
   void aMissAimedAtASeenEnemyIsASeenMiss() {
     cast();
-    frame(0, at(PUDGE_ID, 0, 0), at(ENEMY_ID, 1000, 50));
+    frame(0, at(PUDGE_ID, 0, 0), at(ALLY_ID, 0, 100), at(ENEMY_ID, 1000, 50));
 
     assertThat(outcomes()).containsExactly(HookAspect.SEEN_MISS);
   }
@@ -184,7 +184,12 @@ class HookAspectTest {
   @Test
   void anEnemyOutOfSightIsNeverAimedAt() {
     cast();
-    frame(0, at(PUDGE_ID, 0, 0), at(FAR_ENEMY_ID, 1400, 0), at(ENEMY_ID, 3500, 0));
+    frame(
+        0,
+        at(PUDGE_ID, 0, 0),
+        at(ALLY_ID, 0, 100),
+        at(FAR_ENEMY_ID, 1400, 0),
+        at(ENEMY_ID, 3500, 0));
 
     assertThat(outcomes()).containsExactly(HookAspect.SEEN_MISS);
     snapshots.clear();
@@ -201,12 +206,32 @@ class HookAspectTest {
   }
 
   @Test
-  void aHeroMissingFromTheFrameIsUnknownNotSeen() {
+  void aTargetMissingFromTheFrameIsNotCounted() {
     cast();
     hookHit(ENEMY, 0.5);
-    frame(0, at(PUDGE_ID, 0, 0));
+    frame(0, at(PUDGE_ID, 0, 0), at(ALLY_ID, 100, 0));
+
+    assertThat(outcomes()).containsExactly(HookAspect.NOT_COUNTED);
+  }
+
+  @Test
+  void theCasterAloneNearTheTargetIsNoWitness() {
+    cast();
+    hookHit(ENEMY, 0.5);
+    frame(0, at(PUDGE_ID, 0, 0), at(ENEMY_ID, 900, 0));
+    snapshots.clear();
+    frame(0, at(PUDGE_ID, 0, 0), at(ENEMY_ID, 900, 0), at(ALLY_ID, 5000, 0));
 
     assertThat(outcomes()).containsExactly(HookAspect.DARK_HIT);
+  }
+
+  @Test
+  void anAllyWithinSeenRangeOfTheTargetMakesItASeenHit() {
+    cast();
+    hookHit(ENEMY, 0.5);
+    frame(0, at(PUDGE_ID, 0, 0), at(ENEMY_ID, 3000, 0), at(ALLY_ID, 1500, 0));
+
+    assertThat(outcomes()).containsExactly(HookAspect.SEEN_HIT);
   }
 
   @Test
@@ -276,7 +301,7 @@ class HookAspectTest {
   void aHitAfterTheFlightWindowIsNotThisCasts() {
     cast();
     hookHit(ENEMY, 3);
-    frame(0, at(PUDGE_ID, 0, 0), at(ENEMY_ID, 1000, 0));
+    frame(0, at(PUDGE_ID, 0, 0), at(ALLY_ID, 0, 100), at(ENEMY_ID, 1000, 0));
 
     assertThat(outcomes()).containsExactly(HookAspect.SEEN_MISS);
   }
@@ -285,7 +310,7 @@ class HookAspectTest {
   void withoutConstantsTheWindowFallsBackToOneAndAHalfSeconds() {
     cast();
     hookHit(ENEMY, 1.4);
-    frame(0, at(PUDGE_ID, 0, 0), at(ENEMY_ID, 900, 0));
+    frame(0, at(PUDGE_ID, 0, 0), at(ALLY_ID, 0, 100), at(ENEMY_ID, 900, 0));
 
     assertThat(judge(Optional.empty()))
         .extracting(Outcome::outcome)

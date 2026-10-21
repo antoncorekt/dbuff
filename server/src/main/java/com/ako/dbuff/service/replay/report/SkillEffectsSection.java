@@ -53,7 +53,7 @@ public class SkillEffectsSection implements ReplayReportSection {
   @Override
   public List<String> lines(ReplayReportInput input) {
     List<SkillEffectDomain> rows = repo.findByMatchId(input.matchId());
-    if (rows == null || input.focusSlots() == null) {
+    if (input.focusSlots() == null) {
       return List.of();
     }
     List<SkillCatalogEntry> entries = catalog.entries();
@@ -61,7 +61,7 @@ public class SkillEffectsSection implements ReplayReportSection {
     List<String> lines = new ArrayList<>();
     for (Long slot : new TreeSet<>(input.focusSlots())) {
       rows.stream()
-          .filter(r -> r != null && Objects.equals(r.getPlayerSlot(), slot))
+          .filter(r -> Objects.equals(r.getPlayerSlot(), slot))
           .sorted(Comparator.comparingInt(r -> position(entries, r.getEntryKey())))
           .map(r -> line(r, entries, BehaviourWording.hero(heroes, slot)))
           .flatMap(Optional::stream)

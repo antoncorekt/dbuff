@@ -269,4 +269,27 @@ class SkillPicksSectionTest {
     assertThat(java.util.stream.Stream.of(modest, twin).max(SkillPickFindings.MISSED_ORDER))
         .containsSame(twin);
   }
+
+  @Test
+  void aGapRowIsListedBeforeAGapsNotShownRowAndAFitRowNever() {
+    BuildFitDomain notShown = build("ESCAPE", "Not shown: Pudge may lack escape.");
+    notShown.setStage("BOTH");
+    notShown.setVerdict("GAPS_NOT_SHOWN");
+    BuildFitDomain gap = build("ESCAPE", "Gap: Pudge had no escape and died alone.");
+    gap.setStage("FINAL");
+    gap.setVerdict("GAP");
+    BuildFitDomain fit = build("ESCAPE", "Fit: Pudge was fine.");
+    fit.setStage("INTENT");
+    fit.setVerdict("FIT");
+    when(buildRepo.findByMatchId(1L)).thenReturn(List.of(notShown, fit, gap));
+    assertThat(section.lines(input(3, 0L)))
+        .containsExactly("Anton (Pudge): Gap: Pudge had no escape and died alone.");
+
+    when(buildRepo.findByMatchId(1L)).thenReturn(List.of(fit, notShown));
+    assertThat(section.lines(input(3, 0L)))
+        .containsExactly("Anton (Pudge): Not shown: Pudge may lack escape.");
+
+    when(buildRepo.findByMatchId(1L)).thenReturn(List.of(fit));
+    assertThat(section.lines(input(3, 0L))).isEmpty();
+  }
 }

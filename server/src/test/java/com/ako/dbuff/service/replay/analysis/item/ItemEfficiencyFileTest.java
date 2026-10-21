@@ -275,4 +275,103 @@ class ItemEfficiencyFileTest {
         .hasMessageContaining("unknown setting 'altMinGame'")
         .hasMessageNotContaining("'altMinGames'");
   }
+
+  private static final java.util.Map<String, Double> SHARED_VALUES =
+      java.util.Map.ofEntries(
+          java.util.Map.entry("lowHpFraction", 0.35),
+          java.util.Map.entry("lowHpAbsolute", 300.0),
+          java.util.Map.entry("heavyDamageFraction", 0.3),
+          java.util.Map.entry("heavyDamageAbsolute", 300.0),
+          java.util.Map.entry("damageBeforeSeconds", 3.0),
+          java.util.Map.entry("damageAfterSeconds", 3.0),
+          java.util.Map.entry("surviveSeconds", 10.0),
+          java.util.Map.entry("hpLookbackSeconds", 3.0),
+          java.util.Map.entry("maxHpWindowSeconds", 120.0),
+          java.util.Map.entry("goldPerHp", 0.3),
+          java.util.Map.entry("goldPerMana", 0.3),
+          java.util.Map.entry("xpWeight", 1.0));
+
+  @Test
+  void theEffectiveSharedValuesAreTheSameForEveryEntry() {
+    ItemEfficiencyFile shipped = new ItemEfficiencyFile("replay/items.yaml");
+    var aspects =
+        java.util.List.<ItemAspect>of(
+            new ChargeRestoreAspect(),
+            new BottleRunesAspect(),
+            new SaveAspect(),
+            new SelfHarmAspect(),
+            new MidasUsesAspect(null),
+            new FarmRateAspect(),
+            new ItemDamageAspect(),
+            new StatUpliftAspect(),
+            new AlternativesAspect(null, null),
+            new SavingCostAspect(),
+            new CooldownAspect(),
+            new TeamRestoreAspect(),
+            new TargetUseAspect(),
+            new ControlAspect(),
+            new VisionAspect(new com.ako.dbuff.service.replay.analysis.vision.VisionProperties()));
+    int compared = 0;
+    for (ItemEfficiencyEntry entry : shipped.entries()) {
+      var accepted =
+          entry.aspects().stream()
+              .flatMap(
+                  name ->
+                      aspects.stream()
+                          .filter(a -> a.name().equals(name))
+                          .findFirst()
+                          .orElseThrow()
+                          .parameterNames()
+                          .stream())
+              .collect(java.util.stream.Collectors.toSet());
+      for (var knob : SHARED_VALUES.entrySet()) {
+        if (accepted.contains(knob.getKey())) {
+          double effective =
+              entry.parameter(
+                  knob.getKey(),
+                  shipped.prices().getOrDefault(knob.getKey(), JAVA_DEFAULTS.get(knob.getKey())));
+          assertThat(effective).as(entry.key() + "." + knob.getKey()).isEqualTo(knob.getValue());
+          compared++;
+        }
+      }
+    }
+    assertThat(compared).isGreaterThan(50);
+  }
+
+  private static final java.util.Map<String, Double> JAVA_DEFAULTS = SHARED_VALUES;
+
+  @Test
+  void pricesAcceptTheSharedKnobsAndAnEntryValueWins() {
+    ItemEfficiencyFile f =
+        file(
+            """
+            prices: {lowHpFraction: 0.5, goldPerHp: 0.2, goldPerMana: 0.1, surviveSeconds: 7}
+            categories: {c: C}
+            entries:
+              - {key: a, category: c, items: [x], aspects: [save], parameters: {surviveSeconds: 9}}
+            """);
+
+    assertThat(f.prices())
+        .containsEntry("lowHpFraction", 0.5)
+        .containsEntry("goldPerHp", 0.2)
+        .containsEntry("goldPerMana", 0.1);
+    assertThat(f.entries().getFirst().parameter("surviveSeconds", f.prices().get("surviveSeconds")))
+        .isEqualTo(9);
+  }
+
+  @Test
+  void aPriceNameNoAspectReadsIsStillRejected() {
+    ItemEfficiencyFile bad =
+        file(
+            """
+            prices: {goldPerHP: 1, laningEndSeconds: 600}
+            categories: {c: C}
+            entries:
+              - {key: a, category: c, items: [x], aspects: [save]}
+            """);
+
+    assertThatThrownBy(bad::entries)
+        .hasMessageContaining("unknown price 'goldPerHP'")
+        .hasMessageContaining("unknown price 'laningEndSeconds'");
+  }
 }

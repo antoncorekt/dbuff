@@ -87,6 +87,13 @@ class SkillEffectSmokeTest extends ReplayPipelineFixture {
       assertThat(pudge.getCastCount()).isGreaterThanOrEqualTo(PUDGE_MIN_CASTS);
       assertThat(figures.get("SEEN_HIT").asInt() + figures.get("DARK_HIT").asInt())
           .isGreaterThanOrEqualTo(1);
+      for (JsonNode row : new ObjectMapper().readTree(pudge.getDetails())) {
+        boolean noFrameDarkHit =
+            "DARK_HIT".equals(row.get("outcome").asText()) && row.get("numbers").has("noSnapshot");
+        assertThat(noFrameDarkHit)
+            .as("dark hit without a frame at %s", row.get("second"))
+            .isFalse();
+      }
       assertThat(hookRow(match, RUBICK_SLOT).getCastCount()).isEqualTo(RUBICK_CASTS);
     } finally {
       runRepo.deleteAll();
@@ -110,8 +117,13 @@ class SkillEffectSmokeTest extends ReplayPipelineFixture {
 
       System.out.println("SKILL EFFECTS 9037038717 doom: " + doom.getFigures());
       assertThat(doom.getCastCount()).isGreaterThanOrEqualTo(DOOM_MIN_CASTS);
+      int judged =
+          figures.get("TRAP").asInt()
+              + figures.get("MISS").asInt()
+              + figures.get("NOT_COUNTED").asInt();
       assertThat(figures.get("TRAP").asInt() + figures.get("MISS").asInt())
           .isGreaterThanOrEqualTo(1);
+      assertThat(judged).isEqualTo(doom.getCastCount());
     } finally {
       runRepo.deleteAll();
     }

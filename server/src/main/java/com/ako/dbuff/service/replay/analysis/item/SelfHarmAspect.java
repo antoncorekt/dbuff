@@ -27,9 +27,8 @@ public class SelfHarmAspect implements ItemAspect {
   private static final Set<String> PARAMETERS = parameters();
 
   private static Set<String> parameters() {
-    Set<String> names = new HashSet<>(WorthPrices.NAMES);
-    names.addAll(Set.of("surviveSeconds", "hpLookbackSeconds", "maxHpWindowSeconds"));
-    return Set.copyOf(names);
+    return ParameterNames.withPrices(
+        Set.of("surviveSeconds", "hpLookbackSeconds", "maxHpWindowSeconds"));
   }
 
   @Override

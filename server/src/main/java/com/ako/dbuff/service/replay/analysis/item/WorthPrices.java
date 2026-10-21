@@ -31,6 +31,9 @@ record WorthPrices(
           "trendMinutes",
           "respawnSeconds");
 
+  static final Set<String> ACCEPTED =
+      ParameterNames.of(NAMES, SaveJudge.PARAMETERS, Set.of("goldPerHp", "goldPerMana"));
+
   static WorthPrices of(AspectContext context) {
     return new WorthPrices(
         context.price("killWindowSeconds", 10),

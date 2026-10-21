@@ -150,7 +150,7 @@ public class ItemEfficiencyFile {
     checkNumbers("prices", content.prices(), problems);
     if (content.prices() != null) {
       content.prices().keySet().stream()
-          .filter(name -> !WorthPrices.NAMES.contains(name))
+          .filter(name -> !WorthPrices.ACCEPTED.contains(name))
           .sorted()
           .forEach(name -> problems.add("prices has unknown price '" + name + "'"));
     }

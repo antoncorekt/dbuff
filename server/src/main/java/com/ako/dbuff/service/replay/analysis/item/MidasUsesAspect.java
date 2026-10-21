@@ -60,7 +60,7 @@ public class MidasUsesAspect implements ItemAspect {
     ItemEfficiencyEntry entry = context.entry();
     HeroInputs hero = context.hero();
     List<String> names = context.names();
-    double weight = entry.parameter("xpWeight", 1.0);
+    double weight = context.price("xpWeight", 1.0);
     double cooldown = entry.parameter("cooldownSeconds", 90);
     Long cost = context.cost();
     double bought = hero.firstAdded(names).orElse(0);

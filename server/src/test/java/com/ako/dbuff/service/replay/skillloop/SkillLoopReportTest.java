@@ -78,7 +78,7 @@ class SkillLoopReportTest {
   }
 
   @Test
-  void listsTheSkillEffectsWithCountsAndAtMostFiveDetailLines() {
+  void listsTheSkillEffectsWithCountsAndEveryDetailLine() {
     String details =
         IntStream.range(0, 7)
             .mapToObj(
@@ -102,7 +102,7 @@ class SkillLoopReportTest {
             "## Skill effects",
             "- Windrunner, false_promise: 7 casts; SAVE 7, IMPACT 0, NOT_COUNTED 0, MISSED 1",
             "SAVE 10:00 on Axe (damage 900)");
-    assertThat(report.split("SAVE 10:0", -1)).hasSize(6);
+    assertThat(report.split("SAVE 10:0", -1)).hasSize(8);
   }
 
   @Test
@@ -136,5 +136,59 @@ class SkillLoopReportTest {
   void saysNothingWasCastWhenThereAreNoSkillEffects() {
     assertThat(SkillLoopReport.render(data("All Pick", List.of(), List.of(), List.of())))
         .contains("## Skill effects", "No catalogued skill was cast or learned.");
+  }
+
+  @Test
+  void printsFortyCastLinesAndOneLineForTheRest() {
+    String details =
+        IntStream.range(0, 45)
+            .mapToObj(
+                i ->
+                    "{\"second\":%d,\"target\":\"Axe\",\"outcome\":\"SAVE\",\"numbers\":{}}"
+                        .formatted(600 + i))
+            .collect(Collectors.joining(",", "[", "]"));
+    SkillEffectDomain effect =
+        SkillEffectDomain.builder()
+            .playerSlot(0L)
+            .entryKey("false_promise")
+            .castCount(45)
+            .figures("{\"SAVE\":45}")
+            .details(details)
+            .build();
+
+    String report = SkillLoopReport.render(data("All Pick", List.of(), List.of(), List.of(effect)));
+
+    assertThat(report.split("  - SAVE ", -1)).hasSize(41);
+    assertThat(report).contains("  - ... 5 more casts");
+  }
+
+  @Test
+  void printsTheReportLineBulletUnderTheCountsForAHookRowAndAPromiseRow() {
+    SkillEffectDomain hook =
+        SkillEffectDomain.builder()
+            .playerSlot(0L)
+            .entryKey("meat_hook")
+            .castCount(19)
+            .figures("{\"SEEN_HIT\":7,\"SEEN_MISS\":5,\"accuracy\":58}")
+            .build();
+    SkillEffectDomain promise =
+        SkillEffectDomain.builder()
+            .playerSlot(128L)
+            .entryKey("false_promise")
+            .castCount(5)
+            .figures("{\"SAVE\":3}")
+            .build();
+
+    String report =
+        SkillLoopReport.render(data("All Pick", List.of(), List.of(), List.of(hook, promise)));
+    List<String> lines = List.of(report.split("\n"));
+
+    int hookAt =
+        lines.indexOf("- Windrunner, meat_hook: 19 casts; SEEN_HIT 7, SEEN_MISS 5, accuracy 58");
+    assertThat(hookAt).isNotNegative();
+    assertThat(lines.get(hookAt + 1)).startsWith("  - Report line: ").contains("hooks");
+    int promiseAt = lines.indexOf("- Axe, false_promise: 5 casts; SAVE 3");
+    assertThat(promiseAt).isNotNegative();
+    assertThat(lines.get(promiseAt + 1)).startsWith("  - Report line: ").contains("False Promise");
   }
 }

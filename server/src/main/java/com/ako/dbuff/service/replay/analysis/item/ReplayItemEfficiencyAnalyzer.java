@@ -16,12 +16,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Judges the items of {@code replay/items.yaml} for every hero who held one, with the aspects each
  * entry lists (see {@link ItemAspect}) summed into one row. It does not know any item: a new item
  * or group is a new entry, a new kind of judgment a new aspect bean. The OpenDota based purchase
- * report ({@code ItemEfficiencyAnalyzer} in the match report) is a different feature.
+ * report ({@code ItemEfficiencyAnalyzer} in the match report) is a different feature. The lookups
+ * of the aspects (database, OpenDota) run before the write transaction, which only replaces the
+ * stored rows.
  */
 @Slf4j
 @Order(85)
@@ -33,6 +36,7 @@ public class ReplayItemEfficiencyAnalyzer implements ReplayAnalyzer {
   private final ItemEfficiencyInputs inputs;
   private final ItemKits kits;
   private final ItemEfficiencyRepo repo;
+  private final TransactionTemplate transaction;
 
   @Override
   public String name() {
@@ -51,11 +55,9 @@ public class ReplayItemEfficiencyAnalyzer implements ReplayAnalyzer {
   }
 
   @Override
-  @Transactional
   public void analyze(long matchId) {
     List<ItemEfficiencyEntry> entries = file.entries();
     List<List<ItemAspect>> chosen = aspectsFor(entries);
-    deleteByMatchId(matchId);
     MatchInputs match = inputs.load(matchId);
     List<ItemEfficiency> results = new ArrayList<>();
     for (int i = 0; i < entries.size(); i++) {
@@ -71,7 +73,7 @@ public class ReplayItemEfficiencyAnalyzer implements ReplayAnalyzer {
     Map<String, String> categories =
         entries.stream()
             .collect(Collectors.toMap(ItemEfficiencyEntry::key, ItemEfficiencyEntry::category));
-    repo.saveAll(
+    List<ItemEfficiencyDomain> rows =
         results.stream()
             .map(
                 r -> {
@@ -79,7 +81,12 @@ public class ReplayItemEfficiencyAnalyzer implements ReplayAnalyzer {
                   row.setCategory(categories.get(r.entryKey()));
                   return row;
                 })
-            .toList());
+            .toList();
+    transaction.executeWithoutResult(
+        status -> {
+          repo.deleteByMatchId(matchId);
+          repo.saveAll(rows);
+        });
   }
 
   @Override

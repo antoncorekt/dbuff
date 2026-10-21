@@ -2,7 +2,6 @@ package com.ako.dbuff.service.replay.analysis.item;
 
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.analysis.item.TeamUses.Use;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,9 +23,7 @@ public class TeamRestoreAspect implements ItemAspect {
   private static final Set<String> PARAMETERS = parameters();
 
   private static Set<String> parameters() {
-    Set<String> names = new HashSet<>(TeamUses.PARAMETERS);
-    names.addAll(Set.of("goldPerHp", "goldPerMana"));
-    return Set.copyOf(names);
+    return ParameterNames.of(TeamUses.PARAMETERS, Set.of("goldPerHp", "goldPerMana"));
   }
 
   @Override

@@ -289,6 +289,7 @@ public abstract class ReplayPipelineFixture {
         json.hasNonNull("radiant_win") ? json.get("radiant_win").asBoolean() : null);
     match.setRadiantScore(optLong(json, "radiant_score"));
     match.setDireScore(optLong(json, "dire_score"));
+    match.setPatch(optLong(json, "patch"));
     matchRepo.save(match);
     playerStatRepo.deleteAll(playerStatRepo.findAllByMatchId(match.getId()));
     timelineRepo.deleteByMatchId(match.getId());

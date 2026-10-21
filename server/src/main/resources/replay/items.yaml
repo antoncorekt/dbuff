@@ -6,6 +6,17 @@ prices:
   disableShare: 0.25
   trendMinutes: 8
   respawnSeconds: 30
+  goldPerHp: 0.3
+  goldPerMana: 0.3
+  lowHpFraction: 0.35
+  lowHpAbsolute: 300
+  heavyDamageFraction: 0.3
+  heavyDamageAbsolute: 300
+  damageBeforeSeconds: 3
+  damageAfterSeconds: 3
+  surviveSeconds: 10
+  hpLookbackSeconds: 3
+  maxHpWindowSeconds: 120
 alternatives: { altCostBand: 0.3, altTimeBand: 300, altMinGames: 5 }
 categories:
   farming: Farming
@@ -19,18 +30,7 @@ entries:
     aspects: [charge-restore, save]
     parameters:
       restorePerCharge: 15
-      goldPerHp: 0.3
-      goldPerMana: 0.3
       laningEndSeconds: 600
-      lowHpFraction: 0.35
-      lowHpAbsolute: 300
-      heavyDamageFraction: 0.3
-      heavyDamageAbsolute: 300
-      damageBeforeSeconds: 3
-      damageAfterSeconds: 3
-      surviveSeconds: 10
-      hpLookbackSeconds: 3
-      maxHpWindowSeconds: 120
   - key: hand_of_midas
     category: farming
     items: [hand_of_midas]
@@ -38,7 +38,6 @@ entries:
     winStats: [[hand_of_midas], [hand_of_midas, octarine_core]]
     parameters:
       cooldownSeconds: 90
-      xpWeight: 1
       includeAttackSpeed: 1
   - key: farming_items
     category: farming
@@ -76,18 +75,7 @@ entries:
     aspects: [bottle-runes, charge-restore]
     parameters:
       restoreFromConstants: 1
-      goldPerHp: 0.3
-      goldPerMana: 0.3
       laningEndSeconds: 600
-      lowHpFraction: 0.35
-      lowHpAbsolute: 300
-      heavyDamageFraction: 0.3
-      heavyDamageAbsolute: 300
-      damageBeforeSeconds: 3
-      damageAfterSeconds: 3
-      surviveSeconds: 10
-      hpLookbackSeconds: 3
-      maxHpWindowSeconds: 120
       healWindowSeconds: 4
   - key: arcane_boots
     category: sustain
@@ -107,12 +95,7 @@ entries:
     aspects: [self-harm, charge-restore]
     parameters:
       healthCost: 170
-      goldPerHp: 0.3
-      goldPerMana: 0.3
       laningEndSeconds: 600
-      surviveSeconds: 10
-      hpLookbackSeconds: 3
-      maxHpWindowSeconds: 120
   - key: glimmer_cape
     category: save
     items: [glimmer_cape]
