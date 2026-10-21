@@ -175,11 +175,20 @@ class SkillEffectAnalyzerTest {
   }
 
   @Test
-  void theShippedCatalogIsValidWithTheDefaultProperties() {
-    analyzer(
-            CATALOG,
-            List.of(new PromiseAspect()),
-            new ReplayProcessingProperties().getSnapshotAbilities())
+  void theShippedCatalogIsValidWithTheShippedAspectsAndDefaultProperties() {
+    ReplayProcessingProperties processing = new ReplayProcessingProperties();
+    new SkillEffectAnalyzer(
+            new SkillCatalogFile("replay/skills.yaml"),
+            List.of(new PromiseAspect(), new HookAspect(), new TrapAspect()),
+            processing,
+            mock(CombatLogReader.class),
+            mock(ReplayPlayerRepo.class),
+            mock(ReplayPlayerTrackRepo.class),
+            mock(ReplayStateChangeRepo.class),
+            mock(FightRepo.class),
+            mock(ReplayCastSnapshotRepo.class),
+            mock(HeroKits.class),
+            mock(SkillEffectRepo.class))
         .checkCatalog();
   }
 }
