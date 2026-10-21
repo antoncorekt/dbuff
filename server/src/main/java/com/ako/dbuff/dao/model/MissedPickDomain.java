@@ -52,7 +52,11 @@ public class MissedPickDomain {
   /** Both skills hold the ultimate slot, or both a regular one. */
   private Boolean ultimate;
 
-  /** DAMAGE (the taken skill did damage and the candidate more) or FIGHTS (neither did damage). */
+  /**
+   * DAMAGE (both skills did damage and the candidate more) or {@code FIGHTS:<FUNCTION>} (neither
+   * did damage; both are mainly that function). A bare FIGHTS is an older row without a function;
+   * readers test {@code startsWith("FIGHTS")}.
+   */
   private String basis;
 
   private Long takenDamage;
@@ -69,6 +73,18 @@ public class MissedPickDomain {
 
   /** Important fights the player's team won in which the taken skill was cast. */
   private Integer takenWonFights;
+
+  /** Mean damage per game of the taken skill on the match's patch; null without a patch. */
+  private Double takenPatchAverage;
+
+  /** The same for the candidate; null without a patch or without a game. */
+  private Double candidatePatchAverage;
+
+  /** Games behind the candidate's patch average, 0 when none; null without a patch. */
+  private Integer candidatePatchGames;
+
+  /** The candidate did more than the configured multiple of its patch average. */
+  private Boolean carried;
 
   private Integer analysisVersion;
 }

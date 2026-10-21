@@ -6,6 +6,7 @@ import com.ako.dbuff.dao.model.SkillPickStatDomain;
 import com.ako.dbuff.dao.repo.BuildFitRepo;
 import com.ako.dbuff.dao.repo.MissedPickRepo;
 import com.ako.dbuff.dao.repo.SkillPickStatRepo;
+import com.ako.dbuff.service.replay.analysis.buildfit.BuildFitVerdict;
 import com.ako.dbuff.service.replay.analysis.skillstat.SkillStatMath;
 import com.ako.dbuff.service.replay.analysis.skillstat.SkillStatWording;
 import java.util.ArrayList;
@@ -31,9 +32,13 @@ public class SkillPickFindings {
   /** A skill that did at least this many times the damage is a clear miss whatever the fights. */
   static final double CLEAR_RATIO = 1.5;
 
-  /** Greatest is the best missed pick: a clear damage gap, then won fights, then the ratio. */
+  /**
+   * Greatest is the best missed pick: not carried by a fed hero, then a clear damage gap, then won
+   * fights, then the ratio.
+   */
   static final Comparator<MissedPickDomain> MISSED_ORDER =
-      Comparator.comparing(
+      Comparator.comparing((MissedPickDomain m) -> !Boolean.TRUE.equals(m.getCarried()))
+          .thenComparing(
               (MissedPickDomain m) -> m.getRatio() != null && m.getRatio() >= CLEAR_RATIO)
           .thenComparing(m -> orZero(m.getCandidateWonFights()))
           .thenComparing(m -> m.getRatio() == null ? 0 : m.getRatio())
@@ -44,7 +49,8 @@ public class SkillPickFindings {
               Comparator.nullsLast(Comparator.<String>naturalOrder()));
 
   private static final Comparator<BuildFitDomain> BUILD_ORDER =
-      Comparator.comparing(
+      Comparator.comparing(SkillPickFindings::buildRank)
+          .thenComparing(
               BuildFitDomain::getStage, Comparator.nullsLast(Comparator.<String>naturalOrder()))
           .thenComparing(
               BuildFitDomain::getId, Comparator.nullsLast(Comparator.<Long>naturalOrder()));
@@ -99,11 +105,16 @@ public class SkillPickFindings {
     return findings;
   }
 
+  private static int buildRank(BuildFitDomain row) {
+    return BuildFitVerdict.GAP.name().equals(row.getVerdict()) || row.getVerdict() == null ? 0 : 1;
+  }
+
   private static boolean stated(BuildFitDomain row) {
-    return row.getStated() != null
-        && !row.getStated().isBlank()
-        && row.getEvidence() != null
-        && !row.getEvidence().isBlank();
+    boolean worth =
+        row.getVerdict() == null
+            ? row.getStated() != null && !row.getStated().isBlank()
+            : !BuildFitVerdict.FIT.name().equals(row.getVerdict());
+    return worth && row.getEvidence() != null && !row.getEvidence().isBlank();
   }
 
   private Finding finding(FindingKind kind, String who, String text) {

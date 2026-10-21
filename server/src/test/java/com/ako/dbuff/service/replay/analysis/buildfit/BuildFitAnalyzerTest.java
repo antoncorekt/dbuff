@@ -135,6 +135,8 @@ class BuildFitAnalyzerTest {
     assertThat(verdict.getRole()).isEqualTo(1);
     assertThat(verdict.getMissing()).isEqualTo("ESCAPE");
     assertThat(verdict.getStated()).isEqualTo("ESCAPE");
+    assertThat(verdict.getVerdict()).isEqualTo("GAP");
+    assertThat(verdict.getUnknown()).isEmpty();
     assertThat(verdict.getEvidence()).isEqualTo("Hero10 had no escape and died alone 3 times.");
     assertThat(verdict.getAnalysisVersion()).isEqualTo(analyzer.version());
   }
@@ -149,7 +151,27 @@ class BuildFitAnalyzerTest {
     BuildFitDomain verdict = row(0, "BOTH");
     assertThat(verdict.getMissing()).isEqualTo("ESCAPE");
     assertThat(verdict.getStated()).isEmpty();
-    assertThat(verdict.getEvidence()).isEqualTo("Hero10's build fit the carry role.");
+    assertThat(verdict.getVerdict()).isEqualTo("GAPS_NOT_SHOWN");
+    assertThat(verdict.getEvidence())
+        .isEqualTo("Hero10's build lacks escape, but the match did not show it.");
+  }
+
+  @Test
+  void aCompleteBuildIsFitAndAnUnmeasuredFunctionIsStored() {
+    profile(0, "INTENT", 1, 0.8, 0.9);
+    profile(0, "FINAL", 1, 0.8, null);
+    profile(1, "INTENT", 1, null, 0.9);
+    profile(1, "FINAL", 1, null, null);
+
+    analyzer.analyze(MATCH);
+
+    BuildFitDomain fit = row(0, "BOTH");
+    assertThat(fit.getVerdict()).isEqualTo("FIT");
+    assertThat(fit.getMissing()).isEmpty();
+    assertThat(fit.getEvidence()).isEqualTo("Hero10's build fit the carry role.");
+    BuildFitDomain unmeasured = row(1, "BOTH");
+    assertThat(unmeasured.getUnknown()).isEqualTo("FARM_PRIORITY");
+    assertThat(unmeasured.getEvidence()).contains("Farm priority could not be measured.");
   }
 
   @Test

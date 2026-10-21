@@ -86,11 +86,13 @@ record BuildFitFixtureReport(
             .append("\n");
       }
       for (BuildFitDomain r : own) {
-        out.append("- ").append(r.getEvidence()).append("\n");
+        out.append("- [").append(r.getVerdict()).append("] ").append(r.getEvidence()).append("\n");
         out.append("  - missing: ")
             .append(blank(r.getMissing()))
             .append("; backed by the match: ")
             .append(blank(r.getStated()))
+            .append("; not measured: ")
+            .append(blank(r.getUnknown()))
             .append("\n");
       }
       out.append("\n");

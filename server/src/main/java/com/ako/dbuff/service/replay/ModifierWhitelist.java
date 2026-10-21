@@ -42,7 +42,9 @@ public final class ModifierWhitelist {
           "modifier_item_sphere",
           "modifier_item_sphere_target",
           "modifier_truesight",
-          "modifier_item_gem_of_true_sight");
+          "modifier_item_gem_of_true_sight",
+          "modifier_pudge_meat_hook",
+          "modifier_oracle_false_promise_timer");
 
   /** The effects of the runes a hero picks up; a few events per pickup. */
   private static final String RUNE_PREFIX = "modifier_rune_";

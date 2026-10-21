@@ -350,6 +350,8 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     for (String id : ABILITY_DRAFT_MATCHES) {
       Assumptions.assumeTrue(hasFixture(id), id + " is not in the fixture directory");
       MatchDomain match = seedMatch(id);
+      match.setPatch(60L);
+      matchRepo.save(match);
 
       ReplayStatus status = runService.process(match);
 
@@ -373,7 +375,14 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertRoleAwareReasons(id, match.getId());
       assertThat(buildFitRepo.findByMatchId(match.getId()))
           .as("%s: a build verdict for each player, two when the roles differ", id)
-          .hasSizeBetween(10, 20);
+          .hasSizeBetween(10, 20)
+          .allSatisfy(
+              r -> {
+                assertThat(r.getVerdict()).as("%s: build fit verdict", id).isNotNull();
+                if (r.getMissing() != null && !r.getMissing().isBlank()) {
+                  assertThat(r.getVerdict()).as("%s: missing is never FIT", id).isNotEqualTo("FIT");
+                }
+              });
       buildFitReport().write(id, match.getId(), "Ability Draft");
       assertCreepKills(id, match.getId());
       assertRunes(id, match.getId());
@@ -385,6 +394,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertFightExplanations(id, match.getId());
       saveSwingKeyItems(id, match.getId());
       assertAnalysisDocument(id, match.getId());
+      assertMissedPicksLikeWithLike(id, match.getId());
       missedPickDocument.addAll(renderMissedPicks(id, match.getId()));
       printAbilityDraft(id, match.getId(), profiles);
       System.out.println(
@@ -416,11 +426,35 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
 
   private static final int MISSED_PICK_LINES_PER_PLAYER = 3;
 
+  private static final Map<String, Integer> MISSED_PICK_BASELINE =
+      Map.of("9038725154", 22, "9037038717", 13);
+
+  private void assertMissedPicksLikeWithLike(String id, long matchId) {
+    List<MissedPickDomain> rows = missedPickRepo.findByMatchId(matchId);
+    System.out.println("MISSED PICK FLAGS " + id + " " + rows.size());
+    assertThat(
+            rows.stream()
+                .map(
+                    r -> TeamSide.ofSlot(r.getCandidateOwnerSlot()) + "/" + r.getCandidateAbility())
+                .toList())
+        .as("%s: an enemy skill is flagged once per team", id)
+        .doesNotHaveDuplicates();
+    if ("9038725154".equals(id)) {
+      assertThat(rows)
+          .as("%s: the patch average is stored (0 games allowed)", id)
+          .allSatisfy(r -> assertThat(r.getCandidatePatchGames()).isNotNull());
+    }
+    Integer baseline = MISSED_PICK_BASELINE.get(id);
+    if (baseline != null) {
+      assertThat(rows).as("%s: below the baseline of %d", id, baseline).hasSizeLessThan(baseline);
+    }
+  }
+
   /** Damage gaps by ratio, then gaps against a skill with no damage, then fight-only pairs. */
   private static final Comparator<MissedPickDomain> MISSED_PICK_STRENGTH =
       Comparator.comparing(
               (MissedPickDomain r) ->
-                  "FIGHTS".equals(r.getBasis()) ? 2 : r.getRatio() == null ? 1 : 0)
+                  r.getBasis().startsWith("FIGHTS") ? 2 : r.getRatio() == null ? 1 : 0)
           .thenComparing(r -> r.getRatio() == null ? 0.0 : -r.getRatio())
           .thenComparing(r -> -r.getCandidateDamage());
 
@@ -450,7 +484,8 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
         rows.size()
             + " flagged pairs (a skill a player took, a later enemy skill of the same slot kind"
             + " that did more than 10% more total damage and was cast in an important fight its"
-            + " team won; for skills with no damage on both sides, more won fights). Three per"
+            + " team won, when both did damage; for skills with no damage on both sides, only"
+            + " those with the same main function, by won fights; passives are left out). Three per"
             + " player are shown, damage gaps first. The candidate's own 12-month average is left"
             + " out: it is not stored yet.");
     out.add("");

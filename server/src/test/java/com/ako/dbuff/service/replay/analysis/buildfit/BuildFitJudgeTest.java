@@ -76,11 +76,32 @@ class BuildFitJudgeTest {
   }
 
   @Test
-  void anUnknownFunctionIsNeverMissing() {
+  void anUnknownFunctionIsNeverMissingButIsNamed() {
     Verdict verdict = judge.judge(build(null, null, null), 1, evidence(9, 5));
 
     assertThat(verdict.missing()).isEmpty();
     assertThat(verdict.gaps()).isEmpty();
+    assertThat(verdict.unknown())
+        .containsExactlyInAnyOrder(
+            RoleFunction.FARM_PRIORITY, RoleFunction.DAMAGE, RoleFunction.ESCAPE);
+  }
+
+  @Test
+  void nothingMissingIsFit() {
+    assertThat(judge.judge(build(0.9, 0.9, 0.9), 1, evidence(5, 5)).level())
+        .isEqualTo(BuildFitVerdict.FIT);
+  }
+
+  @Test
+  void aLackTheMatchDoesNotBackIsGapsNotShown() {
+    assertThat(judge.judge(build(0.8, 0.8, 0.0), 1, evidence(1, 1)).level())
+        .isEqualTo(BuildFitVerdict.GAPS_NOT_SHOWN);
+  }
+
+  @Test
+  void aBackedLackIsAGapEvenBesideAnUnbackedOne() {
+    assertThat(judge.judge(build(0.8, 0.1, 0.0), 1, evidence(4, 1)).level())
+        .isEqualTo(BuildFitVerdict.GAP);
   }
 
   @Test

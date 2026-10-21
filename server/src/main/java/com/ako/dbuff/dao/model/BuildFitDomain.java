@@ -53,6 +53,14 @@ public class BuildFitDomain {
   @Column(length = FUNCTIONS_LENGTH)
   private String stated;
 
+  /** FIT, GAPS_NOT_SHOWN or GAP (see {@code BuildFitVerdict}). */
+  @Column(length = 20)
+  private String verdict;
+
+  /** The wanted functions the build has no value for, comma separated; empty for none. */
+  @Column(name = "unknown_functions", length = FUNCTIONS_LENGTH)
+  private String unknown;
+
   /** The stated gaps in plain words; a short fit sentence when none is stated. */
   @Column(length = EVIDENCE_LENGTH)
   private String evidence;

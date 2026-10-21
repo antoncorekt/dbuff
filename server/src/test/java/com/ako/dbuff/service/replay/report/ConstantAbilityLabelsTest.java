@@ -25,6 +25,10 @@ class ConstantAbilityLabelsTest {
             Map.of(
                 "terrorblade_metamorphosis",
                 AbilityConstant.builder().dname("Metamorphosis").build(),
+                "kez_talon_toss",
+                AbilityConstant.builder().dname("Talon Toss").build(),
+                "invoker_cold_snap_ad",
+                AbilityConstant.builder().dname("Cold Snap (AD)").build(),
                 "blank_name",
                 AbilityConstant.builder().dname(" ").build()));
     when(constants.getItemConstantMap())
@@ -43,6 +47,21 @@ class ConstantAbilityLabelsTest {
   @Test
   void label_usesTheDisplayNameWhenKnown() {
     assertThat(labels.label("terrorblade_metamorphosis")).isEqualTo("Metamorphosis");
+  }
+
+  @Test
+  void label_takesTheBaseNameForAnAdVariantWithoutADisplayName() {
+    assertThat(labels.label("kez_talon_toss_ad")).isEqualTo("Talon Toss");
+  }
+
+  @Test
+  void label_dropsTheAdSuffixFromADisplayName() {
+    assertThat(labels.label("invoker_cold_snap_ad")).isEqualTo("Cold Snap");
+  }
+
+  @Test
+  void label_leavesAPlainNameUnchanged() {
+    assertThat(labels.label("sven_gods_strength")).isEqualTo("Gods Strength");
   }
 
   @Test

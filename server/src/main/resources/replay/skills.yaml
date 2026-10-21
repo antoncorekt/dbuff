@@ -1,0 +1,39 @@
+# First guesses, tuned in the review loop. Entry parameters replace the defaults of the same name.
+parameters:
+  dangerShare: 0.3
+  dangerAbsolute: 300
+  impactDamage: 500
+  endGraceSeconds: 1.5
+  surviveSeconds: 5
+  rangeBonus: 300
+  fallbackDurationSeconds: 8.5
+  fallbackCastRange: 800
+  seenRange: 1600
+  aimRangeBonus: 150
+  aimAngleDegrees: 15
+  hitExtraSeconds: 0.3
+  fallbackWindowSeconds: 1.5
+  fallbackHookRange: 1300
+  saveLowShare: 0.35
+  saveHeavyShare: 0.3
+  saveBeforeSeconds: 3
+  saveSurviveSeconds: 10
+  fallbackShardRange: 1200
+  fallbackShardRadius: 200
+  fallbackShardSpeed: 1200
+  fallbackShardSeconds: 7
+  trapEnterMargin: 100
+  trapStayMargin: 150
+  trapStayShare: 0.6
+  trapRetreatDegrees: 120
+  trapKillSeconds: 5
+entries:
+  - key: false_promise
+    abilities: [oracle_false_promise]
+    aspects: [promise]
+  - key: meat_hook
+    abilities: [pudge_meat_hook]
+    aspects: [hook]
+  - key: ice_shards
+    abilities: [tusk_ice_shards]
+    aspects: [trap]

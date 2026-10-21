@@ -10,19 +10,48 @@ public final class BuildFitWording {
   private BuildFitWording() {}
 
   /**
-   * What a stage's verdict says about a hero: the stated gaps, each with what backs it, or that the
-   * build fit. A stage of a hero whose drafted and played roles differ is named first.
+   * What a stage's verdict says about a hero: the stated gaps, each with what backs it; or the
+   * lacks the match did not show; or that the build fit. Functions the build has no value for are
+   * named last. A stage of a hero whose drafted and played roles differ is named first.
    */
-  public static String verdict(String hero, BuildFitStage stage, int role, List<BuildGap> gaps) {
+  public static String verdict(
+      String hero, BuildFitStage stage, int role, BuildFitJudge.Verdict verdict) {
     String body =
-        gaps.isEmpty()
-            ? hero + "'s build fit the " + RoleNames.words(role) + " role."
-            : gaps.stream().map(gap -> gap(hero, gap)).collect(Collectors.joining(" "));
+        switch (verdict.level()) {
+          case FIT ->
+              verdict.unknown().isEmpty()
+                  ? hero + "'s build fit the " + RoleNames.words(role) + " role."
+                  : hero + "'s build showed no gap in the " + RoleNames.words(role) + " role.";
+          case GAPS_NOT_SHOWN ->
+              hero
+                  + "'s build lacks "
+                  + list(verdict.missing())
+                  + ", but the match did not show it.";
+          case GAP ->
+              verdict.gaps().stream().map(gap -> gap(hero, gap)).collect(Collectors.joining(" "));
+        };
+    if (!verdict.unknown().isEmpty()) {
+      body += " " + capitalized(list(verdict.unknown())) + " could not be measured.";
+    }
     return switch (stage) {
       case INTENT -> "Drafted as " + RoleNames.words(role) + ": " + body;
       case FINAL -> "Played " + RoleNames.words(role) + ": " + body;
       case BOTH -> body;
     };
+  }
+
+  private static String list(List<RoleFunction> functions) {
+    List<String> words = functions.stream().map(RoleFunction::words).toList();
+    if (words.size() == 1) {
+      return words.get(0);
+    }
+    return String.join(", ", words.subList(0, words.size() - 1))
+        + " and "
+        + words.get(words.size() - 1);
+  }
+
+  private static String capitalized(String text) {
+    return Character.toUpperCase(text.charAt(0)) + text.substring(1);
   }
 
   /** "Pudge was drafted as a roaming support and played carry." */

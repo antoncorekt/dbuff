@@ -34,6 +34,7 @@ import skadistats.clarity.processor.runner.SimpleRunner;
 import skadistats.clarity.processor.stringtables.StringTables;
 import skadistats.clarity.processor.stringtables.UsesStringTable;
 import skadistats.clarity.source.MappedFileSource;
+import skadistats.clarity.wire.dota.common.proto.DOTACombatLog.DOTA_COMBATLOG_TYPES;
 
 /**
  * Reads the replay with Clarity. It stops as soon as the game clock has started, which is all the
@@ -42,18 +43,20 @@ import skadistats.clarity.source.MappedFileSource;
 @Slf4j
 @Component
 public class ClarityReplayParser implements ReplayParser {
-  static final String CLARITY_VERSION = "5.0.1-2";
+  static final String CLARITY_VERSION = "5.0.1-3";
 
   private final Map<Long, DraftReaderFactory<AbilityDraftFacts>> draftReaders;
   private final Map<Long, DraftReaderFactory<HeroDraftFacts>> heroDraftReaders;
 
   private final Set<String> chargeItems;
+  private final Set<String> snapshotAbilities;
 
   public ClarityReplayParser(
       List<DraftReaderFactory<AbilityDraftFacts>> draftReaders,
       List<DraftReaderFactory<HeroDraftFacts>> heroDraftReaders,
       ReplayProcessingProperties properties) {
     this.chargeItems = Set.copyOf(properties.getChargeItems());
+    this.snapshotAbilities = Set.copyOf(properties.getSnapshotAbilities());
     this.draftReaders = byMode(draftReaders);
     this.heroDraftReaders = byMode(heroDraftReaders);
   }
@@ -82,7 +85,8 @@ public class ClarityReplayParser implements ReplayParser {
             cancelled,
             readerFor(draftReaders, mode),
             readerFor(heroDraftReaders, mode),
-            chargeItems);
+            chargeItems,
+            snapshotAbilities);
     try {
       new SimpleRunner(new MappedFileSource(demoFile.toString())).runWith(collector);
     } catch (Exception e) {
@@ -159,6 +163,7 @@ public class ClarityReplayParser implements ReplayParser {
     private final DraftReader<AbilityDraftFacts> draftReader;
     private final DraftReader<HeroDraftFacts> heroDraftReader;
     private final Set<String> chargeItems;
+    private final CastSnapshotRecorder castSnapshots;
     private long ticksSeen;
     private long gameOverTick = -1;
     private final GameClock clock = new GameClock();
@@ -170,16 +175,23 @@ public class ClarityReplayParser implements ReplayParser {
         BooleanSupplier cancelled,
         DraftReader<AbilityDraftFacts> draftReader,
         DraftReader<HeroDraftFacts> heroDraftReader,
-        Set<String> chargeItems) {
+        Set<String> chargeItems,
+        Set<String> snapshotAbilities) {
       this.cancelled = cancelled;
       this.chargeItems = chargeItems;
+      this.castSnapshots =
+          new CastSnapshotRecorder(
+              () -> Controllers.read(entities), CastSnapshotRecorder::heroName, snapshotAbilities);
       this.draftReader = draftReader;
       this.heroDraftReader = heroDraftReader;
     }
 
     @OnTickStart
     public void onTick(Context ctx, boolean synthetic) {
-      recorder().tick(clock.gameTick(ctx.getTick()));
+      tickNow = ctx.getTick();
+      long gameTick = clock.gameTick(tickNow);
+      recorder().tick(gameTick);
+      castSnapshots.tick(gameTick);
       if (gameOverTick >= 0 && ctx.getTick() - gameOverTick > AFTER_GAME_TICKS) {
         throw new GameOver();
       }
@@ -191,6 +203,14 @@ public class ClarityReplayParser implements ReplayParser {
     @OnCombatLogEntry
     public void onCombatLog(CombatLogEntry entry) {
       combatLog.record(entry);
+      if (entry.getType() == DOTA_COMBATLOG_TYPES.DOTA_COMBATLOG_ABILITY
+          && entry.isAttackerHero()) {
+        castSnapshots.cast(
+            entry.getInflictorName(),
+            entry.getAttackerName(),
+            entry.getTimestamp(),
+            clock.gameTick(tickNow));
+      }
     }
 
     @OnEntityUpdated(classPattern = "CDOTAGamerulesProxy")
@@ -269,6 +289,7 @@ public class ClarityReplayParser implements ReplayParser {
           .combatLog(combatLog.result(facts.gameStartTime()))
           .map(map)
           .stateChanges(stateRecorder().result(facts.clockStartTick()))
+          .castSnapshots(castSnapshots.result(facts.clockStartTick(), facts.gameStartTime()))
           .cutShort(cutShort)
           .build();
     }

@@ -55,6 +55,38 @@ public class SkillCountRepository {
     return counts(row[0], row[1]);
   }
 
+  /** Games and mean damage of one skill over the games of a patch. */
+  public record DamageAverage(long games, double average) {}
+
+  /**
+   * Mean {@code damage_dealt} of each skill over the window's Ability Draft games of one patch, the
+   * match itself left out. Skills never seen are absent.
+   */
+  public Map<Long, DamageAverage> averageDamage(
+      Collection<Long> skillIds, long patch, SkillWindow window) {
+    Map<Long, DamageAverage> result = new HashMap<>();
+    if (skillIds.isEmpty()) {
+      return result;
+    }
+    Query query =
+        bound(
+            entityManager.createNativeQuery(
+                "select a.ability_id, count(*), avg(coalesce(a.damage_dealt, 0))"
+                    + " from ability_domain a join match_domain m on m.id = a.match_id where "
+                    + WINDOW_FILTER
+                    + " and m.patch = :patch and a.ability_id in (:skills) group by a.ability_id"),
+            window);
+    query.setParameter("patch", patch);
+    query.setParameter("skills", skillIds);
+    for (Object row : (List<?>) query.getResultList()) {
+      Object[] cols = (Object[]) row;
+      result.put(
+          ((Number) cols[0]).longValue(),
+          new DamageAverage(((Number) cols[1]).longValue(), ((Number) cols[2]).doubleValue()));
+    }
+    return result;
+  }
+
   public Map<Long, SkillCounts> skills(Collection<Long> skillIds, SkillWindow window) {
     return perSkill(null, skillIds, window);
   }
