@@ -14,14 +14,17 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 
 /**
  * Judges a skill that raises a barrier of shards where it is aimed (Ice Shards). The replay has no
- * shard unit and the combat log has no cast location, so the centre is the caster's position at the
- * cast plus his facing times the cast range. An enemy is trapped when he stood in the ring as it
- * formed and then stayed near it for most of the observed time, or only ever moved back towards the
- * caster. Shard damage alone is never a hit. A hero missing from a frame is unknown, not absent.
+ * shard unit and the combat log has no cast location, so the centre is the mean position of the
+ * enemies the shards hurt as they formed, else the caster's position at the cast plus his facing
+ * times the cast range. An enemy is trapped when he stood in the ring as it formed and then stayed
+ * near it for most of the observed time, or only ever moved back towards the caster. Shard damage
+ * alone is never a hit. A hero missing from a frame is unknown, not absent.
  */
 @Component
 public class TrapAspect implements SkillAspect {
@@ -44,6 +47,7 @@ public class TrapAspect implements SkillAspect {
   private static final String STAY_SHARE = "trapStayShare";
   private static final String RETREAT_DEGREES = "trapRetreatDegrees";
   private static final String KILL_SECONDS = "trapKillSeconds";
+  private static final String CENTRE_WINDOW = "trapCentreWindowSeconds";
 
   private static final Set<String> PARAMETERS =
       Set.of(
@@ -56,7 +60,8 @@ public class TrapAspect implements SkillAspect {
           STAY_MARGIN,
           STAY_SHARE,
           RETREAT_DEGREES,
-          KILL_SECONDS);
+          KILL_SECONDS,
+          CENTRE_WINDOW);
 
   @Override
   public String name() {
@@ -104,6 +109,11 @@ public class TrapAspect implements SkillAspect {
       return new Outcome(cast.second(), "", NOT_COUNTED, true, numbers);
     }
     Ring ring = ring(context, cast, from.get(), facing);
+    Optional<Ring> damaged = centreFromDamage(context, view, frames, cast, ring);
+    if (damaged.isPresent()) {
+      ring = damaged.get();
+      numbers.put("centreFromDamage", 1.0);
+    }
     numbers.put("radius", ring.radius());
 
     List<HeroPoint> trapped = trapped(context, view, frames, from.get(), ring);
@@ -139,6 +149,40 @@ public class TrapAspect implements SkillAspect {
         radius,
         form,
         form + duration);
+  }
+
+  private Optional<Ring> centreFromDamage(
+      SkillContext context, SnapshotView view, List<CastSnapshot> frames, Cast cast, Ring ring) {
+    double window = context.parameter(CENTRE_WINDOW, 0.5);
+    String caster = context.caster().name();
+    Set<String> hurt =
+        context.match().events().stream()
+            .filter(
+                e ->
+                    e.kind() == CombatEventKind.DAMAGE
+                        && caster.equals(e.attacker())
+                        && cast.ability().equals(e.inflictor())
+                        && Math.abs(e.gameSecond() - ring.formSecond()) <= window)
+            .map(CombatEvent::target)
+            .collect(Collectors.toSet());
+    if (hurt.isEmpty()) {
+      return Optional.empty();
+    }
+    Optional<CastSnapshot> frame =
+        frames.stream()
+            .min(Comparator.comparingDouble(f -> Math.abs(f.second() - ring.formSecond())));
+    List<HeroPoint> points =
+        frame
+            .map(f -> f.heroes().stream())
+            .orElseGet(Stream::empty)
+            .filter(h -> view.isEnemy(h) && hurt.contains(view.nameOf(h)))
+            .toList();
+    if (points.isEmpty()) {
+      return Optional.empty();
+    }
+    double x = points.stream().mapToDouble(HeroPoint::x).average().orElseThrow();
+    double y = points.stream().mapToDouble(HeroPoint::y).average().orElseThrow();
+    return Optional.of(new Ring(x, y, ring.radius(), ring.formSecond(), ring.endSecond()));
   }
 
   private static double positive(OptionalDouble value) {

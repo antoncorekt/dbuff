@@ -27,6 +27,7 @@ parameters:
   trapStayShare: 0.6
   trapRetreatDegrees: 120
   trapKillSeconds: 5
+  trapCentreWindowSeconds: 0.5
 entries:
   - key: false_promise
     abilities: [oracle_false_promise]
