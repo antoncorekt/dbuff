@@ -16,6 +16,7 @@ import lombok.Builder;
  * @param combatLog the hero-relevant combat-log entries, null when none were read
  * @param map the buildings and jungle camps of the map the game was played on
  * @param stateChanges items gained and lost, cooldowns and skill levels of the heroes
+ * @param castSnapshots hero positions around the casts of the catalogued skills, null when none
  * @param cutShort true when the replay ended with an error after the game had started, so the facts
  *     cover only the part that was read
  */
@@ -30,6 +31,7 @@ public record ReplayFacts(
     CombatLogFacts combatLog,
     MapFacts map,
     StateFacts stateChanges,
+    CastSnapshotFacts castSnapshots,
     boolean cutShort) {
   /** The players by their replay id; a player listed twice keeps the first entry. */
   public Map<Integer, ReplayPlayerFact> playersById() {
