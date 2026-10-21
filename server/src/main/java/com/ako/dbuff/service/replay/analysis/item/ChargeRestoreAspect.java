@@ -3,7 +3,6 @@ package com.ako.dbuff.service.replay.analysis.item;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency.Detail;
 import com.ako.dbuff.service.replay.analysis.item.StickUses.Use;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,10 +30,10 @@ public class ChargeRestoreAspect implements ItemAspect {
   private static final Set<String> PARAMETERS = parameters();
 
   private static Set<String> parameters() {
-    Set<String> names = new HashSet<>(StickUses.PARAMETERS);
-    names.addAll(BottleSips.PARAMETERS);
-    names.addAll(Set.of("goldPerHp", "goldPerMana", SoulRingUses.HEALTH_COST));
-    return Set.copyOf(names);
+    return ParameterNames.of(
+        StickUses.PARAMETERS,
+        BottleSips.PARAMETERS,
+        Set.of("goldPerHp", "goldPerMana", SoulRingUses.HEALTH_COST));
   }
 
   @Override

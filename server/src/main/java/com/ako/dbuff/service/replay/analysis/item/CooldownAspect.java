@@ -40,9 +40,7 @@ public class CooldownAspect implements ItemAspect {
   private static final Set<String> PARAMETERS = parameters();
 
   private static Set<String> parameters() {
-    Set<String> names = new HashSet<>(Set.of("damageSeconds", "toleranceSeconds"));
-    names.addAll(WorthPrices.NAMES);
-    return Set.copyOf(names);
+    return ParameterNames.withPrices(Set.of("damageSeconds", "toleranceSeconds"));
   }
 
   @Override

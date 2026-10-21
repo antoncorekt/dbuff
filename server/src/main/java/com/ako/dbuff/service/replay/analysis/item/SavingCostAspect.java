@@ -35,9 +35,7 @@ public class SavingCostAspect implements ItemAspect {
   private static final Set<String> PARAMETERS = parameters();
 
   private static Set<String> parameters() {
-    Set<String> names = new HashSet<>(WorthPrices.NAMES);
-    names.addAll(Set.of("savingThreshold", "smallPurchase"));
-    return Set.copyOf(names);
+    return ParameterNames.withPrices(Set.of("savingThreshold", "smallPurchase"));
   }
 
   @Override
