@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Runs the Ability Draft fixture where Sniper has False Promise and checks its skill effects. */
+/** Runs the fixtures where Sniper has False Promise and Pudge has Meat Hook and checks the rows. */
 @Tag("replay")
 @EnabledIfEnvironmentVariable(named = "SMOKE_PG_URL", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "REPLAY_FIXTURE_DIR", matches = ".+")
@@ -28,6 +28,11 @@ class SkillEffectSmokeTest extends ReplayPipelineFixture {
   private static final String PROMISE = "false_promise";
   private static final long SNIPER_SLOT = 0;
   private static final int CASTS = 10;
+  private static final String HOOK = "meat_hook";
+  private static final long PUDGE_SLOT = 131;
+  private static final long RUBICK_SLOT = 1;
+  private static final int PUDGE_MIN_CASTS = 30;
+  private static final int RUBICK_CASTS = 2;
 
   @Autowired private ReplayRunService runService;
   @Autowired private SkillEffectRepo repo;
@@ -59,5 +64,33 @@ class SkillEffectSmokeTest extends ReplayPipelineFixture {
       // ReplayLoadTest needs an empty replay_parse_run and may run after this class.
       runRepo.deleteAll();
     }
+  }
+
+  @Test
+  @Commit
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void pudgeHooksAreJudgedAndRubickHasHisTwo() throws IOException {
+    try {
+      MatchDomain match = seedMatch("9040889566");
+      assertThat(runService.process(match)).isEqualTo(ReplayStatus.DONE);
+
+      SkillEffectDomain pudge = hookRow(match, PUDGE_SLOT);
+      JsonNode figures = new ObjectMapper().readTree(pudge.getFigures());
+
+      System.out.println("SKILL EFFECTS 9040889566 pudge: " + pudge.getFigures());
+      assertThat(pudge.getCastCount()).isGreaterThanOrEqualTo(PUDGE_MIN_CASTS);
+      assertThat(figures.get("SEEN_HIT").asInt() + figures.get("DARK_HIT").asInt())
+          .isGreaterThanOrEqualTo(1);
+      assertThat(hookRow(match, RUBICK_SLOT).getCastCount()).isEqualTo(RUBICK_CASTS);
+    } finally {
+      runRepo.deleteAll();
+    }
+  }
+
+  private SkillEffectDomain hookRow(MatchDomain match, long slot) {
+    return repo.findByMatchId(match.getId()).stream()
+        .filter(r -> r.getPlayerSlot() == slot && HOOK.equals(r.getEntryKey()))
+        .findFirst()
+        .orElseThrow();
   }
 }

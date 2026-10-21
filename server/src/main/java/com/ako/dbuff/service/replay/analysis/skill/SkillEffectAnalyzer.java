@@ -72,7 +72,7 @@ public class SkillEffectAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 1;
+    return 2;
   }
 
   @Override
@@ -171,6 +171,8 @@ public class SkillEffectAnalyzer implements ReplayAnalyzer {
     }
     outcomes.sort(Comparator.comparingDouble(Outcome::second));
     outcomes.forEach(o -> figures.merge(o.outcome(), 1, Integer::sum));
+    Map<String, Integer> counts = new LinkedHashMap<>(figures);
+    aspects.forEach(aspect -> figures.putAll(aspect.derivedFigures(counts)));
     List<Map<String, Object>> details = new ArrayList<>();
     for (Outcome o : outcomes) {
       Map<String, Object> detail = new LinkedHashMap<>();

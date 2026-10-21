@@ -39,7 +39,9 @@ class SkillCatalogFileTest {
   void theShippedFileLoads() {
     SkillCatalogFile file = new SkillCatalogFile("replay/skills.yaml");
 
-    assertThat(file.entries()).extracting(SkillCatalogEntry::key).containsExactly("false_promise");
+    assertThat(file.entries())
+        .extracting(SkillCatalogEntry::key)
+        .containsExactly("false_promise", "meat_hook");
     assertThat(file.entries().getFirst().abilities()).containsExactly("oracle_false_promise");
   }
 
