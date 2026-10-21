@@ -14,8 +14,14 @@ public final class MissedPickWording {
   public static String line(MissedPickDomain row, AbilityLabels labels) {
     String candidate = labels.label(row.getCandidateAbility());
     String taken = labels.label(row.getTakenAbility());
-    return "The enemy took %s at pick %d; %s. It was still free when you took %s at pick %d."
-        .formatted(candidate, row.getCandidateTurn(), why(row, taken), taken, row.getTakenTurn());
+    return "The enemy took %s at pick %d; %s%s. It was still free when you took %s at pick %d."
+        .formatted(
+            candidate,
+            row.getCandidateTurn(),
+            why(row, taken),
+            patchContext(row),
+            taken,
+            row.getTakenTurn());
   }
 
   /** Damage as people read it: 840, 1.2k, cut down to a tenth of a thousand, never rounded up. */
@@ -23,6 +29,22 @@ public final class MissedPickWording {
     return value < 1000
         ? Long.toString(value)
         : String.format(Locale.ROOT, "%.1fk", Math.floor(value / 100.0) / 10);
+  }
+
+  private static String patchContext(MissedPickDomain row) {
+    Integer games = row.getCandidatePatchGames();
+    if (games == null) {
+      return "";
+    }
+    if (games == 0 || row.getCandidatePatchAverage() == null) {
+      return " (no other games of it on this patch)";
+    }
+    return " (its patch average is %s in %d %s%s)"
+        .formatted(
+            damage(Math.round(row.getCandidatePatchAverage())),
+            games,
+            games == 1 ? "game" : "games",
+            Boolean.TRUE.equals(row.getCarried()) ? ", probably carried by a fed hero" : "");
   }
 
   private static String function(String basis) {

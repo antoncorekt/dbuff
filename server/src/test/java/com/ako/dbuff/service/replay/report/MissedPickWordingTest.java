@@ -67,6 +67,31 @@ class MissedPickWordingTest {
   }
 
   @Test
+  void thePatchAverageAndGameCountAreAppendedAndCarriedIsSaid() {
+    MissedPickDomain.MissedPickDomainBuilder damage =
+        row().basis("DAMAGE").takenDamage(1000L).candidateDamage(1380L).ratio(1.38);
+
+    assertThat(
+            MissedPickWording.line(
+                damage.candidatePatchAverage(4140.0).candidatePatchGames(23).carried(false).build(),
+                LABELS))
+        .contains("won fights (its patch average is 4.1k in 23 games). It was");
+    assertThat(MissedPickWording.line(damage.candidatePatchGames(1).carried(true).build(), LABELS))
+        .contains("(its patch average is 4.1k in 1 game, probably carried by a fed hero).");
+    assertThat(MissedPickWording.line(damage.candidatePatchGames(0).build(), LABELS))
+        .contains("(no other games of it on this patch).");
+  }
+
+  @Test
+  void aMissingPatchPrintsNothing() {
+    assertThat(
+            MissedPickWording.line(
+                row().basis("DAMAGE").takenDamage(1L).candidateDamage(2L).ratio(2.0).build(),
+                LABELS))
+        .doesNotContain("patch");
+  }
+
+  @Test
   void damageIsShortenedFromAThousand() {
     assertThat(MissedPickWording.damage(840)).isEqualTo("840");
     assertThat(MissedPickWording.damage(12400)).isEqualTo("12.4k");
