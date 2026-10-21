@@ -3,12 +3,15 @@ package com.ako.dbuff.service.replay.skillloop;
 import com.ako.dbuff.dao.model.BuildFitDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.MissedPickDomain;
+import com.ako.dbuff.dao.model.SkillEffectDomain;
 import com.ako.dbuff.service.replay.analysis.buildfit.BuildFitStage;
 import com.ako.dbuff.service.replay.analysis.role.RoleFunction;
 import com.ako.dbuff.service.replay.analysis.role.RoleNames;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
 import com.ako.dbuff.service.replay.report.AbilityLabels;
 import com.ako.dbuff.service.replay.report.MissedPickWording;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -23,6 +26,11 @@ import java.util.stream.Collectors;
 final class SkillLoopReport {
   static final String MISSED_PICKS = "Missed picks";
   static final String BUILD_FIT = "Build fit";
+  static final String SKILL_EFFECTS = "Skill effects";
+
+  private static final int MAX_DETAIL_LINES = 5;
+  private static final int SECONDS_PER_MINUTE = 60;
+  private static final ObjectMapper JSON = new ObjectMapper();
 
   private static final String ABILITY_DRAFT = "Ability Draft";
   private static final String NOT_AD =
@@ -33,7 +41,9 @@ final class SkillLoopReport {
           + " in the match than the one he took first, while it was still free. \"Build fit\""
           + " lists, per player and stage, the functions his role needs that his drafted skills"
           + " lack (missing), which of them the match backs (stated), the evidence and the"
-          + " wording line of the report. Both are judged for Ability Draft only.";
+          + " wording line of the report. Both are judged for Ability Draft only. \"Skill effects\" lists,"
+          + " per hero and catalogued skill, how many casts ended in each outcome and the first"
+          + " few casts with their numbers.";
 
   record MatchData(
       long matchId,
@@ -42,6 +52,7 @@ final class SkillLoopReport {
       Map<Long, String> heroNames,
       List<MissedPickDomain> missedPicks,
       List<BuildFitDomain> buildFits,
+      List<SkillEffectDomain> skillEffects,
       AbilityLabels labels) {
     boolean abilityDraft() {
       return ABILITY_DRAFT.equals(modeName);
@@ -59,6 +70,8 @@ final class SkillLoopReport {
     out.addAll(missedPicks(d));
     out.add("");
     out.addAll(buildFit(d));
+    out.add("");
+    out.addAll(skillEffects(d));
     return String.join("\n", out) + "\n";
   }
 
@@ -119,6 +132,76 @@ final class SkillLoopReport {
                             functions(r.getStated()),
                             ReviewLoopReport.tableCell(r.getEvidence()))));
     return out;
+  }
+
+  private static List<String> skillEffects(MatchData d) {
+    List<String> out = new ArrayList<>(List.of("## " + SKILL_EFFECTS, ""));
+    if (d.skillEffects().isEmpty()) {
+      out.add("No catalogued skill was cast or learned.");
+      return out;
+    }
+    d.skillEffects().stream()
+        .sorted(
+            Comparator.comparing(SkillEffectDomain::getPlayerSlot)
+                .thenComparing(SkillEffectDomain::getEntryKey))
+        .forEach(
+            r -> {
+              out.add(
+                  "- %s, %s: %d casts; %s"
+                      .formatted(
+                          hero(d, r.getPlayerSlot()),
+                          r.getEntryKey(),
+                          r.getCastCount(),
+                          counts(r.getFigures())));
+              detailLines(r.getDetails()).forEach(line -> out.add("  - " + line));
+            });
+    return out;
+  }
+
+  private static String counts(String figures) {
+    return read(figures, new TypeReference<Map<String, Integer>>() {}, Map.<String, Integer>of())
+        .entrySet()
+        .stream()
+        .map(e -> e.getKey() + " " + e.getValue())
+        .collect(Collectors.joining(", "));
+  }
+
+  private static List<String> detailLines(String details) {
+    List<Map<String, Object>> rows =
+        read(details, new TypeReference<List<Map<String, Object>>>() {}, List.of());
+    return rows.stream()
+        .limit(MAX_DETAIL_LINES)
+        .map(
+            row -> {
+              int second = (int) Math.round(((Number) row.get("second")).doubleValue());
+              String numbers =
+                  ((Map<?, ?>) row.get("numbers"))
+                      .entrySet().stream()
+                          .map(e -> e.getKey() + " " + shorten(e.getValue()))
+                          .collect(Collectors.joining(", "));
+              return "%s %d:%02d on %s (%s)"
+                  .formatted(
+                      row.get("outcome"),
+                      Math.floorDiv(second, SECONDS_PER_MINUTE),
+                      Math.floorMod(second, SECONDS_PER_MINUTE),
+                      row.get("target"),
+                      numbers);
+            })
+        .toList();
+  }
+
+  private static String shorten(Object value) {
+    return value instanceof Number n
+        ? String.valueOf(Math.round(n.doubleValue()))
+        : String.valueOf(value);
+  }
+
+  private static <T> T read(String json, TypeReference<T> type, T fallback) {
+    try {
+      return json == null ? fallback : JSON.readValue(json, type);
+    } catch (java.io.IOException e) {
+      return fallback;
+    }
   }
 
   private static String hero(MatchData d, Long slot) {

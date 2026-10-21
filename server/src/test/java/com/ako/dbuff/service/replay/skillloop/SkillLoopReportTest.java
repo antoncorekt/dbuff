@@ -3,9 +3,12 @@ package com.ako.dbuff.service.replay.skillloop;
 import com.ako.dbuff.dao.model.BuildFitDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.MissedPickDomain;
+import com.ako.dbuff.dao.model.SkillEffectDomain;
 import com.ako.dbuff.service.replay.skillloop.SkillLoopReport.MatchData;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -14,10 +17,13 @@ class SkillLoopReportTest {
   private static final Map<Long, String> HEROES = Map.of(0L, "Windrunner", 128L, "Axe");
 
   private static MatchData data(
-      String mode, List<MissedPickDomain> picks, List<BuildFitDomain> fits) {
+      String mode,
+      List<MissedPickDomain> picks,
+      List<BuildFitDomain> fits,
+      List<SkillEffectDomain> effects) {
     MatchDomain match = new MatchDomain();
     match.setId(1L);
-    return new MatchData(1, match, mode, HEROES, picks, fits, name -> "Name of " + name);
+    return new MatchData(1, match, mode, HEROES, picks, fits, effects, name -> "Name of " + name);
   }
 
   private static MissedPickDomain pick() {
@@ -48,7 +54,8 @@ class SkillLoopReportTest {
 
   @Test
   void listsTheMissedPickAndTheBuildFitRow() {
-    String report = SkillLoopReport.render(data("Ability Draft", List.of(pick()), List.of(fit())));
+    String report =
+        SkillLoopReport.render(data("Ability Draft", List.of(pick()), List.of(fit()), List.of()));
 
     assertThat(report)
         .contains("## Missed picks", "Total: 1", "Windrunner")
@@ -59,9 +66,43 @@ class SkillLoopReportTest {
 
   @Test
   void saysNotAbilityDraftInBothSectionsOfAnAllPickMatch() {
-    String report = SkillLoopReport.render(data("All Pick", List.of(), List.of()));
+    String report = SkillLoopReport.render(data("All Pick", List.of(), List.of(), List.of()));
 
     assertThat(report.split("not Ability Draft", -1)).hasSize(4);
     assertThat(report).contains("## Missed picks", "## Build fit");
+  }
+
+  @Test
+  void listsTheSkillEffectsWithCountsAndAtMostFiveDetailLines() {
+    String details =
+        IntStream.range(0, 7)
+            .mapToObj(
+                i ->
+                    "{\"second\":%d,\"target\":\"Axe\",\"outcome\":\"SAVE\",\"numbers\":{\"damage\":900.4}}"
+                        .formatted(600 + i))
+            .collect(Collectors.joining(",", "[", "]"));
+    SkillEffectDomain effect =
+        SkillEffectDomain.builder()
+            .playerSlot(0L)
+            .entryKey("false_promise")
+            .castCount(7)
+            .figures("{\"SAVE\":7,\"IMPACT\":0,\"NOT_COUNTED\":0,\"MISSED\":1}")
+            .details(details)
+            .build();
+
+    String report = SkillLoopReport.render(data("All Pick", List.of(), List.of(), List.of(effect)));
+
+    assertThat(report)
+        .contains(
+            "## Skill effects",
+            "- Windrunner, false_promise: 7 casts; SAVE 7, IMPACT 0, NOT_COUNTED 0, MISSED 1",
+            "SAVE 10:00 on Axe (damage 900)");
+    assertThat(report.split("SAVE 10:0", -1)).hasSize(6);
+  }
+
+  @Test
+  void saysNothingWasCastWhenThereAreNoSkillEffects() {
+    assertThat(SkillLoopReport.render(data("All Pick", List.of(), List.of(), List.of())))
+        .contains("## Skill effects", "No catalogued skill was cast or learned.");
   }
 }
