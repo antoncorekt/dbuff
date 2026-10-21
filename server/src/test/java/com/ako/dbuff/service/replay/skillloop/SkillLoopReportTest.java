@@ -48,6 +48,8 @@ class SkillLoopReportTest {
         .role(1)
         .missing("FARM_PRIORITY,DAMAGE")
         .stated("FARM_PRIORITY")
+        .verdict("GAP")
+        .unknown("ESCAPE")
         .evidence("Axe had no farming skill and died alone twice.")
         .build();
   }
@@ -61,7 +63,10 @@ class SkillLoopReportTest {
         .contains("## Missed picks", "Total: 1", "Windrunner")
         .contains("The enemy took Name of a_cand at pick 9", "150% more damage")
         .contains(
-            "## Build fit", "| Axe | BOTH |", "Axe had no farming skill and died alone twice.");
+            "## Build fit",
+            "| verdict | missing | stated | unknown |",
+            "| Axe | BOTH | carry | GAP | farm priority, damage | farm priority | escape |",
+            "Axe had no farming skill and died alone twice.");
   }
 
   @Test

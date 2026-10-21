@@ -40,7 +40,7 @@ final class SkillLoopReport {
       "\"Missed picks\" lists, per player, each skill the enemy took later that did clearly more"
           + " in the match than the one he took first, while it was still free. \"Build fit\""
           + " lists, per player and stage, the functions his role needs that his drafted skills"
-          + " lack (missing), which of them the match backs (stated), the evidence and the"
+          + " lack (missing), the verdict (FIT, GAPS_NOT_SHOWN or GAP), which of them the match backs (stated), the functions with no value (unknown), the evidence and the"
           + " wording line of the report. Both are judged for Ability Draft only. \"Skill effects\" lists,"
           + " per hero and catalogued skill, how many casts ended in each outcome and the first"
           + " few casts with their numbers.";
@@ -114,8 +114,9 @@ final class SkillLoopReport {
       out.add(NOT_AD);
       return out;
     }
-    out.add("| player | stage | role | missing | stated | wording | assistant | owner |");
-    out.add("|---|---|---|---|---|---|---|---|");
+    out.add(
+        "| player | stage | role | verdict | missing | stated | unknown | wording | assistant | owner |");
+    out.add("|---|---|---|---|---|---|---|---|---|---|");
     d.buildFits().stream()
         .sorted(
             Comparator.comparing(BuildFitDomain::getPlayerSlot)
@@ -123,13 +124,15 @@ final class SkillLoopReport {
         .forEach(
             r ->
                 out.add(
-                    "| %s | %s | %s | %s | %s | %s | | |"
+                    "| %s | %s | %s | %s | %s | %s | %s | %s | | |"
                         .formatted(
                             ReviewLoopReport.tableCell(hero(d, r.getPlayerSlot())),
                             r.getStage(),
                             RoleNames.words(r.getRole()),
+                            r.getVerdict() == null ? "old" : r.getVerdict(),
                             functions(r.getMissing()),
                             functions(r.getStated()),
+                            functions(r.getUnknown()),
                             ReviewLoopReport.tableCell(r.getEvidence()))));
     return out;
   }

@@ -11,11 +11,45 @@ class BuildFitWordingTest {
     return new BuildGap(RoleFunction.ESCAPE, true, BuildGap.Evidence.DIED_ALONE, deaths);
   }
 
+  private static BuildFitJudge.Verdict gaps(BuildGap... gaps) {
+    return new BuildFitJudge.Verdict(
+        java.util.Arrays.stream(gaps).map(BuildGap::function).toList(), List.of(gaps), List.of());
+  }
+
+  @Test
+  void lacksTheMatchDidNotShowAreSaidSo() {
+    BuildFitJudge.Verdict verdict =
+        new BuildFitJudge.Verdict(
+            List.of(RoleFunction.ESCAPE, RoleFunction.DISABLE), List.of(), List.of());
+
+    assertThat(BuildFitWording.verdict("Pudge", BuildFitStage.BOTH, 1, verdict))
+        .isEqualTo("Pudge's build lacks escape and disable, but the match did not show it.");
+  }
+
+  @Test
+  void anUnknownFunctionIsNamedAndNeverCalledFitting() {
+    BuildFitJudge.Verdict none =
+        new BuildFitJudge.Verdict(List.of(), List.of(), List.of(RoleFunction.DAMAGE));
+    BuildFitJudge.Verdict lacking =
+        new BuildFitJudge.Verdict(
+            List.of(RoleFunction.ESCAPE),
+            List.of(),
+            List.of(RoleFunction.DAMAGE, RoleFunction.DISABLE));
+
+    assertThat(BuildFitWording.verdict("Axe", BuildFitStage.BOTH, 3, none))
+        .isEqualTo("Axe's build showed no gap in the offlane role. Damage could not be measured.")
+        .doesNotContain("fit the");
+    assertThat(BuildFitWording.verdict("Axe", BuildFitStage.BOTH, 3, lacking))
+        .isEqualTo(
+            "Axe's build lacks escape, but the match did not show it."
+                + " Damage and disable could not be measured.");
+  }
+
   @Test
   void aMissingEscapeSaysHowOftenHeDiedAlone() {
-    assertThat(BuildFitWording.verdict("Pudge", BuildFitStage.BOTH, 3, List.of(noEscape(4))))
+    assertThat(BuildFitWording.verdict("Pudge", BuildFitStage.BOTH, 3, gaps(noEscape(4))))
         .isEqualTo("Pudge had no escape and died alone 4 times.");
-    assertThat(BuildFitWording.verdict("Pudge", BuildFitStage.BOTH, 3, List.of(noEscape(2))))
+    assertThat(BuildFitWording.verdict("Pudge", BuildFitStage.BOTH, 3, gaps(noEscape(2))))
         .contains("died alone twice");
   }
 
@@ -23,7 +57,7 @@ class BuildFitWordingTest {
   void aWeakEscapeIsNotCalledMissing() {
     BuildGap weak = new BuildGap(RoleFunction.ESCAPE, false, BuildGap.Evidence.DIED_ALONE, 3);
 
-    assertThat(BuildFitWording.verdict("Pudge", BuildFitStage.BOTH, 3, List.of(weak)))
+    assertThat(BuildFitWording.verdict("Pudge", BuildFitStage.BOTH, 3, gaps(weak)))
         .isEqualTo("Pudge had only a weak escape and died alone 3 times.");
   }
 
@@ -32,7 +66,7 @@ class BuildFitWordingTest {
     BuildGap farm =
         new BuildGap(RoleFunction.FARM_PRIORITY, true, BuildGap.Evidence.LOW_NET_WORTH, 5);
 
-    assertThat(BuildFitWording.verdict("Anti-Mage", BuildFitStage.BOTH, 1, List.of(farm)))
+    assertThat(BuildFitWording.verdict("Anti-Mage", BuildFitStage.BOTH, 1, gaps(farm)))
         .isEqualTo("Anti-Mage had no farming skill and finished 5th of 5 in team net worth.");
   }
 
@@ -41,7 +75,7 @@ class BuildFitWordingTest {
     BuildGap farm =
         new BuildGap(RoleFunction.FARM_PRIORITY, true, BuildGap.Evidence.LOW_NET_WORTH, 4.5);
 
-    assertThat(BuildFitWording.verdict("Anti-Mage", BuildFitStage.BOTH, 1, List.of(farm)))
+    assertThat(BuildFitWording.verdict("Anti-Mage", BuildFitStage.BOTH, 1, gaps(farm)))
         .isEqualTo(
             "Anti-Mage had no farming skill and finished tied 4th and 5th of 5 in team net worth.");
   }
@@ -51,7 +85,7 @@ class BuildFitWordingTest {
     BuildGap farm =
         new BuildGap(RoleFunction.FARM_PRIORITY, true, BuildGap.Evidence.LOW_NET_WORTH, 4);
 
-    assertThat(BuildFitWording.verdict("Pudge", BuildFitStage.BOTH, 1, List.of(noEscape(3), farm)))
+    assertThat(BuildFitWording.verdict("Pudge", BuildFitStage.BOTH, 1, gaps(noEscape(3), farm)))
         .isEqualTo(
             "Pudge had no escape and died alone 3 times."
                 + " Pudge had no farming skill and finished 4th of 5 in team net worth.");
@@ -59,15 +93,15 @@ class BuildFitWordingTest {
 
   @Test
   void noGapSaysTheBuildFit() {
-    assertThat(BuildFitWording.verdict("Axe", BuildFitStage.BOTH, 3, List.of()))
+    assertThat(BuildFitWording.verdict("Axe", BuildFitStage.BOTH, 3, gaps()))
         .isEqualTo("Axe's build fit the offlane role.");
   }
 
   @Test
   void aVerdictOfOneOfTwoRolesNamesIt() {
-    assertThat(BuildFitWording.verdict("Pudge", BuildFitStage.INTENT, 5, List.of(noEscape(3))))
+    assertThat(BuildFitWording.verdict("Pudge", BuildFitStage.INTENT, 5, gaps(noEscape(3))))
         .startsWith("Drafted as hard support: Pudge had no escape");
-    assertThat(BuildFitWording.verdict("Pudge", BuildFitStage.FINAL, 1, List.of()))
+    assertThat(BuildFitWording.verdict("Pudge", BuildFitStage.FINAL, 1, gaps()))
         .isEqualTo("Played carry: Pudge's build fit the carry role.");
   }
 
@@ -82,7 +116,7 @@ class BuildFitWordingTest {
     for (RoleFunction function : RoleFunction.values()) {
       BuildGap gap = new BuildGap(function, true, BuildGap.Evidence.DIED_ALONE, 2);
 
-      assertThat(BuildFitWording.verdict("X", BuildFitStage.BOTH, 1, List.of(gap)))
+      assertThat(BuildFitWording.verdict("X", BuildFitStage.BOTH, 1, gaps(gap)))
           .doesNotContain("_");
     }
   }
