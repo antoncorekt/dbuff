@@ -1,0 +1,14 @@
+# First guesses, tuned in the review loop. Entry parameters replace the defaults of the same name.
+parameters:
+  dangerShare: 0.3
+  dangerAbsolute: 300
+  impactDamage: 500
+  endGraceSeconds: 1.5
+  surviveSeconds: 5
+  rangeBonus: 300
+  fallbackDurationSeconds: 8.5
+  fallbackCastRange: 800
+entries:
+  - key: false_promise
+    abilities: [oracle_false_promise]
+    aspects: [promise]
