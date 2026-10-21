@@ -31,7 +31,7 @@ final class SkillLoopReport {
   static final String BUILD_FIT = "Build fit";
   static final String SKILL_EFFECTS = "Skill effects";
 
-  private static final int MAX_DETAIL_LINES = 5;
+  private static final int MAX_DETAIL_LINES = 40;
   private static final int SECONDS_PER_MINUTE = 60;
   private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -45,8 +45,8 @@ final class SkillLoopReport {
           + " lists, per player and stage, the functions his role needs that his drafted skills"
           + " lack (missing), the verdict (FIT, GAPS_NOT_SHOWN or GAP), which of them the match backs (stated), the functions with no value (unknown), the evidence and the"
           + " wording line of the report. Both are judged for Ability Draft only. \"Skill effects\" lists,"
-          + " per hero and catalogued skill, how many casts ended in each outcome and the first"
-          + " few casts with their numbers, after the line the match report would say.";
+          + " per hero and catalogued skill, how many casts ended in each outcome and every cast"
+          + " (up to 40) with its numbers, after the line the match report would say.";
 
   record MatchData(
       long matchId,
@@ -188,25 +188,30 @@ final class SkillLoopReport {
   private static List<String> detailLines(String details) {
     List<Map<String, Object>> rows =
         read(details, new TypeReference<List<Map<String, Object>>>() {}, List.of());
-    return rows.stream()
-        .limit(MAX_DETAIL_LINES)
-        .map(
-            row -> {
-              int second = (int) Math.round(((Number) row.get("second")).doubleValue());
-              String numbers =
-                  ((Map<?, ?>) row.get("numbers"))
-                      .entrySet().stream()
-                          .map(e -> e.getKey() + " " + shorten(e.getValue()))
-                          .collect(Collectors.joining(", "));
-              return "%s %d:%02d on %s (%s)"
-                  .formatted(
-                      row.get("outcome"),
-                      Math.floorDiv(second, SECONDS_PER_MINUTE),
-                      Math.floorMod(second, SECONDS_PER_MINUTE),
-                      row.get("target"),
-                      numbers);
-            })
-        .toList();
+    List<String> lines =
+        rows.stream()
+            .limit(MAX_DETAIL_LINES)
+            .map(
+                row -> {
+                  int second = (int) Math.round(((Number) row.get("second")).doubleValue());
+                  String numbers =
+                      ((Map<?, ?>) row.get("numbers"))
+                          .entrySet().stream()
+                              .map(e -> e.getKey() + " " + shorten(e.getValue()))
+                              .collect(Collectors.joining(", "));
+                  return "%s %d:%02d on %s (%s)"
+                      .formatted(
+                          row.get("outcome"),
+                          Math.floorDiv(second, SECONDS_PER_MINUTE),
+                          Math.floorMod(second, SECONDS_PER_MINUTE),
+                          row.get("target"),
+                          numbers);
+                })
+            .collect(Collectors.toCollection(ArrayList::new));
+    if (rows.size() > MAX_DETAIL_LINES) {
+      lines.add("... %d more casts".formatted(rows.size() - MAX_DETAIL_LINES));
+    }
+    return lines;
   }
 
   private static String shorten(Object value) {
