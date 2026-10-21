@@ -10,6 +10,8 @@ import com.ako.dbuff.service.replay.analysis.role.RoleNames;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopReport;
 import com.ako.dbuff.service.replay.report.AbilityLabels;
 import com.ako.dbuff.service.replay.report.MissedPickWording;
+import com.ako.dbuff.service.replay.report.Prettify;
+import com.ako.dbuff.service.replay.report.SkillEffectWording;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
@@ -17,6 +19,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -43,7 +46,7 @@ final class SkillLoopReport {
           + " lack (missing), the verdict (FIT, GAPS_NOT_SHOWN or GAP), which of them the match backs (stated), the functions with no value (unknown), the evidence and the"
           + " wording line of the report. Both are judged for Ability Draft only. \"Skill effects\" lists,"
           + " per hero and catalogued skill, how many casts ended in each outcome and the first"
-          + " few casts with their numbers.";
+          + " few casts with their numbers, after the line the match report would say.";
 
   record MatchData(
       long matchId,
@@ -156,9 +159,22 @@ final class SkillLoopReport {
                           r.getEntryKey(),
                           r.getCastCount(),
                           counts(r.getFigures())));
+              reportLine(d, r).ifPresent(line -> out.add("  - Report line: " + line));
               detailLines(r.getDetails()).forEach(line -> out.add("  - " + line));
             });
     return out;
+  }
+
+  private static Optional<String> reportLine(MatchData d, SkillEffectDomain r) {
+    return SkillEffectWording.line(
+        r.getEntryKey(),
+        hero(d, r.getPlayerSlot()),
+        Prettify.ability(r.getEntryKey()),
+        r.getCastCount() == null ? 0 : r.getCastCount(),
+        read(
+            r.getFigures(),
+            new TypeReference<Map<String, Integer>>() {},
+            Map.<String, Integer>of()));
   }
 
   private static String counts(String figures) {
