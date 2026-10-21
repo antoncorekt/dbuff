@@ -57,6 +57,16 @@ class MissedPickWordingTest {
   }
 
   @Test
+  void twoSkillsOfTheSameFunctionAreComparedOnFights() {
+    String line =
+        MissedPickWording.line(
+            row().basis("FIGHTS:SAVE_HEAL").takenDamage(0L).candidateDamage(0L).build(), LABELS);
+
+    assertThat(line)
+        .contains("both are save and heal skills; it was in 3 of their 4 won fights, yours in 1.");
+  }
+
+  @Test
   void damageIsShortenedFromAThousand() {
     assertThat(MissedPickWording.damage(840)).isEqualTo("840");
     assertThat(MissedPickWording.damage(12400)).isEqualTo("12.4k");
