@@ -27,6 +27,9 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -82,6 +85,26 @@ class ReplayItemEfficiencyAnalyzerTest {
     assertThat(back.rows()).hasSize(1);
     assertThat(back.rows().getFirst().figures()).containsEntry("charges", 4.0);
     assertThat(back.flags()).containsExactly("HP_UNCAPPED", "MANA_UNCAPPED");
+  }
+
+  @Test
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void analyze_runsTheAspectsOutsideAnyTransaction_andStoresTheRowsAsBefore() {
+    stored();
+    ToyAspect.transactionSeen.clear();
+    try {
+      analyzer.analyze(MATCH);
+
+      assertThat(ToyAspect.transactionSeen).isNotEmpty().containsOnly(false);
+      assertThat(repo.findByMatchId(MATCH))
+          .extracting(ItemEfficiencyDomain::getEntryKey)
+          .containsExactlyInAnyOrder("magic_stick", "toy", "summed");
+    } finally {
+      repo.deleteByMatchId(MATCH);
+      combatLogRepo.deleteAll();
+      stateRepo.deleteAll();
+      playerRepo.deleteAll();
+    }
   }
 
   @Test
@@ -197,6 +220,7 @@ class ReplayItemEfficiencyAnalyzerTest {
   /** An aspect the analyzer does not know: its gain is its weight. */
   static class ToyAspect implements ItemAspect {
     static final String NAME = "toy";
+    static final List<Boolean> transactionSeen = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     @Override
     public String name() {
@@ -210,6 +234,7 @@ class ReplayItemEfficiencyAnalyzerTest {
 
     @Override
     public AspectPart measure(AspectContext context) {
+      transactionSeen.add(TransactionSynchronizationManager.isActualTransactionActive());
       double weight = context.entry().parameter("weight", 1.0);
       return new AspectPart(
           weight,
