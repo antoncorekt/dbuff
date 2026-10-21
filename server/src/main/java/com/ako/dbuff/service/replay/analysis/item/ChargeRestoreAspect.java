@@ -80,8 +80,7 @@ public class ChargeRestoreAspect implements ItemAspect {
     if (!bottle && uses.stream().anyMatch(u -> !u.chargesSeen())) {
       flags.add(NO_CHARGES_SEEN);
     }
-    double gain =
-        hp * entry.parameter("goldPerHp", 0.3) + mana * entry.parameter("goldPerMana", 0.3);
+    double gain = hp * context.price("goldPerHp", 0.3) + mana * context.price("goldPerMana", 0.3);
     return new AspectPart(
         gain,
         true,
