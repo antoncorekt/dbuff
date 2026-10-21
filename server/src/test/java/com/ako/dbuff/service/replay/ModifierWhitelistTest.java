@@ -22,7 +22,9 @@ class ModifierWhitelistTest {
         "modifier_item_lotus_orb_active",
         "modifier_eul_cyclone",
         "modifier_stunned",
-        "modifier_rune_haste"
+        "modifier_rune_haste",
+        "modifier_pudge_meat_hook",
+        "modifier_oracle_false_promise_timer"
       })
   void keeps_theItemEffectsAndTheExistingOnes(String name) {
     assertThat(ModifierWhitelist.keeps(name, 0)).isTrue();

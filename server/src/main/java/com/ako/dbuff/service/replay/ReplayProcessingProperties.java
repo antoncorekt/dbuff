@@ -46,6 +46,10 @@ public class ReplayProcessingProperties {
    */
   private Set<String> chargeItems = Set.of("item_magic_stick", "item_magic_wand");
 
+  /** Skills whose casts get hero position snapshots; others are left out to keep memory small. */
+  private Set<String> snapshotAbilities =
+      Set.of("pudge_meat_hook", "tusk_ice_shards", "oracle_false_promise");
+
   private int maxAttempts = 5;
 
   /** A run where an extractor failed is tried again fewer times: the cause is often permanent. */
