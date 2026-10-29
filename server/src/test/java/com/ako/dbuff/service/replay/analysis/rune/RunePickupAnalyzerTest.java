@@ -92,7 +92,7 @@ class RunePickupAnalyzerTest {
     assertThat(bounty.getZone()).isEqualTo("LANE");
     assertThat(bounty.getLane()).isEqualTo("BOTTOM");
     assertThat(bounty.getMidLane()).isFalse();
-    assertThat(bounty.getAnalysisVersion()).isEqualTo(1);
+    assertThat(bounty.getAnalysisVersion()).isEqualTo(2);
     RunePickupDomain power = row(rows, RADIANT, "DOUBLE_DAMAGE");
     assertThat(power.getGold()).as("only a bounty rune pays gold").isNull();
     RunePickupDomain direBounty = row(rows, DIRE, "BOUNTY");
@@ -303,6 +303,56 @@ class RunePickupAnalyzerTest {
 
     assertThat(pickupRepo.findByMatchId(MATCH)).hasSize(4).allMatch(r -> r.getGold() == null);
     assertThat(summaryRepo.findByMatchId(MATCH)).as("no stale summary is left").isEmpty();
+  }
+
+  @Test
+  void version_isTwo() {
+    assertThat(analyzer.version()).isEqualTo(2);
+  }
+
+  @Test
+  void analyze_collapsesBountyEventsOfOneSlotAndSecondIntoOnePickupWithTheSummedGold() {
+    stored(layouts.frozenVersion());
+    runeRepo.deleteAll();
+    runeRepo.flush();
+    rune(RADIANT, 0, 744, 5);
+    rune(RADIANT, 1, 744, 5);
+    rune(RADIANT, 2, 744, 5);
+    combatLogRepo.deleteAll();
+    combatLogRepo.flush();
+    save(
+        List.of(
+            event(CombatEventKind.GOLD, 744.1, "", SNIPER, 46, BOUNTY_GOLD),
+            event(CombatEventKind.GOLD, 744.2, "", SNIPER, 58, BOUNTY_GOLD),
+            event(CombatEventKind.GOLD, 744.3, "", SNIPER, 52, BOUNTY_GOLD)));
+
+    analyzer.analyze(MATCH);
+
+    List<RunePickupDomain> rows = pickupRepo.findByMatchId(MATCH);
+    assertThat(rows).hasSize(1);
+    assertThat(rows.get(0).getGold()).isEqualTo(156);
+    assertThat(rows.get(0).getRuneIndex()).isZero();
+  }
+
+  @Test
+  void analyze_keepsTwoSlotsAtTheSameSecondAndOneSlotAtTwoSecondsApart() {
+    stored(layouts.frozenVersion());
+    runeRepo.deleteAll();
+    runeRepo.flush();
+    rune(RADIANT, 0, 744, 5);
+    rune(DIRE, 0, 744, 5);
+    rune(RADIANT, 1, 745, 5);
+    combatLogRepo.deleteAll();
+    combatLogRepo.flush();
+    save(
+        List.of(
+            event(CombatEventKind.GOLD, 744.1, "", SNIPER, 46, BOUNTY_GOLD),
+            event(CombatEventKind.GOLD, 744.2, "", VENOMANCER, 58, BOUNTY_GOLD),
+            event(CombatEventKind.GOLD, 745.1, "", SNIPER, 52, BOUNTY_GOLD)));
+
+    analyzer.analyze(MATCH);
+
+    assertThat(pickupRepo.findByMatchId(MATCH)).hasSize(3);
   }
 
   @Test
