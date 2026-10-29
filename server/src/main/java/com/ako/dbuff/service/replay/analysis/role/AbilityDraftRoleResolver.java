@@ -51,7 +51,7 @@ public class AbilityDraftRoleResolver implements RoleResolver {
       log.info("Nothing known of the {} of slots {}, no roles", context.stage(), slots(context));
       return List.of();
     }
-    List<RoleFitter.RoleFit> fits = fitter.fit(profiles, context.stage());
+    List<RoleFitter.RoleFit> fits = fitter.fit(profiles, context.team(), context.stage());
     if (context.team().size() != TEAM_SIZE || fits.size() != context.team().size()) {
       log.info(
           "The {} of slots {} gave {} fits for {} players, no roles",

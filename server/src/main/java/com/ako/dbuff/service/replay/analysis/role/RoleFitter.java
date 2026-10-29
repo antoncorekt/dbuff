@@ -14,6 +14,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class RoleFitter {
   public static final int ROLES = 5;
+  private static final int MID_ROLE = 2;
+  private static final double NOT_OPEN = -1e6;
 
   private final RoleProfileProperties properties;
 
@@ -58,17 +60,32 @@ public class RoleFitter {
 
   /**
    * @param team the profiles of one team
+   * @param stage how the profiles are scored: the FINAL stage weighs the lane less
    * @return one fit per profile in the same order; empty unless the team has one profile per role
    */
-  /**
-   * @param stage how the profiles are scored: the FINAL stage weighs the lane less
-   */
   public List<RoleFit> fit(List<FunctionProfile> team, RoleStage stage) {
+    return fit(team, null, stage);
+  }
+
+  /**
+   * @param players the players of the profiles in the same order, or null; in the FINAL stage their
+   *     OpenDota position adds a bonus, and the one mid-laner of a team is fixed to role 2
+   */
+  public List<RoleFit> fit(List<FunctionProfile> team, List<RolePlayer> players, RoleStage stage) {
     if (team.size() != ROLES) {
       return List.of();
     }
-    double[][] score = team.stream().map(p -> scores(p, stage)).toArray(double[][]::new);
-    RoleAssignmentSolver.Solution solution = RoleAssignmentSolver.solve(score);
+    boolean known = stage == RoleStage.FINAL && players != null && players.size() == ROLES;
+    double[][] score = new double[ROLES][];
+    for (int i = 0; i < ROLES; i++) {
+      score[i] = scores(team.get(i), stage);
+      Long position = known ? players.get(i).positionEst() : null;
+      if (position != null && position >= 1 && position <= ROLES) {
+        score[i][(int) (position - 1)] += properties.getFit().getFinalPositionBonus();
+      }
+    }
+    double[][] solved = known ? withMidLock(score, team, players) : score;
+    RoleAssignmentSolver.Solution solution = RoleAssignmentSolver.solve(solved);
     List<RoleFit> result = new ArrayList<>();
     for (int i = 0; i < ROLES; i++) {
       double confidence =
@@ -78,6 +95,30 @@ public class RoleFitter {
           new RoleFit(solution.roleOf()[i] + 1, Math.round(confidence * 100) / 100.0, score[i]));
     }
     return result;
+  }
+
+  private static double[][] withMidLock(
+      double[][] score, List<FunctionProfile> team, List<RolePlayer> players) {
+    List<Integer> mids = new ArrayList<>();
+    for (int i = 0; i < ROLES; i++) {
+      Long laneRole = players.get(i).laneRole();
+      if (laneRole != null && laneRole == 2 && team.get(i).lane() == LanePosition.MID) {
+        mids.add(i);
+      }
+    }
+    if (mids.size() != 1) {
+      return score;
+    }
+    double[][] locked = new double[ROLES][];
+    for (int i = 0; i < ROLES; i++) {
+      locked[i] = score[i].clone();
+    }
+    for (int role = 0; role < ROLES; role++) {
+      if (role != MID_ROLE - 1) {
+        locked[mids.getFirst()][role] = NOT_OPEN;
+      }
+    }
+    return locked;
   }
 
   private static double knownShare(FunctionProfile profile) {

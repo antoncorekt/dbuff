@@ -119,6 +119,11 @@ class PlayerRoleAnalyzerTest {
   }
 
   @Test
+  void theVersionCountsTheFinalPositionRule() {
+    assertThat(analyzer.version()).isEqualTo(7);
+  }
+
+  @Test
   void aSecondRunReplacesTheFirst() {
     stored(ALL_PICK_MATCH, 22);
 

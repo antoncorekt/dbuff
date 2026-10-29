@@ -168,9 +168,22 @@ class AbilityDraftRoleResolverTest {
   }
 
   @Test
+  void thePlayersOfTheTeamReachTheFitter() {
+    RoleFitter spy = mock(RoleFitter.class);
+    when(spy.fit(anyList(), anyList(), any())).thenReturn(List.of());
+    AbilityDraftRoleResolver r =
+        new AbilityDraftRoleResolver(new StageProfilers(List.of(intent, observed)), spy);
+    List<RolePlayer> team = team(true);
+
+    r.resolve(new RoleContext(RoleStage.FINAL, team));
+
+    org.mockito.Mockito.verify(spy).fit(anyList(), org.mockito.ArgumentMatchers.eq(team), any());
+  }
+
+  @Test
   void aFitterThatReturnsTooFewFitsGivesNoRolesInsteadOfAMisalignedOnes() {
     RoleFitter shortFitter = mock(RoleFitter.class);
-    when(shortFitter.fit(anyList(), any())).thenReturn(List.of());
+    when(shortFitter.fit(anyList(), anyList(), any())).thenReturn(List.of());
     AbilityDraftRoleResolver broken =
         new AbilityDraftRoleResolver(new StageProfilers(List.of(intent, observed)), shortFitter);
 
