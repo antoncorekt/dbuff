@@ -53,7 +53,7 @@ public final class RotationFinder {
           teamTrips.stream().collect(Collectors.groupingBy(AwayTrip::slot));
       for (AwayTrip trip : teamTrips) {
         Zone.Lane laneLeft = laneLeft(in.lanes(), trip);
-        if (!RotationRules.isRotation(trip, laneLeft)) {
+        if (!RotationRules.isRotation(trip, laneLeft, properties.getRotationMinStartSeconds())) {
           continue;
         }
         TripOutcome outcome = outcomes.of(trip, team, in.events());

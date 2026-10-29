@@ -45,6 +45,24 @@ class TripOutcomesTest {
   }
 
   @Test
+  void of_aFightThatStartedBeforeTheTripIsNotItsOutcome() {
+    AwayTrip left = new AwayTrip(3L, 1195, 1195, 1265, MID, TOP, MID, false, End.REJOINED);
+    TripOutcomes.Events before =
+        new TripOutcomes.Events(
+            Map.of(),
+            List.of(),
+            List.of(new FightFact(19, 1128, 1241, "RADIANT", Set.of(3L), null)));
+    TripOutcomes.Events inside =
+        new TripOutcomes.Events(
+            Map.of(),
+            List.of(),
+            List.of(new FightFact(20, 1200, 1240, "RADIANT", Set.of(3L), null)));
+
+    assertThat(outcomes.of(left, TeamSide.RADIANT, before).fights()).isZero();
+    assertThat(outcomes.of(left, TeamSide.RADIANT, inside).fights()).isEqualTo(1);
+  }
+
+  @Test
   void of_noEventsIsAnEmptyOutcome() {
     TripOutcome outcome =
         outcomes.of(

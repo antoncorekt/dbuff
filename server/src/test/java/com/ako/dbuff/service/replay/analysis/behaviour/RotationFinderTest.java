@@ -16,7 +16,13 @@ import static com.ako.dbuff.service.replay.analysis.behaviour.BehaviourTestData.
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RotationFinderTest {
-  private final RotationFinder finder = new RotationFinder(new BehaviourProperties(), ZONES);
+  private final RotationFinder finder = new RotationFinder(earlyProperties(), ZONES);
+
+  private static BehaviourProperties earlyProperties() {
+    BehaviourProperties properties = new BehaviourProperties();
+    properties.setRotationMinStartSeconds(0);
+    return properties;
+  }
 
   private static Map<Long, Trace> radiant(Trace hero) {
     Map<Long, Trace> traces = new HashMap<>();

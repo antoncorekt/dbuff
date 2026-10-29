@@ -10,9 +10,13 @@ public final class RotationRules {
 
   /**
    * A trip that ends in a lane other than the hero's own (any lane for a hero with none) and other
-   * than the one he left: a hero who stayed put while the group came to him did not rotate.
+   * than the one he left: a hero who stayed put while the group came to him did not rotate. A trip
+   * that starts before {@code minStartSeconds} is the walk to the lane, not a rotation.
    */
-  public static boolean isRotation(AwayTrip trip, Zone.Lane ownLane) {
+  public static boolean isRotation(AwayTrip trip, Zone.Lane ownLane, int minStartSeconds) {
+    if (trip.startSeconds() < minStartSeconds) {
+      return false;
+    }
     Zone to = trip.to();
     boolean sameLaneAsLeft =
         trip.from().kind() == Zone.Kind.LANE && trip.from().lane() == to.lane();

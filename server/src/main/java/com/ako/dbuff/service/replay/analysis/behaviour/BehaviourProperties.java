@@ -72,6 +72,15 @@ public class BehaviourProperties {
   /** Heroes of the winner this close to the hero who killed Roshan were at the pit. */
   private int roshanNearRadius = 1500;
 
+  /** A trip that starts before this game second is the walk to the lane, not a rotation. */
+  private int rotationMinStartSeconds = 120;
+
+  /** A fight that starts before this game second gets no missed-objective row. */
+  private int objectiveMinFightSeconds = 300;
+
+  /** A fight whose nearest living winner is this far or farther from a standing tower gets none. */
+  private int objectiveMaxTowerDistance = 6000;
+
   @PostConstruct
   void validate() {
     require(minClusterSize >= 2, "min-cluster-size must be at least 2, not " + minClusterSize);
@@ -117,6 +126,15 @@ public class BehaviourProperties {
     require(
         objectiveWindowSeconds >= 1,
         "objective-window-seconds must be at least 1, not " + objectiveWindowSeconds);
+    require(
+        rotationMinStartSeconds >= 0,
+        "rotation-min-start-seconds must not be negative, not " + rotationMinStartSeconds);
+    require(
+        objectiveMinFightSeconds >= 0,
+        "objective-min-fight-seconds must not be negative, not " + objectiveMinFightSeconds);
+    require(
+        objectiveMaxTowerDistance >= 1,
+        "objective-max-tower-distance must be at least 1, not " + objectiveMaxTowerDistance);
     require(
         roshanNearRadius >= 1, "roshan-near-radius must be at least 1, not " + roshanNearRadius);
   }
