@@ -108,7 +108,8 @@ class FightExplanationReaderTest {
   }
 
   @Test
-  void anEarlyFightKeepsItsCooldownReasonsUnrankedAfterTheRankedOnes_andCollapsesAbsence() {
+  void
+      anEarlyFightKeepsItsCooldownAndTeleportReasonsUnrankedAfterTheRankedOnes_andCollapsesAbsence() {
     fightRepo.save(FightDomain.builder().matchId(MATCH).fightIndex(7).startSeconds(120.0).build());
     explanationRepo.save(
         FightExplanationDomain.builder()
