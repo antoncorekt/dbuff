@@ -27,7 +27,10 @@ class MissedPickFinderTest {
   private final Map<String, Long> damage = new HashMap<>();
   private final SkillFunctions skills = mock(SkillFunctions.class);
 
+  private final Map<Long, RoleFunction> functions = new HashMap<>();
+
   private void main(long id, RoleFunction function) {
+    functions.put(id, function);
     when(skills.main("skill_" + id)).thenReturn(Optional.of(function));
   }
 
@@ -73,6 +76,12 @@ class MissedPickFinderTest {
   }
 
   private List<MissedPickDomain> find() {
+    for (AbilityDraftPickDomain pick : picks) {
+      if (!functions.containsKey(pick.getAbilityId())
+          && damage.containsKey(pick.getPlayerSlot() + "/" + pick.getAbilityId())) {
+        main(pick.getAbilityId(), RoleFunction.DAMAGE);
+      }
+    }
     return new MissedPickFinder(1.10, skills)
         .find(
             5L,
@@ -322,5 +331,44 @@ class MissedPickFinderTest {
     assertThat(rows).hasSize(1);
     assertThat(rows.getFirst().getPlayerSlot()).isEqualTo(MINE + 1);
     assertThat(rows.getFirst().getTakenTurn()).isEqualTo(3);
+  }
+
+  @Test
+  void aDamageSkillIsNotComparedWithADisableSkillByDamage() {
+    basicPair(false);
+    main(10, RoleFunction.DAMAGE);
+    main(20, RoleFunction.DISABLE);
+    dealt(MINE, 10, 1000);
+    dealt(ENEMY, 20, 58000);
+    cast(ENEMY, 20, 0);
+
+    assertThat(find()).isEmpty();
+  }
+
+  @Test
+  void twoDamageSkillsAtTwiceTheDamageAreFlaggedByDamage() {
+    basicPair(false);
+    main(10, RoleFunction.DAMAGE);
+    main(20, RoleFunction.DAMAGE);
+    dealt(MINE, 10, 1000);
+    dealt(ENEMY, 20, 2000);
+    cast(ENEMY, 20, 0);
+
+    assertThat(find().getFirst().getBasis()).isEqualTo("DAMAGE");
+  }
+
+  @Test
+  void twoDisableSkillsWithDamageAreJudgedOnWonFights() {
+    basicPair(false);
+    main(10, RoleFunction.DISABLE);
+    main(20, RoleFunction.DISABLE);
+    dealt(MINE, 10, 1000);
+    dealt(ENEMY, 20, 1200);
+    cast(ENEMY, 20, 0);
+
+    MissedPickDomain row = find().getFirst();
+
+    assertThat(row.getBasis()).isEqualTo("FIGHTS:DISABLE");
+    assertThat(row.getRatio()).isNull();
   }
 }
