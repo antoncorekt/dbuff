@@ -20,7 +20,7 @@ class SupportPresenceContributor implements LaneReasonContributor {
     if (c.pair().lane() == Zone.Lane.MID
         || own.isEmpty() == enemy.isEmpty()
         || c.enemyHeroes().isEmpty()
-        || soloSupport(c, own, enemy)) {
+        || soloSupport(c, own)) {
       return List.of();
     }
     return List.of(
@@ -39,7 +39,7 @@ class SupportPresenceContributor implements LaneReasonContributor {
                     .formatted(c.teamName(), names(c, own), c.enemyName())));
   }
 
-  private static boolean soloSupport(LaneContext c, List<LaneHero> own, List<LaneHero> enemy) {
+  private static boolean soloSupport(LaneContext c, List<LaneHero> own) {
     return own.isEmpty() ? c.enemyHeroes().size() == 1 : c.ownHeroes().size() == 1;
   }
 
