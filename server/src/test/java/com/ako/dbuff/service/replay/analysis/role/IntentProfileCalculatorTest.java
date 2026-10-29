@@ -241,6 +241,26 @@ class IntentProfileCalculatorTest {
   }
 
   @Test
+  void aSkillAimedAtAnyUnitCountsItsPlainDurationAsDisableButAnAllyOnlyOneDoesNot() {
+    FunctionProfile boulderSmash =
+        holding(
+            """
+            {"behavior":["Point Target","Unit Target"],"target_team":["Both"],"cd":[10],
+             "attrib":[{"key":"duration","value":["1.75","2.5","3.25","4"]},
+                       {"key":"stun_duration","value":["0"]}]}\
+            """);
+    FunctionProfile heal =
+        holding(
+            """
+            {"behavior":["Unit Target"],"target_team":["Friendly"],"cd":[10],
+             "attrib":[{"key":"duration","value":["4"]}]}\
+            """);
+
+    assertThat(boulderSmash.disable()).isGreaterThan(0);
+    assertThat(heal.disable()).isZero();
+  }
+
+  @Test
   void aRangedStunCountsAsInitiationWhateverItsCooldown() {
     FunctionProfile stun =
         holding(

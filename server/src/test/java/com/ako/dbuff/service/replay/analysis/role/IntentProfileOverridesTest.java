@@ -92,4 +92,15 @@ class IntentProfileOverridesTest {
                 .disable())
         .isZero();
   }
+
+  @Test
+  void theCheckedInFileMakesMeepoEarthbindADisable() {
+    IntentProfileCalculator real = calculator(new RoleOverrideFile("replay/role-overrides.json"));
+
+    FunctionProfile profile =
+        real.profile(
+            HERO, List.of(new HeldAbility("meepo_earthbind", new AbilityConstant(), false)));
+
+    assertThat(profile.disable()).isEqualTo(0.4);
+  }
 }
