@@ -18,6 +18,9 @@ import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.StateChangeKind;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
+import com.ako.dbuff.service.replay.analysis.importance.AdvantageSeriesReader;
+import com.ako.dbuff.service.replay.analysis.importance.ImportantFightProperties;
+import com.ako.dbuff.service.replay.analysis.importance.ImportantFightRule;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import com.ako.dbuff.service.replay.map.MapLayouts;
 import com.ako.dbuff.service.replay.map.MatchMapLayout;
@@ -28,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
@@ -47,6 +51,8 @@ import static org.assertj.core.api.Assertions.assertThat;
   MatchMapLayout.class,
   ReplayProcessingProperties.class,
   ReplayAnalysisProperties.class,
+  ImportantFightRule.class,
+  ImportantFightProperties.class,
   FightAbilityAnalyzerTest.Json.class
 })
 class FightAbilityAnalyzerTest {
@@ -58,6 +64,7 @@ class FightAbilityAnalyzerTest {
   @Autowired private ReplayCombatLogRepo combatLogRepo;
 
   @Autowired private FightAnalyzer fightAnalyzer;
+  @MockBean private AdvantageSeriesReader seriesReader;
   @Autowired private FightAbilityAnalyzer analyzer;
   @Autowired private FightAbilityUseRepo useRepo;
   @Autowired private ReplayStateChangeRepo stateRepo;
