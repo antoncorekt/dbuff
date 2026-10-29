@@ -43,7 +43,7 @@ import skadistats.clarity.wire.dota.common.proto.DOTACombatLog.DOTA_COMBATLOG_TY
 @Slf4j
 @Component
 public class ClarityReplayParser implements ReplayParser {
-  static final String CLARITY_VERSION = "5.0.1-3";
+  static final String CLARITY_VERSION = "5.0.1-4";
 
   private final Map<Long, DraftReaderFactory<AbilityDraftFacts>> draftReaders;
   private final Map<Long, DraftReaderFactory<HeroDraftFacts>> heroDraftReaders;

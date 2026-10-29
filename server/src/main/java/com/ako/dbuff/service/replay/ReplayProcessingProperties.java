@@ -61,7 +61,7 @@ public class ReplayProcessingProperties {
   private int leaseMinutes = 30;
 
   /** Bumped when the extractor set changes, which makes finished matches eligible again. */
-  private int parserVersion = 1;
+  private int parserVersion = 2;
 
   /** Game modes whose replays are analysed: Ability Draft and All Draft. */
   private List<Long> supportedModes = List.of(18L, 22L);
