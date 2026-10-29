@@ -40,7 +40,7 @@ public class ImportantFightAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 1;
+    return 2;
   }
 
   @Override

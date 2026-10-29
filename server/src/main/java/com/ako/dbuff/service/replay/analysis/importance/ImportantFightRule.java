@@ -8,8 +8,9 @@ import org.springframework.stereotype.Component;
  * Decides whether a fight changed the advantage graphs. The window runs from the start of the fight
  * for as long as the fight lasted (at least the minimum window) plus the lag, because the series is
  * per minute. Important: the winner's gold advantage grew by the minimum share of its net worth or
- * the minimum gold, or the lead flipped to the winner inside the window. Experience and the slope
- * break are recorded but never decide.
+ * the minimum gold, or the lead flipped to the winner inside the window and that flip carried at
+ * least the minimum flip gold or the minimum share. Experience and the slope break are recorded but
+ * never decide.
  */
 @Component
 @RequiredArgsConstructor
@@ -73,7 +74,11 @@ public class ImportantFightRule {
             && m.goldChange() > 0
             && (m.goldChange() >= properties.getMinGold()
                 || m.sharePercent() >= properties.getMinSharePercent());
-    return grew || m.flipToWinner();
+    boolean flipped =
+        m.flipToWinner()
+            && ((m.goldChange() != null && m.goldChange() >= properties.getMinFlipGold())
+                || m.sharePercent() >= properties.getMinSharePercent());
+    return grew || flipped;
   }
 
   /** Whether every minute the window touches has a figure. */
