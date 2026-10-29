@@ -14,6 +14,11 @@ import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
 import com.ako.dbuff.service.replay.analysis.activity.ActivitySegment;
 import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
+import com.ako.dbuff.service.replay.analysis.importance.AdvantageSeries;
+import com.ako.dbuff.service.replay.analysis.importance.AdvantageSeriesReader;
+import com.ako.dbuff.service.replay.analysis.importance.ImportantFightRule;
+import com.ako.dbuff.service.replay.analysis.reason.Enums;
+import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import com.ako.dbuff.service.replay.map.MapLayout;
@@ -22,6 +27,7 @@ import com.ako.dbuff.service.replay.map.Zone;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class FightAnalyzer implements ReplayAnalyzer {
+  private static final String DRAW = "DRAW";
+
   private final PlayerTraces playerTraces;
   private final ReplayPlayerRepo playerRepo;
   private final StoredActivity storedActivity;
@@ -44,6 +52,8 @@ public class FightAnalyzer implements ReplayAnalyzer {
   private final MatchMapLayout matchMapLayout;
   private final CombatLogReader combatLog;
   private final ReplayAnalysisProperties properties;
+  private final AdvantageSeriesReader seriesReader;
+  private final ImportantFightRule fightRule;
 
   @Override
   public String name() {
@@ -52,7 +62,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 3;
+    return 4;
   }
 
   @Override
@@ -80,12 +90,34 @@ public class FightAnalyzer implements ReplayAnalyzer {
     FightAssessor assessor =
         new FightAssessor(
             properties.getFightParticipationRadius(), properties.getFightWinMarginPercent());
+    Optional<AdvantageSeries> series = seriesReader.read(matchId);
+    int turnedToDraw = 0;
     for (int index = 0; index < detected.size(); index++) {
       FightDetector.Detected fight = detected.get(index);
       FightAssessor.Assessment assessment = assessor.assess(fight, traces, activities, states);
-      fightRepo.save(fightRow(matchId, index, fight, assessment, layout));
+      String winner = winner(series, fight, assessment);
+      if (!winner.equals(assessment.winner())) {
+        turnedToDraw++;
+      }
+      fightRepo.save(fightRow(matchId, index, fight, assessment, winner, layout));
       fightPlayerRepo.saveAll(playerRows(matchId, index, assessment));
     }
+    if (turnedToDraw > 0) {
+      log.info("Match {}: {} fights turned to a draw by the gold", matchId, turnedToDraw);
+    }
+  }
+
+  private String winner(
+      Optional<AdvantageSeries> series,
+      FightDetector.Detected fight,
+      FightAssessor.Assessment assessment) {
+    TeamSide side = Enums.find(TeamSide.class, assessment.winner());
+    if (series.isEmpty() || side == null) {
+      return assessment.winner();
+    }
+    ImportantFightRule.Measurement m =
+        fightRule.measure(series.get(), side, fight.start(), fight.end());
+    return m.goldChange() != null && m.goldChange() < 0 ? DRAW : assessment.winner();
   }
 
   @Override
@@ -108,6 +140,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
       int index,
       FightDetector.Detected fight,
       FightAssessor.Assessment a,
+      String winner,
       MapLayout layout) {
     Zone zone =
         layout == null || a.centerX() == null ? null : layout.zone(a.centerX(), a.centerY());
@@ -128,7 +161,7 @@ public class FightAnalyzer implements ReplayAnalyzer {
         .direParticipants(a.direParticipants())
         .radiantHeroDamage(a.radiantDamage())
         .direHeroDamage(a.direDamage())
-        .winner(a.winner())
+        .winner(winner)
         .analysisVersion(version())
         .build();
   }
