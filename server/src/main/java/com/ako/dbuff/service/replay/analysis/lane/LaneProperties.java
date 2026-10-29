@@ -106,7 +106,7 @@ public class LaneProperties {
   private int earlyKillSeconds = 300;
 
   /** Siege last hits or denies this far apart are an edge. */
-  private int siegeEdge = 1;
+  private int siegeEdge = 2;
 
   /** Denies this far apart are an edge. */
   private int denyEdge = 3;

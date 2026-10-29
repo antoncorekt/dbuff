@@ -112,8 +112,8 @@ class ReplayLaneAnalyzerTest {
     assertThat(radiant.getResult()).isEqualTo("WON");
     assertThat(dire.getResult()).isEqualTo("LOST");
     assertThat(radiant.getMargin()).isPositive().isEqualTo(-dire.getMargin(), offset(1e-9));
-    assertThat(radiant.getLastHits()).isEqualTo(8);
-    assertThat(radiant.getSiegeLastHits()).isEqualTo(1);
+    assertThat(radiant.getLastHits()).isEqualTo(9);
+    assertThat(radiant.getSiegeLastHits()).isEqualTo(2);
     assertThat(dire.getLastHits()).isEqualTo(3);
     assertThat(dire.getSideEndReason()).isEqualTo("JUNGLE");
     assertThat(dire.getEndReason())
@@ -225,6 +225,7 @@ class ReplayLaneAnalyzerTest {
       creep(RADIANT_MID, "LANE_MELEE", 60 + i * 20.0, false);
     }
     creep(RADIANT_MID, "LANE_SIEGE", 300, false);
+    creep(RADIANT_MID, "LANE_SIEGE", 320, false);
     for (int i = 0; i < 3; i++) {
       creep(DIRE_MID, "LANE_MELEE", 70 + i * 20.0, false);
     }

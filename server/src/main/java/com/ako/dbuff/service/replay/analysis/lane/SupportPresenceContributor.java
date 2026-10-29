@@ -1,9 +1,13 @@
 package com.ako.dbuff.service.replay.analysis.lane;
 
+import com.ako.dbuff.service.replay.map.Zone;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
-/** A support (role 4 or 5) in the lane for one side and none for the other. */
+/**
+ * A support (role 4 or 5) in the lane for one side and none for the other. Not in mid, and not when
+ * the side holding the support has a single hero in the lane.
+ */
 @Component
 class SupportPresenceContributor implements LaneReasonContributor {
   static final String CODE = "SUPPORT_PRESENCE";
@@ -13,7 +17,10 @@ class SupportPresenceContributor implements LaneReasonContributor {
   public List<LaneReason> contribute(LaneContext c) {
     List<LaneHero> own = supports(c, c.ownHeroes());
     List<LaneHero> enemy = supports(c, c.enemyHeroes());
-    if (own.isEmpty() == enemy.isEmpty() || c.enemyHeroes().isEmpty()) {
+    if (c.pair().lane() == Zone.Lane.MID
+        || own.isEmpty() == enemy.isEmpty()
+        || c.enemyHeroes().isEmpty()
+        || soloSupport(c, own)) {
       return List.of();
     }
     return List.of(
@@ -30,6 +37,10 @@ class SupportPresenceContributor implements LaneReasonContributor {
                 SEVERITY,
                 "%s had %s in the lane, %s had no support"
                     .formatted(c.teamName(), names(c, own), c.enemyName())));
+  }
+
+  private static boolean soloSupport(LaneContext c, List<LaneHero> own) {
+    return own.isEmpty() ? c.enemyHeroes().size() == 1 : c.ownHeroes().size() == 1;
   }
 
   private static List<LaneHero> supports(LaneContext c, List<LaneHero> heroes) {

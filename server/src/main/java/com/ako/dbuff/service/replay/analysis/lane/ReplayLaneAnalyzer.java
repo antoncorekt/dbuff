@@ -118,7 +118,7 @@ public class ReplayLaneAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 2;
+    return 3;
   }
 
   @Override

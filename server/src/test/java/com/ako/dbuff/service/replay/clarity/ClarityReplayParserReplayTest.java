@@ -141,6 +141,37 @@ class ClarityReplayParserReplayTest {
   }
 
   @Test
+  void parse_snapshotsEveryMinuteWhenTheClockIsOffTheGrid() {
+    SampleFacts samples =
+        parser.parse(replay("9058487700.dem"), TestModes.ABILITY_DRAFT, () -> false).samples();
+
+    var minutes = samples.minutes();
+    assertThat(samples.series()).hasSize(10);
+    int last = minutes.stream().mapToInt(SampleFacts.MinuteSnapshot::gameMinute).max().orElse(-9);
+    assertThat(minutes.stream().mapToInt(SampleFacts.MinuteSnapshot::gameMinute).min())
+        .hasValue(-1);
+    assertThat(last).isGreaterThanOrEqualTo(39);
+    assertThat(minutes).hasSize(10 * (last + 2));
+    assertThat(minutes).allSatisfy(m -> assertThat(m.values()).doesNotContain(MinuteStat.MISSING));
+    var ids = minutes.stream().map(SampleFacts.MinuteSnapshot::replayPlayerId).distinct().toList();
+    assertThat(ids).hasSize(10);
+    for (int id : ids) {
+      assertThat(
+              minutes.stream()
+                  .filter(m -> m.replayPlayerId() == id)
+                  .mapToInt(SampleFacts.MinuteSnapshot::gameMinute))
+          .containsExactlyElementsOf(
+              java.util.stream.IntStream.rangeClosed(-1, last).boxed().toList());
+    }
+    long teamKills =
+        minutes.stream()
+            .filter(m -> m.gameMinute() == last)
+            .mapToLong(m -> m.values()[MinuteStat.KILLS.ordinal()])
+            .sum();
+    assertThat(teamKills).isPositive();
+  }
+
+  @Test
   void parse_keepsWhatItReadWhenTheReplayIsCutShort(@org.junit.jupiter.api.io.TempDir Path dir)
       throws Exception {
     Path cut = dir.resolve("cut.dem");
