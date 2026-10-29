@@ -39,7 +39,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DataJpaTest
+@DataJpaTest(properties = "replay.analysis.behaviour.rotation-min-start-seconds=0")
 @ActiveProfiles("test")
 @Import({
   BehaviourRotationAnalyzer.class,
@@ -87,7 +87,7 @@ class BehaviourRotationAnalyzerTest {
     assertThat(row.getFightsWon()).isEqualTo(1);
     assertThat(row.getVerdict()).isEqualTo("GOOD");
     assertThat(row.getReasons()).isEmpty();
-    assertThat(row.getAnalysisVersion()).isEqualTo(2);
+    assertThat(row.getAnalysisVersion()).isEqualTo(3);
   }
 
   @Test

@@ -26,7 +26,13 @@ class ObjectiveFinderTest {
       new StandingTower(
           "dota_goodguys_tower1_mid", TeamSide.RADIANT, Zone.Lane.MID, 1, new Point(100, 0));
 
-  private final ObjectiveFinder finder = new ObjectiveFinder(new BehaviourProperties(), ZONES);
+  private final ObjectiveFinder finder = new ObjectiveFinder(earlyProperties(), ZONES);
+
+  private static BehaviourProperties earlyProperties() {
+    BehaviourProperties properties = new BehaviourProperties();
+    properties.setObjectiveMinFightSeconds(0);
+    return properties;
+  }
 
   private static ObjectiveFight fight(State before) {
     return new ObjectiveFight(3, TeamSide.RADIANT, 80, 100, before);
@@ -248,6 +254,40 @@ class ObjectiveFinderTest {
 
     assertThat(found.conversions().getFirst().kind()).isEqualTo(ObjectiveKind.ANCIENT);
     assertThat(found.cutShort()).isZero();
+  }
+
+  @Test
+  void find_anEarlyFightWithNothingTakenGetsNoRow() {
+    ObjectiveFinder.Found found =
+        new ObjectiveFinder(new BehaviourProperties(), ZONES)
+            .find(
+                List.of(new ObjectiveFight(3, TeamSide.RADIANT, 93, 110, null)),
+                traces(),
+                events(List.of(), List.of()));
+
+    assertThat(found.conversions()).isEmpty();
+    assertThat(found.skipped()).isEqualTo(1);
+    assertThat(found.cutShort()).isZero();
+  }
+
+  @Test
+  void find_aFightFarFromEveryStandingTowerGetsNoRowButANearOneIsMissed() {
+    ObjectiveFight late = new ObjectiveFight(3, TeamSide.RADIANT, 900, 920, null);
+    ObjectiveFinder.Events events =
+        new ObjectiveFinder.Events(List.of(), List.of(), List.of(FIRST), 5000);
+    ObjectiveFinder defaults = new ObjectiveFinder(new BehaviourProperties(), ZONES);
+
+    ObjectiveFinder.Found far =
+        defaults.find(
+            List.of(late), Map.of(0L, BehaviourTestData.trace(250, i -> 7500, i -> 0)), events);
+    ObjectiveFinder.Found near =
+        defaults.find(
+            List.of(late), Map.of(0L, BehaviourTestData.trace(250, i -> 4000, i -> 0)), events);
+
+    assertThat(far.conversions()).isEmpty();
+    assertThat(far.skipped()).isEqualTo(1);
+    assertThat(near.conversions().getFirst().result()).isEqualTo(ObjectiveResult.MISSED);
+    assertThat(near.skipped()).isZero();
   }
 
   @Test

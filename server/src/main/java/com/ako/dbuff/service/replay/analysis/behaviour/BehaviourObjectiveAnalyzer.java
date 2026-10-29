@@ -56,7 +56,7 @@ public class BehaviourObjectiveAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 2;
+    return 3;
   }
 
   @Override
@@ -106,11 +106,13 @@ public class BehaviourObjectiveAnalyzer implements ReplayAnalyzer {
                     SmokeEvents.roshanKills(events, slotByHero),
                     StandingTower.of(layout.facts()),
                     gameEnd(buildings, traces)));
-    if (found.cutShort() > 0) {
+    if (found.cutShort() > 0 || found.skipped() > 0) {
       log.info(
-          "Match {}: {} fights left out, nothing taken and the game ended inside the window",
+          "Match {}: {} fights left out as cut short by the game end, {} as too early or too far"
+              + " from a tower",
           matchId,
-          found.cutShort());
+          found.cutShort(),
+          found.skipped());
     }
     deleteByMatchId(matchId);
     conversionRepo.saveAll(found.conversions().stream().map(c -> row(matchId, c)).toList());

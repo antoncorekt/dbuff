@@ -40,7 +40,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DataJpaTest
+@DataJpaTest(properties = "replay.analysis.behaviour.objective-min-fight-seconds=0")
 @ActiveProfiles("test")
 @Import({
   BehaviourObjectiveAnalyzer.class,
@@ -97,7 +97,7 @@ class BehaviourObjectiveAnalyzerTest {
     assertThat(row.getObjectiveKey()).isEqualTo("npc_dota_badguys_tower1_mid");
     assertThat(row.getSecondsAfter()).isEqualTo(30);
     assertThat(row.getStateBefore()).isEqualTo("BEHIND");
-    assertThat(row.getAnalysisVersion()).isEqualTo(2);
+    assertThat(row.getAnalysisVersion()).isEqualTo(3);
     assertThat(row.getWindowSeconds())
         .isEqualTo(new BehaviourProperties().getObjectiveWindowSeconds());
   }
