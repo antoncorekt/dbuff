@@ -25,6 +25,7 @@ import org.springframework.stereotype.Component;
 public class IntentProfileCalculator {
   private static final String FRIENDLY = "Friendly";
   private static final String ENEMY = "Enemy";
+  private static final String BOTH = "Both";
   private static final String UNIT_TARGET = "Unit Target";
   private static final String AREA = "AOE";
   private static final String NO_TARGET = "No Target";
@@ -275,10 +276,14 @@ public class IntentProfileCalculator {
           && a.getAttrib().stream().anyMatch(t -> keys.contains(t.getKey()) && positive(t));
     }
 
-    /** Seconds of control: by key ending, and by plain duration on a skill aimed at one enemy. */
+    /**
+     * Seconds of control: by key ending, and by plain duration on a skill aimed at one enemy (or at
+     * any unit).
+     */
     private static double control(AbilityConstant a, RoleProfileProperties.Intent r) {
       double seconds = number(a, r.getDisableKeySuffixes(), String::endsWith);
-      if (has(a.getTarget_team(), ENEMY) && has(a.getBehavior(), UNIT_TARGET)) {
+      if ((has(a.getTarget_team(), ENEMY) || has(a.getTarget_team(), BOTH))
+          && has(a.getBehavior(), UNIT_TARGET)) {
         double plain = number(a, r.getEnemyUnitDisableKeys(), String::equals);
         seconds = plain > r.getEnemyUnitDisableMaxSeconds() ? seconds : Math.max(seconds, plain);
       }

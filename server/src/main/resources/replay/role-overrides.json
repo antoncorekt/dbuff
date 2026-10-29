@@ -56,7 +56,8 @@
     "invoker_ghost_walk": {"ESCAPE": 0.5},
     "nyx_assassin_burrow": {"ESCAPE": 0.5},
     "hoodwink_scurry": {"ESCAPE": 0.4},
-    "templar_assassin_meld": {"ESCAPE": 0.4}
+    "templar_assassin_meld": {"ESCAPE": 0.4},
+    "meepo_earthbind": {"DISABLE": 0.4}
   },
   "heroes": {}
 }
