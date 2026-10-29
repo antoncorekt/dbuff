@@ -14,7 +14,7 @@ public final class MissedPickWording {
   public static String line(MissedPickDomain row, AbilityLabels labels) {
     String candidate = labels.label(row.getCandidateAbility());
     String taken = labels.label(row.getTakenAbility());
-    return "The enemy took %s at pick %d; %s%s. It was still free when you took %s at pick %d."
+    return "The enemy took %s at turn %d; %s%s. It was still free when you took %s at turn %d."
         .formatted(
             candidate,
             row.getCandidateTurn(),

@@ -137,7 +137,7 @@ class SkillPicksSectionTest {
         .extracting(Finding::kind)
         .containsExactly(FindingKind.MISSED, FindingKind.BUILD, FindingKind.PICK);
     assertThat(findings.get(0).text())
-        .startsWith("Anton (Pudge): The enemy took Chain Frost at pick 31; it did 38% more");
+        .startsWith("Anton (Pudge): The enemy took Chain Frost at turn 31; it did 38% more");
     assertThat(findings.get(1).text())
         .isEqualTo("Anton (Pudge): Pudge had no escape and died alone 4 times.");
     assertThat(findings.get(2).text()).isEqualTo("Anton (Pudge): Pudge: 75% in 40 games");

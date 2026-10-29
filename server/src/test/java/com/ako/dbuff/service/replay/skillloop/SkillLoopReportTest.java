@@ -61,7 +61,7 @@ class SkillLoopReportTest {
 
     assertThat(report)
         .contains("## Missed picks", "Total: 1", "Windrunner")
-        .contains("The enemy took Name of a_cand at pick 9", "150% more damage")
+        .contains("The enemy took Name of a_cand at turn 9", "150% more damage")
         .contains(
             "## Build fit",
             "| verdict | missing | stated | unknown |",
