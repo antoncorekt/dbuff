@@ -50,6 +50,7 @@ import com.ako.dbuff.dao.repo.ReplayPlayerMinuteRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
+import com.ako.dbuff.dao.repo.RuneEventRepo;
 import com.ako.dbuff.dao.repo.RunePickupRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.CombatEventKind;
@@ -178,6 +179,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private FightRepo fightRepo;
   @Autowired private CreepKillRepo creepKillRepo;
   @Autowired private RunePickupRepo runePickupRepo;
+  @Autowired private RuneEventRepo runeEventRepo;
   @Autowired private ItemEfficiencyRepo itemEfficiencyRepo;
   @Autowired private LaneAssignmentRepo laneAssignmentRepo;
   @Autowired private LaneResultRepo laneResultRepo;
@@ -825,13 +827,22 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
    * Every rune of OpenDota's log is a pickup, bounty gold is paid, and the opening has a winner.
    */
   private void assertRunes(String id, long matchId) throws Exception {
-    JsonNode players = new ObjectMapper().readTree(fixture(id + ".json").toFile()).get("players");
-    int logged = 0;
-    for (JsonNode p : players) {
-      logged += p.path("runes_log").size();
-    }
+    long expected =
+        runeEventRepo.findByMatchId(matchId).stream()
+            .filter(r -> r.getPlayerSlot() != null && r.getEventTime() != null)
+            .map(
+                r ->
+                    r.getPlayerSlot()
+                        + ":"
+                        + r.getEventTime().intValue()
+                        + ":"
+                        + RuneType.of(r.getRuneType()))
+            .distinct()
+            .count();
     List<RunePickupDomain> pickups = runePickupRepo.findByMatchId(matchId);
-    assertThat(pickups).as("%s: one pickup per logged rune", id).hasSize(logged);
+    assertThat(pickups)
+        .as("%s: one pickup per slot, second and rune type of the logged runes", id)
+        .hasSize((int) expected);
     assertThat(pickups)
         .extracting(RunePickupDomain::getRuneType)
         .as("%s: every rune code is known", id)
