@@ -55,6 +55,7 @@ import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.CombatLogCodec;
 import com.ako.dbuff.service.replay.ReplayDataService;
+import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.ReplayRunService;
 import com.ako.dbuff.service.replay.StateChangeKind;
 import com.ako.dbuff.service.replay.analysis.activity.Activity;
@@ -227,6 +228,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private FightPlayerRepo fightPlayerRepo;
   @Autowired private IntentProfileCalculator intentCalculator;
   @Autowired private BuildFitRepo buildFitRepo;
+  @Autowired private ReplayProcessingProperties processingProperties;
 
   @Test
   @Commit
@@ -239,7 +241,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       ReplayStatus status = runService.process(match);
 
       ReplayParseRunDomain run =
-          runRepo.findByMatchIdAndParserVersion(match.getId(), 1).orElseThrow();
+          runRepo
+              .findByMatchIdAndParserVersion(match.getId(), processingProperties.getParserVersion())
+              .orElseThrow();
       assertThat(status).as("%s: %s", id, run.getError()).isEqualTo(ReplayStatus.DONE);
       assertThat(playerRepo.findByMatchId(match.getId())).hasSize(10);
       assertThat(draftPickRepo.findByMatchId(match.getId())).as("%s has no draft", id).isEmpty();
@@ -356,7 +360,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       ReplayStatus status = runService.process(match);
 
       ReplayParseRunDomain run =
-          runRepo.findByMatchIdAndParserVersion(match.getId(), 1).orElseThrow();
+          runRepo
+              .findByMatchIdAndParserVersion(match.getId(), processingProperties.getParserVersion())
+              .orElseThrow();
       assertThat(status).as("%s: %s", id, run.getError()).isEqualTo(ReplayStatus.DONE);
       assertThat(draftPickRepo.findByMatchId(match.getId())).as("%s draft", id).hasSize(40);
       assertHeroDraft(id, match.getId());

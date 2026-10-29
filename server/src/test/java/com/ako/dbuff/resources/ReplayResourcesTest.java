@@ -75,9 +75,10 @@ class ReplayResourcesTest {
 
   @Test
   void run_reportsHowTheRunEnded_orNotFound() throws Exception {
-    when(runRepo.findByMatchIdAndParserVersion(5L, 1))
+    when(runRepo.findByMatchIdAndParserVersion(5L, properties.getParserVersion()))
         .thenReturn(Optional.of(run(5L, ReplayStatus.PARTIAL)));
-    when(runRepo.findByMatchIdAndParserVersion(6L, 1)).thenReturn(Optional.empty());
+    when(runRepo.findByMatchIdAndParserVersion(6L, properties.getParserVersion()))
+        .thenReturn(Optional.empty());
 
     mvc.perform(get("/api/v1/replay/5"))
         .andExpect(status().isOk())
@@ -94,9 +95,10 @@ class ReplayResourcesTest {
   @Test
   void analysis_answersEverySectionBySelectionOr400ForAnUnknownOne_404ForAnUnstoredMatch()
       throws Exception {
-    when(runRepo.findByMatchIdAndParserVersion(5L, 1))
+    when(runRepo.findByMatchIdAndParserVersion(5L, properties.getParserVersion()))
         .thenReturn(Optional.of(run(5L, ReplayStatus.DONE)));
-    when(runRepo.findByMatchIdAndParserVersion(6L, 1)).thenReturn(Optional.empty());
+    when(runRepo.findByMatchIdAndParserVersion(6L, properties.getParserVersion()))
+        .thenReturn(Optional.empty());
 
     mvc.perform(get("/api/v1/replay/5/analysis"))
         .andExpect(status().isOk())
@@ -120,9 +122,9 @@ class ReplayResourcesTest {
 
   @Test
   void reanalyze_runsTheAnalyzersOnlyForAFinishedRun() throws Exception {
-    when(runRepo.findByMatchIdAndParserVersion(5L, 1))
+    when(runRepo.findByMatchIdAndParserVersion(5L, properties.getParserVersion()))
         .thenReturn(Optional.of(run(5L, ReplayStatus.DONE)));
-    when(runRepo.findByMatchIdAndParserVersion(7L, 1))
+    when(runRepo.findByMatchIdAndParserVersion(7L, properties.getParserVersion()))
         .thenReturn(Optional.of(run(7L, ReplayStatus.PARTIAL)));
     when(matchModes.activeFor(anyLong())).thenReturn(Optional.of(TestModes.ABILITY_DRAFT));
     when(analysis.analyze(5L, TestModes.ABILITY_DRAFT, List.of())).thenReturn(List.of("spikes"));
@@ -145,7 +147,8 @@ class ReplayResourcesTest {
 
   @Test
   void reanalyzeAll_goesThroughTheFinishedRunsUpToTheLimit() throws Exception {
-    when(runRepo.findByParserVersionAndStatusInOrderByMatchId(eq(1), anyCollection()))
+    when(runRepo.findByParserVersionAndStatusInOrderByMatchId(
+            eq(properties.getParserVersion()), anyCollection()))
         .thenReturn(
             List.of(
                 run(1L, ReplayStatus.DONE),
@@ -166,7 +169,7 @@ class ReplayResourcesTest {
 
   @Test
   void reanalyze_saysSoWhenTheMatchHasNoActiveMode() throws Exception {
-    when(runRepo.findByMatchIdAndParserVersion(5L, 1))
+    when(runRepo.findByMatchIdAndParserVersion(5L, properties.getParserVersion()))
         .thenReturn(Optional.of(run(5L, ReplayStatus.DONE)));
     when(matchModes.activeFor(5L)).thenReturn(Optional.empty());
 
@@ -179,7 +182,8 @@ class ReplayResourcesTest {
 
   @Test
   void reanalyzeAll_countsAMatchWithoutAnActiveModeAsSkipped() throws Exception {
-    when(runRepo.findByParserVersionAndStatusInOrderByMatchId(eq(1), anyCollection()))
+    when(runRepo.findByParserVersionAndStatusInOrderByMatchId(
+            eq(properties.getParserVersion()), anyCollection()))
         .thenReturn(List.of(run(1L, ReplayStatus.DONE), run(3L, ReplayStatus.DONE)));
     when(matchModes.activeFor(1L)).thenReturn(Optional.of(TestModes.ABILITY_DRAFT));
     when(matchModes.activeFor(3L)).thenReturn(Optional.empty());

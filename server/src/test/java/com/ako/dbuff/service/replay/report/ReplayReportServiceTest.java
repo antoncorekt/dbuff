@@ -70,6 +70,8 @@ import static org.mockito.Mockito.when;
 
 class ReplayReportServiceTest {
 
+  private static final int PARSER_VERSION = new ReplayProcessingProperties().getParserVersion();
+
   private final ReplayReportProperties properties = new ReplayReportProperties();
   private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
   private final MatchRepo matchRepo = mock(MatchRepo.class);
@@ -488,7 +490,7 @@ class ReplayReportServiceTest {
 
   @Test
   void deliverFinished_postsForADoneRun() {
-    when(runRepo.findByMatchIdAndParserVersion(1L, 1))
+    when(runRepo.findByMatchIdAndParserVersion(1L, PARSER_VERSION))
         .thenReturn(Optional.of(run(ReplayStatus.DONE, null)));
 
     service.deliverFinished(1L);
@@ -498,14 +500,14 @@ class ReplayReportServiceTest {
 
   @Test
   void deliverFinished_postsForAPartialRunOnlyWhenNoRetryIsLeft() {
-    when(runRepo.findByMatchIdAndParserVersion(1L, 1))
+    when(runRepo.findByMatchIdAndParserVersion(1L, PARSER_VERSION))
         .thenReturn(Optional.of(run(ReplayStatus.PARTIAL, LocalDateTime.now().plusHours(1))));
 
     service.deliverFinished(1L);
 
     verify(postedRepo, never()).save(any());
 
-    when(runRepo.findByMatchIdAndParserVersion(1L, 1))
+    when(runRepo.findByMatchIdAndParserVersion(1L, PARSER_VERSION))
         .thenReturn(Optional.of(run(ReplayStatus.PARTIAL, null)));
 
     service.deliverFinished(1L);
@@ -515,7 +517,7 @@ class ReplayReportServiceTest {
 
   @Test
   void deliverFinished_doesNothingForAFailedRunOrNoRun() {
-    when(runRepo.findByMatchIdAndParserVersion(1L, 1))
+    when(runRepo.findByMatchIdAndParserVersion(1L, PARSER_VERSION))
         .thenReturn(Optional.of(run(ReplayStatus.FAILED_DOWNLOAD, null)));
 
     service.deliverFinished(1L);
@@ -527,7 +529,7 @@ class ReplayReportServiceTest {
   private static ReplayParseRunDomain run(ReplayStatus status, LocalDateTime nextAttemptAt) {
     return ReplayParseRunDomain.builder()
         .matchId(1L)
-        .parserVersion(1)
+        .parserVersion(PARSER_VERSION)
         .status(status)
         .nextAttemptAt(nextAttemptAt)
         .build();

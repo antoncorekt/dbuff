@@ -14,8 +14,9 @@ import skadistats.clarity.processor.entities.Entities;
 
 /**
  * Samples every player every five game seconds from the start of the pre-game phase, and their
- * cumulative counters once a game minute. Ticks are 30 a second, so the grid is derived from the
- * tick where the pre-game phase begins, 90 seconds before 0:00.
+ * cumulative counters once a game minute, read at the grid tick nearest each game minute. Ticks are
+ * 30 a second, so the grid is derived from the tick where the pre-game phase begins, 90 seconds
+ * before 0:00.
  */
 final class SampleRecorder {
   private static final int STEP_TICKS = 150;
@@ -106,7 +107,8 @@ final class SampleRecorder {
 
   private void sample(long grid) {
     List<Controllers.View> players = Controllers.read(entities);
-    boolean minuteBoundary = Math.floorMod(grid - clockOriginTick, MINUTE_TICKS) == 0;
+    boolean minuteBoundary =
+        Math.floorMod(grid - clockOriginTick + STEP_TICKS / 2, MINUTE_TICKS) < STEP_TICKS;
     Entity resource = minuteBoundary ? first("CDOTA_PlayerResource") : null;
     Entity radiant = teamData(RADIANT_DATA);
     Entity dire = teamData(DIRE_DATA);
