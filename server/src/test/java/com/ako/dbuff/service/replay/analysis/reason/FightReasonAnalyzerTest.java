@@ -54,12 +54,51 @@ import static org.assertj.core.api.Assertions.tuple;
   ReplayProcessingProperties.class,
   AllPickProfile.class,
   AbilityDraftProfile.class,
-  FightReasonAnalyzerTest.DraftOnly.class
+  FightReasonAnalyzerTest.DraftOnly.class,
+  FightReasonAnalyzerTest.IntentEverywhere.class
 })
 class FightReasonAnalyzerTest {
   private static final long ALL_PICK_MATCH = 51L;
   private static final long DRAFT_MATCH = 52L;
   private static final long UNKNOWN_MODE_MATCH = 53L;
+  private static final long INTENT_MATCH = 54L;
+
+  @TestConfiguration
+  static class IntentEverywhere {
+    @Bean
+    ReasonContributor intentEverywhere() {
+      return new ReasonContributor() {
+        @Override
+        public boolean supports(GameModeProfile mode) {
+          return mode.gameModeId() == AbilityDraftProfile.MODE_ID;
+        }
+
+        @Override
+        public List<Reason> contribute(FightContext context) {
+          return List.of(Reason.player("ABILITY_DRAFT", "INTENT_NOT_PLAYED", 0, 0.6, "t"));
+        }
+      };
+    }
+  }
+
+  @Test
+  void aHeroIntentNotPlayedIsKeptOnlyInTheFirstFightHisTeamLost_drawsSkipped() {
+    entityManager.persist(MatchDomain.builder().id(INTENT_MATCH).gameModeId(18L).build());
+    String[] winners = {"RADIANT", "DRAW", "DIRE", "DIRE"};
+    for (int i = 0; i < winners.length; i++) {
+      fightRepo.save(
+          FightDomain.builder().matchId(INTENT_MATCH).fightIndex(i).winner(winners[i]).build());
+    }
+    entityManager.flush();
+
+    analyzer.analyze(INTENT_MATCH);
+
+    assertThat(reasonRepo.findByMatchId(INTENT_MATCH))
+        .filteredOn(r -> r.getCode().equals("INTENT_NOT_PLAYED"))
+        .extracting(FightReasonDomain::getFightIndex, FightReasonDomain::getSubjectSlot)
+        .containsExactly(tuple(2, 0L));
+    assertThat(analyzer.version()).isEqualTo(5);
+  }
 
   @TestConfiguration
   static class DraftOnly {
@@ -215,7 +254,7 @@ class FightReasonAnalyzerTest {
             r -> {
               assertThat(r.getScope()).isEqualTo("PLAYER");
               assertThat(r.getSource()).isEqualTo("COMMON");
-              assertThat(r.getAnalysisVersion()).isEqualTo(4);
+              assertThat(r.getAnalysisVersion()).isEqualTo(5);
             });
     assertThat(rows)
         .filteredOn(r -> r.getSubjectSlot() == 128L)

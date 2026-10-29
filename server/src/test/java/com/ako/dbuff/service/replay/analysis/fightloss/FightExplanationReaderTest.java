@@ -108,7 +108,8 @@ class FightExplanationReaderTest {
   }
 
   @Test
-  void anEarlyFightKeepsItsCooldownReasonsUnrankedAfterTheRankedOnes_andCollapsesAbsence() {
+  void
+      anEarlyFightKeepsItsCooldownAndTeleportReasonsUnrankedAfterTheRankedOnes_andCollapsesAbsence() {
     fightRepo.save(FightDomain.builder().matchId(MATCH).fightIndex(7).startSeconds(120.0).build());
     explanationRepo.save(
         FightExplanationDomain.builder()
@@ -127,9 +128,10 @@ class FightExplanationReaderTest {
     assertThat(fight.reasons())
         .extracting(r -> r.rank() + " " + r.reason().getCode() + " " + r.also() + " " + r.ranked())
         .containsExactly(
-            "1 SUPPORT_ABSENT [NO_TP] true",
+            "1 SUPPORT_ABSENT [] true",
             "2 INTENT_NOT_PLAYED [] true",
-            "0 ABILITY_ON_COOLDOWN [] false");
+            "0 ABILITY_ON_COOLDOWN [] false",
+            "0 NO_TP [] false");
     assertThat(fight.totalReasons()).isEqualTo(4);
   }
 

@@ -123,6 +123,21 @@ class ReasonRankingTest {
   }
 
   @Test
+  void aTeleportReasonIsNotRankedBeforeTheEarlyLimitButIsAfterIt() {
+    List<FightReasonDomain> reasons = List.of(reason("HAD_TP_NOT_USED", "PLAYER", 1L, 0.5));
+
+    Ranking early = ranking(reasons, 170);
+    Ranking later = ranking(reasons, 400);
+
+    assertThat(early.notRanked())
+        .extracting(FightReasonDomain::getCode)
+        .containsExactly("HAD_TP_NOT_USED");
+    assertThat(early.ranked()).isEmpty();
+    assertThat(later.ranked()).hasSize(1);
+    assertThat(later.notRanked()).isEmpty();
+  }
+
+  @Test
   void theThreeRulesCombine() {
     Ranking ranking =
         ranking(
@@ -135,10 +150,10 @@ class ReasonRankingTest {
 
     assertThat(ranking.ranked())
         .extracting(e -> e.reason().getCode() + e.also())
-        .containsExactly("HAD_TP_NOT_USED[NO_TP]", "STRONG_SKILL_LEFT[]");
+        .containsExactly("STRONG_SKILL_LEFT[]");
     assertThat(ranking.notRanked())
         .extracting(FightReasonDomain::getCode)
-        .containsExactly("ABILITY_ON_COOLDOWN");
+        .containsExactly("ABILITY_ON_COOLDOWN", "NO_TP", "HAD_TP_NOT_USED");
   }
 
   @Test
