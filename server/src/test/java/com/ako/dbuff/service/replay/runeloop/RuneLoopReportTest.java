@@ -112,8 +112,7 @@ class RuneLoopReportTest {
         .contains(
             "| Windrunner took the double damage rune at 9:20 | Radiant | - | mid lane | yes |"
                 + " yes: fight 3 at 10:00 | | |")
-        .contains(
-            "| Axe took the water rune at 2:10 | Dire | - | mid lane | yes | not a power rune")
+        .contains("| Axe took the water rune at 2:10 | Dire | - | mid lane | yes | no fight effect")
         .contains(
             "| Windrunner took a double damage rune 40 s before the fight | fight 3 at 10:00 | Dire"
                 + " won | yes | Dire list: yes | 0.50 | | |")

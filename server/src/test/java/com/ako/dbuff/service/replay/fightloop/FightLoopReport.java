@@ -261,7 +261,7 @@ final class FightLoopReport {
                       lost.important() ? mainReason(d, lost) : "not told (unimportant)"),
                   unpriced(gold, unmatched),
                   ReviewLoopReport.tableCell(r.swing()),
-                  openDotaFight(d, lost.fight())
+                  openDotaFight(d, lost.fight(), rows)
                       .map(t -> openDotaText(d, t, loser))
                       .orElse("none")));
     }
@@ -428,22 +428,37 @@ final class FightLoopReport {
                         .collect(Collectors.joining(", ")));
   }
 
-  /** The OpenDota teamfight that overlaps the fight most; of equal overlap, the nearest start. */
-  private static Optional<TeamfightDomain> openDotaFight(MatchData d, FightDomain fight) {
-    if (fight.getStartSeconds() == null || fight.getEndSeconds() == null) {
-      return Optional.empty();
-    }
-    double from = fight.getStartSeconds() - OPEN_DOTA_SLACK_SECONDS;
-    double to = fight.getEndSeconds() + OPEN_DOTA_SLACK_SECONDS;
+  /** The OpenDota teamfight that the fight overlaps most, unless another fight overlaps it more. */
+  private static Optional<TeamfightDomain> openDotaFight(
+      MatchData d, FightDomain fight, List<Row> rows) {
     return d.openDotaFights().stream()
         .filter(t -> t.getStartTime() != null && t.getEndTime() != null)
-        .filter(t -> overlap(t, from, to) > 0)
+        .filter(t -> overlap(t, fight) > 0)
+        .filter(
+            t ->
+                rows.stream()
+                    .map(r -> r.lost().fight())
+                    .filter(f -> f.getStartSeconds() != null && f.getEndSeconds() != null)
+                    .min(closest(t))
+                    .filter(f -> f == fight)
+                    .isPresent())
         .max(
-            Comparator.comparingDouble((TeamfightDomain t) -> overlap(t, from, to))
+            Comparator.comparingDouble((TeamfightDomain t) -> overlap(t, fight))
                 .thenComparing(t -> -Math.abs(t.getStartTime() - fight.getStartSeconds())));
   }
 
-  private static double overlap(TeamfightDomain t, double from, double to) {
+  private static Comparator<FightDomain> closest(TeamfightDomain t) {
+    return Comparator.comparingDouble((FightDomain f) -> -overlap(t, f))
+        .thenComparingDouble(f -> Math.abs(t.getStartTime() - f.getStartSeconds()))
+        .thenComparing(FightDomain::getFightIndex);
+  }
+
+  private static double overlap(TeamfightDomain t, FightDomain f) {
+    if (f.getStartSeconds() == null || f.getEndSeconds() == null) {
+      return 0;
+    }
+    double from = f.getStartSeconds() - OPEN_DOTA_SLACK_SECONDS;
+    double to = f.getEndSeconds() + OPEN_DOTA_SLACK_SECONDS;
     return Math.min(t.getEndTime(), to) - Math.max(t.getStartTime(), from);
   }
 
