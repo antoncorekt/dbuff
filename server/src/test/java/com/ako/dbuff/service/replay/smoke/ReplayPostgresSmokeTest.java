@@ -113,6 +113,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1394,17 +1395,29 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                     .computeIfAbsent(p.getPlayerSlot(), s -> new TreeMap<>())
                     .put(p.getStage(), p.getRole()));
     Set<String> expectedIntent = new TreeSet<>();
-    for (FightPlayerDomain p : fightPlayerRepo.findByMatchId(matchId)) {
+    Map<Integer, TeamSide> losers = new TreeMap<>();
+    fightRepo.findByMatchId(matchId).forEach(f -> losers.put(f.getFightIndex(), loserOf(f)));
+    Set<Long> told = new HashSet<>();
+    List<FightPlayerDomain> fightPlayers =
+        fightPlayerRepo.findByMatchId(matchId).stream()
+            .sorted(Comparator.comparing(FightPlayerDomain::getFightIndex))
+            .toList();
+    for (FightPlayerDomain p : fightPlayers) {
       Map<String, Integer> byStage = roles.getOrDefault(p.getPlayerSlot(), Map.of());
       Integer intent = byStage.get("INTENT");
       Integer played = byStage.get("FINAL");
-      if (inFight(p) && intent != null && played != null && !intent.equals(played)) {
+      if (inFight(p)
+          && intent != null
+          && played != null
+          && !intent.equals(played)
+          && losers.get(p.getFightIndex()) == TeamSide.ofSlot(p.getPlayerSlot())
+          && told.add(p.getPlayerSlot())) {
         expectedIntent.add(
             p.getFightIndex() + "/" + TeamSide.ofSlot(p.getPlayerSlot()) + "/" + p.getPlayerSlot());
       }
     }
     assertThat(keys(stored, "INTENT_NOT_PLAYED"))
-        .as("%s: heroes in the fight whose intent role differs from the final one", id)
+        .as("%s: intent role differs from the final one, told once in the first lost fight", id)
         .isEqualTo(expectedIntent);
 
     Map<TeamSide, Map<String, Double>> peaks = new TreeMap<>();
