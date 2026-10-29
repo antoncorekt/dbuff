@@ -450,7 +450,7 @@ final class FightLoopReport {
   private static Comparator<FightDomain> closest(TeamfightDomain t) {
     return Comparator.comparingDouble((FightDomain f) -> -overlap(t, f))
         .thenComparingDouble(f -> Math.abs(t.getStartTime() - f.getStartSeconds()))
-        .thenComparing(FightDomain::getFightIndex);
+        .thenComparing(FightDomain::getFightIndex, Comparator.nullsLast(Comparator.naturalOrder()));
   }
 
   private static double overlap(TeamfightDomain t, FightDomain f) {
