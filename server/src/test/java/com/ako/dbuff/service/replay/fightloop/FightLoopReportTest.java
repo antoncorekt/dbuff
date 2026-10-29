@@ -289,6 +289,41 @@ class FightLoopReportTest {
   }
 
   @Test
+  void aTeamfightOverlappingTwoFightsIsShownOnlyForTheOneWithTheLargerOverlap() {
+    LostFight near = lost(5, null, "DIRE", null, "NO_TP");
+    LostFight far = lost(6, null, "DIRE", null, "NO_BKB");
+    far.fight().setStartSeconds(1420.0);
+    far.fight().setEndSeconds(1430.0);
+    MatchData d = data(new MatchExplanation(List.of(), List.of(near, far)));
+    d =
+        new MatchData(
+            d.matchId(),
+            d.match(),
+            d.modeName(),
+            d.explanation(),
+            d.heroNames(),
+            null,
+            List.of(
+                TeamfightDomain.builder()
+                    .fightIndex(1)
+                    .startTime(1395L)
+                    .endTime(1415L)
+                    .deaths(4L)
+                    .build()),
+            List.of());
+
+    List<String> rows =
+        FightLoopReport.render(d)
+            .lines()
+            .filter(l -> l.startsWith("| Dire lost fight") && l.contains("| unknown |"))
+            .toList();
+
+    assertThat(rows).hasSize(2);
+    assertThat(rows.get(0)).endsWith("| 4 deaths, ? gold change for the loser |");
+    assertThat(rows.get(1)).endsWith("| none |");
+  }
+
+  @Test
   void anAbsenceEntryListsItsAlsoReasons_andAnEarlyCooldownReasonIsMarkedNotRanked() {
     LostFight base = lost(5, 0, "DIRE", 1200L, "NO_TP");
     FightReasonDomain cooldown =

@@ -218,7 +218,7 @@ final class RuneLoopReport {
 
   private static String fightWindowText(MatchData d, RunePickupDomain p) {
     if (!isPower(p)) {
-      return "not a power rune";
+      return "no fight effect";
     }
     List<FightDomain> fights = windowFights(d, p);
     return fights.isEmpty()
