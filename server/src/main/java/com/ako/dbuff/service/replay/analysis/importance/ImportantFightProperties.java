@@ -17,6 +17,16 @@ public class ImportantFightProperties {
   /** Or when it grew by this much gold. */
   private long minGold = 1500;
 
+  /** A lead flip to the winner counts only when the winner gained at least this much gold. */
+  private long minFlipGold = 1500;
+
+  public void setMinFlipGold(long minFlipGold) {
+    if (minFlipGold < 0) {
+      throw new IllegalArgumentException("min-flip-gold must be >= 0");
+    }
+    this.minFlipGold = minFlipGold;
+  }
+
   /** How long after the fight the advantage is still read, to cover the one-minute resolution. */
   private int lagSeconds = 60;
 

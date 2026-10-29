@@ -69,6 +69,11 @@ class ImportantFightAnalyzerTest {
   }
 
   @Test
+  void theVersionIsTwo() {
+    assertThat(analyzer.version()).isEqualTo(2);
+  }
+
+  @Test
   void everyDecidedFightGetsARow_drawsAndUnknownWinnersGetNone() {
     timeline(new long[] {0, 0, 0, 0, 3000, 3000, 3000, 3000}, 4000L, null);
     fight(0, "RADIANT", 150, 170);
