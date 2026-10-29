@@ -32,6 +32,11 @@ public class RoleProfileProperties {
                 + unknown);
       }
     }
+    if (fit.getFinalPositionBonus() < 0 || fit.getFinalPositionBonus() > 1) {
+      throw new IllegalStateException(
+          "replay.analysis.role-profile.fit.final-position-bonus must be in 0 to 1, got "
+              + fit.getFinalPositionBonus());
+    }
     double[] fullShares = {
       observed.getDamageFullShare(),
       observed.getHealFullShare(),
@@ -346,6 +351,9 @@ public class RoleProfileProperties {
      * that the net worth place and the farm carry more of the role than the lane.
      */
     private double finalLaneFactor = 0.1;
+
+    /** The FINAL stage adds this to the score of the role equal to OpenDota's position, 0 to 1. */
+    private double finalPositionBonus = 0.3;
 
     /** What a function the FINAL stage does not know counts as: none, so it favours no role. */
     private double finalUnknownValue = 0.0;

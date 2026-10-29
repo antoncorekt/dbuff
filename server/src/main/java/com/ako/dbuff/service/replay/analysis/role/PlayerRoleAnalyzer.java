@@ -65,7 +65,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 6;
+    return 7;
   }
 
   @Override
@@ -113,7 +113,8 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
                         activity.getOrDefault(s.getPlayerSlot(), List.of()),
                         s.getHeroId(),
                         drafted.getOrDefault(s.getPlayerSlot(), List.of()),
-                        PlayerOutput.from(s)))
+                        PlayerOutput.from(s),
+                        s.getPositionEst()))
             .toList();
     List<PlayerRoleDomain> rows = new ArrayList<>();
     List<PlayerRoleProfileDomain> profiles = new ArrayList<>();
