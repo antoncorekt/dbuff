@@ -120,6 +120,34 @@ class ImportantFightsSectionTest {
   }
 
   @Test
+  void wordsTheRuneFromTheReadersSide() {
+    RankedReason rune =
+        new RankedReason(
+            1,
+            FightReasonDomain.builder()
+                .scope("TEAM")
+                .team("DIRE")
+                .code("ENEMY_RUNE_ADVANTAGE")
+                .evidence(
+                    "double damage rune taken at 37:30 by Terrorblade, 37 s from the fight start,"
+                        + " active in the fight")
+                .severity(0.5)
+                .build(),
+            List.of(),
+            true);
+    stored(fight(1, 2250, "RADIANT", 1200L, false, rune));
+
+    assertThat(section.lines(input(2L)).get(1))
+        .endsWith(
+            "Radiant (your team) won the fight, 1.2k net worth swing: your Terrorblade took a"
+                + " double damage rune 37 s before the fight");
+    assertThat(section.lines(input(130L)).get(1))
+        .endsWith("the enemy Terrorblade took a double damage rune 37 s before the fight");
+    assertThat(section.lines(input(2L, 130L)).get(1))
+        .endsWith("Radiant's Terrorblade took a double damage rune 37 s before the fight");
+  }
+
+  @Test
   void namesACooldownAbilityByItsDisplayName() {
     RankedReason cooldown =
         new RankedReason(
