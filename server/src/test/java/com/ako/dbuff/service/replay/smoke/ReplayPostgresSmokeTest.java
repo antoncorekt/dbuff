@@ -419,6 +419,15 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                           java.util.Set.of(0L),
                           java.util.Map.of(0L, "P0"),
                           3))));
+      ReplayReportInput draftInput =
+          new ReplayReportInput(
+              match.getId(), match, java.util.Set.of(0L), java.util.Map.of(0L, "P0"), 3);
+      if (draftPickRepo.findByMatchId(match.getId()).stream()
+          .anyMatch(d -> Long.valueOf(0).equals(d.getPlayerSlot()) && d.getAbilityName() != null)) {
+        assertThat(draftSection.view(draftInput).orElseThrow().image())
+            .as("the draft view of %s carries its picture", id)
+            .isNotNull();
+      }
       System.out.println(
           "DRAFT RAW "
               + id
