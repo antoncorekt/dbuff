@@ -98,16 +98,16 @@ public class IncomeChartBuilder {
       int hiddenHeroes,
       int maxFindings,
       int lineLength) {
-    List<ChartSpec.Panel> panels = new ArrayList<>();
     List<Pin> allPins = new ArrayList<>();
     List<Found> found = new ArrayList<>();
     List<String> midas = new ArrayList<>();
+    Map<Long, double[]> rolling = new HashMap<>();
     double end = SECONDS;
     for (long slot : slots) {
       double[] gpm = IncomeDips.rolling(gold.get(slot));
       List<Dip> dips = biggest(IncomeDips.find(gpm));
       List<Pin> hisPins = events.pins(slot);
-      panels.add(panel(slot, heroes, gpm, dips, hisPins));
+      rolling.put(slot, gpm);
       allPins.addAll(hisPins);
       dips.forEach(
           d -> found.add(new Found(slot, d, why.why(slot, d.causeFromSeconds(), d.toSeconds()))));
@@ -126,6 +126,13 @@ public class IncomeChartBuilder {
     List<String> bullets = new ArrayList<>(lines.stream().limit(room).toList());
     if (hidden != null) {
       bullets.add(hidden);
+    }
+    int described = Math.max(0, Math.min(worst.size() - 1, room - midas.size()));
+    List<Found> shown = worst.stream().limit(worst.isEmpty() ? 0 : 1L + described).toList();
+    List<ChartSpec.Panel> panels = new ArrayList<>();
+    for (long slot : slots) {
+      List<Dip> dips = shown.stream().filter(f -> f.slot() == slot).map(Found::dip).toList();
+      panels.add(panel(slot, heroes, rolling.get(slot), dips, events.pins(slot)));
     }
     ChartSpec spec =
         new ChartSpec("Hero income", end, panels, List.of(), List.of(), legend(found, allPins));
@@ -154,9 +161,7 @@ public class IncomeChartBuilder {
             .map(
                 d ->
                     new ChartSpec.Band(
-                        Math.max(0, (d.fromMinute() - 1) * (double) SECONDS),
-                        d.toSeconds(),
-                        ChartPalette.DIP_BAND))
+                        Math.max(0, d.causeFromSeconds()), d.toSeconds(), ChartPalette.DIP_BAND))
             .toList();
     return new ChartSpec.Panel(
         BehaviourWording.hero(heroes, slot) + ": gold per minute (last 3 minutes)",
@@ -224,9 +229,7 @@ public class IncomeChartBuilder {
             ChartFormat.compact(d.lowest()),
             ChartFormat.clock(Math.max(0, d.causeFromSeconds())),
             ChartFormat.clock(d.toSeconds()));
-    return f.why().isEmpty()
-        ? drop + " (no stored reason)"
-        : drop + ": " + String.join("; ", f.why());
+    return f.why().isEmpty() ? drop : drop + ": " + String.join("; ", f.why());
   }
 
   private Map<Long, TreeMap<Integer, Long>> goldBySlot(long matchId) {

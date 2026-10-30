@@ -19,6 +19,7 @@ import com.ako.dbuff.service.replay.analysis.item.ItemEfficiency;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyJson;
 import com.ako.dbuff.service.replay.analysis.item.ItemKits;
 import com.ako.dbuff.service.replay.report.IncomeChartBuilder.IncomeChart;
+import com.ako.dbuff.service.replay.report.chart.ChartFormat;
 import com.ako.dbuff.service.replay.report.chart.ChartRenderer;
 import com.ako.dbuff.service.replay.report.chart.ChartSpec;
 import com.ako.dbuff.service.replay.report.chart.ChartSpec.PinShape;
@@ -240,11 +241,33 @@ class IncomeChartBuilderTest {
 
   @Test
   @SuppressWarnings("unchecked")
-  void aFallWithoutAStoredReasonSaysSo() {
+  void aFallWithoutAStoredReasonHasNoParentheticalAndTheBandStartsWhereTheTextWindowStarts() {
     timeline(gold(0, withFall()));
 
-    assertThat(builder.build(MATCH, Set.of(0L), 2, 3, LINE).orElseThrow().verdict())
-        .endsWith("(no stored reason).");
+    IncomeChart chart = builder.build(MATCH, Set.of(0L), 2, 3, LINE).orElseThrow();
+
+    assertThat(chart.verdict()).doesNotContain("no stored reason");
+    double start = chart.spec().panels().getFirst().bands().getFirst().startSeconds();
+    assertThat(chart.verdict()).contains("between " + ChartFormat.clock(start) + " and ");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void everyShadedFallIsDescribedUnderTheSameCap() {
+    timeline(gold(0, withFall()), gold(1, withFall()));
+
+    IncomeChart capped = builder.build(MATCH, Set.of(0L, 1L), 2, 0, LINE).orElseThrow();
+    IncomeChart open = builder.build(MATCH, Set.of(0L, 1L), 2, 3, LINE).orElseThrow();
+
+    assertThat(shaded(capped)).isEqualTo(1);
+    assertThat(capped.bullets()).isEmpty();
+    assertThat(shaded(open)).isEqualTo(2);
+    assertThat(open.bullets()).hasSize(1);
+    assertThat(open.bullets()).noneMatch(b -> b.contains("no stored reason"));
+  }
+
+  private static int shaded(IncomeChart chart) {
+    return chart.spec().panels().stream().mapToInt(p -> p.bands().size()).sum();
   }
 
   @Test
