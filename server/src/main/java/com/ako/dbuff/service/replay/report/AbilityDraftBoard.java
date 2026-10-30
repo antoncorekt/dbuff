@@ -304,7 +304,7 @@ public class AbilityDraftBoard implements DraftBoard {
       Long heroId = heroIdBySlot.get(slot);
       String hero = heroId == null ? null : heroNames.heroName(heroId);
       if (picker != null) {
-        return picker + (hero == null ? "" : " (" + hero + ")");
+        return picker;
       }
       if (hero != null) {
         return hero;

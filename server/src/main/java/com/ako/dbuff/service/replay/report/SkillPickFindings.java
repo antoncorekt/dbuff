@@ -123,12 +123,11 @@ public class SkillPickFindings {
   }
 
   private static String who(ReplayReportInput input, Map<Long, String> heroes, Long slot) {
-    String hero = heroes.get(slot);
     String name = input.namesBySlot() == null ? null : input.namesBySlot().get(slot);
     if (name == null || name.isBlank()) {
       return BehaviourWording.hero(heroes, slot);
     }
-    return ReportHeroNames.label(name, hero);
+    return name;
   }
 
   /** How far from an even win rate the row is with confidence: negative when it could be chance. */
