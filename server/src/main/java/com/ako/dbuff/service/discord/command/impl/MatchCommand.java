@@ -42,7 +42,7 @@ import org.springframework.stereotype.Component;
  * <p>{@code rerun} re-reports from data already stored. {@code retry} throws that data away and
  * re-fetches from OpenDota — slower, and the right answer only when the stored data is wrong.
  * {@code ai} posts the AI top reasons card from the stored replay analysis; {@code report} posts a
- * section of it, or all the sections the channel posts automatically.
+ * section of it, all the sections the channel posts automatically, or every section.
  */
 @Slf4j
 @Component
@@ -136,12 +136,12 @@ public class MatchCommand implements DbuffCommand {
                         .setAutoComplete(true)),
             new SubcommandData(
                     "report",
-                    "Post one replay report section, or all (the ones set to post automatically)")
+                    "Post one replay report section, all (the automatic ones) or everything")
                 .addOptions(
                     new OptionData(
                             OptionType.STRING,
                             ReportCommandHandler.SECTION_OPTION,
-                            "A section, or all = every section this channel posts automatically",
+                            "A section; all = the ones this channel posts automatically; everything = every section",
                             true)
                         .setAutoComplete(true),
                     new OptionData(

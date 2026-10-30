@@ -32,7 +32,7 @@ class ReportSectionAutocompleteTest {
   void offersAllAndEveryRegisteredSectionIncludingANewOne() {
     assertThat(provider.getChoices("", null))
         .extracting(c -> c.getAsString())
-        .containsExactlyInAnyOrder("all", "lanes", "opendota", "brand-new");
+        .containsExactlyInAnyOrder("all", "everything", "lanes", "opendota", "brand-new");
   }
 
   @Test

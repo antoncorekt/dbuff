@@ -11,9 +11,9 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 /**
- * {@code /match report <section|all>}: posts one section, or every section the channel posts
- * automatically, of the match of this thread. Everything that can be refused is checked before the
- * command is acknowledged, each with its own one-line reply.
+ * {@code /match report <section|all|everything>}: posts one section, every section the channel
+ * posts automatically, or every section there is, of the match of this thread. Everything that can
+ * be refused is checked before the command is acknowledged, each with its own one-line reply.
  */
 @Slf4j
 @Component
@@ -21,6 +21,7 @@ public class ReportCommandHandler {
   public static final String SECTION_OPTION = "section";
   public static final String ITEMS_OPTION = "items";
   public static final String ALL = "all";
+  public static final String EVERYTHING = "everything";
   private static final String ITEMS_SECTION = "items";
 
   private final ReplayReportService reports;
@@ -46,9 +47,11 @@ public class ReportCommandHandler {
       return;
     }
     boolean all = ALL.equalsIgnoreCase(requested.strip());
+    boolean everything = EVERYTHING.equalsIgnoreCase(requested.strip());
+    boolean whole = all || everything;
     Optional<ReplayReportSection> section =
-        all ? Optional.empty() : sectionSwitch.find(requested.strip());
-    if (!all && section.isEmpty()) {
+        whole ? Optional.empty() : sectionSwitch.find(requested.strip());
+    if (!whole && section.isEmpty()) {
       context.replyEphemeral(
           "❌ Unknown section `" + requested.strip() + "`. Choose from: " + choices() + ".");
       return;
@@ -82,11 +85,14 @@ public class ReportCommandHandler {
     }
     boolean posted = false;
     try {
-      String label = all ? "the report" : "section `" + section.get().name() + "`";
+      String label =
+          everything
+              ? "every section"
+              : all ? "the report" : "section `" + section.get().name() + "`";
       AsyncReply reply =
           context.acknowledge(
               "🔄 Preparing " + label + " of match " + matchId + "…", "Match " + matchId);
-      posted = deliver(reply, matchId, config, requested, all, section, items);
+      posted = deliver(reply, matchId, config, requested, all, everything, section, items);
     } finally {
       if (!posted) {
         cooldown.release(permit);
@@ -100,20 +106,23 @@ public class ReportCommandHandler {
       DbufInstanceConfigDomain config,
       String requested,
       boolean all,
+      boolean everything,
       Optional<ReplayReportSection> section,
       List<String> items) {
     try {
       ReportDelivery delivery =
-          all
-              ? reports.redeliver(matchId, config.getId())
-              : items == null
-                  ? reports.deliverSection(matchId, config.getId(), section.get().name())
-                  : reports.deliverSection(
-                      matchId, config.getId(), section.get().name(), null, items);
+          everything
+              ? reports.deliverEverything(matchId, config.getId())
+              : all
+                  ? reports.redeliver(matchId, config.getId())
+                  : items == null
+                      ? reports.deliverSection(matchId, config.getId(), section.get().name())
+                      : reports.deliverSection(
+                          matchId, config.getId(), section.get().name(), null, items);
       if (delivery == ReportDelivery.POSTED) {
         return true;
       }
-      reply.post(notPosted(delivery, all, section, matchId));
+      reply.post(notPosted(delivery, all, everything, section, matchId));
     } catch (RuntimeException e) {
       log.warn("Report {} of match {} failed: {}", requested, matchId, e.getMessage(), e);
       reply.fail("❌ The report of match " + matchId + " failed, see the log.");
@@ -137,7 +146,14 @@ public class ReportCommandHandler {
   }
 
   private static String notPosted(
-      ReportDelivery delivery, boolean all, Optional<ReplayReportSection> section, long matchId) {
+      ReportDelivery delivery,
+      boolean all,
+      boolean everything,
+      Optional<ReplayReportSection> section,
+      long matchId) {
+    if (everything && delivery == ReportDelivery.SECTION_EMPTY) {
+      return "No section has anything to show for match " + matchId + ".";
+    }
     if (all && delivery == ReportDelivery.NO_SECTIONS) {
       return "Nothing is set to post automatically in this channel; name a section instead"
           + " (see `/dbuff settings sections:`).";
@@ -153,6 +169,6 @@ public class ReportCommandHandler {
   }
 
   private String choices() {
-    return ALL + ", " + String.join(", ", sectionSwitch.visibleNames());
+    return ALL + ", " + EVERYTHING + ", " + String.join(", ", sectionSwitch.visibleNames());
   }
 }

@@ -211,7 +211,7 @@ class ReportCommandHandlerTest {
     assertThat(context.getEphemeralReplies())
         .singleElement()
         .asString()
-        .contains("all, lanes, items, opendota");
+        .contains("all, everything, lanes, items, opendota");
     assertThat(context.getAcknowledgeSummary()).isNull();
   }
 
@@ -335,6 +335,57 @@ class ReportCommandHandlerTest {
         .singleElement()
         .asString()
         .contains("this section is not available for this game mode");
+    assertThat(cooldown.acquire("thread-1").granted()).isTrue();
+  }
+
+  @Test
+  void everything_isPostedThroughDeliverEverythingIgnoringCase() {
+    when(reports.deliverEverything(MATCH, "i1")).thenReturn(ReportDelivery.POSTED);
+    FakeCommandContext context = context("EveryThing");
+
+    handler.handle(context, MATCH, config);
+
+    verify(reports).deliverEverything(MATCH, "i1");
+    verify(reports, never()).redeliver(anyLong(), anyString());
+    verify(reports, never()).deliverSection(anyLong(), anyString(), anyString());
+    assertThat(context.getAcknowledgeSummary()).contains("every section").contains("" + MATCH);
+    assertThat(cooldown.acquire("thread-1").granted()).isFalse();
+  }
+
+  @Test
+  void everythingWithoutStoredAnalysis_isRefusedBeforeAcknowledging() {
+    when(reports.hasStoredAnalysis(MATCH)).thenReturn(false);
+    FakeCommandContext context = context("everything");
+
+    handler.handle(context, MATCH, config);
+
+    assertThat(context.getEphemeralReplies())
+        .singleElement()
+        .asString()
+        .contains("no stored replay analysis");
+    assertThat(context.getAcknowledgeSummary()).isNull();
+    verify(reports, never()).deliverEverything(anyLong(), anyString());
+  }
+
+  @Test
+  void everything_sharesTheCooldown() {
+    cooldown.acquire("thread-1");
+    FakeCommandContext context = context("everything");
+
+    handler.handle(context, MATCH, config);
+
+    assertThat(context.getEphemeralReplies()).singleElement().asString().contains("30 s");
+    verify(reports, never()).deliverEverything(anyLong(), anyString());
+  }
+
+  @Test
+  void everythingWithNothingToShow_saysSoAndReleases() {
+    when(reports.deliverEverything(MATCH, "i1")).thenReturn(ReportDelivery.SECTION_EMPTY);
+    FakeCommandContext context = context("everything");
+
+    handler.handle(context, MATCH, config);
+
+    assertThat(context.getPosts()).singleElement().asString().contains("No section has anything");
     assertThat(cooldown.acquire("thread-1").granted()).isTrue();
   }
 }
