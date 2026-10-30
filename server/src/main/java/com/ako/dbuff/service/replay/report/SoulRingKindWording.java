@@ -25,8 +25,9 @@ public class SoulRingKindWording implements ItemKindWording {
     if (row.count() == 0) {
       return "bought, never used" + ItemWording.limits(row.flags());
     }
-    return "%s, worth %s its cost%s"
-        .formatted(figures(row), ItemWording.ratio(row.ratio()), ItemWording.limits(row.flags()));
+    return "%s%s%s"
+        .formatted(
+            figures(row), ItemWording.worthClause(row.ratio()), ItemWording.limits(row.flags()));
   }
 
   @Override
