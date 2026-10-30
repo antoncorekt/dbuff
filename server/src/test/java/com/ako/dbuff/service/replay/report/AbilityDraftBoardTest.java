@@ -93,7 +93,7 @@ class AbilityDraftBoardTest {
   void view_givesEveryTurnInOrderWithItsTeamAndPicker() {
     fullDraft(true);
 
-    SectionView view = board.view(input(Map.of(128L, "Пастух"))).orElseThrow();
+    SectionView view = board.view(input(Map.of(128L, "Пастух (Hero105)"))).orElseThrow();
 
     List<String> lines = view.bullets().getFirst().lines().skip(1).toList();
     assertThat(lines).hasSize(50);
@@ -108,7 +108,7 @@ class AbilityDraftBoardTest {
   void picture_hasTwoColumnsOfTeamsAndMarksTheTrackedPlayer() {
     fullDraft(true);
 
-    board.view(input(Map.of(128L, "Пастух"))).orElseThrow();
+    board.view(input(Map.of(128L, "Пастух (Hero105)"))).orElseThrow();
 
     ArgumentCaptor<TableSpec> spec = ArgumentCaptor.forClass(TableSpec.class);
     verify(tables).render(spec.capture());
@@ -149,7 +149,7 @@ class AbilityDraftBoardTest {
         .thenReturn(
             List.of(PlayerMatchStatisticDomain.builder().playerSlot(0L).heroId(5L).build()));
 
-    SectionView view = board.view(input(Map.of(0L, "Anton"))).orElseThrow();
+    SectionView view = board.view(input(Map.of(0L, "Anton (Hero5)"))).orElseThrow();
 
     assertThat(view.bullets().getFirst().lines().toList())
         .contains("1. Radiant · Anton (Hero5): Hero Skill 0");

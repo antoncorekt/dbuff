@@ -30,6 +30,7 @@ import org.springframework.stereotype.Component;
 public class SwingSection implements ReplayReportSection {
   private static final int MAX_CAUSES = 2;
   private static final double MIN_SHARE = 10;
+  private static final double CLEAR_MARGIN = 5;
 
   private static final Map<String, String> SOURCES =
       Map.of(
@@ -71,51 +72,59 @@ public class SwingSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
-    return render(input, selectedSwings(input));
+    return render(input, selectedSwings(input), null);
   }
 
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
     List<GameSpikeDomain> spikes = selectedSwings(input);
-    List<String> lines = render(input, spikes);
-    if (lines.isEmpty()) {
+    if (render(input, spikes, null).isEmpty()) {
       return Optional.empty();
     }
     GameSpikeDomain biggest =
         spikes.stream().max(Comparator.comparingLong(GameSpikeDomain::getDeltaGold)).orElseThrow();
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
+    List<GameSpikeFactorDomain> found =
+        factorsOf(input.matchId()).getOrDefault(biggest.getSpikeIndex(), List.of());
     String verdict =
-        String.format(
-            Locale.ROOT,
-            "Biggest swing: %s gained %.1fk net worth between %s and %s",
-            Prettify.teamOf(biggest.getBenefitingTeam(), yours),
-            biggest.getDeltaGold() / 1000.0,
-            GameTime.clock(biggest.getStartSeconds()),
-            GameTime.clock(biggest.getEndSeconds()));
+        "Biggest swing: "
+            + line(biggest, found, yours)
+            + keyItemClause(biggest, found, heroNames.iconBySlot(input.matchId()));
     return SectionViews.titled(
-        lines,
+        render(input, spikes, biggest),
         new Verdict(
             verdict,
             SectionViews.forTeam(Enums.find(TeamSide.class, biggest.getBenefitingTeam()), yours)));
   }
 
-  private List<String> render(ReplayReportInput input, List<GameSpikeDomain> spikes) {
+  private Map<Integer, List<GameSpikeFactorDomain>> factorsOf(long matchId) {
+    return factorRepo.findByMatchId(matchId).stream()
+        .collect(Collectors.groupingBy(GameSpikeFactorDomain::getSpikeIndex));
+  }
+
+  private List<String> render(
+      ReplayReportInput input, List<GameSpikeDomain> spikes, GameSpikeDomain verdictSwing) {
     if (spikes.isEmpty()) {
       return List.of();
     }
-    Map<Integer, List<GameSpikeFactorDomain>> factors =
-        factorRepo.findByMatchId(input.matchId()).stream()
-            .collect(Collectors.groupingBy(GameSpikeFactorDomain::getSpikeIndex));
+    Map<Integer, List<GameSpikeFactorDomain>> factors = factorsOf(input.matchId());
+    TeamSide yours = TeamSide.commonSide(input.focusSlots());
     Map<Integer, SwingExplanation> lostBySwing = lostFights(input.matchId());
     Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
     List<String> lines = new ArrayList<>();
     lines.add("**Swings**");
     for (GameSpikeDomain spike : spikes) {
       List<GameSpikeFactorDomain> found = factors.getOrDefault(spike.getSpikeIndex(), List.of());
-      lines.add(line(spike, found) + keyItemClause(spike, found, heroes));
+      if (spike != verdictSwing) {
+        lines.add(line(spike, found, yours) + keyItemClause(spike, found, heroes));
+      }
       SwingExplanation told = lostBySwing.get(spike.getSpikeIndex());
       (told == null ? List.<LostFight>of() : told.fights())
           .stream()
+              .sorted(
+                  Comparator.comparing(
+                      lost -> lost.fight().getStartSeconds(),
+                      Comparator.nullsLast(Comparator.naturalOrder())))
               .map(lost -> lostLine(lost, heroes, told.noImportantFight()))
               .flatMap(Optional::stream)
               .forEach(lines::add);
@@ -208,9 +217,10 @@ public class SwingSection implements ReplayReportSection {
     }
   }
 
-  private static String line(GameSpikeDomain spike, List<GameSpikeFactorDomain> factors) {
-    String team = Prettify.team(spike.getBenefitingTeam());
-    String because =
+  private static String line(
+      GameSpikeDomain spike, List<GameSpikeFactorDomain> factors, TeamSide yours) {
+    String team = Prettify.teamOf(spike.getBenefitingTeam(), yours);
+    List<GameSpikeFactorDomain> sources =
         factors.stream()
             .filter(
                 f ->
@@ -219,23 +229,34 @@ public class SwingSection implements ReplayReportSection {
                         && f.getSharePercent() >= MIN_SHARE)
             .sorted(Comparator.comparingDouble(GameSpikeFactorDomain::getSharePercent).reversed())
             .limit(MAX_CAUSES)
-            .map(
-                f ->
-                    SOURCES.getOrDefault(f.getRef(), f.getRef())
-                        + " "
-                        + Math.round(f.getSharePercent())
-                        + "%")
+            .toList();
+    String because =
+        sources.stream()
+            .map(f -> sourceName(f) + " " + Math.round(f.getSharePercent()) + "%")
             .collect(Collectors.joining(", "));
+    boolean tie =
+        sources.size() == MAX_CAUSES
+            && sources.get(0).getSharePercent() - sources.get(1).getSharePercent() < CLEAR_MARGIN;
     String cause = SwingCauses.phrase(spike.getPrimaryCause());
+    String from =
+        cause.isEmpty()
+            ? ""
+            : tie
+                ? ", from " + sourceName(sources.get(0)) + " and " + sourceName(sources.get(1))
+                : ", mostly from " + cause;
     return String.format(
         Locale.ROOT,
-        "%s-%s: %s gained %.1fk net worth%s%s%s",
+        "%s-%s: swung %.1fk gold toward %s%s%s%s",
         GameTime.clock(spike.getStartSeconds()),
         GameTime.clock(spike.getEndSeconds()),
-        team,
         spike.getDeltaGold() / 1000.0,
+        team,
         Boolean.TRUE.equals(spike.getDirectionChange()) ? " and took the lead" : "",
-        cause.isEmpty() ? "" : ", mostly from " + cause,
+        from,
         because.isEmpty() ? "" : " (" + because + ")");
+  }
+
+  private static String sourceName(GameSpikeFactorDomain factor) {
+    return SOURCES.getOrDefault(factor.getRef(), factor.getRef());
   }
 }

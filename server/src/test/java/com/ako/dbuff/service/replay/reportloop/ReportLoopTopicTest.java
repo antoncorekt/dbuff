@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.reportloop;
 
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
+import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.ImageAttachment;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 class ReportLoopTopicTest {
   private final PlainViewRenderer plain = new PlainViewRenderer();
@@ -62,19 +64,31 @@ class ReportLoopTopicTest {
   }
 
   @Test
-  void aRegisteredSectionWithoutViewsStillHasItsHeadingSoRoundsCompare(@TempDir Path dir) {
+  void aSectionWithoutContentWritesNothing(@TempDir Path dir) {
     String report = ReportLoopTopic.render(1L, Map.of(), List.of("draft", "vision"), plain, dir);
 
-    assertThat(report).contains("## draft\n", "## vision\n");
+    assertThat(report).doesNotContain("## draft", "## vision").contains("# Match 1");
   }
 
   @Test
-  void theTrackedListIsReadAndBuildsTheInstance() {
-    List<Long> ids = ReportLoopTopic.trackedIds();
-    DbufInstanceConfigDomain instance = ReportLoopTopic.instance(ids);
+  void theTrackedFileGivesIdsAndNames() {
+    Map<Long, String> players = ReportLoopTopic.trackedPlayers();
+    DbufInstanceConfigDomain instance = ReportLoopTopic.instance(players);
 
-    assertThat(ids).containsExactly(204429164L, 279195408L, 208611215L, 201613150L);
-    assertThat(instance.getPlayerIds()).containsExactlyInAnyOrderElementsOf(ids);
+    assertThat(players)
+        .containsExactly(
+            entry(204429164L, "Пастух лолей"),
+            entry(279195408L, "Доктор Сливси"),
+            entry(208611215L, "Лолец пастухов"),
+            entry(201613150L, "Невротик"));
+    assertThat(instance.getPlayerIds()).containsExactlyInAnyOrderElementsOf(players.keySet());
+    assertThat(instance.getPlayers()).extracting(PlayerDomain::getName).contains("Невротик");
+  }
+
+  @Test
+  void aOneColumnFileStillLoadsWithTheIdAsName() {
+    assertThat(ReportLoopTopic.parseTracked(List.of("12", "# note", "", "13 Two Words # c")))
+        .containsExactly(entry(12L, "12"), entry(13L, "Two Words"));
   }
 
   private static ImageAttachment image() {

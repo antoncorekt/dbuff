@@ -44,6 +44,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
@@ -281,11 +282,13 @@ public class ReplayReportService {
 
   /** The names of the sections {@link #deliverEverything} can post, in posting order. */
   public List<String> everythingSectionNames() {
+    return everythingCandidates().map(ReplayReportSection::name).toList();
+  }
+
+  private Stream<ReplayReportSection> everythingCandidates() {
     return sections.stream()
         .filter(s -> !AiReasonsSection.NAME.equals(s.name()))
-        .sorted(Comparator.comparingInt(ReplayReportSection::order))
-        .map(ReplayReportSection::name)
-        .toList();
+        .sorted(Comparator.comparingInt(ReplayReportSection::order));
   }
 
   private List<ReplayReportSection> everythingSections(MatchDomain match) {
@@ -293,11 +296,9 @@ public class ReplayReportService {
     if (mode == null) {
       return List.of();
     }
-    return sections.stream()
+    return everythingCandidates()
         .filter(s -> !sectionSwitch.isHidden(s))
         .filter(s -> s.supports(mode))
-        .filter(s -> !AiReasonsSection.NAME.equals(s.name()))
-        .sorted(Comparator.comparingInt(ReplayReportSection::order))
         .toList();
   }
 

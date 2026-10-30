@@ -193,7 +193,7 @@ public class FightSection implements ReplayReportSection {
     Map<String, List<FightAbilityUseDomain>> byAbility =
         uses.stream()
             .filter(u -> u.getPlayerSlot() == slot)
-            .filter(u -> !skills.passive(u.getAbilityName()))
+            .filter(u -> !skills.notCastable(u.getAbilityName()))
             .collect(Collectors.groupingBy(FightAbilityUseDomain::getAbilityName));
     return byAbility.entrySet().stream()
         .map(

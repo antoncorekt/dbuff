@@ -137,6 +137,12 @@ public class ReplayAnalysisProperties {
     static final Set<String> DEFAULT_IGNORED_ITEMS =
         Set.of(
             "item_quelling_blade",
+            "item_magic_stick",
+            "item_soul_ring",
+            "item_hand_of_midas",
+            "item_echo_sabre",
+            "item_branches",
+            "item_bfury",
             "item_tango",
             "item_flask",
             "item_clarity",

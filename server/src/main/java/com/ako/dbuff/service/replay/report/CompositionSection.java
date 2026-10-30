@@ -78,7 +78,8 @@ public class CompositionSection implements ReplayReportSection {
       }
     }
     if (listed > input.maxFindings()) {
-      lines.add("and " + (listed - input.maxFindings()) + " more tracked players");
+      int rest = listed - input.maxFindings();
+      lines.add("and " + rest + " more tracked " + (rest == 1 ? "player" : "players"));
     }
     Set<TeamSide> sides = EnumSet.noneOf(TeamSide.class);
     input.namesBySlot().keySet().forEach(slot -> sides.add(TeamSide.ofSlot(slot)));
@@ -157,7 +158,7 @@ public class CompositionSection implements ReplayReportSection {
       return "was meant to play " + intended;
     }
     return intended.equals(played)
-        ? "was meant to play and played " + played
+        ? "played " + played + ", as meant"
         : "was meant to play " + intended + " and played " + played;
   }
 

@@ -28,12 +28,30 @@ public final class ItemWording {
 
   /** The ratio as {@code +0.3x}, or {@code -0.3x}. */
   public static String signedRatio(double ratio) {
-    return (ratio >= 0 ? "+" : "") + ratio(ratio);
+    return isZero(ratio) ? "no change" : (ratio > 0 ? "+" : "") + ratio(ratio);
+  }
+
+  /** Whether the value shows as {@code 0.0} at one decimal. */
+  public static boolean isZero(double value) {
+    return Math.abs(value) < 0.05;
   }
 
   /** {@code 1.5x its cost} when the cost is known, nothing otherwise. */
   public static String worth(ItemEfficiency row) {
-    return row.ratio() == null ? "" : ratio(row.ratio()) + " its cost";
+    if (row.ratio() == null) {
+      return "";
+    }
+    return isZero(row.ratio()) ? "no measurable effect" : ratio(row.ratio()) + " its cost";
+  }
+
+  /**
+   * {@code , worth 1.5x its cost}, {@code , no measurable effect} for a zero ratio, else nothing.
+   */
+  public static String worthClause(Double ratio) {
+    if (ratio == null) {
+      return "";
+    }
+    return isZero(ratio) ? ", no measurable effect" : ", worth " + ratio(ratio) + " its cost";
   }
 
   /** What the flags of a row say the data could not tell, in words, in brackets. */
@@ -106,6 +124,17 @@ public final class ItemWording {
   /** What the item gave divided by what it cost, as {@code 1.5x}; {@code -} when not known. */
   public static String ratio(Double ratio) {
     return ratio == null ? "-" : String.format(Locale.ROOT, "%.1fx", ratio);
+  }
+
+  /**
+   * A length of time as {@code 5 min 25 s}, {@code 40 s} under a minute, {@code ?} when unknown.
+   */
+  public static String duration(Double seconds) {
+    if (seconds == null) {
+      return UNKNOWN;
+    }
+    long total = Math.round(Math.max(0, seconds));
+    return total < 60 ? total + " s" : total / 60 + " min " + total % 60 + " s";
   }
 
   /** Game seconds as {@code m:ss}, {@code ?} when not known. */

@@ -113,7 +113,12 @@ public class ImportantFightsSection implements ReplayReportSection {
       LostFight fight, LostFight withReasons, Map<Long, String> heroes, TeamSide yours) {
     FightImportanceDomain importance = fight.importance();
     TeamSide winner = Enums.find(TeamSide.class, importance.getWinningTeam());
-    String reasons = wording.ranked(withReasons.reasons(), heroes, MAX_REASONS);
+    String reasons =
+        wording.ranked(
+            withReasons.reasons(),
+            heroes,
+            MAX_REASONS,
+            new ReasonWording.Perspective(winner.opponent(), yours));
     return String.format(
         Locale.ROOT,
         "%s %s won the fight%s%s",

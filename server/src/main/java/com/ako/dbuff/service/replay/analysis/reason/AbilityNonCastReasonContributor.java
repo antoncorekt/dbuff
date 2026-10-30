@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.analysis.reason;
 import com.ako.dbuff.dao.model.FightAbilityUseDomain;
 import com.ako.dbuff.service.replay.analysis.fight.NonCastReason;
 import com.ako.dbuff.service.replay.analysis.fight.Presence;
+import com.ako.dbuff.service.replay.analysis.role.SkillFunctions;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -21,6 +22,7 @@ public class AbilityNonCastReasonContributor implements ReasonContributor {
   private static final String ITEM = "ITEM";
 
   private final ReasonProperties properties;
+  private final SkillFunctions skills;
 
   @Override
   public boolean supports(GameModeProfile mode) {
@@ -61,14 +63,21 @@ public class AbilityNonCastReasonContributor implements ReasonContributor {
     return Reason.player(Reason.COMMON, code, slot, severity, String.join(", ", names));
   }
 
-  private static String code(FightAbilityUseDomain use) {
+  private String cooldownCode(FightAbilityUseDomain use) {
+    if (ITEM.equals(use.getKind())) {
+      return "ITEM_ON_COOLDOWN";
+    }
+    return skills.notCastable(use.getAbilityName()) ? null : "ABILITY_ON_COOLDOWN";
+  }
+
+  private String code(FightAbilityUseDomain use) {
     NonCastReason reason = Enums.find(NonCastReason.class, use.getNonCastReason());
     if (reason == null) {
       return null;
     }
     return switch (reason) {
       case NO_MANA -> "NO_MANA";
-      case ON_COOLDOWN -> ITEM.equals(use.getKind()) ? "ITEM_ON_COOLDOWN" : "ABILITY_ON_COOLDOWN";
+      case ON_COOLDOWN -> cooldownCode(use);
       case DEAD_EARLY, READY_NOT_CAST -> null;
     };
   }

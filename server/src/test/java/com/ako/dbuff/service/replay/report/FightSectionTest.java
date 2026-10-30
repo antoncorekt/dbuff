@@ -92,10 +92,33 @@ class FightSectionTest {
   }
 
   @Test
+  void lines_leaveOutAnItemAndAHiddenAbilityStoredAsReadyNotCast() {
+    when(fightRepo.findByMatchId(1L)).thenReturn(List.of());
+    when(partRepo.findByMatchId(1L)).thenReturn(List.of());
+    when(skills.notCastable("item_magic_stick")).thenReturn(true);
+    when(skills.notCastable("morphling_hidden")).thenReturn(true);
+    List<FightAbilityUseDomain> uses = new ArrayList<>();
+    for (String ability : List.of("item_magic_stick", "morphling_hidden")) {
+      for (int i = 0; i < 3; i++) {
+        uses.add(
+            FightAbilityUseDomain.builder()
+                .fightIndex(i)
+                .playerSlot(128L)
+                .abilityName(ability)
+                .nonCastReason("READY_NOT_CAST")
+                .build());
+      }
+    }
+    when(abilityRepo.findByMatchId(1L)).thenReturn(uses);
+
+    assertThat(String.join("\n", section.lines(input()))).doesNotContain("ready and did not cast");
+  }
+
+  @Test
   void lines_leaveOutAPassiveAbilityStoredAsReadyNotCast() {
     when(fightRepo.findByMatchId(1L)).thenReturn(List.of());
     when(partRepo.findByMatchId(1L)).thenReturn(List.of());
-    when(skills.passive("axe_counter_helix")).thenReturn(true);
+    when(skills.notCastable("axe_counter_helix")).thenReturn(true);
     List<FightAbilityUseDomain> uses = new ArrayList<>();
     for (String ability : List.of("axe_counter_helix", "axe_culling_blade")) {
       for (int i = 0; i < 3; i++) {

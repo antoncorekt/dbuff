@@ -122,7 +122,8 @@ class DraftBoardSectionTest {
   void view_listsEveryTurnInOrderWithTheTeamAndThePicker() {
     draft();
 
-    SectionView view = section.view(input(Set.of(130L), Map.of(130L, "Anton"))).orElseThrow();
+    SectionView view =
+        section.view(input(Set.of(130L), Map.of(130L, "Anton (Sven)"))).orElseThrow();
 
     assertThat(view.title()).isEqualTo("Draft board");
     assertThat(view.bullets().getFirst().lines())
@@ -221,7 +222,7 @@ class DraftBoardSectionTest {
   void lines_areOnePlainLinePerRowAfterTheTitle() {
     draft();
 
-    List<String> lines = section.lines(input(Set.of(130L), Map.of(130L, "Anton")));
+    List<String> lines = section.lines(input(Set.of(130L), Map.of(130L, "Anton (Sven)")));
 
     assertThat(lines).first().isEqualTo("**Draft board**");
     assertThat(lines).contains("2. Dire · Anton (Sven): Sven Storm Bolt", "Heroes: Meepo");
@@ -231,7 +232,8 @@ class DraftBoardSectionTest {
   @Test
   void render_fitsTheSectionIntoComponentsCardsAndPlainText() {
     draft();
-    SectionView view = section.view(input(Set.of(130L), Map.of(130L, "Anton"))).orElseThrow();
+    SectionView view =
+        section.view(input(Set.of(130L), Map.of(130L, "Anton (Sven)"))).orElseThrow();
 
     List<ReportMessage> cards = new ComponentsViewRenderer(plain).render(view);
     List<ReportMessage> text = plain.render(view);

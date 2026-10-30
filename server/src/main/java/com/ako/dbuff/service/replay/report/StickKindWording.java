@@ -25,14 +25,14 @@ public class StickKindWording implements ItemKindWording {
     Map<String, Double> f = row.figures();
     long saves = Math.round(ItemWording.figure(f, "saves"));
     long died = Math.round(ItemWording.figure(f, "diedSoon"));
-    return "%s, restored %s HP and %s mana, %s%s, worth %s its cost%s"
+    return "%s, restored %s HP and %s mana, %s%s%s%s"
         .formatted(
             ItemWording.plural(row.count(), "use"),
             BehaviourWording.gold(f.get("hp")),
             BehaviourWording.gold(f.get("mana")),
             saves == 0 ? "no saves" : saves == 1 ? "1 save" : saves + " saves",
             died == 0 ? "" : ", died within 10 s after %d of them".formatted(died),
-            ItemWording.ratio(row.ratio()),
+            ItemWording.worthClause(row.ratio()),
             ItemWording.limits(row.flags()));
   }
 

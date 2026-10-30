@@ -62,7 +62,7 @@ public class FightAbilityAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 4;
+    return 5;
   }
 
   @Override
@@ -89,7 +89,7 @@ public class FightAbilityAnalyzer implements ReplayAnalyzer {
         new FightAbilityAssessor(
             properties.getFightEarlyDeathSeconds(),
             properties.fightAbilityIgnoredItems(),
-            skills::passive);
+            skills::notCastable);
     Map<Integer, FightDomain> fightByIndex = new HashMap<>();
     fights.forEach(f -> fightByIndex.put(f.getFightIndex(), f));
     List<FightAbilityUseDomain> rows = new ArrayList<>();

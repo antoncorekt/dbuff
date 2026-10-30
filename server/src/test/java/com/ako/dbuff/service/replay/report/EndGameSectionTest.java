@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.report;
 import com.ako.dbuff.dao.model.EndGameSummaryDomain;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.EndGameSummaryRepo;
+import com.ako.dbuff.service.replay.analysis.endgame.EndGameProperties;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
@@ -18,7 +19,8 @@ import static org.mockito.Mockito.when;
 class EndGameSectionTest {
   private final EndGameSummaryRepo repo = mock(EndGameSummaryRepo.class);
   private final ReplayReportProperties properties = new ReplayReportProperties();
-  private final EndGameSection section = new EndGameSection(repo, properties);
+  private final EndGameSection section =
+      new EndGameSection(repo, properties, new EndGameProperties());
 
   private static EndGameSummaryDomain.EndGameSummaryDomainBuilder won() {
     return EndGameSummaryDomain.builder()
@@ -44,8 +46,12 @@ class EndGameSectionTest {
   }
 
   private List<String> lines(EndGameSummaryDomain row, Long... focus) {
+    return lines(section, row, focus);
+  }
+
+  private List<String> lines(EndGameSection target, EndGameSummaryDomain row, Long... focus) {
     when(repo.findByMatchId(1L)).thenReturn(row == null ? List.of() : List.of(row));
-    return section.lines(new ReplayReportInput(1L, null, Set.of(focus), Map.of(), 3));
+    return target.lines(new ReplayReportInput(1L, null, Set.of(focus), Map.of(), 3));
   }
 
   @Test
@@ -91,7 +97,20 @@ class EndGameSectionTest {
     EndGameSummaryDomain row =
         won().peakLeadSeconds(null).peakLeadGold(null).turningSeconds(null).leadLost(null).build();
 
-    assertThat(lines(row).getFirst()).isEqualTo("Radiant won at 41:20; Dire never led.");
+    assertThat(lines(row).getFirst())
+        .isEqualTo("Radiant won at 41:20; Dire never led by 2k gold or more.");
+  }
+
+  @Test
+  void theNeverLedThresholdFollowsTheConfiguredMinLeadGold() {
+    EndGameProperties custom = new EndGameProperties();
+    custom.setMinLeadGold(1500);
+    EndGameSection section = new EndGameSection(repo, properties, custom);
+    EndGameSummaryDomain row =
+        won().peakLeadSeconds(null).peakLeadGold(null).turningSeconds(null).leadLost(null).build();
+
+    assertThat(lines(section, row).getFirst())
+        .isEqualTo("Radiant won at 41:20; Dire never led by 1.5k gold or more.");
   }
 
   @Test

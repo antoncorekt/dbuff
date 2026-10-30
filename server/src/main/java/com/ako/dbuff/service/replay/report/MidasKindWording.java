@@ -30,7 +30,7 @@ public class MidasKindWording implements ItemKindWording {
             ? " (%d%% of his gold)".formatted(Math.round(100 * f.get("gold") / heroGold))
             : "";
     return ("%s, gave %s gold%s and %s XP, %s, ready but unused %s of the %s he farmed with"
-            + " it, worth %s its cost%s")
+            + " it%s%s")
         .formatted(
             ItemWording.plural(row.count(), "use"),
             BehaviourWording.gold(f.get("gold")),
@@ -41,7 +41,7 @@ public class MidasKindWording implements ItemKindWording {
                 : "paid for itself at " + ItemWording.clock(row.paybackSeconds()),
             ItemWording.clock(f.get("idleSeconds")),
             ItemWording.clock(f.get("farmingSeconds")),
-            ItemWording.ratio(row.ratio()),
+            ItemWording.worthClause(row.ratio()),
             ItemWording.limits(row.flags()) + attackSpeed(f));
   }
 

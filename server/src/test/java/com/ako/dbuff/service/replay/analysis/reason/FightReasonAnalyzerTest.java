@@ -16,6 +16,7 @@ import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.composition.TeamCompositionAnalyzer;
 import com.ako.dbuff.service.replay.analysis.role.PlayerRoleAnalyzer;
+import com.ako.dbuff.service.replay.analysis.role.SkillFunctions;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.AllPickProfile;
@@ -65,6 +66,11 @@ class FightReasonAnalyzerTest {
 
   @TestConfiguration
   static class IntentEverywhere {
+    @Bean
+    SkillFunctions skillFunctions() {
+      return org.mockito.Mockito.mock(SkillFunctions.class);
+    }
+
     @Bean
     ReasonContributor intentEverywhere() {
       return new ReasonContributor() {

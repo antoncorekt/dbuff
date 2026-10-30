@@ -78,7 +78,7 @@ class CompositionSectionTest {
     when(compositionRepo.findByMatchId(1L)).thenReturn(List.of());
 
     assertThat(section.lines(input(Map.of(0L, "Anton"), 3)))
-        .containsExactly("**Roles and composition**", "Anton was meant to play and played mid");
+        .containsExactly("**Roles and composition**", "Anton played mid, as meant");
   }
 
   @Test
@@ -113,6 +113,20 @@ class CompositionSectionTest {
             "P0 played carry",
             "P1 played mid",
             "and 2 more tracked players");
+  }
+
+  @Test
+  void aSingleRemainingPlayerIsCountedInTheSingular() {
+    Map<Long, String> names = new LinkedHashMap<>();
+    List<PlayerRoleProfileDomain> profiles = new java.util.ArrayList<>();
+    for (long slot = 0; slot < 3; slot++) {
+      names.put(slot, "P" + slot);
+      profiles.add(profile(slot, "FINAL", (int) slot + 1));
+    }
+    when(profileRepo.findByMatchId(1L)).thenReturn(profiles);
+    when(compositionRepo.findByMatchId(1L)).thenReturn(List.of());
+
+    assertThat(section.lines(input(names, 2))).last().isEqualTo("and 1 more tracked player");
   }
 
   @Test

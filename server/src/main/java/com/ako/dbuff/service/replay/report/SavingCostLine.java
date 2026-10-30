@@ -6,8 +6,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * What saving up for the item cost: {@code saved 3.8k for 6:10, died twice holding 2.1k (lost
- * 640)}.
+ * What saving up for the item cost: {@code saved 3.8k over 6 min 10 s, died twice holding 2.1k
+ * (lost 640)}.
  */
 public final class SavingCostLine {
   public static final String LABEL = "SAVING";
@@ -26,10 +26,10 @@ public final class SavingCostLine {
 
   private static String line(Map<String, Double> f) {
     String saved =
-        "saved %s for %s"
+        "saved %s over %s"
             .formatted(
                 BehaviourWording.gold(f.get("savingPeakGold")),
-                ItemWording.clock(f.get("savingSeconds")));
+                ItemWording.duration(f.get("savingSeconds")));
     long deaths = Math.round(f.get("savingDeaths"));
     if (deaths == 0) {
       return saved + " without dying";
