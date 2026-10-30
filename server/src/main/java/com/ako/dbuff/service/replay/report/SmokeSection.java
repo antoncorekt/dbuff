@@ -70,7 +70,12 @@ public class SmokeSection implements ReplayReportSection {
 
   private List<SmokeUseDomain> usableRows(ReplayReportInput input) {
     List<SmokeUseDomain> rows = smokeRepo.findByMatchId(input.matchId());
-    return rows == null ? List.of() : rows.stream().filter(Objects::nonNull).toList();
+    return rows == null
+        ? List.of()
+        : rows.stream()
+            .filter(Objects::nonNull)
+            .filter(r -> r.getStartSeconds() == null || r.getStartSeconds() >= 0)
+            .toList();
   }
 
   private static Verdict smokeVerdict(List<SmokeUseDomain> rows, ReplayReportInput input) {

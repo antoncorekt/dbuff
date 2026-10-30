@@ -222,4 +222,23 @@ class SmokeSectionTest {
   void view_isEmptyWithoutSmoke() {
     assertThat(section.view(input())).isEmpty();
   }
+
+  @Test
+  void aSmokeBeforeTheHornIsHiddenAndOneAtZeroStays() {
+    row(0, "0", -20, "PAID_OFF");
+    row(0, "0", 0, "PAID_OFF");
+
+    List<String> lines = section.lines(input(0L));
+
+    assertThat(lines).hasSize(2);
+    assertThat(lines.get(1)).startsWith("0:00 to 0:40");
+  }
+
+  @Test
+  void onlyPreHornSmokesGiveNoSection() {
+    row(0, "0", -20, "PAID_OFF");
+
+    assertThat(section.lines(input(0L))).isEmpty();
+    assertThat(section.view(input(0L))).isEmpty();
+  }
 }
