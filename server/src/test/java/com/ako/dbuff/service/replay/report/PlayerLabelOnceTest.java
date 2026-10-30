@@ -15,6 +15,7 @@ import com.ako.dbuff.dao.repo.FightRepo;
 import com.ako.dbuff.dao.repo.PlayerPhaseSummaryRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
+import com.ako.dbuff.service.replay.analysis.role.SkillFunctions;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import java.util.ArrayList;
 import java.util.List;
@@ -137,7 +138,9 @@ class PlayerLabelOnceTest {
               .build());
     }
     when(abilityRepo.findByMatchId(1L)).thenReturn(uses);
-    return new FightSection(fightRepo, partRepo, abilityRepo, Prettify::ability).lines(INPUT);
+    return new FightSection(
+            fightRepo, partRepo, abilityRepo, Prettify::ability, mock(SkillFunctions.class))
+        .lines(INPUT);
   }
 
   private static List<String> movement() {

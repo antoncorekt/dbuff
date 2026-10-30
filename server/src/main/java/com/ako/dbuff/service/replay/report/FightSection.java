@@ -7,6 +7,7 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.FightAbilityUseRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
+import com.ako.dbuff.service.replay.analysis.role.SkillFunctions;
 import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.SectionView;
@@ -36,6 +37,7 @@ public class FightSection implements ReplayReportSection {
   private final FightPlayerRepo fightPlayerRepo;
   private final FightAbilityUseRepo abilityRepo;
   private final AbilityLabels labels;
+  private final SkillFunctions skills;
 
   @Override
   public String name() {
@@ -191,6 +193,7 @@ public class FightSection implements ReplayReportSection {
     Map<String, List<FightAbilityUseDomain>> byAbility =
         uses.stream()
             .filter(u -> u.getPlayerSlot() == slot)
+            .filter(u -> !skills.passive(u.getAbilityName()))
             .collect(Collectors.groupingBy(FightAbilityUseDomain::getAbilityName));
     return byAbility.entrySet().stream()
         .map(

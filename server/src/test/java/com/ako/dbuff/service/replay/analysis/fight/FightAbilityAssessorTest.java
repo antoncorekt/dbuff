@@ -20,7 +20,8 @@ class FightAbilityAssessorTest {
   private static final String PASSIVE = "sven_great_cleave";
 
   private final FightAbilityAssessor assessor =
-      new FightAbilityAssessor(5, new ReplayAnalysisProperties().fightAbilityIgnoredItems());
+      new FightAbilityAssessor(
+          5, new ReplayAnalysisProperties().fightAbilityIgnoredItems(), name -> false);
 
   @Test
   void assess_countsCastsAndDamageInTheFightAndLeavesPassivesOut() {
@@ -39,6 +40,30 @@ class FightAbilityAssessorTest {
     assertThat(storm.reason()).isNull();
     assertThat(storm.level()).isEqualTo(2);
     assertThat(storm.manaCost()).isEqualTo(110);
+  }
+
+  @Test
+  void assess_givesAPassiveWithACooldownNoUseButACastableSkillWithTheSameTimelineStillHasOne() {
+    HeroStateTimeline state = state();
+    state.add(change(StateChangeKind.COOLDOWN, STORM, 95, 130));
+    state.add(change(StateChangeKind.COOLDOWN, GOD, 95, 130));
+    var skipping = new FightAbilityAssessor(5, Set.of(), name -> name.equals(STORM));
+
+    assertThat(skipping.assess(100, 120, state, 400, Map.of(), List.of()))
+        .extracting(FightAbilityAssessor.Use::name)
+        .containsExactly(GOD);
+  }
+
+  @Test
+  void assess_doesNotApplyThePassiveRuleToItems() {
+    HeroStateTimeline state = state();
+    state.add(change(StateChangeKind.ITEM_ADDED, "item_blink", 0, 0));
+    state.add(change(StateChangeKind.COOLDOWN, "item_blink", 50, 60));
+    var allPassive = new FightAbilityAssessor(5, Set.of(), name -> true);
+
+    assertThat(allPassive.assess(100, 120, state, 400, Map.of(), List.of()))
+        .extracting(FightAbilityAssessor.Use::name)
+        .containsExactly("item_blink");
   }
 
   @Test
@@ -112,7 +137,7 @@ class FightAbilityAssessorTest {
 
   @Test
   void assess_listsAnItemAgainOnceItIsNotInTheIgnoreList() {
-    var open = new FightAbilityAssessor(5, Set.of());
+    var open = new FightAbilityAssessor(5, Set.of(), name -> false);
     HeroStateTimeline state = state();
     state.add(change(StateChangeKind.ITEM_ADDED, "item_quelling_blade", 0, 0));
     Map<String, List<CombatEvent>> events =
