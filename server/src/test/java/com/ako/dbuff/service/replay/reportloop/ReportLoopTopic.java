@@ -2,10 +2,18 @@ package com.ako.dbuff.service.replay.reportloop;
 
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.dao.model.PlayerDomain;
+import com.ako.dbuff.dao.repo.MatchRepo;
+import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
+import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopDiff.Section;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopMatchList;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopTopic;
+import com.ako.dbuff.service.replay.mode.GameModeRegistry;
+import com.ako.dbuff.service.replay.report.ReplayReportProperties;
+import com.ako.dbuff.service.replay.report.ReplayReportSection;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
+import com.ako.dbuff.service.replay.report.ReportHeroNames;
+import com.ako.dbuff.service.replay.report.SectionSwitch;
 import com.ako.dbuff.service.replay.report.view.ImageAttachment;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
@@ -20,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 /**
@@ -34,13 +43,48 @@ class ReportLoopTopic implements ReviewLoopTopic {
   private static final Path OUTPUT_DIR = Path.of("build", "report-loop");
   private static final String ROUND_PREFIX = "round-";
 
-  private final ReplayReportService reportService;
+  private final ApplicationContext context;
   private final PlainViewRenderer plain;
+  private ReplayReportService reportService;
   private Path imageDir;
 
-  ReportLoopTopic(ReplayReportService reportService, PlainViewRenderer plain) {
-    this.reportService = reportService;
+  ReportLoopTopic(ApplicationContext context, PlainViewRenderer plain) {
+    this.context = context;
     this.plain = plain;
+  }
+
+  /**
+   * The replay test contexts leave the real service out (it needs Discord), so the views are read
+   * through one built here from the beans of the context; only what {@code everythingViews} uses is
+   * set.
+   */
+  private synchronized ReplayReportService service() {
+    if (reportService == null) {
+      reportService =
+          context
+              .getBeanProvider(ReplayReportService.class)
+              .getIfAvailable(
+                  () ->
+                      new ReplayReportService(
+                          context.getBean(ReplayReportProperties.class),
+                          context.getBean(ReplayProcessingProperties.class),
+                          null,
+                          context.getBean(MatchRepo.class),
+                          context.getBean(PlayerGameStatisticRepo.class),
+                          null,
+                          null,
+                          null,
+                          context.getBeanProvider(ReplayReportSection.class).stream().toList(),
+                          context.getBean(SectionSwitch.class),
+                          null,
+                          null,
+                          null,
+                          context.getBean(GameModeRegistry.class),
+                          null,
+                          null,
+                          context.getBean(ReportHeroNames.class)));
+    }
+    return reportService;
   }
 
   @Override
@@ -60,15 +104,15 @@ class ReportLoopTopic implements ReviewLoopTopic {
 
   @Override
   public List<Section> sections() {
-    return reportService.everythingSectionNames().stream().map(n -> new Section(n, "", 1)).toList();
+    return service().everythingSectionNames().stream().map(n -> new Section(n, "", 1)).toList();
   }
 
   @Override
   public String render(long matchId) {
     return render(
         matchId,
-        reportService.everythingViewsByName(matchId, instance(trackedIds())),
-        reportService.everythingSectionNames(),
+        service().everythingViewsByName(matchId, instance(trackedIds())),
+        service().everythingSectionNames(),
         plain,
         roundDir());
   }
