@@ -2,17 +2,20 @@ package com.ako.dbuff.service.replay.analysis.reason;
 
 import com.ako.dbuff.dao.model.FightAbilityUseDomain;
 import com.ako.dbuff.dao.model.FightPlayerDomain;
+import com.ako.dbuff.service.replay.analysis.role.SkillFunctions;
 import com.ako.dbuff.service.replay.mode.TestModes;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 class AbilityNonCastReasonContributorTest {
+  private final SkillFunctions skills = Mockito.mock(SkillFunctions.class);
   private final AbilityNonCastReasonContributor contributor =
-      new AbilityNonCastReasonContributor(new ReasonProperties());
+      new AbilityNonCastReasonContributor(new ReasonProperties(), skills);
 
   private static FightAbilityUseDomain use(long slot, String name, String kind, String reason) {
     return FightAbilityUseDomain.builder()
@@ -108,5 +111,22 @@ class AbilityNonCastReasonContributorTest {
               assertThat(r.evidence()).isEqualTo("a");
               assertThat(r.severity()).isCloseTo(0.4, within(1e-9));
             });
+  }
+
+  @Test
+  void aPassiveOnCooldownGivesNoReason_whileAnItemOnCooldownStillDoes() {
+    Mockito.when(skills.notCastable("axe_counter_helix")).thenReturn(true);
+    Mockito.when(skills.notCastable("item_blink")).thenReturn(true);
+
+    List<Reason> reasons =
+        contributor.contribute(
+            context(
+                "ACTIVE",
+                use(0, "axe_counter_helix", "ABILITY", "ON_COOLDOWN"),
+                use(0, "item_blink", "ITEM", "ON_COOLDOWN")));
+
+    assertThat(reasons)
+        .singleElement()
+        .satisfies(r -> assertThat(r.code()).isEqualTo("ITEM_ON_COOLDOWN"));
   }
 }
