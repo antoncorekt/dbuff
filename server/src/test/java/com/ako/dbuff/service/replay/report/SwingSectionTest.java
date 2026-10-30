@@ -187,6 +187,17 @@ class SwingSectionTest {
   }
 
   @Test
+  void view_keepsTheKeyItemClauseOnTheBiggestSwingVerdict() {
+    when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spike(0, 1800, 5000, "FIGHT_WIN", false)));
+    heroes();
+    when(factorRepo.findByMatchId(1L))
+        .thenReturn(List.of(itemFactor("black_king_bar", 2L, "1660")));
+
+    assertThat(section.view(input()).orElseThrow().verdict())
+        .endsWith("; it came after Dire finished Black King Bar (Terrorblade) at 27:40");
+  }
+
+  @Test
   void lines_nameTheKeyItemBehindTheSwing() {
     when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spike(0, 1800, 5000, "FIGHT_WIN", false)));
     heroes();

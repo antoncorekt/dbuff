@@ -84,12 +84,12 @@ public class SwingSection implements ReplayReportSection {
     GameSpikeDomain biggest =
         spikes.stream().max(Comparator.comparingLong(GameSpikeDomain::getDeltaGold)).orElseThrow();
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
+    List<GameSpikeFactorDomain> found =
+        factorsOf(input.matchId()).getOrDefault(biggest.getSpikeIndex(), List.of());
     String verdict =
         "Biggest swing: "
-            + line(
-                biggest,
-                factorsOf(input.matchId()).getOrDefault(biggest.getSpikeIndex(), List.of()),
-                yours);
+            + line(biggest, found, yours)
+            + keyItemClause(biggest, found, heroNames.iconBySlot(input.matchId()));
     return SectionViews.titled(
         render(input, spikes, biggest),
         new Verdict(
