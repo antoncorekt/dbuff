@@ -19,6 +19,8 @@ import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.ImageAttachment;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -35,6 +37,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class DraftSection implements ReplayReportSection {
+  private static final int DELIVERIES_KEPT = 8;
   static final String NOT_DRAWN = "The picture could not be drawn this time.";
 
   private final AbilityDraftPickRepo pickRepo;
@@ -45,6 +48,8 @@ public class DraftSection implements ReplayReportSection {
   private final SkillIconImages icons;
   private final TableRenderer tables;
   private final PlainViewRenderer plain = new PlainViewRenderer();
+  private final Cache<ReplayReportInput, Optional<SectionView>> views =
+      Caffeine.newBuilder().weakKeys().maximumSize(DELIVERIES_KEPT).build();
 
   @Override
   public boolean supports(GameModeProfile mode) {
@@ -83,6 +88,10 @@ public class DraftSection implements ReplayReportSection {
 
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
+    return views.get(input, this::build);
+  }
+
+  private Optional<SectionView> build(ReplayReportInput input) {
     List<Drafter> drafters = drafters(input);
     if (drafters.isEmpty()) {
       return Optional.empty();

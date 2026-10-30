@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -237,6 +238,18 @@ class DraftSectionTest {
 
     assertThat(section.view(anton()).orElseThrow().bullets())
         .contains("The picture could not be drawn this time.");
+  }
+
+  @Test
+  void linesAndImageOfOneInputDrawThePictureOnceAndImageIsTheViewsImage() {
+    when(repo.findByMatchId(1L)).thenReturn(List.of(pick(3, 0, "sven_storm_bolt")));
+    ReplayReportInput in = anton();
+
+    section.lines(in);
+    var image = section.image(in);
+
+    verify(tables, times(1)).render(any());
+    assertThat(image).isEqualTo(Optional.of(section.view(in).orElseThrow().image()));
   }
 
   private TableSpec drawn() {
