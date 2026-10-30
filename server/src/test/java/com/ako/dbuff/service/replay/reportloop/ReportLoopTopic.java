@@ -14,11 +14,8 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.IntStream;
@@ -34,22 +31,6 @@ import org.springframework.stereotype.Component;
 class ReportLoopTopic implements ReviewLoopTopic {
   static final Path MATCH_LIST = Path.of("src/test/resources/replay/report-loop/matches.txt");
   static final Path TRACKED_LIST = Path.of("src/test/resources/replay/report-loop/tracked.txt");
-  static final List<String> KNOWN_TITLES =
-      List.of(
-          "Draft",
-          "Roles and composition",
-          "Skill picks",
-          "Laning stage",
-          "Items",
-          "Fights",
-          "Important fights",
-          "Swings",
-          "Deaths",
-          "Net worth outliers",
-          "Team rotations",
-          "Vision",
-          "Smoke");
-
   private static final Path OUTPUT_DIR = Path.of("build", "report-loop");
   private static final String ROUND_PREFIX = "round-";
 
@@ -79,13 +60,17 @@ class ReportLoopTopic implements ReviewLoopTopic {
 
   @Override
   public List<Section> sections() {
-    return KNOWN_TITLES.stream().map(t -> new Section(t, "", 1)).toList();
+    return reportService.everythingSectionNames().stream().map(n -> new Section(n, "", 1)).toList();
   }
 
   @Override
   public String render(long matchId) {
-    List<SectionView> views = reportService.everythingViews(matchId, instance(trackedIds()));
-    return render(matchId, views, plain, roundDir());
+    return render(
+        matchId,
+        reportService.everythingViewsByName(matchId, instance(trackedIds())),
+        reportService.everythingSectionNames(),
+        plain,
+        roundDir());
   }
 
   static DbufInstanceConfigDomain instance(List<Long> accountIds) {
@@ -100,27 +85,24 @@ class ReportLoopTopic implements ReviewLoopTopic {
   }
 
   static String render(
-      long matchId, List<SectionView> views, PlainViewRenderer plain, Path imageDir) {
+      long matchId,
+      Map<String, List<SectionView>> views,
+      List<String> sectionNames,
+      PlainViewRenderer plain,
+      Path imageDir) {
     List<String> out = new ArrayList<>();
     out.add("# Match " + matchId);
-    Set<String> seen = new HashSet<>();
-    Map<String, Integer> counts = new HashMap<>();
-    int untitled = 0;
-    for (SectionView view : views) {
-      String heading = view.title().isBlank() ? "Untitled " + (++untitled) : view.title();
-      if (seen.add(heading)) {
-        out.addAll(tableStart(heading));
-      }
-      List<String> lines = plain.lines(view, true);
-      lines.stream().skip(view.title().isBlank() ? 0 : 1).forEach(l -> out.add(row(l)));
-      if (view.image() != null) {
-        String file = saveImage(imageDir, matchId, heading, view.image(), counts);
-        out.add(row("[image " + file + "]"));
-      }
-    }
-    for (String title : KNOWN_TITLES) {
-      if (seen.add(title)) {
-        out.addAll(tableStart(title));
+    Set<String> names = new LinkedHashSet<>(sectionNames);
+    names.addAll(views.keySet());
+    for (String name : names) {
+      out.addAll(tableStart(name));
+      int imageNo = 0;
+      for (SectionView view : views.getOrDefault(name, List.of())) {
+        plain.lines(view, true).forEach(l -> out.add(row(l)));
+        if (view.image() != null) {
+          out.add(
+              row("[image " + saveImage(imageDir, matchId, name, view.image(), ++imageNo) + "]"));
+        }
       }
     }
     return String.join("\n", out) + "\n";
@@ -136,10 +118,8 @@ class ReportLoopTopic implements ReviewLoopTopic {
   }
 
   private static String saveImage(
-      Path dir, long matchId, String heading, ImageAttachment image, Map<String, Integer> counts) {
-    String slug =
-        heading.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
-    String file = "%d-%s-%d.png".formatted(matchId, slug, counts.merge(slug, 1, Integer::sum));
+      Path dir, long matchId, String section, ImageAttachment image, int number) {
+    String file = "%d-%s-%d.png".formatted(matchId, section, number);
     try {
       Files.createDirectories(dir);
       Files.write(dir.resolve(file), image.bytes());

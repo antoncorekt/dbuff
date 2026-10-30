@@ -261,12 +261,31 @@ public class ReplayReportService {
 
   /** The views of every section {@link #deliverEverything} posts, with all pages of paged ones. */
   public List<SectionView> everythingViews(long matchId, DbufInstanceConfigDomain instance) {
+    return everythingViewsByName(matchId, instance).values().stream()
+        .flatMap(List::stream)
+        .toList();
+  }
+
+  /** The views of {@link #everythingViews} by section name, in posting order. */
+  public Map<String, List<SectionView>> everythingViewsByName(
+      long matchId, DbufInstanceConfigDomain instance) {
     MatchDomain match = matchRepo.findById(matchId).orElse(null);
     if (match == null) {
-      return List.of();
+      return Map.of();
     }
     ReplayReportInput input = input(match, statRepo.findAllByMatchId(matchId), instance);
-    return everythingSections(match).stream().flatMap(s -> s.pages(input).stream()).toList();
+    Map<String, List<SectionView>> views = new LinkedHashMap<>();
+    everythingSections(match).forEach(s -> views.put(s.name(), s.pages(input)));
+    return views;
+  }
+
+  /** The names of the sections {@link #deliverEverything} can post, in posting order. */
+  public List<String> everythingSectionNames() {
+    return sections.stream()
+        .filter(s -> !AiReasonsSection.NAME.equals(s.name()))
+        .sorted(Comparator.comparingInt(ReplayReportSection::order))
+        .map(ReplayReportSection::name)
+        .toList();
   }
 
   private List<ReplayReportSection> everythingSections(MatchDomain match) {
