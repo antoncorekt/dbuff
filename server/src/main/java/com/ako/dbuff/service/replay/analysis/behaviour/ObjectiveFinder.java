@@ -36,8 +36,10 @@ final class ObjectiveFinder {
   /**
    * @param cutShort fights left out because nothing was taken and the game ended before the window
    *     ran out, so a miss cannot be told
+   * @param skipped fights left out because they started too early or the winner was too far from
+   *     any standing tower for a miss to mean anything
    */
-  record Found(List<ObjectiveConversion> conversions, int cutShort) {}
+  record Found(List<ObjectiveConversion> conversions, int cutShort, int skipped) {}
 
   private record Taken(
       ObjectiveKind kind, String key, double seconds, TeamSide taker, Long roshanKiller) {}
@@ -56,6 +58,7 @@ final class ObjectiveFinder {
     Map<Integer, Taken> takenBy = firstClaims(ordered, events);
     List<ObjectiveConversion> found = new ArrayList<>();
     int cutShort = 0;
+    int skipped = 0;
     for (ObjectiveFight fight : ordered) {
       Map<Long, Point> alive = winnersAlive(fight, traces);
       Taken taken = takenBy.get(fight.index());
@@ -64,11 +67,18 @@ final class ObjectiveFinder {
       } else if (fight.endSeconds() + properties.getObjectiveWindowSeconds()
           > events.gameEndSeconds()) {
         cutShort++;
+      } else if (fight.startSeconds() < properties.getObjectiveMinFightSeconds()) {
+        skipped++;
       } else {
-        found.add(missed(fight, alive, events));
+        ObjectiveConversion miss = missed(fight, alive, events);
+        if (tooFar(miss)) {
+          skipped++;
+        } else {
+          found.add(miss);
+        }
       }
     }
-    return new Found(found, cutShort);
+    return new Found(found, cutShort, skipped);
   }
 
   /**
@@ -157,6 +167,11 @@ final class ObjectiveFinder {
         alive.size(),
         nearest(fight, alive, events).orElse(null),
         null);
+  }
+
+  private boolean tooFar(ObjectiveConversion miss) {
+    return miss.nearest() != null
+        && miss.nearest().distance() >= properties.getObjectiveMaxTowerDistance();
   }
 
   private Optional<Nearest> nearest(ObjectiveFight fight, Map<Long, Point> alive, Events events) {

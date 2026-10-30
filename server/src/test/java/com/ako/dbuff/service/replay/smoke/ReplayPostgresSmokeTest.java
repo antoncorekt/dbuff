@@ -50,11 +50,13 @@ import com.ako.dbuff.dao.repo.ReplayPlayerMinuteRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerRepo;
 import com.ako.dbuff.dao.repo.ReplayPlayerTrackRepo;
 import com.ako.dbuff.dao.repo.ReplayStateChangeRepo;
+import com.ako.dbuff.dao.repo.RuneEventRepo;
 import com.ako.dbuff.dao.repo.RunePickupRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.CombatLogCodec;
 import com.ako.dbuff.service.replay.ReplayDataService;
+import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.ReplayRunService;
 import com.ako.dbuff.service.replay.StateChangeKind;
 import com.ako.dbuff.service.replay.analysis.activity.Activity;
@@ -113,6 +115,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -176,6 +179,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private FightRepo fightRepo;
   @Autowired private CreepKillRepo creepKillRepo;
   @Autowired private RunePickupRepo runePickupRepo;
+  @Autowired private RuneEventRepo runeEventRepo;
   @Autowired private ItemEfficiencyRepo itemEfficiencyRepo;
   @Autowired private LaneAssignmentRepo laneAssignmentRepo;
   @Autowired private LaneResultRepo laneResultRepo;
@@ -227,6 +231,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private FightPlayerRepo fightPlayerRepo;
   @Autowired private IntentProfileCalculator intentCalculator;
   @Autowired private BuildFitRepo buildFitRepo;
+  @Autowired private ReplayProcessingProperties processingProperties;
 
   @Test
   @Commit
@@ -239,7 +244,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       ReplayStatus status = runService.process(match);
 
       ReplayParseRunDomain run =
-          runRepo.findByMatchIdAndParserVersion(match.getId(), 1).orElseThrow();
+          runRepo
+              .findByMatchIdAndParserVersion(match.getId(), processingProperties.getParserVersion())
+              .orElseThrow();
       assertThat(status).as("%s: %s", id, run.getError()).isEqualTo(ReplayStatus.DONE);
       assertThat(playerRepo.findByMatchId(match.getId())).hasSize(10);
       assertThat(draftPickRepo.findByMatchId(match.getId())).as("%s has no draft", id).isEmpty();
@@ -356,7 +363,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       ReplayStatus status = runService.process(match);
 
       ReplayParseRunDomain run =
-          runRepo.findByMatchIdAndParserVersion(match.getId(), 1).orElseThrow();
+          runRepo
+              .findByMatchIdAndParserVersion(match.getId(), processingProperties.getParserVersion())
+              .orElseThrow();
       assertThat(status).as("%s: %s", id, run.getError()).isEqualTo(ReplayStatus.DONE);
       assertThat(draftPickRepo.findByMatchId(match.getId())).as("%s draft", id).hasSize(40);
       assertHeroDraft(id, match.getId());
@@ -818,13 +827,22 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
    * Every rune of OpenDota's log is a pickup, bounty gold is paid, and the opening has a winner.
    */
   private void assertRunes(String id, long matchId) throws Exception {
-    JsonNode players = new ObjectMapper().readTree(fixture(id + ".json").toFile()).get("players");
-    int logged = 0;
-    for (JsonNode p : players) {
-      logged += p.path("runes_log").size();
-    }
+    long expected =
+        runeEventRepo.findByMatchId(matchId).stream()
+            .filter(r -> r.getPlayerSlot() != null && r.getEventTime() != null)
+            .map(
+                r ->
+                    r.getPlayerSlot()
+                        + ":"
+                        + r.getEventTime().intValue()
+                        + ":"
+                        + RuneType.of(r.getRuneType()))
+            .distinct()
+            .count();
     List<RunePickupDomain> pickups = runePickupRepo.findByMatchId(matchId);
-    assertThat(pickups).as("%s: one pickup per logged rune", id).hasSize(logged);
+    assertThat(pickups)
+        .as("%s: one pickup per slot, second and rune type of the logged runes", id)
+        .hasSize((int) expected);
     assertThat(pickups)
         .extracting(RunePickupDomain::getRuneType)
         .as("%s: every rune code is known", id)
@@ -1394,17 +1412,29 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                     .computeIfAbsent(p.getPlayerSlot(), s -> new TreeMap<>())
                     .put(p.getStage(), p.getRole()));
     Set<String> expectedIntent = new TreeSet<>();
-    for (FightPlayerDomain p : fightPlayerRepo.findByMatchId(matchId)) {
+    Map<Integer, TeamSide> losers = new TreeMap<>();
+    fightRepo.findByMatchId(matchId).forEach(f -> losers.put(f.getFightIndex(), loserOf(f)));
+    Set<Long> told = new HashSet<>();
+    List<FightPlayerDomain> fightPlayers =
+        fightPlayerRepo.findByMatchId(matchId).stream()
+            .sorted(Comparator.comparing(FightPlayerDomain::getFightIndex))
+            .toList();
+    for (FightPlayerDomain p : fightPlayers) {
       Map<String, Integer> byStage = roles.getOrDefault(p.getPlayerSlot(), Map.of());
       Integer intent = byStage.get("INTENT");
       Integer played = byStage.get("FINAL");
-      if (inFight(p) && intent != null && played != null && !intent.equals(played)) {
+      if (inFight(p)
+          && intent != null
+          && played != null
+          && !intent.equals(played)
+          && losers.get(p.getFightIndex()) == TeamSide.ofSlot(p.getPlayerSlot())
+          && told.add(p.getPlayerSlot())) {
         expectedIntent.add(
             p.getFightIndex() + "/" + TeamSide.ofSlot(p.getPlayerSlot()) + "/" + p.getPlayerSlot());
       }
     }
     assertThat(keys(stored, "INTENT_NOT_PLAYED"))
-        .as("%s: heroes in the fight whose intent role differs from the final one", id)
+        .as("%s: intent role differs from the final one, told once in the first lost fight", id)
         .isEqualTo(expectedIntent);
 
     Map<TeamSide, Map<String, Double>> peaks = new TreeMap<>();

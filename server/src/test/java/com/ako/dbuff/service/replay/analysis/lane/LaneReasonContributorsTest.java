@@ -179,6 +179,49 @@ class LaneReasonContributorsTest {
   }
 
   @Test
+  void supportPresence_isNoReasonInMid() {
+    hero(AXE, Zone.Lane.MID, 10, 480);
+    hero(MIRANA, Zone.Lane.MID, 10, 480);
+    hero(LICH, Zone.Lane.MID, 10, 480);
+    roles.put(LICH, 5);
+
+    assertThat(
+            new SupportPresenceContributor().contribute(context(Zone.Lane.MID, TeamSide.RADIANT)))
+        .isEmpty();
+  }
+
+  @Test
+  void supportPresence_isNoReasonWhenTheSupportSideHasOneHero() {
+    hero(AXE, Zone.Lane.TOP, 10, 480);
+    hero(MIRANA, Zone.Lane.TOP, 10, 480);
+    roles.put(AXE, 4);
+
+    assertThat(
+            new SupportPresenceContributor().contribute(context(Zone.Lane.TOP, TeamSide.RADIANT)))
+        .isEmpty();
+    assertThat(new SupportPresenceContributor().contribute(context(Zone.Lane.TOP, TeamSide.DIRE)))
+        .isEmpty();
+
+    hero(DOOM, Zone.Lane.TOP, 10, 480);
+    assertThat(
+            new SupportPresenceContributor().contribute(context(Zone.Lane.TOP, TeamSide.RADIANT)))
+        .isEmpty();
+  }
+
+  @Test
+  void creepEdge_needsASiegeLeadOfTwo() {
+    hero(AXE, Zone.Lane.TOP, 10, 480);
+    hero(MIRANA, Zone.Lane.TOP, 10, 480);
+    stats.put(AXE, stats(AXE, 1, 0, 0));
+    assertThat(new CreepEdgeContributor().contribute(context(Zone.Lane.TOP, TeamSide.RADIANT)))
+        .isEmpty();
+    stats.put(AXE, stats(AXE, 2, 0, 0));
+    assertThat(new CreepEdgeContributor().contribute(context(Zone.Lane.TOP, TeamSide.RADIANT)))
+        .extracting(LaneReason::code)
+        .containsExactly("SIEGE_EDGE");
+  }
+
+  @Test
   void earlyKill_listsAnEarlyDeathAndTheKillForTheOtherSide() {
     hero(AXE, Zone.Lane.TOP, 10, 480);
     hero(MIRANA, Zone.Lane.TOP, 10, 480);

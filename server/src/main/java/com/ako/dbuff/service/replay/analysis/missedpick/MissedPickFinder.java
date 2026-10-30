@@ -108,19 +108,18 @@ final class MissedPickFinder {
     if (skills.passive(taken.getAbilityName()) || skills.passive(candidate.getAbilityName())) {
       return null;
     }
-    boolean noDamage = takenDamage == 0 && candidateDamage == 0;
+    Optional<RoleFunction> main = skills.main(taken.getAbilityName());
+    boolean sameMain = main.isPresent() && main.equals(skills.main(candidate.getAbilityName()));
+    boolean bothDamage = takenDamage > 0 && candidateDamage > 0;
+    boolean damageSkills = bothDamage && main.equals(Optional.of(RoleFunction.DAMAGE)) && sameMain;
+    boolean noDamage = !damageSkills;
     String basis = DAMAGE;
     boolean flagged = false;
-    if (noDamage) {
-      Optional<RoleFunction> main = skills.main(taken.getAbilityName());
-      flagged =
-          main.isPresent()
-              && main.equals(skills.main(candidate.getAbilityName()))
-              && candidateWon >= 1
-              && candidateWon > takenWon;
-      basis = main.map(f -> FIGHTS + FIGHTS_SEPARATOR + f.name()).orElse(FIGHTS);
-    } else if (takenDamage > 0 && candidateDamage > 0) {
+    if (damageSkills) {
       flagged = candidateWon >= 1 && candidateDamage > takenDamage * minRatio;
+    } else if (takenDamage == 0 && candidateDamage == 0 || bothDamage) {
+      flagged = sameMain && candidateWon >= 1 && candidateWon > takenWon;
+      basis = main.map(f -> FIGHTS + FIGHTS_SEPARATOR + f.name()).orElse(FIGHTS);
     }
     if (!flagged) {
       return null;

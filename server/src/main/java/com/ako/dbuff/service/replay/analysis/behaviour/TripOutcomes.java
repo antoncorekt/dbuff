@@ -37,7 +37,7 @@ public final class TripOutcomes {
     List<FightFact> taken =
         events.fights().stream()
             .filter(f -> f.present().contains(trip.slot()))
-            .filter(f -> f.end() >= from && f.start() <= to)
+            .filter(f -> f.end() >= from && f.start() <= to && f.start() >= trip.startSeconds())
             .toList();
     List<FightFact> won = taken.stream().filter(f -> team.name().equals(f.winner())).toList();
     return new TripOutcome(kills, creeps, taken.size(), won.size(), keyFight(taken, won));

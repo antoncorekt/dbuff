@@ -22,17 +22,26 @@ class RotationRulesTest {
 
   @Test
   void isRotation_needsAnotherLanesZone() {
-    assertThat(RotationRules.isRotation(trip(TOP, End.REJOINED), Zone.Lane.MID)).isTrue();
-    assertThat(RotationRules.isRotation(trip(TOP, End.REJOINED), null)).isTrue();
-    assertThat(RotationRules.isRotation(trip(MID, End.REJOINED), Zone.Lane.MID)).isFalse();
-    assertThat(RotationRules.isRotation(trip(BASE, End.REJOINED), Zone.Lane.MID)).isFalse();
+    assertThat(RotationRules.isRotation(trip(TOP, End.REJOINED), Zone.Lane.MID, 120)).isTrue();
+    assertThat(RotationRules.isRotation(trip(TOP, End.REJOINED), null, 120)).isTrue();
+    assertThat(RotationRules.isRotation(trip(MID, End.REJOINED), Zone.Lane.MID, 120)).isFalse();
+    assertThat(RotationRules.isRotation(trip(BASE, End.REJOINED), Zone.Lane.MID, 120)).isFalse();
+  }
+
+  @Test
+  void isRotation_aTripThatStartsBeforeTheMinimumIsNotOne() {
+    AwayTrip early = new AwayTrip(0L, 25, 45, 80, MID, TOP, MID, false, End.REJOINED);
+    AwayTrip later = new AwayTrip(0L, 130, 150, 180, MID, TOP, MID, false, End.REJOINED);
+
+    assertThat(RotationRules.isRotation(early, Zone.Lane.MID, 120)).isFalse();
+    assertThat(RotationRules.isRotation(later, Zone.Lane.MID, 120)).isTrue();
   }
 
   @Test
   void isRotation_stayingInTheLaneHeLeftIsNotOne() {
     AwayTrip stayed = new AwayTrip(0L, 600, 620, 650, TOP, TOP, MID, false, End.REJOINED);
 
-    assertThat(RotationRules.isRotation(stayed, null)).isFalse();
+    assertThat(RotationRules.isRotation(stayed, null, 120)).isFalse();
   }
 
   private static final List<RotationReason> NONE = List.of();

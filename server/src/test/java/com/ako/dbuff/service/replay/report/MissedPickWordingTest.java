@@ -29,9 +29,9 @@ class MissedPickWordingTest {
 
     assertThat(line)
         .isEqualTo(
-            "The enemy took Chain Frost at pick 31; it did 38% more damage than your Dragon Blood"
+            "The enemy took Chain Frost at turn 31; it did 38% more damage than your Dragon Blood"
                 + " and was in 3 of their 4 won fights. It was still free when you took Dragon"
-                + " Blood at pick 12.");
+                + " Blood at turn 12.");
   }
 
   @Test

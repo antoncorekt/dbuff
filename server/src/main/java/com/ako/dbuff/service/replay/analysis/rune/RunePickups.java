@@ -15,11 +15,17 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 
-/** Turns the stored rune events into pickups: position, bounty gold and the mid lane flag. */
+/**
+ * Turns the stored rune events into pickups: position, bounty gold and the mid lane flag. Events of
+ * one slot, second and rune type are one pickup.
+ */
+@Slf4j
 final class RunePickups {
   private final RuneProperties properties;
   private final Map<Long, String> heroOfSlot;
@@ -64,8 +70,19 @@ final class RunePickups {
                 Comparator.comparing(RuneEventDomain::getEventTime)
                     .thenComparing(RuneEventDomain::getPlayerSlot))
             .toList();
-    List<RunePickupDomain> rows = new ArrayList<>();
+    Map<String, List<RuneEventDomain>> pickups = new LinkedHashMap<>();
     for (RuneEventDomain rune : inOrder) {
+      String key =
+          rune.getPlayerSlot()
+              + ":"
+              + rune.getEventTime().intValue()
+              + ":"
+              + RuneType.of(rune.getRuneType());
+      pickups.computeIfAbsent(key, k -> new ArrayList<>()).add(rune);
+    }
+    List<RunePickupDomain> rows = new ArrayList<>();
+    for (List<RuneEventDomain> group : pickups.values()) {
+      RuneEventDomain rune = group.get(0);
       long slot = rune.getPlayerSlot();
       int seconds = rune.getEventTime().intValue();
       RuneType type = RuneType.of(rune.getRuneType());
@@ -81,11 +98,15 @@ final class RunePickups {
               .seconds(seconds)
               .zone(zone == null ? null : zone.kind().name())
               .lane(zone == null || zone.lane() == null ? null : zone.lane().name())
-              .gold(type == RuneType.BOUNTY ? goldAt(slot, seconds) : null)
+              .gold(type == RuneType.BOUNTY ? goldOf(slot, seconds, group.size()) : null)
               .effectEndSeconds(effectEnd)
               .midLane(midLane(slot, seconds, zone))
               .analysisVersion(version)
               .build());
+    }
+    int collapsed = inOrder.size() - rows.size();
+    if (collapsed > 0) {
+      log.info("Match {}: collapsed {} duplicate rune events", matchId, collapsed);
     }
     return rows;
   }
@@ -107,6 +128,17 @@ final class RunePickups {
     long index = Math.round((seconds - track.getStartSeconds()) / (double) track.getStepSeconds());
     int i = (int) Math.max(0, Math.min(last, index));
     return layout.zone(track.getX()[i], track.getY()[i]);
+  }
+
+  private Integer goldOf(long slot, int seconds, int events) {
+    Integer sum = null;
+    for (int i = 0; i < events; i++) {
+      Integer gold = goldAt(slot, seconds);
+      if (gold != null) {
+        sum = sum == null ? gold : sum + gold;
+      }
+    }
+    return sum;
   }
 
   /** The nearest unused bounty entry of the hero within the tolerance; each pays one pickup. */

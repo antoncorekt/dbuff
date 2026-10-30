@@ -154,4 +154,77 @@ class RoleFitterTest {
     assertThat(RoleFitter.bestRole(rich)).isEqualTo(1);
     assertThat(rich[0] - safe[0]).isPositive();
   }
+
+  private static final FunctionProfile BLANK =
+      profile(LanePosition.SAFE, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+  private static RolePlayer player(long slot, Long laneRole, Long position) {
+    return new RolePlayer(
+        slot, laneRole, null, null, List.of(), null, List.of(), PlayerOutput.NONE, position);
+  }
+
+  private static List<RolePlayer> players(Long[] lanes, Long[] positions) {
+    List<RolePlayer> result = new java.util.ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      result.add(player(i, lanes[i], positions[i]));
+    }
+    return result;
+  }
+
+  private static final Long[] NO_LANES = {null, null, null, null, null};
+
+  @Test
+  void theFinalPositionBonusMovesATieToTheOpenDotaRole() {
+    List<FunctionProfile> blank = java.util.Collections.nCopies(5, BLANK);
+    Long[] positions = {5L, 4L, 3L, 2L, 1L};
+
+    assertThat(roles(fitter.fit(blank, players(NO_LANES, positions), RoleStage.FINAL)))
+        .containsExactly(5, 4, 3, 2, 1);
+  }
+
+  @Test
+  void aZeroBonusScoresAsBefore() {
+    RoleProfileProperties zero = new RoleProfileProperties();
+    zero.getFit().setFinalPositionBonus(0);
+    RoleFitter off = new RoleFitter(zero);
+    List<FunctionProfile> team = List.of(CARRY, MID, OFFLANER, ROAMER, HARD_SUPPORT);
+    Long[] positions = {5L, 4L, 3L, 2L, 1L};
+
+    assertThat(off.fit(team, players(NO_LANES, positions), RoleStage.FINAL).get(0).scores())
+        .containsExactly(fitter.fit(team, RoleStage.FINAL).get(0).scores());
+    assertThat(roles(off.fit(team, players(NO_LANES, positions), RoleStage.FINAL)))
+        .isEqualTo(roles(fitter.fit(team, RoleStage.FINAL)));
+  }
+
+  @Test
+  void theIntentStageIgnoresThePosition() {
+    List<FunctionProfile> blank = java.util.Collections.nCopies(5, BLANK);
+    Long[] positions = {5L, 4L, 3L, 2L, 1L};
+
+    assertThat(roles(fitter.fit(blank, players(NO_LANES, positions), RoleStage.INTENT)))
+        .isEqualTo(roles(fitter.fit(blank, RoleStage.INTENT)));
+  }
+
+  @Test
+  void aLoneMidLanerIsFixedToRoleTwoEvenWhenAnotherRoleScoresHigher() {
+    FunctionProfile supportish = profile(LanePosition.MID, 0, 0, 1, 1, 0, 1, 1, 0, 0);
+    List<FunctionProfile> team = List.of(CARRY, supportish, OFFLANER, ROAMER, HARD_SUPPORT);
+    Long[] lanes = {1L, 2L, 3L, 3L, 1L};
+    Long[] none = {null, null, null, null, null};
+
+    assertThat(roles(fitter.fit(team, RoleStage.FINAL)).get(1)).isNotEqualTo(2);
+    assertThat(roles(fitter.fit(team, players(lanes, none), RoleStage.FINAL)).get(1)).isEqualTo(2);
+  }
+
+  @Test
+  void twoMidCandidatesFixNobody() {
+    FunctionProfile supportish = profile(LanePosition.MID, 0, 0, 1, 1, 0, 1, 1, 0, 0);
+    List<FunctionProfile> team = List.of(CARRY, supportish, supportish, ROAMER, HARD_SUPPORT);
+    Long[] lanes = {1L, 2L, 2L, 3L, 1L};
+    Long[] none = {null, null, null, null, null};
+
+    assertThat(fitter.fit(team, players(lanes, none), RoleStage.FINAL))
+        .extracting(RoleFit::role)
+        .isEqualTo(roles(fitter.fit(team, RoleStage.FINAL)));
+  }
 }

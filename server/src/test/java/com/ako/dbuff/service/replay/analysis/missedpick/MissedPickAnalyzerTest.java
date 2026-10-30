@@ -14,6 +14,7 @@ import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.MissedPickRepo;
 import com.ako.dbuff.dao.repo.SkillCountRepository;
 import com.ako.dbuff.dao.repo.SkillCountRepository.DamageAverage;
+import com.ako.dbuff.service.replay.analysis.role.RoleFunction;
 import com.ako.dbuff.service.replay.analysis.role.SkillFunctions;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.AllPickProfile;
@@ -30,6 +31,7 @@ import org.springframework.test.context.ActiveProfiles;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 @DataJpaTest
@@ -63,6 +65,7 @@ class MissedPickAnalyzerTest {
   }
 
   private void draft(Integer secondTurn) {
+    when(skillFunctions.main(anyString())).thenReturn(Optional.of(RoleFunction.DAMAGE));
     pick(1, 1, 0, 10);
     pick(2, secondTurn, 128, 20);
     abilityRepo.save(

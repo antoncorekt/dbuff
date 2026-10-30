@@ -63,7 +63,7 @@ public class MissedPickAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 4;
+    return 5;
   }
 
   @Override

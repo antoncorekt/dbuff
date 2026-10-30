@@ -74,7 +74,7 @@ public class BehaviourRotationAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 2;
+    return 3;
   }
 
   @Override

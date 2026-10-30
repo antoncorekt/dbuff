@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.ReplayParseRunDomain;
 import com.ako.dbuff.dao.model.ReplayStatus;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.service.constant.ConstantPrecacheStarter;
+import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -103,7 +104,7 @@ class ApiKeyFilterWebTest {
     runRepo.save(
         ReplayParseRunDomain.builder()
             .matchId(MATCH)
-            .parserVersion(1)
+            .parserVersion(new ReplayProcessingProperties().getParserVersion())
             .status(ReplayStatus.DONE)
             .attempts(1)
             .build());

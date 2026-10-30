@@ -17,21 +17,28 @@ import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
+import com.ako.dbuff.service.replay.analysis.importance.AdvantageSeries;
+import com.ako.dbuff.service.replay.analysis.importance.AdvantageSeriesReader;
+import com.ako.dbuff.service.replay.analysis.importance.ImportantFightProperties;
+import com.ako.dbuff.service.replay.analysis.importance.ImportantFightRule;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import com.ako.dbuff.service.replay.map.MapLayouts;
 import com.ako.dbuff.service.replay.map.MatchMapLayout;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -45,6 +52,8 @@ import static org.assertj.core.api.Assertions.assertThat;
   MatchMapLayout.class,
   ReplayProcessingProperties.class,
   ReplayAnalysisProperties.class,
+  ImportantFightRule.class,
+  ImportantFightProperties.class,
   FightAnalyzerTest.Json.class
 })
 class FightAnalyzerTest {
@@ -57,6 +66,7 @@ class FightAnalyzerTest {
   @Autowired private ReplayCombatLogRepo combatLogRepo;
   @Autowired private FightRepo fightRepo;
   @Autowired private FightPlayerRepo fightPlayerRepo;
+  @MockBean private AdvantageSeriesReader seriesReader;
 
   @Test
   void analyze_storesTheFightAndAnEntryForEveryPlayer_andReplacesAnEarlierRun() {
@@ -74,6 +84,53 @@ class FightAnalyzerTest {
     assertThat(players).hasSize(10);
     assertThat(players).extracting(FightPlayerDomain::getPlayerSlot).contains(0L, 4L, 128L, 132L);
     assertThat(players.stream().filter(p -> p.getPresence().equals("ACTIVE")).count()).isEqualTo(2);
+  }
+
+  @Test
+  void analyze_turnsTheWinnerToDraw_whenTheWinnerLostGold() {
+    stored();
+    when(seriesReader.read(MATCH)).thenReturn(Optional.of(series(-2000)));
+
+    analyzer.analyze(MATCH);
+
+    assertThat(fightRepo.findAll().getFirst().getWinner()).isEqualTo("DRAW");
+  }
+
+  @Test
+  void analyze_keepsTheWinner_whenTheGoldAgrees() {
+    stored();
+    when(seriesReader.read(MATCH)).thenReturn(Optional.of(series(2000)));
+
+    analyzer.analyze(MATCH);
+
+    assertThat(fightRepo.findAll().getFirst().getWinner()).isEqualTo("RADIANT");
+  }
+
+  @Test
+  void analyze_keepsTheWinner_whenThereIsNoSeries() {
+    stored();
+    when(seriesReader.read(MATCH)).thenReturn(Optional.empty());
+
+    analyzer.analyze(MATCH);
+
+    assertThat(fightRepo.findAll().getFirst().getWinner()).isEqualTo("RADIANT");
+  }
+
+  @Test
+  void analyze_keepsTheWinner_whenTheGoldChangeIsUnknown() {
+    stored();
+    AdvantageSeries unknown = series(-2000);
+    java.util.Arrays.fill(unknown.radiantGold(), Double.NaN);
+    when(seriesReader.read(MATCH)).thenReturn(Optional.of(unknown));
+
+    analyzer.analyze(MATCH);
+
+    assertThat(fightRepo.findAll().getFirst().getWinner()).isEqualTo("RADIANT");
+  }
+
+  @Test
+  void version_isFour() {
+    assertThat(analyzer.version()).isEqualTo(4);
   }
 
   @Test
@@ -171,6 +228,13 @@ class FightAnalyzerTest {
             .eventCount(events.size())
             .data(CombatLogCodec.encode(events))
             .build());
+  }
+
+  private static AdvantageSeries series(double radiantGoldLate) {
+    double[] gold = {0, 0, radiantGoldLate, radiantGoldLate, radiantGoldLate};
+    double[] xp = new double[5];
+    double[] worth = {1000, 2000, 3000, 4000, 5000};
+    return new AdvantageSeries(gold, xp, worth, worth.clone());
   }
 
   private static int[] filled(int size, int value) {

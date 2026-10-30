@@ -47,5 +47,8 @@ class BehaviourPropertiesTest {
     rejects(p -> p.setSmokeOutcomeSeconds(0), "smoke-outcome-seconds");
     rejects(p -> p.setObjectiveWindowSeconds(0), "objective-window-seconds");
     rejects(p -> p.setRoshanNearRadius(0), "roshan-near-radius");
+    rejects(p -> p.setRotationMinStartSeconds(-1), "rotation-min-start-seconds");
+    rejects(p -> p.setObjectiveMinFightSeconds(-1), "objective-min-fight-seconds");
+    rejects(p -> p.setObjectiveMaxTowerDistance(0), "objective-max-tower-distance");
   }
 }

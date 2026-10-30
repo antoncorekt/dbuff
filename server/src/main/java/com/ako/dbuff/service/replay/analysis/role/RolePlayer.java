@@ -14,6 +14,7 @@ import java.util.List;
  * @param heroId the picked hero; null when not stored
  * @param abilities the skills he holds after an Ability Draft; empty in other modes
  * @param output what he dealt, healed, farmed and warded over the match
+ * @param positionEst OpenDota's estimated position 1 to 5; null when absent
  */
 public record RolePlayer(
     long slot,
@@ -23,7 +24,21 @@ public record RolePlayer(
     List<ActivitySegment> activity,
     Long heroId,
     List<DraftedAbility> abilities,
-    PlayerOutput output) {
+    PlayerOutput output,
+    Long positionEst) {
+  public RolePlayer(
+      long slot,
+      Long laneRole,
+      Long finalNetWorth,
+      double[] netWorthByMinute,
+      List<ActivitySegment> activity,
+      Long heroId,
+      List<DraftedAbility> abilities,
+      PlayerOutput output) {
+    this(
+        slot, laneRole, finalNetWorth, netWorthByMinute, activity, heroId, abilities, output, null);
+  }
+
   public RolePlayer(
       long slot,
       Long laneRole,

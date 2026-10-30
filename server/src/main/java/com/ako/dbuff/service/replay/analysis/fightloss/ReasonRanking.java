@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The order in which the reasons of one fight are told, computed on read so a change of rule needs
@@ -15,7 +16,8 @@ import java.util.stream.Collectors;
  * come after the player reasons unless no player reason is severe enough to stand on its own; that
  * decision looks at the ranked entries only, so an unranked early cooldown reason never makes a
  * player lead. The absence reasons of one hero are one entry, draft-level reasons come after every
- * other, and the cooldown reasons of an early fight are not ranked at all.
+ * other, and the cooldown and teleport reasons ({@link #EARLY_UNRANKED}: {@link #COOLDOWN} plus
+ * NO_TP, TP_ON_COOLDOWN, HAD_TP_NOT_USED) of an early fight are not ranked at all.
  */
 public final class ReasonRanking {
   /** Why one hero was away from a fight; of these, one entry per hero is ranked. */
@@ -33,6 +35,13 @@ public final class ReasonRanking {
 
   /** Cooldowns say little in a fight that starts before the heroes have their items. */
   public static final Set<String> COOLDOWN = Set.of("ABILITY_ON_COOLDOWN", "ITEM_ON_COOLDOWN");
+
+  /**
+   * Unranked in an early fight: the cooldowns, and the teleport reasons that are about the items.
+   */
+  public static final Set<String> EARLY_UNRANKED =
+      Stream.concat(COOLDOWN.stream(), Stream.of("NO_TP", "TP_ON_COOLDOWN", "HAD_TP_NOT_USED"))
+          .collect(Collectors.toUnmodifiableSet());
 
   /**
    * @param reason the entry's main reason
@@ -71,7 +80,8 @@ public final class ReasonRanking {
         fightStartSeconds != null && fightStartSeconds < properties.getEarlyFightSeconds();
     Map<Boolean, List<FightReasonDomain>> byRanked =
         reasons.stream()
-            .collect(Collectors.partitioningBy(r -> !(early && COOLDOWN.contains(r.getCode()))));
+            .collect(
+                Collectors.partitioningBy(r -> !(early && EARLY_UNRANKED.contains(r.getCode()))));
     List<FightReasonDomain> notRanked = byRanked.get(false);
     List<Entry> entries = collapseAbsence(byRanked.get(true));
     boolean playerLeads =

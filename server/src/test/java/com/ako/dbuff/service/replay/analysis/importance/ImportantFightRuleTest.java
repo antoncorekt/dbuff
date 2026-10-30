@@ -6,6 +6,7 @@ import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ImportantFightRuleTest {
   private final ImportantFightRule rule = new ImportantFightRule(new ImportantFightProperties());
@@ -67,7 +68,7 @@ class ImportantFightRuleTest {
   }
 
   @Test
-  void aLeadFlipToTheWinnerMakesASmallFightImportant_aFlipToTheLoserDoesNot() {
+  void aLeadFlipToTheWinnerNeedsTheFlipGold_aFlipToTheLoserNeverCounts() {
     double[] gold = {-300, -300, -300, -100, 100, 100};
     AdvantageSeries s = series(gold, flat(6), 100_000);
 
@@ -77,7 +78,7 @@ class ImportantFightRuleTest {
     assertThat(toWinner.leadFlip()).isTrue();
     assertThat(toWinner.flipToWinner()).isTrue();
     assertThat(toWinner.goldChange()).isLessThan(1500);
-    assertThat(rule.isImportant(toWinner)).isTrue();
+    assertThat(rule.isImportant(toWinner)).isFalse();
     assertThat(toLoser.leadFlip()).isTrue();
     assertThat(toLoser.flipToWinner()).isFalse();
     assertThat(rule.isImportant(toLoser)).isFalse();
@@ -147,5 +148,47 @@ class ImportantFightRuleTest {
 
     assertThat(m.goldChange()).isNull();
     assertThat(rule.isImportant(m)).isFalse();
+  }
+
+  @Test
+  void aSmallLeadFlipIsNotImportant_theOpeningFightOfMatch9058566396() {
+    Measurement flip = new Measurement(84L, 0L, 28_000, 0.3, true, true, false);
+    assertThat(rule.isImportant(flip)).isFalse();
+  }
+
+  @Test
+  void aLeadFlipWithTheFlipGoldIsImportant() {
+    Measurement flip = new Measurement(1600L, 0L, 100_000, 1.6, true, true, false);
+
+    assertThat(rule.isImportant(flip)).isTrue();
+  }
+
+  @Test
+  void aLeadFlipWithAZeroMinimumFlipGoldIsImportantAsBefore() {
+    ImportantFightProperties properties = new ImportantFightProperties();
+    properties.setMinFlipGold(0);
+    Measurement flip = new Measurement(84L, 0L, 28_000, 0.3, true, true, false);
+
+    assertThat(new ImportantFightRule(properties).isImportant(flip)).isTrue();
+  }
+
+  @Test
+  void aLeadFlipWithTheMinimumShareIsImportant() {
+    Measurement flip = new Measurement(900L, 0L, 20_000, 4.5, true, true, false);
+
+    assertThat(rule.isImportant(flip)).isTrue();
+  }
+
+  @Test
+  void noFlipAndTheMinimumGoldIsImportant() {
+    Measurement m = new Measurement(1500L, 0L, 100_000, 1.5, false, false, false);
+
+    assertThat(rule.isImportant(m)).isTrue();
+  }
+
+  @Test
+  void aNegativeMinimumFlipGoldIsRejected() {
+    assertThatThrownBy(() -> new ImportantFightProperties().setMinFlipGold(-1))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 }
