@@ -20,11 +20,11 @@ public class CooldownKindWording implements ItemKindWording {
   @Override
   public String longVerdict(ItemEfficiency row) {
     Map<String, Double> f = row.figures();
-    return "%s, helped %s, %s%s"
+    return "%s%s%s%s"
         .formatted(
-            ItemWording.plural(Math.round(ItemWording.figure(f, "extraCasts")), "extra cast"),
-            ItemWording.plural(Math.round(ItemWording.figure(f, "killsHelped")), "kill"),
-            ItemWording.ratio(row.ratio()),
+            casts(f),
+            helped(f),
+            ItemWording.worthClause(row.ratio()),
             ItemWording.limits(row.flags()));
   }
 
@@ -32,11 +32,17 @@ public class CooldownKindWording implements ItemKindWording {
   public String shortVerdict(ItemEfficiency row, String subject) {
     Map<String, Double> f = row.figures();
     String worth = ItemWording.worth(row);
-    return "%s gave %s, helped %s%s"
-        .formatted(
-            subject,
-            ItemWording.plural(Math.round(ItemWording.figure(f, "extraCasts")), "extra cast"),
-            ItemWording.plural(Math.round(ItemWording.figure(f, "killsHelped")), "kill"),
-            worth.isEmpty() ? "" : " (" + worth + ")");
+    return "%s gave %s%s%s"
+        .formatted(subject, casts(f), helped(f), worth.isEmpty() ? "" : " (" + worth + ")");
+  }
+
+  private static String casts(Map<String, Double> f) {
+    long casts = Math.round(ItemWording.figure(f, "extraCasts"));
+    return casts == 0 ? "no extra casts" : ItemWording.plural(casts, "extra cast");
+  }
+
+  private static String helped(Map<String, Double> f) {
+    long kills = Math.round(ItemWording.figure(f, "killsHelped"));
+    return kills == 0 ? "" : ", helped " + ItemWording.plural(kills, "kill");
   }
 }

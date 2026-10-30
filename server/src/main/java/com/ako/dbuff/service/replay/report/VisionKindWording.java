@@ -73,7 +73,7 @@ public class VisionKindWording implements ItemKindWording {
     if (fast > 0) {
       text += "; %s dewarded within a minute".formatted(ItemWording.plural(fast, "observer"));
     }
-    return row.ratio() == null ? text : text + ", worth " + ItemWording.worth(row);
+    return text + ItemWording.worthClause(row.ratio());
   }
 
   private static java.util.Optional<String> kills(ItemEfficiency row) {

@@ -86,7 +86,7 @@ class SavingCostAspectTest {
         .containsEntry("savingGoldLost", 0.0);
     assertThat(saving.figures().get("savingPeakGold")).isGreaterThan(2500);
     assertThat(SavingCostLine.of(row))
-        .hasValueSatisfying(l -> assertThat(l).startsWith("saved 3.1k for 5:00"));
+        .hasValueSatisfying(l -> assertThat(l).startsWith("saved 3.1k over 5 min 0 s"));
   }
 
   @Test

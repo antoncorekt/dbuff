@@ -57,4 +57,78 @@ class ItemKindWordingsTest {
     assertThat(wordings.find("new-kind")).isEmpty();
     assertThat(wordings.find(null)).isEmpty();
   }
+
+  private static ItemEfficiency cooldown(Double ratio, double casts, double kills) {
+    return new ItemEfficiency(
+        0,
+        "refresher",
+        "refresher",
+        "cooldown",
+        60.0,
+        1,
+        1000,
+        1000L,
+        ratio,
+        null,
+        Map.of("extraCasts", casts, "killsHelped", kills),
+        List.of(),
+        List.of());
+  }
+
+  @Test
+  void aZeroEffectIsNeverWrittenAsAZeroRatio() {
+    ItemEfficiency none = cooldown(0.0, 0, 0);
+    ItemEfficiency negativeZero = cooldown(-0.01, 0, 0);
+
+    assertThat(new CooldownKindWording().shortVerdict(none, "Axe"))
+        .isEqualTo("Axe gave no extra casts (no measurable effect)");
+    assertThat(new CooldownKindWording().longVerdict(negativeZero))
+        .isEqualTo("no extra casts, no measurable effect")
+        .doesNotContain("0.0x");
+    assertThat(ItemWording.signedRatio(-0.01)).doesNotContain("0.0");
+    assertThat(ItemWording.worthClause(0.0)).isEqualTo(", no measurable effect");
+    assertThat(ItemWording.worthClause(null)).isEmpty();
+    assertThat(ItemWording.worthClause(1.5)).isEqualTo(", worth 1.5x its cost");
+  }
+
+  @Test
+  void aCooldownRowKeepsItsCastsAndKills() {
+    assertThat(new CooldownKindWording().shortVerdict(cooldown(1.5, 3, 1), "Axe"))
+        .isEqualTo("Axe gave 3 extra casts, helped 1 kill (1.5x its cost)");
+  }
+
+  @Test
+  void aDurationIsMinutesAndSecondsAndAGameTimeStaysAClock() {
+    assertThat(ItemWording.duration(325.0)).isEqualTo("5 min 25 s");
+    assertThat(ItemWording.duration(40.0)).isEqualTo("40 s");
+    assertThat(ItemWording.duration(null)).isEqualTo("?");
+    assertThat(ItemWording.clock(325.0)).isEqualTo("5:25");
+  }
+
+  @Test
+  void savingCostUsesTheDuration() {
+    ItemEfficiency row =
+        new ItemEfficiency(
+            0,
+            "x",
+            "x",
+            "farm-rate",
+            60.0,
+            1,
+            1000,
+            1000L,
+            1.0,
+            null,
+            Map.of(),
+            List.of(),
+            List.of(
+                new ItemEfficiency.Detail(
+                    SavingCostLine.LABEL,
+                    0,
+                    null,
+                    Map.of(
+                        "savingSeconds", 325.0, "savingPeakGold", 3400.0, "savingDeaths", 0.0))));
+
+    assertThat(SavingCostLine.of(row)).contains("saved 3.4k over 5 min 25 s without dying");
+  }
 }

@@ -9,7 +9,6 @@ import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyEntry;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyFile;
 import com.ako.dbuff.service.replay.analysis.item.ItemEfficiencyJson;
 import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
-import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -79,7 +78,7 @@ public class ItemsSection implements ReplayReportSection {
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
     Rendered rendered = render(input, entries(input));
-    return SectionViews.titled(rendered.lines(), paidBack(input, rendered.shown()));
+    return SectionViews.titled(rendered.lines(), paidBack(rendered.shown()));
   }
 
   private List<Entry> entries(ReplayReportInput input) {
@@ -122,21 +121,15 @@ public class ItemsSection implements ReplayReportSection {
         .orElse(null);
   }
 
-  private Verdict paidBack(ReplayReportInput input, List<Entry> rows) {
-    Set<Long> focus = input.focusSlots() == null ? Set.of() : input.focusSlots();
-    List<Entry> own = rows.stream().filter(e -> focus.contains(e.row().slot())).toList();
-    List<Entry> scope = own.isEmpty() ? rows : own;
-    long known = scope.stream().filter(e -> e.row().ratio() != null).count();
-    long paid = scope.stream().filter(e -> e.row().ratio() != null && e.row().ratio() >= 1).count();
-    String whose = own.isEmpty() ? "Items shown" : "Your players' items shown";
-    if (known == 0) {
-      return new Verdict(
-          "%s: %s checked".formatted(whose, SectionViews.count(scope.size(), "purchase")),
-          Accent.NEUTRAL);
-    }
+  private Verdict paidBack(List<Entry> shown) {
+    long paid = shown.stream().filter(e -> isPaidBack(e.row())).count();
     return new Verdict(
-        "%s: %d of %d paid back their cost".formatted(whose, paid, known),
-        SectionViews.balance(paid, known - paid));
+        "Items shown: %d of %d paid back".formatted(paid, shown.size()),
+        SectionViews.balance(paid, shown.size() - paid));
+  }
+
+  private static boolean isPaidBack(ItemEfficiency row) {
+    return row.paybackSeconds() != null || (row.ratio() != null && row.ratio() >= 1);
   }
 
   private Rendered render(ReplayReportInput input, List<Entry> rows) {

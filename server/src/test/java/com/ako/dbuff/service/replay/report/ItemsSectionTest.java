@@ -504,7 +504,7 @@ class ItemsSectionTest {
 
     ViewRendering.assertWithinLimits(view);
     assertThat(view.title()).isEqualTo("Items");
-    assertThat(view.verdict()).isEqualTo("Items shown: 2 of 3 paid back their cost");
+    assertThat(view.verdict()).isEqualTo("Items shown: 3 of 3 paid back");
     assertThat(view.accent()).isEqualTo(Accent.WIN);
     assertThat(String.join("\n", section.lines(input())))
         .isEqualTo(
@@ -521,14 +521,21 @@ class ItemsSectionTest {
   }
 
   @Test
-  void view_looksAtTheTrackedPlayersItemsFirst() {
-    add(farming(1, 1500));
+  void view_countsEveryShownRowOfTrackedAndOtherPlayers() {
+    add(farming(1, 900, 0.0, null, 133, 97, Map.of("netGoldPerMinute", -37.0)));
     add(midas(2, 600, 0.9));
 
     SectionView view = section.view(input(2L)).orElseThrow();
 
-    assertThat(view.verdict()).isEqualTo("Your players' items shown: 0 of 1 paid back their cost");
-    assertThat(view.accent()).isEqualTo(Accent.LOSS);
+    assertThat(view.verdict()).isEqualTo("Items shown: 1 of 2 paid back");
+  }
+
+  @Test
+  void view_aPaybackTimeCountsAsPaidBackEvenBelowOneTimesTheCost() {
+    add(midas(2, 600, 0.9));
+
+    assertThat(section.view(input()).orElseThrow().verdict())
+        .isEqualTo("Items shown: 1 of 1 paid back");
   }
 
   @Test
@@ -546,6 +553,6 @@ class ItemsSectionTest {
     SectionView view = section.view(input()).orElseThrow();
 
     assertThat(view.bullets()).hasSize(4);
-    assertThat(view.verdict()).matches("Items shown: [012] of 2 paid back their cost");
+    assertThat(view.verdict()).matches("Items shown: [012] of 2 paid back");
   }
 }
