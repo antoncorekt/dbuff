@@ -53,7 +53,16 @@ class DraftSectionTest {
   private AbilityDraftPickDomain pick(int order, long slot, String ability) {
     return AbilityDraftPickDomain.builder()
         .pickOrder(order)
+        .turnNumber(order + 1)
         .teamPickIndex((order + 1) / 2)
+        .playerSlot(slot)
+        .abilityName(ability)
+        .build();
+  }
+
+  private static AbilityDraftPickDomain noTurn(int order, long slot, String ability) {
+    return AbilityDraftPickDomain.builder()
+        .pickOrder(order)
         .playerSlot(slot)
         .abilityName(ability)
         .build();
@@ -89,9 +98,9 @@ class DraftSectionTest {
         .containsExactly(
             "**Draft**",
             "Anton",
-            "- Faceless Void Chronosphere · pick 3",
-            "- Sven Gods Strength · pick 12",
-            "- Sven Storm Bolt · pick 22");
+            "- Faceless Void Chronosphere · pick 4",
+            "- Sven Gods Strength · pick 13",
+            "- Sven Storm Bolt · pick 23");
   }
 
   @Test
@@ -105,7 +114,7 @@ class DraftSectionTest {
 
     assertThat(real.lines(anton()))
         .containsExactly(
-            "**Draft**", "Anton", "- Metamorphosis · pick 3", "- Gods Strength · pick 12");
+            "**Draft**", "Anton", "- Metamorphosis · pick 4", "- Gods Strength · pick 13");
   }
 
   @Test
@@ -128,7 +137,7 @@ class DraftSectionTest {
     AbilityDraftPickDomain bare =
         AbilityDraftPickDomain.builder().playerSlot(0L).abilityName("sven_great_cleave").build();
     when(repo.findByMatchId(1L))
-        .thenReturn(List.of(unordered, bare, pick(5, 0, "sven_gods_strength")));
+        .thenReturn(List.of(unordered, bare, noTurn(5, 0, "sven_gods_strength")));
 
     assertThat(section.lines(anton()))
         .containsExactly(
@@ -154,7 +163,7 @@ class DraftSectionTest {
     assertThat(view.image().name()).isEqualTo("draft-1.png");
     assertThat(view.image().bytes()).isEqualTo(PNG);
     assertThat(view.bullets())
-        .containsExactly("Anton", "- Sven Storm Bolt · pick 3", "- Sven Gods Strength · pick 12");
+        .containsExactly("Anton", "- Sven Storm Bolt · pick 4", "- Sven Gods Strength · pick 13");
     assertThat(new PlainViewRenderer().lines(view)).isEqualTo(section.lines(in));
     assertThat(section.image(in).orElseThrow().name()).isEqualTo("draft-1.png");
   }
@@ -194,7 +203,7 @@ class DraftSectionTest {
     assertThat(drawn.rows().get(0).get(1).text()).isEqualTo("Phoenix");
     TableSpec.Cell first = drawn.rows().get(0).get(2);
     assertThat(first.text()).isEqualTo("Axe Counter Helix");
-    assertThat(first.note()).isEqualTo("#5");
+    assertThat(first.note()).isEqualTo("#6");
     assertThat(first.icon()).containsExactly(8);
   }
 
@@ -227,7 +236,7 @@ class DraftSectionTest {
     assertThat(view.image()).isNull();
     assertThat(view.bullets())
         .containsExactly(
-            "Anton", "- Sven Storm Bolt · pick 3", "The picture could not be drawn this time.");
+            "Anton", "- Sven Storm Bolt · pick 4", "The picture could not be drawn this time.");
     assertThat(section.image(anton())).isEmpty();
   }
 

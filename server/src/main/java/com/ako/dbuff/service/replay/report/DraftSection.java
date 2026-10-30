@@ -189,16 +189,22 @@ public class DraftSection implements ReplayReportSection {
   }
 
   private static String note(AbilityDraftPickDomain pick) {
-    if (pick.getPickOrder() != null) {
-      return "#" + pick.getPickOrder();
+    Integer number = number(pick);
+    if (number != null) {
+      return "#" + number;
     }
     return pick.getTeamPickIndex() == null ? null : "team pick " + pick.getTeamPickIndex();
   }
 
   private static String position(AbilityDraftPickDomain pick) {
-    if (pick.getPickOrder() != null) {
-      return "pick " + pick.getPickOrder();
+    Integer number = number(pick);
+    if (number != null) {
+      return "pick " + number;
     }
     return pick.getTeamPickIndex() == null ? "" : "team pick " + pick.getTeamPickIndex();
+  }
+
+  private static Integer number(AbilityDraftPickDomain pick) {
+    return pick.getTurnNumber() != null ? pick.getTurnNumber() : pick.getPickOrder();
   }
 }
