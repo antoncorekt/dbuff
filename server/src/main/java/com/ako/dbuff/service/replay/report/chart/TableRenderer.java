@@ -8,6 +8,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import javax.imageio.ImageIO;
@@ -49,7 +50,7 @@ public class TableRenderer {
     System.setProperty("java.awt.headless", "true");
   }
 
-  /** The PNG, or empty when the table is empty, too long, or drawing failed. */
+  /** The PNG, or empty when the table is empty, too long or too wide, or drawing failed. */
   public Optional<byte[]> render(TableSpec spec) {
     if (spec.headers().isEmpty() || spec.rows().isEmpty() || spec.rows().size() > MAX_ROWS) {
       return Optional.empty();
@@ -66,6 +67,9 @@ public class TableRenderer {
         g.setRenderingHint(
             RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         int[] columns = columnWidths(g, spec);
+        if (columns == null) {
+          return Optional.empty();
+        }
         width = Math.min(MAX_WIDTH, 2 * MARGIN + sum(columns));
         draw(g, spec, columns, width, height);
       } finally {
@@ -176,9 +180,15 @@ public class TableRenderer {
     if (total <= available) {
       return natural;
     }
+    if (count * MIN_COLUMN > available) {
+      return null;
+    }
     int[] shrunk = new int[count];
     for (int c = 0; c < count; c++) {
       shrunk[c] = Math.max(MIN_COLUMN, (int) ((long) natural[c] * available / total));
+    }
+    if (sum(shrunk) > available) {
+      Arrays.fill(shrunk, available / count);
     }
     return shrunk;
   }

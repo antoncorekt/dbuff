@@ -118,6 +118,36 @@ class TableRendererTest {
     assertThat(dire.fingerprint()).isNotEqualTo(base.fingerprint());
   }
 
+  @Test
+  void nullCellsAndHeadersAreEmptyAndFingerprinted() {
+    List<TableSpec.Cell> row = new ArrayList<>();
+    row.add(null);
+    row.add(TableSpec.Cell.text("x"));
+    List<String> headers = new ArrayList<>();
+    headers.add(null);
+    headers.add("Pick");
+    TableSpec spec = new TableSpec("T", headers, List.of(row));
+
+    assertThat(renderer.render(spec)).isPresent();
+    assertThat(spec.fingerprint()).isNotEmpty();
+    List<TableSpec.Cell> other = List.of(TableSpec.Cell.text(""), TableSpec.Cell.text("x"));
+    assertThat(new TableSpec("T", headers, List.of(other)).fingerprint())
+        .isNotEqualTo(spec.fingerprint());
+  }
+
+  @Test
+  void manyColumnsAreSqueezedToFitOrRefused() throws IOException {
+    List<String> twelve = java.util.Collections.nCopies(12, "Header");
+    List<TableSpec.Cell> row = java.util.Collections.nCopies(12, TableSpec.Cell.text("Some text"));
+    BufferedImage image =
+        decode(renderer.render(new TableSpec("T", twelve, List.of(row))).orElseThrow());
+    assertThat(image.getWidth()).isLessThanOrEqualTo(TableRenderer.MAX_WIDTH);
+
+    List<String> forty = java.util.Collections.nCopies(40, "H");
+    List<TableSpec.Cell> wide = java.util.Collections.nCopies(40, TableSpec.Cell.text("t"));
+    assertThat(renderer.render(new TableSpec("T", forty, List.of(wide)))).isEmpty();
+  }
+
   private static byte[] icon0() {
     try {
       return icon();

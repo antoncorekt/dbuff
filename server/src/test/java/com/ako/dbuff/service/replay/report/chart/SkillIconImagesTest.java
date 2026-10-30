@@ -134,18 +134,22 @@ class SkillIconImagesTest {
   }
 
   @Test
-  void aFailureIsEmptyAndNotRetried() {
+  void aDownloadFailureIsEmptyAndRetriedLater() {
     failing = true;
 
     assertThat(images.ability("axe_culling_blade")).isEmpty();
     assertThat(images.ability("axe_culling_blade")).isEmpty();
-    assertThat(fetched).hasSize(1);
+    assertThat(fetched).hasSize(2);
+
+    failing = false;
+    assertThat(images.ability("axe_culling_blade")).isPresent();
   }
 
   @Test
   void unknownNamesAndIdsAreEmpty() {
     assertThat(images.ability("nope")).isEmpty();
     assertThat(images.ability(null)).isEmpty();
+    assertThat(images.hero(1)).isEmpty();
     assertThat(images.hero(1)).isEmpty();
     assertThat(fetched).isEmpty();
   }

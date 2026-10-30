@@ -8,18 +8,21 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.List;
 
 /**
  * What a table picture shows: a title, column headers and rows of cells. A row with fewer cells
- * than there are headers leaves the rest empty.
+ * than there are headers leaves the rest empty; a null cell is an empty cell and a null header an
+ * empty header.
  */
 public record TableSpec(String title, List<String> headers, List<List<Cell>> rows) {
 
   public TableSpec {
-    headers = List.copyOf(headers);
-    rows = rows.stream().map(List::copyOf).toList();
+    headers = headers.stream().map(h -> h == null ? "" : h).toList();
+    rows = rows.stream().map(r -> Collections.unmodifiableList(new ArrayList<>(r))).toList();
   }
 
   /**
@@ -49,6 +52,10 @@ public record TableSpec(String title, List<String> headers, List<List<Cell>> row
       for (List<Cell> row : rows) {
         out.writeInt(row.size());
         for (Cell cell : row) {
+          if (cell == null) {
+            out.writeInt(-2);
+            continue;
+          }
           out.writeInt(cell.icon() == null ? -1 : cell.icon().length);
           if (cell.icon() != null) {
             out.write(cell.icon());
