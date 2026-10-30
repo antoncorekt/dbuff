@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.report;
 import com.ako.dbuff.dao.model.EndGameSummaryDomain;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.EndGameSummaryRepo;
+import com.ako.dbuff.service.replay.analysis.endgame.EndGameProperties;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
@@ -91,7 +92,20 @@ class EndGameSectionTest {
     EndGameSummaryDomain row =
         won().peakLeadSeconds(null).peakLeadGold(null).turningSeconds(null).leadLost(null).build();
 
-    assertThat(lines(row).getFirst()).isEqualTo("Radiant won at 41:20; Dire never led.");
+    assertThat(lines(row).getFirst())
+        .isEqualTo("Radiant won at 41:20; Dire never led by 2k gold or more.");
+  }
+
+  @Test
+  void theNeverLedThresholdFollowsTheConfiguredMinLeadGold() {
+    EndGameProperties custom = new EndGameProperties();
+    custom.setMinLeadGold(1500);
+    section.setEndGameProperties(custom);
+    EndGameSummaryDomain row =
+        won().peakLeadSeconds(null).peakLeadGold(null).turningSeconds(null).leadLost(null).build();
+
+    assertThat(lines(row).getFirst())
+        .isEqualTo("Radiant won at 41:20; Dire never led by 1.5k gold or more.");
   }
 
   @Test

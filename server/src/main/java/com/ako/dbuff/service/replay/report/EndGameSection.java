@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.EndGameSummaryRepo;
 import com.ako.dbuff.service.replay.analysis.behaviour.ObjectiveKind;
 import com.ako.dbuff.service.replay.analysis.building.BuildingName;
+import com.ako.dbuff.service.replay.analysis.endgame.EndGameProperties;
 import com.ako.dbuff.service.replay.analysis.endgame.EndGameTurningPoint;
 import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
@@ -16,6 +17,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -28,6 +31,9 @@ import org.springframework.stereotype.Component;
 public class EndGameSection implements ReplayReportSection {
   private final EndGameSummaryRepo summaryRepo;
   private final ReplayReportProperties properties;
+
+  @Setter(onMethod_ = @Autowired(required = false))
+  private EndGameProperties endGameProperties = new EndGameProperties();
 
   @Override
   public String name() {
@@ -88,7 +94,7 @@ public class EndGameSection implements ReplayReportSection {
     return Optional.of(new Ended(lines, winner, yours));
   }
 
-  private static String verdict(EndGameSummaryDomain r, TeamSide winner, TeamSide yours) {
+  private String verdict(EndGameSummaryDomain r, TeamSide winner, TeamSide yours) {
     String won = Prettify.teamOf(winner.name(), yours);
     String loser = Prettify.teamOf(winner.opponent().name(), yours);
     String end =
@@ -97,7 +103,8 @@ public class EndGameSection implements ReplayReportSection {
       return won + " won" + end + ".";
     }
     if (r.getPeakLeadSeconds() == null || r.getPeakLeadGold() == null) {
-      return won + " won" + end + "; " + loser + " never led.";
+      return "%s won%s; %s never led by %s gold or more."
+          .formatted(won, end, loser, BehaviourWording.gold(endGameProperties.getMinLeadGold()));
     }
     if (Boolean.FALSE.equals(r.getLeadLost())) {
       return "%s won%s although %s still led%s at the last minute."
