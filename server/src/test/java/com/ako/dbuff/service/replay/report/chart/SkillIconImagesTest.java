@@ -1,10 +1,9 @@
 package com.ako.dbuff.service.replay.report.chart;
 
-import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.discord.icon.IconImageSource;
-import com.ako.dbuff.service.discord.icon.IconProperties;
+import com.ako.dbuff.service.replay.analysis.role.HeroKits;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -14,19 +13,17 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 class SkillIconImagesTest {
   @TempDir Path dir;
 
-  private final ConstantsManagers constants = mock(ConstantsManagers.class);
   private final List<String> fetched = new ArrayList<>();
   private boolean failing;
   private SkillIconImages images;
@@ -40,9 +37,6 @@ class SkillIconImagesTest {
 
   @BeforeEach
   void setUp() throws IOException {
-    IconProperties properties = new IconProperties();
-    properties.setDirectory(dir);
-    properties.setCdnUrl("https://cdn.test");
     IconImageSource source =
         url -> {
           fetched.add(url);
@@ -51,17 +45,49 @@ class SkillIconImagesTest {
           }
           return png(64);
         };
-    when(constants.getAllAbilityConstants())
-        .thenReturn(
-            Map.of(
-                "axe_culling_blade",
-                AbilityConstant.builder().img("/img/culling.png").build(),
-                "axe_counter_helix",
-                AbilityConstant.builder().img("/img/helix.png").build()));
+    Map<String, AbilityConstant> abilities =
+        Map.of(
+            "axe_culling_blade", AbilityConstant.builder().img("/img/culling.png").build(),
+            "axe_counter_helix", AbilityConstant.builder().img("/img/helix.png").build());
     HeroConstant phoenix = new HeroConstant("110", "npc_dota_hero_phoenix", "Phoenix");
     phoenix.setImg("/img/phoenix.png");
-    when(constants.getHeroConstantMap()).thenReturn(Map.of("110", phoenix));
-    images = new SkillIconImages(properties, source, constants);
+    HeroKits kits =
+        new HeroKits() {
+          @Override
+          public Optional<HeroConstant> hero(long heroId) {
+            return heroId == 110 ? Optional.of(phoenix) : Optional.empty();
+          }
+
+          @Override
+          public Optional<AbilityConstant> ability(String name) {
+            return Optional.ofNullable(abilities.get(name));
+          }
+        };
+    images = new SkillIconImages(dir, "https://cdn.test", source, kits);
+  }
+
+  @Test
+  void theSpringConstructorNeedsNoDiscordBeans() {
+    HeroKits none =
+        new HeroKits() {
+          @Override
+          public Optional<HeroConstant> hero(long heroId) {
+            return Optional.empty();
+          }
+
+          @Override
+          public Optional<AbilityConstant> ability(String name) {
+            return Optional.empty();
+          }
+        };
+    try (var context =
+        new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
+      context.registerBean(HeroKits.class, () -> none);
+      context.register(SkillIconImages.class);
+      context.refresh();
+
+      assertThat(context.getBean(SkillIconImages.class).ability("x")).isEmpty();
+    }
   }
 
   private static int widthOf(byte[] bytes) throws IOException {
