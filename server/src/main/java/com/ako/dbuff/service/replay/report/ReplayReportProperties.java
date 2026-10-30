@@ -22,6 +22,7 @@ public class ReplayReportProperties {
   private static final int MAX_GRAPH_HEROES_PER_IMAGE = 3;
   private static final int MAX_GRAPH_IMAGES = 10;
   private static final double MAX_OBJECTIVE_DISTANCE = 20000;
+  private static final int MAX_EVERYTHING_MESSAGES = 100;
 
   /** The server-wide switch; nothing is posted until it is turned on. */
   private boolean enabled = false;
@@ -31,6 +32,9 @@ public class ReplayReportProperties {
 
   /** The most messages one match's replay analysis takes at the full detail level. */
   private int maxMessages = 4;
+
+  /** The most messages one {@code /match report section:everything} posts. */
+  private int everythingMaxMessages = 30;
 
   /** The most messages it takes at the standard detail level. */
   private int standardMaxMessages = 2;
@@ -139,6 +143,7 @@ public class ReplayReportProperties {
           "replay.report.on-demand-cooldown-seconds must be 0 or more, got "
               + onDemandCooldownSeconds);
     }
+    requireRange("everything-max-messages", everythingMaxMessages, 1, MAX_EVERYTHING_MESSAGES);
     requireRange("max-important-fight-lines", maxImportantFightLines, 1, MAX_IMPORTANT_FIGHT_LINES);
     requireRange("max-rotation-lines", maxRotationLines, 1, MAX_BEHAVIOUR_LINES);
     requireRange("max-smoke-lines", maxSmokeLines, 1, MAX_BEHAVIOUR_LINES);

@@ -11,8 +11,8 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 /**
- * The {@code section:} option of {@code /match report}: {@code all} and the registered sections, so
- * a new section appears without an edit here.
+ * The {@code section:} option of {@code /match report}: {@code all}, {@code everything} and the
+ * registered sections, so a new section appears without an edit here.
  */
 @Component
 public class ReportSectionAutocomplete implements AutocompleteProvider {
@@ -41,6 +41,7 @@ public class ReportSectionAutocomplete implements AutocompleteProvider {
   public List<Command.Choice> getChoices(String currentInput, CommandContext context) {
     Map<String, String> names = new LinkedHashMap<>();
     names.put(ReportCommandHandler.ALL, ReportCommandHandler.ALL);
+    names.put(ReportCommandHandler.EVERYTHING, ReportCommandHandler.EVERYTHING);
     sectionSwitch.visibleNames().forEach(name -> names.put(name, name));
     return ChoiceAccumulator.single(currentInput, names);
   }

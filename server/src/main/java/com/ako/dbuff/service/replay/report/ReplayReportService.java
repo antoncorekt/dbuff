@@ -15,6 +15,7 @@ import com.ako.dbuff.dao.repo.MatchReportThreadRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayReportPostedRepo;
+import com.ako.dbuff.service.ai.reasons.AiReasonsSection;
 import com.ako.dbuff.service.discord.DiscordMessageService;
 import com.ako.dbuff.service.discord.icon.IconText;
 import com.ako.dbuff.service.match.report.analyzer.Report;
@@ -222,6 +223,63 @@ public class ReplayReportService {
       log.warn("Section {} of match {} failed: {}", sectionName, matchId, e.getMessage(), e);
       return ReportDelivery.FAILED;
     }
+  }
+
+  /**
+   * Posts every section of the match to one channel's thread for a person who asked for it, in the
+   * report's format: all that are not hidden, fit the match's mode and are not the AI reasons card,
+   * whatever the channel's lists, the sections' defaults, its detail level, the report switch or
+   * the quiet hours. Capped at {@code replay.report.everything-max-messages}.
+   */
+  public ReportDelivery deliverEverything(long matchId, String instanceId) {
+    try {
+      if (!hasStoredAnalysis(matchId)) {
+        return logSkipped(matchId, ReportDelivery.NOT_STORED);
+      }
+      MatchDomain match = matchRepo.findById(matchId).orElse(null);
+      DbufInstanceConfigDomain instance = instanceRepo.findById(instanceId).orElse(null);
+      if (match == null || instance == null) {
+        return logSkipped(matchId, ReportDelivery.NO_INSTANCE);
+      }
+      List<PlayerMatchStatisticDomain> stats = statRepo.findAllByMatchId(matchId);
+      return logSkipped(
+          matchId,
+          postToThread(
+              match,
+              instance,
+              () ->
+                  MessageCap.apply(
+                      render(everythingSections(match), input(match, stats, instance)),
+                      properties.getEverythingMaxMessages()),
+              ReportDelivery.SECTION_EMPTY,
+              false));
+    } catch (RuntimeException e) {
+      log.warn("Every section of match {} failed: {}", matchId, e.getMessage(), e);
+      return ReportDelivery.FAILED;
+    }
+  }
+
+  /** The views of every section {@link #deliverEverything} posts, with all pages of paged ones. */
+  public List<SectionView> everythingViews(long matchId, DbufInstanceConfigDomain instance) {
+    MatchDomain match = matchRepo.findById(matchId).orElse(null);
+    if (match == null) {
+      return List.of();
+    }
+    ReplayReportInput input = input(match, statRepo.findAllByMatchId(matchId), instance);
+    return everythingSections(match).stream().flatMap(s -> s.pages(input).stream()).toList();
+  }
+
+  private List<ReplayReportSection> everythingSections(MatchDomain match) {
+    GameModeProfile mode = modes.activeFor(match.getGameModeId()).orElse(null);
+    if (mode == null) {
+      return List.of();
+    }
+    return sections.stream()
+        .filter(s -> !sectionSwitch.isHidden(s))
+        .filter(s -> s.supports(mode))
+        .filter(s -> !AiReasonsSection.NAME.equals(s.name()))
+        .sorted(Comparator.comparingInt(ReplayReportSection::order))
+        .toList();
   }
 
   private ReportDelivery logSkipped(long matchId, ReportDelivery result) {
