@@ -103,4 +103,14 @@ class IntentProfileOverridesTest {
 
     assertThat(profile.disable()).isEqualTo(0.4);
   }
+
+  @Test
+  void theCheckedInFileGivesLionVoodooADisable() {
+    IntentProfileCalculator real = calculator(new RoleOverrideFile("replay/role-overrides.json"));
+
+    FunctionProfile profile =
+        real.profile(HERO, List.of(new HeldAbility("lion_voodoo", new AbilityConstant(), false)));
+
+    assertThat(profile.disable()).isGreaterThanOrEqualTo(0.5);
+  }
 }

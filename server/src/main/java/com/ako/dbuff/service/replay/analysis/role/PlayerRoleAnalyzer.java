@@ -65,7 +65,7 @@ public class PlayerRoleAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 7;
+    return 8;
   }
 
   @Override

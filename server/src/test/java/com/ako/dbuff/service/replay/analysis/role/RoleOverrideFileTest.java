@@ -1,11 +1,15 @@
 package com.ako.dbuff.service.replay.analysis.role;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assumptions.assumeThat;
 
 class RoleOverrideFileTest {
 
@@ -48,6 +52,47 @@ class RoleOverrideFileTest {
     }
     assertThat(file.forAbility("furion_teleportation"))
         .containsKeys(RoleFunction.ROAMING, RoleFunction.ESCAPE);
+  }
+
+  @Test
+  void theShippedFileNamesTheAddedDisableAndDamageSkillsAndTheConstantsKnowThem() throws Exception {
+    RoleOverrideFile file = new RoleOverrideFile("replay/role-overrides.json");
+    String[] disables = {
+      "lion_voodoo",
+      "bane_fiends_grip",
+      "bane_nightmare",
+      "storm_spirit_electric_vortex",
+      "disruptor_kinetic_field",
+      "lone_druid_entangle",
+      "slark_pounce"
+    };
+    String[] damages = {
+      "clinkz_searing_arrows",
+      "bane_brain_sap",
+      "storm_spirit_static_remnant",
+      "gyrocopter_flak_cannon",
+      "venomancer_snakebite"
+    };
+    for (String skill : disables) {
+      assertThat(file.forAbility(skill)).as(skill).containsKey(RoleFunction.DISABLE);
+    }
+    for (String skill : damages) {
+      assertThat(file.forAbility(skill)).as(skill).containsKey(RoleFunction.DAMAGE);
+    }
+    assertThat(file.forAbility("slark_pounce")).containsKey(RoleFunction.ESCAPE);
+
+    Path constants =
+        Path.of(System.getProperty("user.home"), "dbuff-fixtures/replays/constants-abilities.json");
+    assumeThat(constants).exists();
+    JsonNode root = new ObjectMapper().readTree(constants.toFile());
+    for (String skill : concat(disables, damages)) {
+      assertThat(root.has(skill)).as("unknown ability " + skill).isTrue();
+    }
+  }
+
+  private static String[] concat(String[] a, String[] b) {
+    return java.util.stream.Stream.concat(java.util.Arrays.stream(a), java.util.Arrays.stream(b))
+        .toArray(String[]::new);
   }
 
   @Test
