@@ -53,18 +53,24 @@ public class FarmingKindWording implements ItemKindWording {
             : "paid back at " + ItemWording.clock(row.paybackSeconds());
     String net = BehaviourWording.gold(row.figures().get("netGoldPerMinute"));
     if (hasDamage(row)) {
-      return "%s, net %s gold per min, %s, %s in total, %s%s"
+      return "%s, net %s gold per min, %s, %s, %s%s"
           .formatted(
               rates,
               net,
               parts(row),
-              ItemWording.ratio(row.ratio()),
+              ItemWording.isZero(row.ratio())
+                  ? "no measurable effect in total"
+                  : ItemWording.ratio(row.ratio()) + " in total",
               payback,
               ItemWording.limits(row.flags()));
     }
-    return "%s, net %s gold per min, %s, worth %s its cost%s"
+    return "%s, net %s gold per min, %s%s%s"
         .formatted(
-            rates, net, payback, ItemWording.ratio(row.ratio()), ItemWording.limits(row.flags()));
+            rates,
+            net,
+            payback,
+            ItemWording.worthClause(row.ratio()),
+            ItemWording.limits(row.flags()));
   }
 
   private static boolean hasDamage(ItemEfficiency row) {
@@ -117,7 +123,9 @@ public class FarmingKindWording implements ItemKindWording {
 
   private static String damage(ItemEfficiency row) {
     double worth = fights(row.figures()) / row.cost();
-    return ", its damage was worth %s its cost".formatted(ItemWording.ratio(worth));
+    return ItemWording.isZero(worth)
+        ? ", its damage had no measurable effect"
+        : ", its damage was worth %s its cost".formatted(ItemWording.ratio(worth));
   }
 
   private static String camps(Map<String, Double> before, Map<String, Double> after) {

@@ -28,12 +28,12 @@ public class TargetUseKindWording implements ItemKindWording {
     if (row.count() == 0) {
       return "bought, never used" + ItemWording.limits(row.flags());
     }
-    return "%s, %s%s, worth %s its cost%s"
+    return "%s, %s%s%s%s"
         .formatted(
             ItemWording.plural(row.count(), "cast"),
             saved(row),
             setUps(row),
-            ItemWording.ratio(row.ratio()),
+            ItemWording.worthClause(row.ratio()),
             ItemWording.limits(row.flags()));
   }
 

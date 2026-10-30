@@ -131,4 +131,45 @@ class ItemKindWordingsTest {
 
     assertThat(SavingCostLine.of(row)).contains("saved 3.4k over 5 min 25 s without dying");
   }
+
+  private static ItemEfficiency zeroWorth(String aspect, Map<String, Double> figures) {
+    return new ItemEfficiency(
+        0, "item", "item", aspect, 60.0, 2, 1000, 1000L, 0.0, null, figures, List.of(), List.of());
+  }
+
+  @Test
+  void everyKindSaysNoMeasurableEffectForAZeroRatio() {
+    Map<String, Double> all =
+        Map.ofEntries(
+            Map.entry("hp", 100.0),
+            Map.entry("mana", 50.0),
+            Map.entry("runes", 1.0),
+            Map.entry("bottled", 1.0),
+            Map.entry("selfDeaths", 0.0),
+            Map.entry("saves", 1.0),
+            Map.entry("allies", 2.0),
+            Map.entry("gold", 10.0),
+            Map.entry("xp", 10.0),
+            Map.entry("idleSeconds", 5.0),
+            Map.entry("farmingSeconds", 60.0),
+            Map.entry("netGoldPerMinute", 10.0),
+            Map.entry("extraCasts", 1.0),
+            Map.entry("killsHelped", 0.0));
+    for (String aspect :
+        List.of(
+            "bottle-runes",
+            "self-harm",
+            "team-restore",
+            "target-use",
+            "charge-restore",
+            "midas-uses",
+            "farm-rate",
+            "cooldown")) {
+      ItemEfficiency row = zeroWorth(aspect, all);
+      ItemKindWording wording = wordings.find(aspect).orElseThrow();
+      assertThat(wording.longVerdict(row)).as(aspect).doesNotContain("0.0x");
+      assertThat(wording.shortVerdict(row, "Axe")).as(aspect).doesNotContain("0.0x");
+      assertThat(wording.longVerdict(row)).as(aspect).contains("no measurable effect");
+    }
+  }
 }
