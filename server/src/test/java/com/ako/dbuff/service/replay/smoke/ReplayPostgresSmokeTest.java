@@ -428,6 +428,12 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
             .as("the draft view of %s carries its picture", id)
             .isNotNull();
       }
+      var boardView = draftBoardSection.view(draftInput).orElseThrow();
+      assertThat(boardView.image()).as("the draft board of %s carries its picture", id).isNotNull();
+      assertThat(boardView.bullets().getFirst().lines().skip(1))
+          .as("the draft board lines of %s", id)
+          .isNotEmpty()
+          .allMatch(line -> line.matches("\\d+\\. (Radiant|Dire) · .*: .*"));
       System.out.println(
           "DRAFT RAW "
               + id

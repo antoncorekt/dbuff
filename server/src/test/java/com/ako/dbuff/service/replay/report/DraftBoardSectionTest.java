@@ -6,8 +6,11 @@ import com.ako.dbuff.dao.model.HeroDraftPickDomain;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
 import com.ako.dbuff.dao.repo.AbilityDraftPoolRepo;
 import com.ako.dbuff.dao.repo.HeroDraftPickRepo;
+import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.TestModes;
+import com.ako.dbuff.service.replay.report.chart.SkillIconImages;
+import com.ako.dbuff.service.replay.report.chart.TableRenderer;
 import com.ako.dbuff.service.replay.report.view.ComponentsViewRenderer;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.ReportMessage;
@@ -15,10 +18,13 @@ import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -31,6 +37,9 @@ class DraftBoardSectionTest {
   private final AbilityDraftPickRepo skillRepo = mock(AbilityDraftPickRepo.class);
   private final AbilityDraftPoolRepo poolRepo = mock(AbilityDraftPoolRepo.class);
   private final ReportHeroNames heroNames = mock(ReportHeroNames.class);
+  private final PlayerGameStatisticRepo stats = mock(PlayerGameStatisticRepo.class);
+  private final SkillIconImages icons = mock(SkillIconImages.class);
+  private final TableRenderer tables = mock(TableRenderer.class);
   private final PlainViewRenderer plain = new PlainViewRenderer();
   private final DraftBoardSection section =
       new DraftBoardSection(
@@ -39,10 +48,20 @@ class DraftBoardSectionTest {
                   heroRepo,
                   skillRepo,
                   poolRepo,
+                  stats,
                   new AbilityDraftProfile(),
                   Prettify::ability,
-                  heroNames)),
+                  heroNames,
+                  icons,
+                  tables)),
           plain);
+
+  DraftBoardSectionTest() {
+    when(tables.render(any())).thenReturn(Optional.of(new byte[] {1, 2, 3}));
+    when(icons.ability(any())).thenReturn(Optional.empty());
+    when(icons.hero(anyLong())).thenReturn(Optional.empty());
+    when(stats.findAllByMatchId(anyLong())).thenReturn(List.of());
+  }
 
   private ReplayReportInput input(Set<Long> focus, Map<Long, String> names) {
     when(heroNames.heroName(SVEN)).thenReturn("Sven");
@@ -100,7 +119,7 @@ class DraftBoardSectionTest {
   }
 
   @Test
-  void view_putsEachPlayersHeroInTheSameQueueAsHisSkillsByTurn() {
+  void view_listsEveryTurnInOrderWithTheTeamAndThePicker() {
     draft();
 
     SectionView view = section.view(input(Set.of(130L), Map.of(130L, "Anton"))).orElseThrow();
@@ -109,8 +128,12 @@ class DraftBoardSectionTest {
     assertThat(view.bullets().getFirst().lines())
         .containsExactly(
             "**Picks in draft order**",
-            "Anton (Sven): Sven Storm Bolt (2), hero Sven (15)",
-            "Sniper: Sniper Take Aim (1), Sniper Headshot (3), hero Sniper (20)");
+            "1. Radiant · Sniper: Sniper Take Aim",
+            "2. Dire · Anton (Sven): Sven Storm Bolt",
+            "3. Radiant · Sniper: Sniper Headshot",
+            "15. Dire · Anton (Sven): hero Sven",
+            "20. Radiant · Sniper: hero Sniper");
+    assertThat(view.image()).isNotNull();
   }
 
   @Test
@@ -122,7 +145,7 @@ class DraftBoardSectionTest {
     SectionView view = section.view(input(Set.of(), Map.of())).orElseThrow();
 
     assertThat(view.bullets().getFirst().lines().toList())
-        .contains("Sniper: Sniper Take Aim (1), hero Sniper (2), Sniper Headshot (3)");
+        .contains("2. Radiant · Sniper: hero Sniper", "3. Radiant · Sniper: Sniper Headshot");
   }
 
   @Test
@@ -149,7 +172,10 @@ class DraftBoardSectionTest {
     SectionView view = section.view(input(Set.of(), Map.of())).orElseThrow();
 
     assertThat(view.bullets().getFirst().lines().toList())
-        .contains("Sniper: Sniper Take Aim, hero Sniper, Sniper Headshot");
+        .contains(
+            "1. Radiant · Sniper: Sniper Take Aim",
+            "2. Radiant · Sniper: hero Sniper",
+            "3. Radiant · Sniper: Sniper Headshot");
   }
 
   @Test
@@ -170,16 +196,7 @@ class DraftBoardSectionTest {
     SectionView view = section.view(input(Set.of(), Map.of())).orElseThrow();
 
     assertThat(view.bullets().getFirst().lines().toList())
-        .contains("Sniper: Sniper Take Aim, hero Sniper");
-  }
-
-  @Test
-  void view_putsRadiantFirstWhenNobodyIsTracked() {
-    draft();
-
-    SectionView view = section.view(input(Set.of(), Map.of())).orElseThrow();
-
-    assertThat(view.bullets().getFirst().lines().toList().get(1)).startsWith("Sniper:");
+        .contains("1. Radiant · Sniper: Sniper Take Aim", "2. Radiant · Sniper: hero Sniper");
   }
 
   @Test
@@ -207,8 +224,7 @@ class DraftBoardSectionTest {
     List<String> lines = section.lines(input(Set.of(130L), Map.of(130L, "Anton")));
 
     assertThat(lines).first().isEqualTo("**Draft board**");
-    assertThat(lines)
-        .contains("Anton (Sven): Sven Storm Bolt (2), hero Sven (15)", "Heroes: Meepo");
+    assertThat(lines).contains("2. Dire · Anton (Sven): Sven Storm Bolt", "Heroes: Meepo");
     assertThat(lines).allMatch(line -> !line.contains("\n"));
   }
 
@@ -271,8 +287,9 @@ class DraftBoardSectionTest {
     assertThat(view.bullets().getFirst().lines().toList())
         .containsExactly(
             "**Picks in draft order**",
-            "Sniper: Skill 5156 (1), hero Sniper (20)",
-            "Sven: hero Sven (15)");
+            "1. Radiant · Sniper: Skill 5156",
+            "15. Dire · Sven: hero Sven",
+            "20. Radiant · Sniper: hero Sniper");
   }
 
   @Test
@@ -292,9 +309,10 @@ class DraftBoardSectionTest {
     assertThat(view.bullets().getFirst().lines().toList())
         .containsExactly(
             "**Picks in draft order**",
-            "Sniper: hero Sniper (20), Sniper Take Aim",
-            "Sven: hero Sven (15)");
-    assertThat(view.footnote()).contains("order is not known");
+            "15. Dire · Sven: hero Sven",
+            "20. Radiant · Sniper: hero Sniper",
+            "3. Radiant · Sniper: Sniper Take Aim");
+    assertThat(view.footnote()).contains("not known");
   }
 
   @Test

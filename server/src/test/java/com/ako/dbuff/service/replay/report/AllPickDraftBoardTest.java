@@ -38,9 +38,12 @@ class AllPickDraftBoardTest {
                   abilityHeroRepo,
                   mock(AbilityDraftPickRepo.class),
                   mock(AbilityDraftPoolRepo.class),
+                  mock(com.ako.dbuff.dao.repo.PlayerGameStatisticRepo.class),
                   new AbilityDraftProfile(),
                   Prettify::ability,
-                  heroNames)),
+                  heroNames,
+                  mock(com.ako.dbuff.service.replay.report.chart.SkillIconImages.class),
+                  mock(com.ako.dbuff.service.replay.report.chart.TableRenderer.class))),
           new PlainViewRenderer());
 
   private static DraftEventDomain event(int order, boolean pick, long hero, int team) {

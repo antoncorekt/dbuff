@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
+import com.ako.dbuff.service.replay.report.view.ImageAttachment;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
@@ -42,6 +43,11 @@ public class DraftBoardSection implements ReplayReportSection {
         .flatMap(v -> plain.lines(v).stream())
         .flatMap(line -> line.lines())
         .toList();
+  }
+
+  @Override
+  public Optional<ImageAttachment> image(ReplayReportInput input) {
+    return view(input).map(SectionView::image);
   }
 
   @Override

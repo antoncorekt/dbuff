@@ -305,9 +305,12 @@ class ReportIconsTest {
                     heroRepo,
                     skillRepo,
                     poolRepo,
+                    mock(com.ako.dbuff.dao.repo.PlayerGameStatisticRepo.class),
                     new AbilityDraftProfile(),
                     labels(icons),
-                    heroNames(icons))),
+                    heroNames(icons),
+                    mock(com.ako.dbuff.service.replay.report.chart.SkillIconImages.class),
+                    mock(com.ako.dbuff.service.replay.report.chart.TableRenderer.class))),
             plain);
     SectionView view =
         section
@@ -361,9 +364,12 @@ class ReportIconsTest {
                     heroRepo,
                     skillRepo,
                     poolRepo,
+                    mock(com.ako.dbuff.dao.repo.PlayerGameStatisticRepo.class),
                     new AbilityDraftProfile(),
                     labels(icons),
-                    heroNames(icons))),
+                    heroNames(icons),
+                    mock(com.ako.dbuff.service.replay.report.chart.SkillIconImages.class),
+                    mock(com.ako.dbuff.service.replay.report.chart.TableRenderer.class))),
             new PlainViewRenderer());
     return section
         .view(new ReplayReportInput(1L, abilityDraftMatch(), Set.of(), Map.of(), 3))
