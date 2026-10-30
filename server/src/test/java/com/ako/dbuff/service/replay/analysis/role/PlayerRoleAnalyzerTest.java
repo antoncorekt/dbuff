@@ -120,7 +120,7 @@ class PlayerRoleAnalyzerTest {
 
   @Test
   void theVersionCountsTheFinalPositionRule() {
-    assertThat(analyzer.version()).isEqualTo(7);
+    assertThat(analyzer.version()).isEqualTo(8);
   }
 
   @Test
