@@ -30,6 +30,7 @@ import com.ako.dbuff.service.replay.map.MatchMapLayout;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -59,6 +60,7 @@ class BehaviourObjectiveAnalyzerTest {
   private static final int HERO = CombatEvent.ATTACKER_HERO | CombatEvent.TARGET_HERO;
 
   @Autowired private BehaviourObjectiveAnalyzer analyzer;
+  @Autowired private BehaviourProperties properties;
   @Autowired private MapLayouts layouts;
   @Autowired private ReplayProcessingProperties processing;
   @Autowired private ReplayParseRunRepo runRepo;
@@ -209,6 +211,11 @@ class BehaviourObjectiveAnalyzerTest {
   }
 
   private void stored(String mapVersion, int lastEventSecond, boolean roshan, int samples) {
+    stored(mapVersion, lastEventSecond, roshan, samples, 80.0);
+  }
+
+  private void stored(
+      String mapVersion, int lastEventSecond, boolean roshan, int samples, double fightStart) {
     runRepo.saveAndFlush(
         ReplayParseRunDomain.builder()
             .matchId(MATCH)
@@ -226,8 +233,8 @@ class BehaviourObjectiveAnalyzerTest {
         FightDomain.builder()
             .matchId(MATCH)
             .fightIndex(1)
-            .startSeconds(80.0)
-            .endSeconds(100.0)
+            .startSeconds(fightStart)
+            .endSeconds(fightStart + 20)
             .winner("RADIANT")
             .build());
     importanceRepo.saveAndFlush(
@@ -242,7 +249,7 @@ class BehaviourObjectiveAnalyzerTest {
             .matchId(MATCH)
             .team("RADIANT")
             .startSeconds(0)
-            .endSeconds(300)
+            .endSeconds(1000)
             .state("BEHIND")
             .build());
     List<CombatEvent> events =
@@ -274,6 +281,47 @@ class BehaviourObjectiveAnalyzerTest {
             .eventCount(events.size())
             .data(CombatLogCodec.encode(events))
             .build());
+  }
+
+  @Test
+  void analyze_aFightBefore300SecondsStoresNoMissedRow() {
+    atTheDefaultMinimum();
+    stored(layouts.frozenVersion(), 300, false, 120, 280.0);
+
+    analyzer.analyze(MATCH);
+
+    assertThat(conversionRepo.findAll()).isEmpty();
+  }
+
+  @Test
+  void analyze_aFightAfter300SecondsStillGivesTheConvertedRow() {
+    atTheDefaultMinimum();
+    stored(layouts.frozenVersion(), 320, false, 120, 310.0);
+    buildingRepo.saveAndFlush(
+        BuildingKillContextDomain.builder()
+            .matchId(MATCH)
+            .buildingName("npc_dota_badguys_tower1_mid")
+            .kind("TOWER")
+            .ownerTeam("DIRE")
+            .seconds(360.0)
+            .denied(false)
+            .build());
+
+    analyzer.analyze(MATCH);
+
+    List<ObjectiveConversionDomain> rows = conversionRepo.findAll();
+    assertThat(rows).hasSize(1);
+    assertThat(rows.getFirst().getResult()).isEqualTo("CONVERTED");
+    assertThat(rows.getFirst().getObjectiveKind()).isEqualTo("TOWER");
+  }
+
+  @AfterEach
+  void restoreTheOverride() {
+    properties.setObjectiveMinFightSeconds(0);
+  }
+
+  private void atTheDefaultMinimum() {
+    properties.setObjectiveMinFightSeconds(new BehaviourProperties().getObjectiveMinFightSeconds());
   }
 
   @TestConfiguration
