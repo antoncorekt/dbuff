@@ -67,7 +67,7 @@ public class ReasonWording {
           "NO_VISION_BEFORE_FIGHT",
               v -> v.self() + " had no vision near the fight, " + v.other() + " did",
           "NO_DETECTION_VS_INVISIBLE",
-              v -> v.self() + " had no detection against an invisible enemy hero",
+              v -> v.self() + " had no detection against an invisible " + v.otherHero(),
           "LATE_WARD", v -> v.self() + "'s ward near the fight went down too late");
 
   /**
@@ -81,6 +81,10 @@ public class ReasonWording {
   }
 
   private record Voice(String self, String other, String otherOwner) {
+    String otherHero() {
+      return other.equals("the enemy") ? "enemy hero" : "hero of " + other;
+    }
+
     static Voice of(Perspective view, String storedTeam) {
       TeamSide losing =
           view.losing() != null ? view.losing() : Enums.find(TeamSide.class, storedTeam);

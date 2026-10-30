@@ -236,4 +236,14 @@ class ReasonWordingTest {
             WORDING.phrase(team("NO_DISABLE"), "x", new Perspective(TeamSide.DIRE, TeamSide.DIRE)))
         .isEqualTo("your team had no disable");
   }
+
+  @Test
+  void phrase_namesTheInvisibleHeroOnTheOtherTeam() {
+    FightReasonDomain detection = team("NO_DETECTION_VS_INVISIBLE");
+
+    assertThat(WORDING.phrase(detection, "x", new Perspective(TeamSide.DIRE, TeamSide.DIRE)))
+        .isEqualTo("your team had no detection against an invisible enemy hero");
+    assertThat(WORDING.phrase(detection, "x", new Perspective(TeamSide.DIRE, TeamSide.RADIANT)))
+        .isEqualTo("the enemy team had no detection against an invisible hero of your team");
+  }
 }
