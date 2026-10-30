@@ -864,9 +864,13 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     for (JsonNode p : new ObjectMapper().readTree(fixture(id + ".json").toFile()).get("players")) {
       long slot = p.get("player_slot").asLong();
       for (JsonNode entry : p.path("runes_log")) {
-        logged.add(List.of(slot, entry.get("time").asLong()));
+        JsonNode time = entry.path("time");
+        if (!time.isMissingNode() && !time.isNull()) {
+          logged.add(List.of(slot, time.asLong()));
+        }
       }
     }
+    assertThat(logged).as("%s: OpenDota runes_log has timed entries", id).isNotEmpty();
     List<List<Long>> uncovered =
         logged.stream()
             .filter(
@@ -886,9 +890,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     if (!uncovered.isEmpty()) {
       System.out.printf("%s: uncovered (slot, time) %s%n", id, uncovered);
     }
-    assertThat(logged.size() - uncovered.size())
+    assertThat((long) (logged.size() - uncovered.size()))
         .as(coverage)
-        .isGreaterThanOrEqualTo((int) Math.ceil(logged.size() * 0.95));
+        .isGreaterThanOrEqualTo((logged.size() * 95L + 99) / 100);
     assertThat(pickups)
         .extracting(RunePickupDomain::getRuneType)
         .as("%s: every rune code is known", id)
