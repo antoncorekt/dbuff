@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.analysis.role;
 
 import com.ako.dbuff.service.constant.data.AbilityConstant;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -30,9 +31,7 @@ public class SkillFunctions {
 
   /** Whether the skill is a passive one; a skill the constants do not know is not. */
   public boolean passive(String abilityName) {
-    return constant(abilityName)
-        .map(c -> c.getBehavior() != null && c.getBehavior().contains(PASSIVE))
-        .orElse(false);
+    return constant(abilityName).map(c -> hasBehavior(c, PASSIVE)).orElse(false);
   }
 
   /**
@@ -54,7 +53,7 @@ public class SkillFunctions {
     return c.getBehavior() != null && c.getBehavior().contains(behavior);
   }
 
-  private static boolean zero(java.util.List<Double> values) {
+  private static boolean zero(List<Double> values) {
     return values == null || values.stream().allMatch(v -> v == null || v == 0);
   }
 
