@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class SkillFunctions {
   private static final String PASSIVE = "Passive";
+  private static final String AUTOCAST = "Autocast";
+  private static final String HIDDEN = "Hidden";
   private static final String AD_SUFFIX = "_ad";
 
   private final HeroKits kits;
@@ -31,6 +33,29 @@ public class SkillFunctions {
     return constant(abilityName)
         .map(c -> c.getBehavior() != null && c.getBehavior().contains(PASSIVE))
         .orElse(false);
+  }
+
+  /**
+   * Whether the skill cannot be cast by hand: passive, autocast, hidden, or with neither a cooldown
+   * nor a mana cost. A skill the constants do not know is castable.
+   */
+  public boolean notCastable(String abilityName) {
+    return constant(abilityName)
+        .map(
+            c ->
+                hasBehavior(c, PASSIVE)
+                    || hasBehavior(c, AUTOCAST)
+                    || hasBehavior(c, HIDDEN)
+                    || (zero(c.getCd()) && zero(c.getMc())))
+        .orElse(false);
+  }
+
+  private static boolean hasBehavior(AbilityConstant c, String behavior) {
+    return c.getBehavior() != null && c.getBehavior().contains(behavior);
+  }
+
+  private static boolean zero(java.util.List<Double> values) {
+    return values == null || values.stream().allMatch(v -> v == null || v == 0);
   }
 
   private Optional<AbilityConstant> constant(String abilityName) {
