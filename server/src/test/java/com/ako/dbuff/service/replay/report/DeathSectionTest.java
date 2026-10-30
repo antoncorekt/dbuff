@@ -114,4 +114,28 @@ class DeathSectionTest {
     assertThat(section.view(new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3)))
         .isEmpty();
   }
+
+  @Test
+  void aDeathBeforeTheHornIsHiddenAndOneAtZeroStays() {
+    when(repo.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                death(0, -30, "BKB_READY_UNUSED", "npc_dota_hero_lycan"),
+                death(0, 0, "DISABLE_CHAIN", "npc_dota_hero_sven")));
+    ReplayReportInput in = new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3);
+
+    assertThat(section.lines(in))
+        .containsExactly(
+            "**Deaths**", "0:00 Anton died to Sven: disabled for 4.2 s in the last seconds");
+  }
+
+  @Test
+  void onlyPreHornDeathsGiveNoSection() {
+    when(repo.findByMatchId(1L))
+        .thenReturn(List.of(death(0, -5, "BKB_READY_UNUSED", "npc_dota_hero_lycan")));
+    ReplayReportInput in = new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3);
+
+    assertThat(section.lines(in)).isEmpty();
+    assertThat(section.view(in)).isEmpty();
+  }
 }

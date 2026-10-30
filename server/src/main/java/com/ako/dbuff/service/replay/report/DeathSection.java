@@ -67,7 +67,11 @@ public class DeathSection implements ReplayReportSection {
     for (Map.Entry<Long, String> player : input.namesBySlot().entrySet()) {
       deaths.stream()
           .filter(
-              d -> d.getPlayerSlot().equals(player.getKey()) && SEVERITY.containsKey(d.getReason()))
+              d ->
+                  d.getPlayerSlot().equals(player.getKey())
+                      && SEVERITY.containsKey(d.getReason())
+                      && d.getDeathSeconds() != null
+                      && d.getDeathSeconds() >= 0)
           .sorted(
               Comparator.comparingInt((DeathAnalysisDomain d) -> SEVERITY.get(d.getReason()))
                   .thenComparing(DeathAnalysisDomain::getDeathSeconds))
