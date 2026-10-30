@@ -97,7 +97,7 @@ class SkillPicksSectionTest {
     when(heroNames.iconBySlot(1L)).thenReturn(HEROES);
     MatchDomain match = MatchDomain.builder().id(1L).gameModeId(18L).build();
     return new ReplayReportInput(
-        1L, match, Set.of(focus), Map.of(0L, "Anton", 1L, "Olga"), maxFindings);
+        1L, match, Set.of(focus), Map.of(0L, "Anton (Pudge)", 1L, "Olga (Lina)"), maxFindings);
   }
 
   @Test
