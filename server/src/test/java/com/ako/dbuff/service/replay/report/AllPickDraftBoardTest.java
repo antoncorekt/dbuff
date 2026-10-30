@@ -9,6 +9,8 @@ import com.ako.dbuff.dao.repo.HeroDraftPickRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
 import com.ako.dbuff.service.replay.mode.TestModes;
+import com.ako.dbuff.service.replay.report.chart.SkillIconImages;
+import com.ako.dbuff.service.replay.report.chart.TableRenderer;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
@@ -38,12 +40,12 @@ class AllPickDraftBoardTest {
                   abilityHeroRepo,
                   mock(AbilityDraftPickRepo.class),
                   mock(AbilityDraftPoolRepo.class),
-                  mock(com.ako.dbuff.dao.repo.PlayerGameStatisticRepo.class),
+                  mock(PlayerGameStatisticRepo.class),
                   new AbilityDraftProfile(),
                   Prettify::ability,
                   heroNames,
-                  mock(com.ako.dbuff.service.replay.report.chart.SkillIconImages.class),
-                  mock(com.ako.dbuff.service.replay.report.chart.TableRenderer.class))),
+                  mock(SkillIconImages.class),
+                  mock(TableRenderer.class))),
           new PlainViewRenderer());
 
   private static DraftEventDomain event(int order, boolean pick, long hero, int team) {

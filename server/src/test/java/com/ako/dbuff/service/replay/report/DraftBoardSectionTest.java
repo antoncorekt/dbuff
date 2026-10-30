@@ -311,7 +311,7 @@ class DraftBoardSectionTest {
             "**Picks in draft order**",
             "15. Dire · Sven: hero Sven",
             "20. Radiant · Sniper: hero Sniper",
-            "3. Radiant · Sniper: Sniper Take Aim");
+            "Radiant · Sniper: Sniper Take Aim");
     assertThat(view.footnote()).contains("not known");
   }
 

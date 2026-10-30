@@ -104,7 +104,7 @@ public class AbilityDraftBoard implements DraftBoard {
 
   /** One turn of the draft: what was picked, by whom, shown as text and as picture cells. */
   private record Turn(
-      int number,
+      Integer number,
       TeamSide side,
       String line,
       String abilityName,
@@ -161,17 +161,21 @@ public class AbilityDraftBoard implements DraftBoard {
     if (turn == null) {
       return List.of(Cell.text(""), Cell.text(""));
     }
-    byte[] icon =
-        turn.heroId() != null
-            ? icons.hero(turn.heroId()).orElse(null)
-            : turn.abilityName() == null ? null : icons.ability(turn.abilityName()).orElse(null);
+    byte[] icon = icon(turn.heroId(), turn.abilityName());
     Color band =
         !turn.tracked()
             ? null
             : turn.side() == TeamSide.RADIANT ? ChartPalette.RADIANT : ChartPalette.DIRE;
     return List.of(
-        new Cell(icon, turn.name(), "#" + turn.number(), null),
+        new Cell(icon, turn.name(), turn.number() == null ? null : "#" + turn.number(), null),
         new Cell(null, turn.who(), null, band));
+  }
+
+  private byte[] icon(Long heroId, String abilityName) {
+    if (heroId != null) {
+      return icons.hero(heroId).orElse(null);
+    }
+    return abilityName == null ? null : icons.ability(abilityName).orElse(null);
   }
 
   private void addLeftOver(List<List<Cell>> rows, List<Leftover> leftOver) {
@@ -192,10 +196,7 @@ public class AbilityDraftBoard implements DraftBoard {
     }
     List<Cell> items = new ArrayList<>();
     for (Leftover item : shown) {
-      byte[] icon =
-          item.heroId() != null
-              ? icons.hero(item.heroId()).orElse(null)
-              : item.abilityName() == null ? null : icons.ability(item.abilityName()).orElse(null);
+      byte[] icon = icon(item.heroId(), item.abilityName());
       items.add(new Cell(icon, item.name(), null, null));
     }
     if (hidden > 0) {
@@ -259,15 +260,15 @@ public class AbilityDraftBoard implements DraftBoard {
                           null,
                           h.getHeroId())));
       picks.sort(Pick.DRAFT_ORDER);
+      boolean numbered = picks.stream().anyMatch(p -> p.turn() != null);
       List<Turn> turns = new ArrayList<>();
       for (Pick pick : picks) {
-        turns.add(turn(turns.size() + 1, pick));
+        turns.add(turn(numbered ? pick.turn() : Integer.valueOf(turns.size() + 1), pick));
       }
       return turns;
     }
 
-    private Turn turn(int sequence, Pick pick) {
-      int number = pick.turn() == null ? sequence : pick.turn();
+    private Turn turn(Integer number, Pick pick) {
       TeamSide side = TeamSide.ofSlot(pick.slot());
       String plainName =
           pick.hero()
@@ -280,7 +281,13 @@ public class AbilityDraftBoard implements DraftBoard {
               ? plainName
               : pick.abilityName() == null ? plainName : labels.decorated(pick.abilityName());
       String who = who(pick.slot());
-      String line = number + ". " + Prettify.team(side.name()) + " · " + who + ": " + decorated;
+      String line =
+          (number == null ? "" : number + ". ")
+              + Prettify.team(side.name())
+              + " · "
+              + who
+              + ": "
+              + decorated;
       return new Turn(
           number,
           side,

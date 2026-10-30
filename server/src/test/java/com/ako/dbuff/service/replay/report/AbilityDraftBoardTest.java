@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -25,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -193,6 +193,49 @@ class AbilityDraftBoardTest {
   }
 
   @Test
+  void view_numbersNoPickInventedWhenOnlySomeHaveATurn() {
+    fullDraft(true);
+    List<AbilityDraftPickDomain> skills = new ArrayList<>(skillRepo.findByMatchId(1L));
+    skills.set(
+        0,
+        AbilityDraftPickDomain.builder()
+            .pickOrder(1)
+            .playerSlot(0L)
+            .abilityName("hero_skill_0")
+            .build());
+    when(skillRepo.findByMatchId(1L)).thenReturn(skills);
+
+    List<String> lines =
+        board.view(input(Map.of())).orElseThrow().bullets().getFirst().lines().skip(1).toList();
+
+    assertThat(lines.getLast()).isEqualTo("Radiant · Hero100: Hero Skill 0");
+    assertThat(lines.stream().filter(l -> l.startsWith("1. "))).isEmpty();
+  }
+
+  @Test
+  void view_keepsTheTextWhenOneSideHasTooManyTurnsForThePicture() {
+    List<AbilityDraftPickDomain> skills = new ArrayList<>();
+    for (int i = 0; i < TableRenderer.MAX_ROWS + 1; i++) {
+      skills.add(
+          AbilityDraftPickDomain.builder()
+              .turnNumber(i + 1)
+              .playerSlot(0L)
+              .abilityName("hero_skill_" + i)
+              .build());
+    }
+    when(heroRepo.findByMatchId(1L))
+        .thenReturn(List.of(HeroDraftPickDomain.builder().matchId(1L).heroId(7L).build()));
+    when(skillRepo.findByMatchId(1L)).thenReturn(skills);
+    when(tables.render(any())).thenReturn(Optional.empty());
+
+    SectionView view = board.view(input(Map.of())).orElseThrow();
+
+    assertThat(view.image()).isNull();
+    assertThat(view.bullets().getFirst().lines().skip(1)).hasSize(TableRenderer.MAX_ROWS + 1);
+    assertThat(view.bullets()).contains(AbilityDraftBoard.NOT_DRAWN);
+  }
+
+  @Test
   void view_keepsTheTextAndSaysSoWhenThePictureFails() {
     fullDraft(true);
     when(tables.render(any())).thenReturn(Optional.empty());
@@ -207,12 +250,11 @@ class AbilityDraftBoardTest {
   @Test
   void view_isRenderedOncePerInput() {
     fullDraft(true);
-    ReplayReportInput in =
-        input(Set.of(0L).stream().collect(java.util.stream.Collectors.toMap(s -> s, s -> "A")));
+    ReplayReportInput in = input(Map.of(0L, "A"));
 
     board.view(in);
     board.view(in);
 
-    verify(tables, org.mockito.Mockito.times(1)).render(any());
+    verify(tables, times(1)).render(any());
   }
 }
