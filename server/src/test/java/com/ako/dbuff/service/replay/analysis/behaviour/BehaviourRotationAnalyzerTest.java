@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -60,6 +61,7 @@ class BehaviourRotationAnalyzerTest {
   private static final int SAMPLES = 40;
 
   @Autowired private BehaviourRotationAnalyzer analyzer;
+  @Autowired private BehaviourProperties properties;
   @Autowired private MapLayouts layouts;
   @Autowired private ReplayProcessingProperties processing;
   @Autowired private ReplayParseRunRepo runRepo;
@@ -174,6 +176,10 @@ class BehaviourRotationAnalyzerTest {
   }
 
   private void stored(String mapVersion) {
+    stored(mapVersion, 4, 60.0);
+  }
+
+  private void stored(String mapVersion, int tripStartSample, double fightStart) {
     runRepo.saveAndFlush(
         ReplayParseRunDomain.builder()
             .matchId(MATCH)
@@ -188,14 +194,14 @@ class BehaviourRotationAnalyzerTest {
     }
     track(
         4,
-        IntStream.range(0, SAMPLES).map(i -> i < 4 ? -1000 : -6000).toArray(),
-        IntStream.range(0, SAMPLES).map(i -> i < 4 ? -1000 : 5500).toArray());
+        IntStream.range(0, SAMPLES).map(i -> i < tripStartSample ? -1000 : -6000).toArray(),
+        IntStream.range(0, SAMPLES).map(i -> i < tripStartSample ? -1000 : 5500).toArray());
     fightRepo.saveAndFlush(
         FightDomain.builder()
             .matchId(MATCH)
             .fightIndex(0)
-            .startSeconds(60.0)
-            .endSeconds(80.0)
+            .startSeconds(fightStart)
+            .endSeconds(fightStart + 20)
             .winner("RADIANT")
             .build());
     fightPlayerRepo.saveAndFlush(
@@ -212,6 +218,35 @@ class BehaviourRotationAnalyzerTest {
             .eventCount(0)
             .data(CombatLogCodec.encode(List.of()))
             .build());
+  }
+
+  @Test
+  void analyze_storesNoRotationForATripThatStartsBefore120Seconds() {
+    atTheDefaultMinimum();
+    stored(layouts.frozenVersion(), 20, 160.0);
+
+    analyzer.analyze(MATCH);
+
+    assertThat(rotationRepo.findAll()).isEmpty();
+  }
+
+  @Test
+  void analyze_storesTheRotationOfATripThatStartsPast120Seconds() {
+    atTheDefaultMinimum();
+    stored(layouts.frozenVersion(), 26, 170.0);
+
+    analyzer.analyze(MATCH);
+
+    assertThat(rotationRepo.findAll()).hasSize(1);
+  }
+
+  @AfterEach
+  void restoreTheOverride() {
+    properties.setRotationMinStartSeconds(0);
+  }
+
+  private void atTheDefaultMinimum() {
+    properties.setRotationMinStartSeconds(new BehaviourProperties().getRotationMinStartSeconds());
   }
 
   @TestConfiguration

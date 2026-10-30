@@ -12,10 +12,15 @@ import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightAbilityUseRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
+import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerPhaseSummaryRepo;
 import com.ako.dbuff.dao.repo.PlayerRoleProfileRepo;
 import com.ako.dbuff.dao.repo.TeamCompositionRepo;
+import com.ako.dbuff.service.replay.analysis.role.HeroKits;
+import com.ako.dbuff.service.replay.analysis.role.SkillFunctions;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
+import com.ako.dbuff.service.replay.report.chart.SkillIconImages;
+import com.ako.dbuff.service.replay.report.chart.TableRenderer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -99,7 +104,15 @@ class PlayerLabelOnceTest {
                     .playerSlot(SLOT)
                     .abilityName("sven_storm_bolt")
                     .build()));
-    return new DraftSection(repo, new AbilityDraftProfile(), TestLabels.labels()).lines(INPUT);
+    return new DraftSection(
+            repo,
+            mock(PlayerGameStatisticRepo.class),
+            new AbilityDraftProfile(),
+            TestLabels.labels(),
+            mock(HeroKits.class),
+            mock(SkillIconImages.class),
+            mock(TableRenderer.class))
+        .lines(INPUT);
   }
 
   private static List<String> fights() {
@@ -137,7 +150,9 @@ class PlayerLabelOnceTest {
               .build());
     }
     when(abilityRepo.findByMatchId(1L)).thenReturn(uses);
-    return new FightSection(fightRepo, partRepo, abilityRepo, Prettify::ability).lines(INPUT);
+    return new FightSection(
+            fightRepo, partRepo, abilityRepo, Prettify::ability, mock(SkillFunctions.class))
+        .lines(INPUT);
   }
 
   private static List<String> movement() {

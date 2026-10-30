@@ -1207,4 +1207,125 @@ class ReplayReportServiceTest {
     verify(discord, Mockito.atLeastOnce())
         .sendThreadMessageBlocking(Mockito.eq(thread), Mockito.anyString());
   }
+
+  private static ReplayReportSection called(String name, boolean defaultEnabled, int order) {
+    return new ReplaySection() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public boolean defaultEnabled() {
+        return defaultEnabled;
+      }
+
+      @Override
+      public int order() {
+        return order;
+      }
+
+      @Override
+      public List<String> lines(ReplayReportInput input) {
+        return List.of("**" + name + "**", "line of " + name);
+      }
+    };
+  }
+
+  @Test
+  void deliverEverything_leavesOutHiddenWrongModeAndAiReasonsButKeepsOffByDefaultOnes() {
+    storedRun(ReplayStatus.DONE);
+    enable("hidden", false);
+    properties.setDefaultSections(List.of("alpha"));
+    service =
+        serviceWith(
+            called("alpha", true, 1),
+            called("offbydefault", false, 2),
+            called("hidden", true, 3),
+            called("ai-reasons", true, 4),
+            new AbilityDraftOnlySection() {
+              @Override
+              public String name() {
+                return "adonly";
+              }
+            });
+
+    assertThat(service.deliverEverything(1L, "i1")).isEqualTo(ReportDelivery.POSTED);
+
+    assertThat(posted())
+        .contains("line of alpha")
+        .contains("line of offbydefault")
+        .doesNotContain("line of hidden")
+        .doesNotContain("line of ai-reasons");
+    verify(postedRepo, never()).save(any());
+  }
+
+  @Test
+  void deliverEverything_leavesOutASectionOfAnotherMode() {
+    storedRun(ReplayStatus.DONE);
+    service = serviceWith(called("alpha", true, 1), new AbilityDraftOnlySection());
+    when(matchRepo.findById(1L))
+        .thenReturn(Optional.of(MatchDomain.builder().id(1L).gameModeId(22L).build()));
+
+    assertThat(service.deliverEverything(1L, "i1")).isEqualTo(ReportDelivery.POSTED);
+
+    assertThat(posted()).contains("line of alpha").doesNotContain("did something");
+  }
+
+  @Test
+  void deliverEverything_ignoresTheReportSwitchAndTheChannelsLists() {
+    storedRun(ReplayStatus.DONE);
+    properties.setEnabled(false);
+    service = serviceWith(called("alpha", false, 1));
+
+    assertThat(service.deliverEverything(1L, "i1")).isEqualTo(ReportDelivery.POSTED);
+  }
+
+  @Test
+  void deliverEverything_postsAllPagesOfAPagedSection() {
+    storedRun(ReplayStatus.DONE);
+    service = serviceWith(pagedGraph("graph", 3));
+
+    assertThat(service.everythingViews(1L, instance(null))).hasSize(3);
+    assertThat(service.deliverEverything(1L, "i1")).isEqualTo(ReportDelivery.POSTED);
+
+    ArgumentCaptor<List<FileUpload>> files = ArgumentCaptor.forClass(List.class);
+    verify(discord, Mockito.times(3))
+        .sendThreadMessageBlocking(Mockito.eq(thread), Mockito.anyString(), files.capture());
+    assertThat(files.getAllValues())
+        .extracting(f -> f.getFirst().getName())
+        .containsExactly("graph-1.png", "graph-2.png", "graph-3.png");
+  }
+
+  @Test
+  void deliverEverything_isCappedWithTheLeftOutNote() {
+    storedRun(ReplayStatus.DONE);
+    properties.setEverythingMaxMessages(2);
+    service = serviceWith(pagedGraph("graph", 5));
+
+    assertThat(service.deliverEverything(1L, "i1")).isEqualTo(ReportDelivery.POSTED);
+
+    ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
+    verify(discord, Mockito.times(2))
+        .sendThreadMessageBlocking(Mockito.eq(thread), text.capture(), any(List.class));
+    assertThat(String.join("\n", text.getAllValues())).contains("3 more left out");
+  }
+
+  @Test
+  void deliverEverything_saysWhyNothingWasPosted() {
+    storedRun(ReplayStatus.DONE);
+    service = serviceWith(emptySection("quiet"));
+
+    assertThat(service.deliverEverything(1L, "i1")).isEqualTo(ReportDelivery.SECTION_EMPTY);
+    when(runRepo.findByMatchIdAndParserVersion(any(), any())).thenReturn(Optional.empty());
+    assertThat(service.deliverEverything(1L, "i1")).isEqualTo(ReportDelivery.NOT_STORED);
+  }
+
+  @Test
+  void validate_rejectsAnEverythingCapOutsideOneToHundred() {
+    properties.setEverythingMaxMessages(0);
+    assertThatThrownBy(properties::validate).hasMessageContaining("everything-max-messages");
+    properties.setEverythingMaxMessages(101);
+    assertThatThrownBy(properties::validate).hasMessageContaining("everything-max-messages");
+  }
 }

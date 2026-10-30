@@ -112,7 +112,7 @@ final class MissedPickFinder {
     boolean sameMain = main.isPresent() && main.equals(skills.main(candidate.getAbilityName()));
     boolean bothDamage = takenDamage > 0 && candidateDamage > 0;
     boolean damageSkills = bothDamage && main.equals(Optional.of(RoleFunction.DAMAGE)) && sameMain;
-    boolean noDamage = !damageSkills;
+    boolean byFights = !damageSkills;
     String basis = DAMAGE;
     boolean flagged = false;
     if (damageSkills) {
@@ -136,7 +136,7 @@ final class MissedPickFinder {
         .basis(basis)
         .takenDamage(takenDamage)
         .candidateDamage(candidateDamage)
-        .ratio(noDamage ? null : (double) candidateDamage / takenDamage)
+        .ratio(byFights ? null : (double) candidateDamage / takenDamage)
         .candidateWonFights(candidateWon)
         .enemyWonFights(casts.teamWon(TeamSide.ofSlot(candidate.getPlayerSlot())))
         .takenWonFights(takenWon)

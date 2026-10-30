@@ -19,6 +19,8 @@ import com.ako.dbuff.service.discord.icon.IconText;
 import com.ako.dbuff.service.discord.icon.TestIcons;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
 import com.ako.dbuff.service.replay.mode.AbilityDraftProfile;
+import com.ako.dbuff.service.replay.report.chart.SkillIconImages;
+import com.ako.dbuff.service.replay.report.chart.TableRenderer;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.ComponentsViewRenderer;
 import com.ako.dbuff.service.replay.report.view.MessageLimits;
@@ -305,9 +307,12 @@ class ReportIconsTest {
                     heroRepo,
                     skillRepo,
                     poolRepo,
+                    mock(PlayerGameStatisticRepo.class),
                     new AbilityDraftProfile(),
                     labels(icons),
-                    heroNames(icons))),
+                    heroNames(icons),
+                    mock(SkillIconImages.class),
+                    mock(TableRenderer.class))),
             plain);
     SectionView view =
         section
@@ -361,9 +366,12 @@ class ReportIconsTest {
                     heroRepo,
                     skillRepo,
                     poolRepo,
+                    mock(PlayerGameStatisticRepo.class),
                     new AbilityDraftProfile(),
                     labels(icons),
-                    heroNames(icons))),
+                    heroNames(icons),
+                    mock(SkillIconImages.class),
+                    mock(TableRenderer.class))),
             new PlainViewRenderer());
     return section
         .view(new ReplayReportInput(1L, abilityDraftMatch(), Set.of(), Map.of(), 3))

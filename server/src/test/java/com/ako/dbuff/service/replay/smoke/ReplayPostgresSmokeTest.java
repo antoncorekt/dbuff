@@ -419,6 +419,21 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                           java.util.Set.of(0L),
                           java.util.Map.of(0L, "P0"),
                           3))));
+      ReplayReportInput draftInput =
+          new ReplayReportInput(
+              match.getId(), match, java.util.Set.of(0L), java.util.Map.of(0L, "P0"), 3);
+      if (draftPickRepo.findByMatchId(match.getId()).stream()
+          .anyMatch(d -> Long.valueOf(0).equals(d.getPlayerSlot()) && d.getAbilityName() != null)) {
+        assertThat(draftSection.view(draftInput).orElseThrow().image())
+            .as("the draft view of %s carries its picture", id)
+            .isNotNull();
+      }
+      var boardView = draftBoardSection.view(draftInput).orElseThrow();
+      assertThat(boardView.image()).as("the draft board of %s carries its picture", id).isNotNull();
+      assertThat(boardView.bullets().getFirst().lines().skip(1))
+          .as("the draft board lines of %s", id)
+          .isNotEmpty()
+          .allMatch(line -> line.matches("\\d+\\. (Radiant|Dire) · .*: .*"));
       System.out.println(
           "DRAFT RAW "
               + id
@@ -824,7 +839,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   }
 
   /**
-   * Every rune of OpenDota's log is a pickup, bounty gold is paid, and the opening has a winner.
+   * The stored rune events give exactly the stored pickups, at least 95% of OpenDota's distinct
+   * (player slot, time) rune log entries have a pickup of that slot within a second, bounty gold is
+   * paid, and the opening has a winner.
    */
   private void assertRunes(String id, long matchId) throws Exception {
     long expected =
@@ -843,6 +860,35 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(pickups)
         .as("%s: one pickup per slot, second and rune type of the logged runes", id)
         .hasSize((int) expected);
+    Set<List<Long>> logged = new TreeSet<>(Comparator.comparing(List::toString));
+    for (JsonNode p : new ObjectMapper().readTree(fixture(id + ".json").toFile()).get("players")) {
+      long slot = p.get("player_slot").asLong();
+      for (JsonNode entry : p.path("runes_log")) {
+        logged.add(List.of(slot, entry.get("time").asLong()));
+      }
+    }
+    List<List<Long>> uncovered =
+        logged.stream()
+            .filter(
+                pair ->
+                    pickups.stream()
+                        .noneMatch(
+                            r ->
+                                r.getPlayerSlot() != null
+                                    && r.getSeconds() != null
+                                    && r.getPlayerSlot().equals(pair.get(0))
+                                    && Math.abs(r.getSeconds() - pair.get(1)) <= 1))
+            .toList();
+    String coverage =
+        "%s: %d of %d OpenDota runes have a pickup"
+            .formatted(id, logged.size() - uncovered.size(), logged.size());
+    System.out.printf("%s%n", coverage);
+    if (!uncovered.isEmpty()) {
+      System.out.printf("%s: uncovered (slot, time) %s%n", id, uncovered);
+    }
+    assertThat(logged.size() - uncovered.size())
+        .as(coverage)
+        .isGreaterThanOrEqualTo((int) Math.ceil(logged.size() * 0.95));
     assertThat(pickups)
         .extracting(RunePickupDomain::getRuneType)
         .as("%s: every rune code is known", id)

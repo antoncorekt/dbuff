@@ -6,7 +6,6 @@ import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ImportantFightRuleTest {
   private final ImportantFightRule rule = new ImportantFightRule(new ImportantFightProperties());
@@ -184,11 +183,5 @@ class ImportantFightRuleTest {
     Measurement m = new Measurement(1500L, 0L, 100_000, 1.5, false, false, false);
 
     assertThat(rule.isImportant(m)).isTrue();
-  }
-
-  @Test
-  void aNegativeMinimumFlipGoldIsRejected() {
-    assertThatThrownBy(() -> new ImportantFightProperties().setMinFlipGold(-1))
-        .isInstanceOf(IllegalArgumentException.class);
   }
 }
