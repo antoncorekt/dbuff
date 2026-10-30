@@ -1,5 +1,6 @@
 package com.ako.dbuff.service.replay.analysis.importance;
 
+import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -20,13 +21,6 @@ public class ImportantFightProperties {
   /** A lead flip to the winner counts only when the winner gained at least this much gold. */
   private long minFlipGold = 1500;
 
-  public void setMinFlipGold(long minFlipGold) {
-    if (minFlipGold < 0) {
-      throw new IllegalArgumentException("min-flip-gold must be >= 0");
-    }
-    this.minFlipGold = minFlipGold;
-  }
-
   /** How long after the fight the advantage is still read, to cover the one-minute resolution. */
   private int lagSeconds = 60;
 
@@ -35,4 +29,15 @@ public class ImportantFightProperties {
 
   /** A slope break needs the advantage to move at least this much on both sides of the fight. */
   private long minSlopeGold = 300;
+
+  @PostConstruct
+  void validate() {
+    require(minFlipGold >= 0, "min-flip-gold must not be negative, not " + minFlipGold);
+  }
+
+  private static void require(boolean ok, String message) {
+    if (!ok) {
+      throw new IllegalStateException("replay.analysis.important-fights." + message);
+    }
+  }
 }
