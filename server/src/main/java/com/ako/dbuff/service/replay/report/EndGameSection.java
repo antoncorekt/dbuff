@@ -17,8 +17,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -32,8 +30,7 @@ public class EndGameSection implements ReplayReportSection {
   private final EndGameSummaryRepo summaryRepo;
   private final ReplayReportProperties properties;
 
-  @Setter(onMethod_ = @Autowired(required = false))
-  private EndGameProperties endGameProperties = new EndGameProperties();
+  private final EndGameProperties endGameProperties;
 
   @Override
   public String name() {
