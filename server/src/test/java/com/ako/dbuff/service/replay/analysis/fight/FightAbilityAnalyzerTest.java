@@ -21,6 +21,7 @@ import com.ako.dbuff.service.replay.analysis.activity.StoredActivity;
 import com.ako.dbuff.service.replay.analysis.importance.AdvantageSeriesReader;
 import com.ako.dbuff.service.replay.analysis.importance.ImportantFightProperties;
 import com.ako.dbuff.service.replay.analysis.importance.ImportantFightRule;
+import com.ako.dbuff.service.replay.analysis.role.SkillFunctions;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import com.ako.dbuff.service.replay.map.MapLayouts;
 import com.ako.dbuff.service.replay.map.MatchMapLayout;
@@ -57,6 +58,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 class FightAbilityAnalyzerTest {
 
+  @Test
+  void version_isFourSincePassivesLeftTheUses() {
+    assertThat(analyzer.version()).isEqualTo(4);
+  }
+
   private static final long MATCH = 12L;
 
   @Autowired private ReplayPlayerRepo playerRepo;
@@ -86,7 +92,7 @@ class FightAbilityAnalyzerTest {
     assertThat(cast.getManaCost()).isEqualTo(100);
     assertThat(cast.getManaAtStart()).isEqualTo(400);
     assertThat(cast.getNonCastReason()).isNull();
-    assertThat(cast.getAnalysisVersion()).isEqualTo(3);
+    assertThat(cast.getAnalysisVersion()).isEqualTo(4);
     FightAbilityUseDomain missed =
         uses.stream().filter(u -> u.getPlayerSlot() == 128L).findFirst().orElseThrow();
     assertThat(missed.getCasts()).isZero();
@@ -280,6 +286,11 @@ class FightAbilityAnalyzerTest {
     @Bean
     ObjectMapper objectMapper() {
       return new ObjectMapper();
+    }
+
+    @Bean
+    SkillFunctions skillFunctions() {
+      return org.mockito.Mockito.mock(SkillFunctions.class);
     }
   }
 }

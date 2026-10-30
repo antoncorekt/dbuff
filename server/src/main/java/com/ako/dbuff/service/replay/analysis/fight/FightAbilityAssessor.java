@@ -8,6 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Says for one hero in one fight which of his abilities and items he used, and when not, why. It
@@ -21,13 +22,19 @@ public final class FightAbilityAssessor {
 
   private final Set<String> ignoredItems;
 
+  private final Predicate<String> passive;
+
   /**
    * @param ignoredItems items never meant to be cast in a fight; teleports are covered by
    *     AbsenceReason, which reads the state timeline
+   * @param passive whether an ability is passive by the constants' behaviour; such an ability is
+   *     never meant to be used, whatever cooldown it shows
    */
-  public FightAbilityAssessor(int earlyDeathSeconds, Set<String> ignoredItems) {
+  public FightAbilityAssessor(
+      int earlyDeathSeconds, Set<String> ignoredItems, Predicate<String> passive) {
     this.earlyDeathSeconds = earlyDeathSeconds;
     this.ignoredItems = ignoredItems;
+    this.passive = passive;
   }
 
   /**
@@ -118,7 +125,9 @@ public final class FightAbilityAssessor {
       double start, HeroStateTimeline state, Map<String, List<CombatEvent>> byName) {
     Set<String> names = new LinkedHashSet<>();
     for (String ability : state.learnedAbilities()) {
-      if (state.level(ability, start) >= 1 && usable(ability, start, state, byName)) {
+      if (!passive.test(ability)
+          && state.level(ability, start) >= 1
+          && usable(ability, start, state, byName)) {
         names.add(ability);
       }
     }
@@ -130,7 +139,10 @@ public final class FightAbilityAssessor {
     return names;
   }
 
-  /** Passives and toggles never show a cooldown, a cost or a use, so they are left out. */
+  /**
+   * Passive by the constants' behaviour (see {@code passive}), or never on cooldown, with no mana
+   * cost and never cast, is not meant to be used.
+   */
   private static boolean usable(
       String name, double start, HeroStateTimeline state, Map<String, List<CombatEvent>> byName) {
     return state.everOnCooldown(name)

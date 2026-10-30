@@ -6,6 +6,7 @@ import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.repo.FightAbilityUseRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
 import com.ako.dbuff.dao.repo.FightRepo;
+import com.ako.dbuff.service.replay.analysis.role.SkillFunctions;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
@@ -24,8 +25,9 @@ class FightSectionTest {
   private final FightRepo fightRepo = mock(FightRepo.class);
   private final FightPlayerRepo partRepo = mock(FightPlayerRepo.class);
   private final FightAbilityUseRepo abilityRepo = mock(FightAbilityUseRepo.class);
+  private final SkillFunctions skills = mock(SkillFunctions.class);
   private final FightSection section =
-      new FightSection(fightRepo, partRepo, abilityRepo, Prettify::ability);
+      new FightSection(fightRepo, partRepo, abilityRepo, Prettify::ability, skills);
 
   private ReplayReportInput input() {
     return new ReplayReportInput(1L, null, Set.of(128L), Map.of(128L, "Anton"), 3);
@@ -87,6 +89,32 @@ class FightSectionTest {
             "23:10 teamfight (lost, deaths 1 to 4): Anton was farming away from it, with no"
                 + " teleport.",
             "Anton had Faceless Void Chronosphere ready and did not cast it in 2 of 3 fights.");
+  }
+
+  @Test
+  void lines_leaveOutAPassiveAbilityStoredAsReadyNotCast() {
+    when(fightRepo.findByMatchId(1L)).thenReturn(List.of());
+    when(partRepo.findByMatchId(1L)).thenReturn(List.of());
+    when(skills.passive("axe_counter_helix")).thenReturn(true);
+    List<FightAbilityUseDomain> uses = new ArrayList<>();
+    for (String ability : List.of("axe_counter_helix", "axe_culling_blade")) {
+      for (int i = 0; i < 3; i++) {
+        uses.add(
+            FightAbilityUseDomain.builder()
+                .fightIndex(i)
+                .playerSlot(128L)
+                .abilityName(ability)
+                .nonCastReason("READY_NOT_CAST")
+                .build());
+      }
+    }
+    when(abilityRepo.findByMatchId(1L)).thenReturn(uses);
+
+    List<String> lines = section.lines(input());
+
+    assertThat(String.join("\n", lines))
+        .contains("Axe Culling Blade")
+        .doesNotContain("Counter Helix");
   }
 
   @Test

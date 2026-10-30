@@ -17,6 +17,7 @@ import com.ako.dbuff.service.replay.CombatLogReader;
 import com.ako.dbuff.service.replay.PlayerSlots;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalysisProperties;
 import com.ako.dbuff.service.replay.analysis.ReplayAnalyzer;
+import com.ako.dbuff.service.replay.analysis.role.SkillFunctions;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimeline;
 import com.ako.dbuff.service.replay.analysis.state.HeroStateTimelines;
 import java.util.ArrayList;
@@ -52,6 +53,7 @@ public class FightAbilityAnalyzer implements ReplayAnalyzer {
   private final HeroStateTimelines timelines;
   private final CombatLogReader combatLog;
   private final ReplayAnalysisProperties properties;
+  private final SkillFunctions skills;
 
   @Override
   public String name() {
@@ -60,7 +62,7 @@ public class FightAbilityAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 3;
+    return 4;
   }
 
   @Override
@@ -85,7 +87,9 @@ public class FightAbilityAnalyzer implements ReplayAnalyzer {
     Map<Integer, HeroStateTimeline> states = timelines.load(matchId);
     FightAbilityAssessor assessor =
         new FightAbilityAssessor(
-            properties.getFightEarlyDeathSeconds(), properties.fightAbilityIgnoredItems());
+            properties.getFightEarlyDeathSeconds(),
+            properties.fightAbilityIgnoredItems(),
+            skills::passive);
     Map<Integer, FightDomain> fightByIndex = new HashMap<>();
     fights.forEach(f -> fightByIndex.put(f.getFightIndex(), f));
     List<FightAbilityUseDomain> rows = new ArrayList<>();
