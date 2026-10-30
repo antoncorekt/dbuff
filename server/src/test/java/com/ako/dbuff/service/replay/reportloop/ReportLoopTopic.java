@@ -9,6 +9,7 @@ import com.ako.dbuff.service.replay.looprunner.ReviewLoopDiff.Section;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopMatchList;
 import com.ako.dbuff.service.replay.looprunner.ReviewLoopTopic;
 import com.ako.dbuff.service.replay.mode.GameModeRegistry;
+import com.ako.dbuff.service.replay.report.OpenDotaSection;
 import com.ako.dbuff.service.replay.report.ReplayReportProperties;
 import com.ako.dbuff.service.replay.report.ReplayReportSection;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
@@ -74,7 +75,11 @@ class ReportLoopTopic implements ReviewLoopTopic {
                           null,
                           null,
                           null,
-                          context.getBeanProvider(ReplayReportSection.class).stream().toList(),
+                          context
+                              .getBeanProvider(ReplayReportSection.class)
+                              .orderedStream()
+                              .filter(sec -> !OpenDotaSection.NAME.equals(sec.name()))
+                              .toList(),
                           context.getBean(SectionSwitch.class),
                           null,
                           null,
