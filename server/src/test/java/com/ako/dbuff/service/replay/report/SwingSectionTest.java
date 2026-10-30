@@ -17,7 +17,6 @@ import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.Ma
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.RankedReason;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.SwingExplanation;
 import com.ako.dbuff.service.replay.report.view.Accent;
-import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.List;
 import java.util.Map;
@@ -169,10 +168,10 @@ class SwingSectionTest {
     assertThat(lines).hasSize(3);
     assertThat(lines.get(0)).isEqualTo("**Swings**");
     assertThat(lines.get(1))
-        .startsWith("20:00-23:00: Dire gained 3.0k net worth")
+        .startsWith("20:00-23:00: swung 3.0k gold toward Dire")
         .contains("buildings");
     assertThat(lines.get(2))
-        .startsWith("28:00-31:00: Dire gained 7.4k net worth and took the lead")
+        .startsWith("28:00-31:00: swung 7.4k gold toward Dire and took the lead")
         .contains("a won fight (kills 62%, Roshan 21%)");
   }
 
@@ -445,7 +444,7 @@ class SwingSectionTest {
   }
 
   @Test
-  void view_namesTheBiggestSwingAndKeepsPlainTextAsItWas() {
+  void view_namesTheBiggestSwingOnceAndKeepsTheOthersAsBullets() {
     when(spikeRepo.findByMatchId(1L))
         .thenReturn(
             List.of(
@@ -458,17 +457,76 @@ class SwingSectionTest {
     ViewRendering.assertWithinLimits(view);
     assertThat(view.title()).isEqualTo("Swings");
     assertThat(view.verdict())
-        .isEqualTo("Biggest swing: Dire (your team) gained 9.0k net worth between 40:00 and 43:00");
+        .isEqualTo(
+            "Biggest swing: 40:00-43:00: swung 9.0k gold toward Dire (your team) and took the"
+                + " lead, mostly from buildings");
+    assertThat(view.bullets())
+        .containsExactly(
+            "23:00-26:00: swung 5.0k gold toward Dire (your team), mostly from a won fight");
     assertThat(view.accent()).isEqualTo(Accent.WIN);
     assertThat(section.view(radiant).orElseThrow().accent()).isEqualTo(Accent.LOSS);
     assertThat(section.view(input()).orElseThrow().accent()).isEqualTo(Accent.NEUTRAL);
     assertThat(String.join("\n", section.lines(input())))
         .isEqualTo(
             "**Swings**\n"
-                + "23:00-26:00: Dire gained 5.0k net worth, mostly from a won fight\n"
-                + "40:00-43:00: Dire gained 9.0k net worth and took the lead, mostly from"
+                + "23:00-26:00: swung 5.0k gold toward Dire, mostly from a won fight\n"
+                + "40:00-43:00: swung 9.0k gold toward Dire and took the lead, mostly from"
                 + " buildings");
-    assertThat(new PlainViewRenderer().lines(view)).isEqualTo(section.lines(dire));
+  }
+
+  @Test
+  void view_keepsTheLostFightsOfTheBiggestSwingUnderTheVerdict() {
+    when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spike(0, 1300, 5000, "FIGHT_WIN", false)));
+    heroes();
+    explain(0, lost(4, 1390.0, 3200L, ranked(1, "PLAYER", 3L, "NO_TP", "x")));
+
+    SectionView view = section.view(input()).orElseThrow();
+
+    assertThat(view.bullets())
+        .containsExactly("Radiant lost 3.2k from the fight at 23:10: Venomancer had no teleport");
+  }
+
+  private static GameSpikeFactorDomain source(String ref, double share) {
+    return GameSpikeFactorDomain.builder()
+        .spikeIndex(0)
+        .factorType("SOURCE")
+        .ref(ref)
+        .sharePercent(share)
+        .build();
+  }
+
+  @Test
+  void lines_sayFromBothSourcesOnATieAndMostlyFromOnlyWithAClearLead() {
+    when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spike(0, 600, 3800, "CARRY_FARM", false)));
+    when(factorRepo.findByMatchId(1L))
+        .thenReturn(List.of(source("FARM", 25.0), source("HERO_KILLS", 25.0)));
+
+    assertThat(section.lines(input()).get(1))
+        .isEqualTo(
+            "10:00-13:00: swung 3.8k gold toward Dire, from farming and kills"
+                + " (farming 25%, kills 25%)");
+
+    when(factorRepo.findByMatchId(1L))
+        .thenReturn(List.of(source("FARM", 40.0), source("HERO_KILLS", 25.0)));
+    assertThat(section.lines(input()).get(1))
+        .contains(", mostly from farming (farming 40%, kills 25%)");
+
+    when(factorRepo.findByMatchId(1L)).thenReturn(List.of(source("FARM", 40.0)));
+    assertThat(section.lines(input()).get(1)).contains(", mostly from farming (farming 40%)");
+  }
+
+  @Test
+  void lines_listTheLostFightsOfASwingInTimeOrder() {
+    oneSwing();
+    explain(
+        0,
+        lost(5, 1500.0, 900L, ranked(1, "PLAYER", 3L, "NO_TP", "x")),
+        lost(4, 1390.0, 3200L, ranked(1, "PLAYER", 3L, "NO_TP", "x")));
+
+    List<String> lines = section.lines(input());
+
+    assertThat(lines.get(2)).contains("23:10");
+    assertThat(lines.get(3)).contains("25:00");
   }
 
   @Test

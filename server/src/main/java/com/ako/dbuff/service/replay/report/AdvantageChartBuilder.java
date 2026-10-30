@@ -137,9 +137,9 @@ public class AdvantageChartBuilder {
     String label =
         String.format(
             Locale.ROOT,
-            "%s gained %s%s",
-            Prettify.teamOf(spike.getBenefitingTeam(), yours),
+            "Swung %s gold toward %s%s",
             ChartFormat.compact(spike.getDeltaGold()),
+            Prettify.teamOf(spike.getBenefitingTeam(), yours),
             cause.isEmpty() ? "" : " from " + cause);
     return new ChartSpec.Marker(
         (spike.getStartSeconds() + spike.getEndSeconds()) / 2.0, label, colour(winner).darker());

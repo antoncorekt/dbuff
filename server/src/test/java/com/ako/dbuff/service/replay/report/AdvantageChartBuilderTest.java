@@ -96,7 +96,7 @@ class AdvantageChartBuilderTest {
     assertThat(chart.spec().bands().get(0).startSeconds()).isEqualTo(40);
     assertThat(chart.spec().markers()).hasSize(1);
     assertThat(chart.spec().markers().get(0).label())
-        .isEqualTo("Radiant (your team) gained 3.1k from a won fight");
+        .isEqualTo("Swung 3.1k gold toward Radiant (your team) from a won fight");
     assertThat(chart.spec().markers().get(0).seconds()).isEqualTo(90);
     assertThat(chart.spec().legend()).hasSize(2);
   }
@@ -150,7 +150,7 @@ class AdvantageChartBuilderTest {
     List<ChartSpec.Marker> markers = builder.build(1L, null, 5).orElseThrow().spec().markers();
 
     assertThat(markers).hasSize(1);
-    assertThat(markers.get(0).label()).isEqualTo("Dire gained 900 from buildings");
+    assertThat(markers.get(0).label()).isEqualTo("Swung 900 gold toward Dire from buildings");
   }
 
   @Test
