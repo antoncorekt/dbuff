@@ -59,8 +59,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FightAbilityAnalyzerTest {
 
   @Test
-  void version_isFourSincePassivesLeftTheUses() {
-    assertThat(analyzer.version()).isEqualTo(4);
+  void version_isFiveSinceItemsAndAutocastLeftTheReadyOnes() {
+    assertThat(analyzer.version()).isEqualTo(5);
   }
 
   private static final long MATCH = 12L;
@@ -92,7 +92,7 @@ class FightAbilityAnalyzerTest {
     assertThat(cast.getManaCost()).isEqualTo(100);
     assertThat(cast.getManaAtStart()).isEqualTo(400);
     assertThat(cast.getNonCastReason()).isNull();
-    assertThat(cast.getAnalysisVersion()).isEqualTo(4);
+    assertThat(cast.getAnalysisVersion()).isEqualTo(5);
     FightAbilityUseDomain missed =
         uses.stream().filter(u -> u.getPlayerSlot() == 128L).findFirst().orElseThrow();
     assertThat(missed.getCasts()).isZero();
@@ -115,6 +115,22 @@ class FightAbilityAnalyzerTest {
         .extracting(FightAbilityUseDomain::getAbilityName)
         .contains("item_blink")
         .doesNotContain("item_quelling_blade");
+  }
+
+  @Test
+  void analyze_neverCountsAMagicStickAsReadyNotCast() {
+    stored();
+    item("item_magic_stick", StateChangeKind.ITEM_ADDED, 1.0, null);
+    item("item_magic_stick", StateChangeKind.COOLDOWN, 50.0, 400.0);
+    fightAnalyzer.analyze(MATCH);
+
+    analyzer.analyze(MATCH);
+
+    assertThat(useRepo.findAll())
+        .noneMatch(
+            u ->
+                "item_magic_stick".equals(u.getAbilityName())
+                    && "READY_NOT_CAST".equals(u.getNonCastReason()));
   }
 
   private void item(String name, StateChangeKind kind, double at, Double readyAt) {
