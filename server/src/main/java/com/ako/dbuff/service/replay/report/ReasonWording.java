@@ -4,6 +4,8 @@ import com.ako.dbuff.dao.model.FightReasonDomain;
 import com.ako.dbuff.service.discord.icon.IconText;
 import com.ako.dbuff.service.replay.analysis.composition.CompositionToken;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.RankedReason;
+import com.ako.dbuff.service.replay.analysis.reason.Enums;
+import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.analysis.rune.RuneEvidence;
 import java.util.Arrays;
 import java.util.List;
@@ -60,12 +62,41 @@ public class ReasonWording {
               "ROTATION_DIED_BEFORE_FIGHT",
               (w, e) -> "died on a rotation just before the fight and missed it"));
 
-  private static final Map<String, Function<String, String>> VISION_PHRASES =
+  private static final Map<String, Function<Voice, String>> VISION_PHRASES =
       Map.of(
-          "NO_VISION_BEFORE_FIGHT", e -> "the team had no vision near the fight, the enemy did",
+          "NO_VISION_BEFORE_FIGHT",
+              v -> v.self() + " had no vision near the fight, " + v.other() + " did",
           "NO_DETECTION_VS_INVISIBLE",
-              e -> "the team had no detection against an invisible enemy hero",
-          "LATE_WARD", e -> "the team's ward near the fight went down too late");
+              v -> v.self() + " had no detection against an invisible enemy hero",
+          "LATE_WARD", v -> v.self() + "'s ward near the fight went down too late");
+
+  /**
+   * Who a team reason is about, from the reader's side.
+   *
+   * @param losing the team the reason belongs to; null when not known
+   * @param yours the reader's team; null when the reader has no side
+   */
+  public record Perspective(TeamSide losing, TeamSide yours) {
+    static final Perspective NEUTRAL = new Perspective(null, null);
+  }
+
+  private record Voice(String self, String other, String otherOwner) {
+    static Voice of(Perspective view, String storedTeam) {
+      TeamSide losing =
+          view.losing() != null ? view.losing() : Enums.find(TeamSide.class, storedTeam);
+      if (losing == null) {
+        return new Voice(TEAM, "the enemy", "the enemy ");
+      }
+      if (view.yours() == null) {
+        String self = Prettify.team(losing.name());
+        String other = Prettify.team(losing.opponent().name());
+        return new Voice(self, other, other + "'s ");
+      }
+      return view.yours() == losing
+          ? new Voice("your team", "the enemy", "the enemy ")
+          : new Voice("the enemy team", "your team", "your ");
+    }
+  }
 
   private final AbilityLabels labels;
 
@@ -74,8 +105,12 @@ public class ReasonWording {
   }
 
   public String phrase(FightReasonDomain reason, String hero) {
+    return phrase(reason, hero, Perspective.NEUTRAL);
+  }
+
+  public String phrase(FightReasonDomain reason, String hero, Perspective view) {
     if (TEAM_REASON.equals(reason.getScope())) {
-      return teamPhrase(reason.getCode(), reason.getEvidence());
+      return teamPhrase(reason, Voice.of(view, reason.getTeam()));
     }
     String evidence = reason.getEvidence() == null ? "" : reason.getEvidence().trim();
     BiFunction<ReasonWording, String, String> known = PLAYER_PHRASES.get(reason.getCode());
@@ -97,29 +132,42 @@ public class ReasonWording {
    * not known.
    */
   public Optional<String> phrase(FightReasonDomain reason, Map<Long, String> heroes) {
+    return phrase(reason, heroes, Perspective.NEUTRAL);
+  }
+
+  private Optional<String> phrase(
+      FightReasonDomain reason, Map<Long, String> heroes, Perspective view) {
     String hero = reason.getSubjectSlot() == null ? null : heroes.get(reason.getSubjectSlot());
     if (hero == null && !TEAM_REASON.equals(reason.getScope())) {
       return Optional.empty();
     }
-    return Optional.of(phrase(reason, hero));
+    return Optional.of(phrase(reason, hero, view));
   }
 
   /** The first {@code limit} ranked reasons that can be worded, joined with commas. */
   public String ranked(List<RankedReason> reasons, Map<Long, String> heroes, int limit) {
+    return ranked(reasons, heroes, limit, Perspective.NEUTRAL);
+  }
+
+  /** As {@link #ranked(List, Map, int)}, with the team reasons phrased from the reader's side. */
+  public String ranked(
+      List<RankedReason> reasons, Map<Long, String> heroes, int limit, Perspective view) {
     return reasons.stream()
         .filter(RankedReason::ranked)
-        .map(r -> phrase(r.reason(), heroes))
+        .map(r -> phrase(r.reason(), heroes, view))
         .flatMap(Optional::stream)
         .limit(limit)
         .collect(Collectors.joining(", "));
   }
 
-  private String teamPhrase(String code, String evidence) {
+  private String teamPhrase(FightReasonDomain reason, Voice voice) {
+    String code = reason.getCode();
+    String evidence = reason.getEvidence();
     if (ENEMY_RUNE.equals(code)) {
       List<RuneEvidence> runes = RuneEvidence.parseAll(evidence);
       return runes.isEmpty()
-          ? TEAM + ": the enemy had a rune effect"
-          : "the enemy "
+          ? voice.self() + ": " + voice.other() + " had a rune effect"
+          : voice.otherOwner()
               + runes.stream()
                   .map(
                       r ->
@@ -127,20 +175,20 @@ public class ReasonWording {
                               .formatted(r.hero(), article(r.rune()), r.rune(), r.timing()))
                   .collect(Collectors.joining(", "));
     }
-    Function<String, String> vision = code == null ? null : VISION_PHRASES.get(code);
+    Function<Voice, String> vision = code == null ? null : VISION_PHRASES.get(code);
     if (vision != null) {
-      return vision.apply(evidence == null ? "" : evidence.trim());
+      return vision.apply(voice);
     }
     if (!CompositionToken.isToken(code)) {
       String note = evidence == null ? "" : evidence.trim();
       if (note.isEmpty()) {
-        return TEAM + " had a gap";
+        return voice.self() + " had a gap";
       }
-      return ABOUT_A_TEAM.matcher(note).find() ? note : TEAM + ": " + note;
+      return ABOUT_A_TEAM.matcher(note).find() ? note : voice.self() + ": " + note;
     }
     String words = CompositionToken.words(code);
     boolean has = words.startsWith("no ") || Character.isDigit(words.charAt(0));
-    return TEAM + (has ? " had " : ": ") + words;
+    return voice.self() + (has ? " had " : ": ") + words;
   }
 
   private String tookRune(String evidence) {

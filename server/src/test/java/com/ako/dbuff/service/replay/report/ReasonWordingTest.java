@@ -1,6 +1,8 @@
 package com.ako.dbuff.service.replay.report;
 
 import com.ako.dbuff.dao.model.FightReasonDomain;
+import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.report.ReasonWording.Perspective;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -190,5 +192,48 @@ class ReasonWordingTest {
         .isEqualTo("Axe had just wasted a rotation and missed the fight");
     assertThat(WORDING.phrase(player("ROTATION_DIED_BEFORE_FIGHT", "anything"), "Axe"))
         .isEqualTo("Axe died on a rotation just before the fight and missed it");
+  }
+
+  private static final String RUNE =
+      "double damage rune taken at 37:30 by Windrunner, 37 s from the fight start, active in the"
+          + " fight";
+
+  @Test
+  void phrase_namesTheRuneTakerAsYoursWhenHeIsOnTheReadersTeam() {
+    Perspective readerRadiant = new Perspective(TeamSide.DIRE, TeamSide.RADIANT);
+
+    assertThat(WORDING.phrase(teamWith("ENEMY_RUNE_ADVANTAGE", RUNE), "x", readerRadiant))
+        .isEqualTo("your Windrunner took a double damage rune 37 s before the fight");
+  }
+
+  @Test
+  void phrase_namesTheRuneTakerAsTheEnemyWhenHeIsOnTheOtherTeam() {
+    Perspective readerDire = new Perspective(TeamSide.DIRE, TeamSide.DIRE);
+
+    assertThat(WORDING.phrase(teamWith("ENEMY_RUNE_ADVANTAGE", RUNE), "x", readerDire))
+        .isEqualTo("the enemy Windrunner took a double damage rune 37 s before the fight");
+  }
+
+  @Test
+  void phrase_namesTheSideWhenTheReaderHasNone() {
+    Perspective neutral = new Perspective(TeamSide.DIRE, null);
+
+    assertThat(WORDING.phrase(teamWith("ENEMY_RUNE_ADVANTAGE", RUNE), "x", neutral))
+        .isEqualTo("Radiant's Windrunner took a double damage rune 37 s before the fight");
+    assertThat(WORDING.phrase(team("NO_VISION_BEFORE_FIGHT"), "x", neutral))
+        .isEqualTo("Dire had no vision near the fight, Radiant did");
+  }
+
+  @Test
+  void phrase_wordsTeamGapsFromTheReadersSide() {
+    FightReasonDomain vision = team("NO_VISION_BEFORE_FIGHT");
+
+    assertThat(WORDING.phrase(vision, "x", new Perspective(TeamSide.DIRE, TeamSide.DIRE)))
+        .isEqualTo("your team had no vision near the fight, the enemy did");
+    assertThat(WORDING.phrase(vision, "x", new Perspective(TeamSide.DIRE, TeamSide.RADIANT)))
+        .isEqualTo("the enemy team had no vision near the fight, your team did");
+    assertThat(
+            WORDING.phrase(team("NO_DISABLE"), "x", new Perspective(TeamSide.DIRE, TeamSide.DIRE)))
+        .isEqualTo("your team had no disable");
   }
 }
