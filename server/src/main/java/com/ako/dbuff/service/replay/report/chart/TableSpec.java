@@ -31,11 +31,16 @@ public record TableSpec(String title, List<String> headers, List<List<Cell>> row
    * @param icon PNG bytes drawn left of the text, or null
    * @param note small text after the main one, such as "#14", or null
    * @param band colour of a stripe at the cell's left edge (a team), or null
+   * @param sub small muted text under the main one, or null
    */
-  public record Cell(byte[] icon, String text, String note, Color band) {
+  public record Cell(byte[] icon, String text, String note, Color band, String sub) {
+
+    public Cell(byte[] icon, String text, String note, Color band) {
+      this(icon, text, note, band, null);
+    }
 
     public static Cell text(String text) {
-      return new Cell(null, text, null, null);
+      return new Cell(null, text, null, null, null);
     }
   }
 
@@ -62,6 +67,7 @@ public record TableSpec(String title, List<String> headers, List<List<Cell>> row
           }
           text(out, cell.text());
           text(out, cell.note());
+          text(out, cell.sub());
           out.writeInt(cell.band() == null ? 0 : cell.band().getRGB());
         }
       }

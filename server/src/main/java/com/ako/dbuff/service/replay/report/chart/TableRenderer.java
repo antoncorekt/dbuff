@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 public class TableRenderer {
-  public static final int MAX_WIDTH = 1000;
+  public static final int MAX_WIDTH = 1400;
   public static final int MAX_HEIGHT = 1800;
   public static final int ICON_PX = 32;
   public static final int ROW_HEIGHT = 40;
@@ -44,6 +44,7 @@ public class TableRenderer {
   private static final int BAND_WIDTH = 5;
   private static final int ICON_GAP = 6;
   private static final int NOTE_GAP = 6;
+  private static final int SUB_GAP = 13;
   private static final int MIN_COLUMN = 40;
 
   static {
@@ -151,13 +152,19 @@ public class TableRenderer {
       g.setFont(ChartFonts.plain(TEXT_SIZE));
     }
     String text = fit(g, cell.text() == null ? "" : cell.text(), right - left - noteWidth);
-    int baseline = y + (ROW_HEIGHT + fm.getAscent()) / 2 - 2;
+    boolean hasSub = cell.sub() != null && !cell.sub().isBlank();
+    int baseline = y + (ROW_HEIGHT + fm.getAscent()) / 2 - 2 - (hasSub ? SUB_GAP / 2 : 0);
     g.setColor(TEXT);
     g.drawString(text, left, baseline);
     if (note != null) {
       g.setFont(ChartFonts.plain(NOTE_SIZE));
       g.setColor(MUTED);
       g.drawString(note, left + fm.stringWidth(text) + NOTE_GAP, baseline);
+    }
+    if (hasSub) {
+      g.setFont(ChartFonts.plain(NOTE_SIZE));
+      g.setColor(MUTED);
+      g.drawString(fit(g, cell.sub(), right - left), left, baseline + SUB_GAP);
     }
   }
 
@@ -199,12 +206,15 @@ public class TableRenderer {
       width += ICON_PX + ICON_GAP;
     }
     g.setFont(ChartFonts.plain(TEXT_SIZE));
-    width += g.getFontMetrics().stringWidth(cell.text() == null ? "" : cell.text());
+    int line = g.getFontMetrics().stringWidth(cell.text() == null ? "" : cell.text());
+    g.setFont(ChartFonts.plain(NOTE_SIZE));
     if (cell.note() != null && !cell.note().isBlank()) {
-      g.setFont(ChartFonts.plain(NOTE_SIZE));
-      width += NOTE_GAP + g.getFontMetrics().stringWidth(cell.note());
+      line += NOTE_GAP + g.getFontMetrics().stringWidth(cell.note());
     }
-    return width;
+    if (cell.sub() != null && !cell.sub().isBlank()) {
+      line = Math.max(line, g.getFontMetrics().stringWidth(cell.sub()));
+    }
+    return width + line;
   }
 
   private static String fit(Graphics2D g, String text, int width) {

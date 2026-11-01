@@ -1,7 +1,9 @@
 package com.ako.dbuff.service.replay.report.chart;
 
+import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import com.ako.dbuff.service.constant.data.ItemConstant;
 import com.ako.dbuff.service.discord.icon.EmojiNames;
 import com.ako.dbuff.service.discord.icon.IconCandidates;
 import com.ako.dbuff.service.discord.icon.IconImageSource;
@@ -40,6 +42,7 @@ public class SkillIconImages {
   private final String cdnUrl;
   private final IconImageSource source;
   private final HeroKits kits;
+  private final ConstantsManagers constants;
   private final Cache<String, Optional<byte[]>> cache =
       Caffeine.newBuilder().maximumSize(CACHE_ENTRIES).build();
 
@@ -47,15 +50,22 @@ public class SkillIconImages {
   public SkillIconImages(
       @Value("${discord.icons.directory:icons}") String directory,
       @Value("${discord.icons.cdn-url:https://cdn.cloudflare.steamstatic.com}") String cdnUrl,
-      HeroKits kits) {
-    this(Path.of(directory), cdnUrl, new ShortTimeoutSource(), kits);
+      HeroKits kits,
+      ConstantsManagers constants) {
+    this(Path.of(directory), cdnUrl, new ShortTimeoutSource(), kits, constants);
   }
 
-  SkillIconImages(Path directory, String cdnUrl, IconImageSource source, HeroKits kits) {
+  SkillIconImages(
+      Path directory,
+      String cdnUrl,
+      IconImageSource source,
+      HeroKits kits,
+      ConstantsManagers constants) {
     this.directory = directory;
     this.cdnUrl = cdnUrl;
     this.source = source;
     this.kits = kits;
+    this.constants = constants;
   }
 
   public Optional<byte[]> ability(String internalName) {
@@ -68,6 +78,13 @@ public class SkillIconImages {
           IconKind.ABILITY, internalName.substring(0, internalName.length() - AD_SUFFIX.length()));
     }
     return icon;
+  }
+
+  public Optional<byte[]> item(String key) {
+    if (key == null || key.isBlank()) {
+      return Optional.empty();
+    }
+    return cached(IconKind.ITEM, key);
   }
 
   public Optional<byte[]> hero(long heroId) {
@@ -111,6 +128,11 @@ public class SkillIconImages {
   private String img(IconKind kind, String key) {
     if (kind == IconKind.HERO) {
       return kits.hero(Long.parseLong(key)).map(HeroConstant::getImg).orElse(null);
+    }
+    if (kind == IconKind.ITEM) {
+      return Optional.ofNullable(constants.getItemConstantMap().get(key))
+          .map(ItemConstant::getImg)
+          .orElse(null);
     }
     return kits.ability(key).map(AbilityConstant::getImg).orElse(null);
   }

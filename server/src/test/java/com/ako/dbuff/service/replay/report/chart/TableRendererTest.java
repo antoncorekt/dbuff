@@ -119,6 +119,34 @@ class TableRendererTest {
   }
 
   @Test
+  void aSubLineKeepsTheRowHeightAndChangesTheFingerprint() throws IOException {
+    TableSpec plain = single(new TableSpec.Cell(icon(), "Axe", null, null));
+    TableSpec withSub = single(new TableSpec.Cell(icon(), "Axe", null, null, "Gave 12k"));
+
+    assertThat(
+            ImageIO.read(new ByteArrayInputStream(renderer.render(withSub).orElseThrow()))
+                .getHeight())
+        .isEqualTo(
+            ImageIO.read(new ByteArrayInputStream(renderer.render(plain).orElseThrow()))
+                .getHeight());
+    assertThat(withSub.fingerprint()).isNotEqualTo(plain.fingerprint());
+  }
+
+  @Test
+  void aWideTableStaysWithinTheMaximum() throws IOException {
+    TableSpec wide = single(TableSpec.Cell.text("x".repeat(3000)));
+
+    assertThat(
+            ImageIO.read(new ByteArrayInputStream(renderer.render(wide).orElseThrow())).getWidth())
+        .isEqualTo(TableRenderer.MAX_WIDTH)
+        .isEqualTo(1400);
+  }
+
+  private static TableSpec single(TableSpec.Cell cell) {
+    return new TableSpec("T", List.of("Name"), List.of(List.of(cell)));
+  }
+
+  @Test
   void nullCellsAndHeadersAreEmptyAndFingerprinted() {
     List<TableSpec.Cell> row = new ArrayList<>();
     row.add(null);
@@ -143,8 +171,8 @@ class TableRendererTest {
         decode(renderer.render(new TableSpec("T", twelve, List.of(row))).orElseThrow());
     assertThat(image.getWidth()).isLessThanOrEqualTo(TableRenderer.MAX_WIDTH);
 
-    List<String> forty = java.util.Collections.nCopies(40, "H");
-    List<TableSpec.Cell> wide = java.util.Collections.nCopies(40, TableSpec.Cell.text("t"));
+    List<String> forty = java.util.Collections.nCopies(60, "H");
+    List<TableSpec.Cell> wide = java.util.Collections.nCopies(60, TableSpec.Cell.text("t"));
     assertThat(renderer.render(new TableSpec("T", forty, List.of(wide)))).isEmpty();
   }
 
