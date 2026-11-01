@@ -291,4 +291,57 @@ class FightSectionTest {
     assertThat(view.verdict()).isEqualTo("Anton missed 1 big fight");
     assertThat(view.accent()).isEqualTo(Accent.NEUTRAL);
   }
+
+  @Test
+  void lines_putMissedFightsOfSeveralPlayersInGameTimeBeforeTheReadyAbilityLines() {
+    when(fightRepo.findByMatchId(1L))
+        .thenReturn(List.of(bigFight(0, 500.0), bigFight(1, 900.0), bigFight(2, 1300.0)));
+    when(partRepo.findByMatchId(1L))
+        .thenReturn(List.of(absent(0, 128L), absent(1, 0L), absent(2, 128L), absent(0, 0L)));
+    List<FightAbilityUseDomain> uses = new ArrayList<>();
+    for (long slot : List.of(0L, 128L)) {
+      for (int i = 0; i < 2; i++) {
+        uses.add(
+            FightAbilityUseDomain.builder()
+                .fightIndex(i)
+                .playerSlot(slot)
+                .abilityName("faceless_void_chronosphere")
+                .nonCastReason("READY_NOT_CAST")
+                .build());
+      }
+    }
+    when(abilityRepo.findByMatchId(1L)).thenReturn(uses);
+    Map<Long, String> names = new java.util.LinkedHashMap<>();
+    names.put(0L, "Anton");
+    names.put(128L, "Bob");
+
+    List<String> lines = section.lines(new ReplayReportInput(1L, null, Set.of(0L, 128L), names, 5));
+
+    assertThat(lines).hasSize(1 + 4 + 2);
+    assertThat(lines.subList(1, 5))
+        .extracting(l -> l.substring(0, 5))
+        .containsExactly("8:20 ", "8:20 ", "15:00", "21:40");
+    assertThat(lines.get(5)).startsWith("Anton had").contains("ready");
+    assertThat(lines.get(6)).startsWith("Bob had");
+  }
+
+  private static FightDomain bigFight(int index, double start) {
+    return FightDomain.builder()
+        .fightIndex(index)
+        .type("TEAMFIGHT")
+        .startSeconds(start)
+        .radiantDeaths(4)
+        .direDeaths(1)
+        .winner("RADIANT")
+        .build();
+  }
+
+  private static FightPlayerDomain absent(int fight, long slot) {
+    return FightPlayerDomain.builder()
+        .fightIndex(fight)
+        .playerSlot(slot)
+        .presence("ABSENT_FARMING")
+        .absenceReason("NO_TP")
+        .build();
+  }
 }

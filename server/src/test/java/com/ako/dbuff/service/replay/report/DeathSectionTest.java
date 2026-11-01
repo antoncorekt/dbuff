@@ -138,4 +138,25 @@ class DeathSectionTest {
     assertThat(section.lines(in)).isEmpty();
     assertThat(section.view(in)).isEmpty();
   }
+
+  @Test
+  void lines_listDeathsOfSeveralPlayersInGameTime() {
+    when(repo.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                death(0, 2000, "DISABLE_CHAIN", "npc_dota_hero_sven"),
+                death(0, 600, "DISABLE_CHAIN", "npc_dota_hero_sven"),
+                death(128, 1000, "TOWER", "npc_dota_goodguys_tower1_top"),
+                death(128, 2500, "TOWER", "npc_dota_goodguys_tower1_top")));
+    Map<Long, String> names = new java.util.LinkedHashMap<>();
+    names.put(0L, "Anton");
+    names.put(128L, "Bob");
+
+    List<String> lines = section.lines(new ReplayReportInput(1L, null, Set.of(0L, 128L), names, 3));
+
+    assertThat(lines)
+        .extracting(l -> l.substring(0, Math.min(5, l.length())))
+        .containsExactly("**Dea", "10:00", "16:40", "33:20", "41:40");
+    assertThat(lines.get(2)).contains("Bob");
+  }
 }
