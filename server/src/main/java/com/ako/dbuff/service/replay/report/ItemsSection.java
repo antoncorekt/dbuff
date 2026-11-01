@@ -59,7 +59,12 @@ public class ItemsSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 77;
+    return 62;
+  }
+
+  @Override
+  public String summary() {
+    return "how well each bought item was used";
   }
 
   @Override

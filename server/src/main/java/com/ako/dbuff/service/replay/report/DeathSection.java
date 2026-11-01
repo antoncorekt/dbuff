@@ -46,7 +46,12 @@ public class DeathSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 50;
+    return 44;
+  }
+
+  @Override
+  public String summary() {
+    return "each death and what led to it";
   }
 
   @Override

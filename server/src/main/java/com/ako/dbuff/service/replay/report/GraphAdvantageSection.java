@@ -34,7 +34,12 @@ public class GraphAdvantageSection extends GraphSection {
 
   @Override
   public int order() {
-    return 90;
+    return 64;
+  }
+
+  @Override
+  public String summary() {
+    return "gold and xp advantage over time";
   }
 
   @Override

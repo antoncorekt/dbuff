@@ -34,7 +34,12 @@ public class MidActivitySection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 73;
+    return 30;
+  }
+
+  @Override
+  public String summary() {
+    return "who was more active in the mid game";
   }
 
   @Override

@@ -98,7 +98,12 @@ public class VisionSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 76;
+    return 46;
+  }
+
+  @Override
+  public String summary() {
+    return "vision problems in important fights";
   }
 
   @Override

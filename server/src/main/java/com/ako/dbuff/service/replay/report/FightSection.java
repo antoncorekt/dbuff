@@ -51,7 +51,12 @@ public class FightSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 40;
+    return 42;
+  }
+
+  @Override
+  public String summary() {
+    return "every fight and who was missing";
   }
 
   @Override

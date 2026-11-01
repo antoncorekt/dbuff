@@ -40,6 +40,11 @@ public class AiReasonsSection implements ReplayReportSection {
   }
 
   @Override
+  public String summary() {
+    return "the top reasons the game was won or lost";
+  }
+
+  @Override
   public ReportDetail minimumDetail() {
     return ReportDetail.STANDARD;
   }

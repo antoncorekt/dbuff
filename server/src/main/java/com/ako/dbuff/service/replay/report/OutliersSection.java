@@ -66,7 +66,12 @@ public class OutliersSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 78;
+    return 74;
+  }
+
+  @Override
+  public String summary() {
+    return "players far from their usual numbers";
   }
 
   @Override

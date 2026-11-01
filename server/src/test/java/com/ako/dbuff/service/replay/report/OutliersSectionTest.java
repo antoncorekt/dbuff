@@ -75,7 +75,7 @@ class OutliersSectionTest {
   @Test
   void isOffByDefaultUntilThePropertyIsTrue() {
     assertThat(section.name()).isEqualTo("outliers");
-    assertThat(section.order()).isEqualTo(78);
+    assertThat(section.order()).isEqualTo(74);
     assertThat(section.defaultEnabled()).isFalse();
     assertThat(sectionSwitch.isEnabled(section)).isFalse();
 

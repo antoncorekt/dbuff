@@ -39,7 +39,12 @@ public class MovementSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 30;
+    return 70;
+  }
+
+  @Override
+  public String summary() {
+    return "where the heroes spent their time";
   }
 
   @Override

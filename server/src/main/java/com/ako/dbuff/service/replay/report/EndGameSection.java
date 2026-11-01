@@ -39,7 +39,12 @@ public class EndGameSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 79;
+    return 50;
+  }
+
+  @Override
+  public String summary() {
+    return "how the game ended, thrown or held";
   }
 
   @Override

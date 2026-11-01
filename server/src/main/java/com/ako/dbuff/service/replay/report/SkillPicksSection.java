@@ -37,6 +37,11 @@ public class SkillPicksSection implements ReplayReportSection, SectionFindings {
   }
 
   @Override
+  public String summary() {
+    return "which skills each player picked";
+  }
+
+  @Override
   public ReportDetail minimumDetail() {
     return ReportDetail.STANDARD;
   }

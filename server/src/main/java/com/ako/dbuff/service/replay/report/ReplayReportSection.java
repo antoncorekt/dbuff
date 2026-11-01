@@ -35,6 +35,11 @@ public interface ReplayReportSection {
   /** Sections are posted in this order, lowest first. */
   int order();
 
+  /** One plain phrase telling what the section reports, shown in the list of more reports. */
+  default String summary() {
+    return name();
+  }
+
   /** The lowest detail level of a channel that gets the section. */
   ReportDetail minimumDetail();
 

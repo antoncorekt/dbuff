@@ -60,7 +60,12 @@ public class LanesSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 20;
+    return 22;
+  }
+
+  @Override
+  public String summary() {
+    return "who won each lane and why";
   }
 
   @Override
