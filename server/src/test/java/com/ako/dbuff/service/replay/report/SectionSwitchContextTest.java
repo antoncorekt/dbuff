@@ -24,7 +24,6 @@ class SectionSwitchContextTest {
 
   private static final List<Class<? extends ReplayReportSection>> REAL =
       List.of(
-          SwingSection.class,
           DeathSection.class,
           FightSection.class,
           MovementSection.class,
@@ -98,7 +97,6 @@ class SectionSwitchContextTest {
                       .collect(Collectors.toMap(ReplayReportSection::name, s -> s));
               assertThat(byName.keySet())
                   .containsExactlyInAnyOrder(
-                      "swing",
                       "deaths",
                       "fights",
                       "movement",
@@ -169,7 +167,7 @@ class SectionSwitchContextTest {
                     .hasRootCauseInstanceOf(IllegalStateException.class)
                     .rootCause()
                     .hasMessageContaining("nope")
-                    .hasMessageContaining("swing"));
+                    .hasMessageContaining("important-fights"));
     runner()
         .withPropertyValues("replay.report.sections.nope.enabled=true")
         .run(context -> assertThat(context).hasNotFailed());
