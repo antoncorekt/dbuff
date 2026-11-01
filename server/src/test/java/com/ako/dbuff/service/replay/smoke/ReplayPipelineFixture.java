@@ -211,6 +211,13 @@ public abstract class ReplayPipelineFixture {
     }
 
     @Bean
+    ConstantsManagers constantsManagers() {
+      ConstantsManagers constants = mock(ConstantsManagers.class);
+      when(constants.getItemConstantMap()).thenReturn(Map.of());
+      return constants;
+    }
+
+    @Bean
     DotaApiConfig.DotaApiConfigurationProperties dotaApiConfigurationProperties() {
       return new DotaApiConfig.DotaApiConfigurationProperties();
     }

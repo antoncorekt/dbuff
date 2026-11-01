@@ -1,7 +1,9 @@
 package com.ako.dbuff.service.replay.report.chart;
 
+import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.AbilityConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
+import com.ako.dbuff.service.constant.data.ItemConstant;
 import com.ako.dbuff.service.discord.icon.IconImageSource;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
 import java.awt.image.BufferedImage;
@@ -18,6 +20,7 @@ import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -63,7 +66,11 @@ class SkillIconImagesTest {
             return Optional.ofNullable(abilities.get(name));
           }
         };
-    images = new SkillIconImages(dir, "https://cdn.test", source, kits);
+    ConstantsManagers constants = Mockito.mock(ConstantsManagers.class);
+    ItemConstant blink = new ItemConstant();
+    blink.setImg("/img/blink.png");
+    Mockito.when(constants.getItemConstantMap()).thenReturn(Map.of("blink", blink));
+    images = new SkillIconImages(dir, "https://cdn.test", source, kits, constants);
   }
 
   @Test
@@ -83,6 +90,7 @@ class SkillIconImagesTest {
     try (var context =
         new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
       context.registerBean(HeroKits.class, () -> none);
+      context.registerBean(ConstantsManagers.class, () -> Mockito.mock(ConstantsManagers.class));
       context.register(SkillIconImages.class);
       context.refresh();
 
@@ -111,6 +119,27 @@ class SkillIconImagesTest {
 
     assertThat(widthOf(icon)).isEqualTo(SkillIconImages.SIZE_PX);
     assertThat(fetched).containsExactly("https://cdn.test/img/culling.png");
+  }
+
+  @Test
+  void anItemComesFromItsFile() throws IOException {
+    Files.createDirectories(dir.resolve("item"));
+    Files.write(dir.resolve("item").resolve("i_blink.png"), png(128));
+
+    assertThat(widthOf(images.item("blink").orElseThrow())).isEqualTo(SkillIconImages.SIZE_PX);
+    assertThat(fetched).isEmpty();
+  }
+
+  @Test
+  void anItemComesFromTheCdnWithoutAFile() {
+    assertThat(images.item("blink")).isPresent();
+    assertThat(fetched).containsExactly("https://cdn.test/img/blink.png");
+  }
+
+  @Test
+  void anUnknownItemIsEmpty() {
+    assertThat(images.item("no_such_item")).isEmpty();
+    assertThat(images.item(null)).isEmpty();
   }
 
   @Test
