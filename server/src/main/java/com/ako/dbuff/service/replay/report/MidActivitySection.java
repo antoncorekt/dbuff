@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class MidActivitySection implements ReplayReportSection {
+public class MidActivitySection implements ReplayReportSection, HighlightSource {
   private final MidActivityRepo midRepo;
   private final ReportHeroNames heroNames;
   private final ReplayReportProperties properties;
@@ -50,6 +50,33 @@ public class MidActivitySection implements ReplayReportSection {
   @Override
   public List<String> lines(ReplayReportInput input) {
     return sentences(input);
+  }
+
+  @Override
+  public List<Highlight> highlights(ReplayReportInput input) {
+    TeamSide yours = TeamSide.commonSide(input.focusSlots());
+    if (yours == null) {
+      return List.of();
+    }
+    TeamSide winner = winner(input.match());
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
+    return rows(input.matchId()).stream()
+        .filter(r -> side(r) == yours)
+        .filter(r -> r.getGoldPerMinute() != null && r.getEnemyGoldPerMinute() != null)
+        .filter(r -> r.getEnemyGoldPerMinute() > 0)
+        .map(
+            r ->
+                new Highlight(
+                    "mid-activity",
+                    r.getWindowStartSeconds() == null
+                        ? null
+                        : r.getWindowStartSeconds().doubleValue(),
+                    Highlight.scale(
+                        Math.abs(r.getGoldPerMinute() - r.getEnemyGoldPerMinute())
+                            / (double) r.getEnemyGoldPerMinute(),
+                        properties.getHighlights().getMidActivity()),
+                    line(r, heroes, yours, winner)))
+        .toList();
   }
 
   @Override
