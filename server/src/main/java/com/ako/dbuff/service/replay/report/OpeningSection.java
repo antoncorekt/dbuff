@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class OpeningSection implements ReplayReportSection {
+public class OpeningSection implements ReplayReportSection, HighlightSource {
   private static final Comparator<RunePickupDomain> CHRONOLOGICAL =
       Comparator.comparing(
               RunePickupDomain::getSeconds, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -70,7 +70,7 @@ public class OpeningSection implements ReplayReportSection {
   /** The result and the rune lines, each already cut to the line length. */
   private record Opening(Optional<Result> result, List<String> runes, int maxLength) {}
 
-  private record Result(String text, TeamSide winner) {}
+  private record Result(String text, TeamSide winner, Long balance) {}
 
   @Override
   public List<String> lines(ReplayReportInput input) {
@@ -101,6 +101,31 @@ public class OpeningSection implements ReplayReportSection {
                     null));
   }
 
+  @Override
+  public List<Highlight> highlights(ReplayReportInput input) {
+    if (TeamSide.commonSide(input.focusSlots()) == null) {
+      return List.of();
+    }
+    List<OpeningSummaryDomain> summaries = present(summaryRepo.findByMatchId(input.matchId()));
+    Integer seconds =
+        summaries.stream()
+            .map(OpeningSummaryDomain::getWindowEnd)
+            .filter(Objects::nonNull)
+            .findFirst()
+            .orElse(null);
+    return result(summaries, TeamSide.commonSide(input.focusSlots()))
+        .filter(r -> r.balance() != null)
+        .map(
+            r ->
+                new Highlight(
+                    "opening",
+                    seconds == null ? null : seconds.doubleValue(),
+                    Highlight.scale(Math.abs(r.balance()), properties.getHighlights().getOpening()),
+                    r.text()))
+        .stream()
+        .toList();
+  }
+
   private Optional<Opening> opening(ReplayReportInput input) {
     List<OpeningSummaryDomain> summaries = present(summaryRepo.findByMatchId(input.matchId()));
     if (summaries.isEmpty()) {
@@ -112,7 +137,8 @@ public class OpeningSection implements ReplayReportSection {
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     int max = Math.max(LineText.ELLIPSIS.length() + 1, properties.getMaxOpeningLineLength());
     Optional<Result> result =
-        result(summaries, yours).map(r -> new Result(LineText.cut(r.text(), max), r.winner()));
+        result(summaries, yours)
+            .map(r -> new Result(LineText.cut(r.text(), max), r.winner(), r.balance()));
     List<String> runes = new ArrayList<>();
     bounty(pickups, heroes, yours).map(l -> LineText.cut(l, max)).ifPresent(runes::add);
     midLane(pickups, heroes, properties.getOpeningRuneMinutes())
@@ -133,7 +159,7 @@ public class OpeningSection implements ReplayReportSection {
     OpeningSummaryDomain lost = withResult(summaries, "LOST");
     if (won == null && lost == null) {
       return summaries.stream().anyMatch(s -> "DRAW".equals(s.getResult()))
-          ? Optional.of(new Result(LEVEL, null))
+          ? Optional.of(new Result(LEVEL, null, 0L))
           : Optional.empty();
     }
     TeamSide winner =
@@ -153,14 +179,15 @@ public class OpeningSection implements ReplayReportSection {
     String took = OpeningWording.result("WON");
     if (balance != null && balance == 0) {
       if (!knownKills) {
-        return Optional.of(new Result("The opening was level in gold and XP.", null));
+        return Optional.of(new Result("The opening was level in gold and XP.", null, 0L));
       }
       return winnerKills.equals(enemyKills)
-          ? Optional.of(new Result(LEVEL, null))
+          ? Optional.of(new Result(LEVEL, null, 0L))
           : Optional.of(
               new Result(
                   "%s %s on kills, %s, after gold and XP were level.".formatted(team, took, kills),
-                  winner));
+                  winner,
+                  0L));
     }
     String by =
         balance == null
@@ -171,7 +198,8 @@ public class OpeningSection implements ReplayReportSection {
             kills.isEmpty()
                 ? "%s %s%s.".formatted(team, took, by)
                 : "%s %s%s; kills %s.".formatted(team, took, by, kills),
-            winner));
+            winner,
+            balance));
   }
 
   private static TeamSide opponent(TeamSide side) {

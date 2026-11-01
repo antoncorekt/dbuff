@@ -419,4 +419,34 @@ class LanesSectionTest {
   void view_isEmptyWithoutLanes() {
     assertThat(section.view(input())).isEmpty();
   }
+
+  @Test
+  void highlights_scoreTheMarginOfADecidedLaneAtNormalAndAtExtreme() {
+    result(2, "TOP", "RADIANT", "WON", 0.3);
+    result(2, "TOP", "DIRE", "LOST", -0.3);
+    result(0, "BOTTOM", "RADIANT", "LOST", -1.0);
+    result(0, "BOTTOM", "DIRE", "WON", 1.0);
+    result(1, "MID", "RADIANT", "EVEN", 0.0);
+    result(1, "MID", "DIRE", "EVEN", 0.0);
+    assertThat(section.highlights(input(0L)))
+        .extracting(Highlight::source, Highlight::seconds, Highlight::score)
+        .containsExactlyInAnyOrder(
+            org.assertj.core.groups.Tuple.tuple("lanes", 650.0, 0.0),
+            org.assertj.core.groups.Tuple.tuple("lanes", 650.0, 1.0));
+    assertThat(section.highlights(input(0L)))
+        .extracting(Highlight::text)
+        .anyMatch(t -> t.startsWith("Bottom lane:") && t.contains("by a lot"));
+  }
+
+  @Test
+  void highlights_skipANullMarginALaneWithoutTheTrackedTeamAndNoTrackedTeam() {
+    result(2, "TOP", "RADIANT", "WON", null);
+    result(2, "TOP", "DIRE", "LOST", null);
+    result(0, "BOTTOM", "DIRE", "WON", 1.0);
+    assertThat(section.highlights(input(0L))).isEmpty();
+    result(1, "MID", "RADIANT", "WON", 1.0);
+    result(1, "MID", "DIRE", "LOST", -1.0);
+    assertThat(section.highlights(input())).isEmpty();
+    assertThat(section.highlights(input(0L))).hasSize(1);
+  }
 }

@@ -38,7 +38,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class LanesSection implements ReplayReportSection {
+public class LanesSection implements ReplayReportSection, HighlightSource {
   private static final int MAX_REASONS = 2;
   private static final String UNKNOWN_HERO = "an unknown hero";
 
@@ -76,6 +76,40 @@ public class LanesSection implements ReplayReportSection {
   @Override
   public List<String> lines(ReplayReportInput input) {
     return render(input, pairs(input.matchId()));
+  }
+
+  @Override
+  public List<Highlight> highlights(ReplayReportInput input) {
+    TeamSide yours = TeamSide.commonSide(input.focusSlots());
+    if (yours == null) {
+      return List.of();
+    }
+    return pairs(input.matchId()).stream()
+        .filter(p -> p.sides().containsKey(yours))
+        .map(p -> highlight(p, yours))
+        .filter(Objects::nonNull)
+        .toList();
+  }
+
+  private Highlight highlight(Pair pair, TeamSide yours) {
+    Winner winner = winner(pair.sides());
+    if (winner == null || winner.row().getMargin() == null) {
+      return null;
+    }
+    double margin = winner.row().getMargin();
+    Integer end = winner.row().getEndSeconds();
+    String text =
+        "%s lane: %s won %s."
+            .formatted(
+                LaneWording.capitalised(pair.lane().name().toLowerCase(Locale.ROOT)),
+                Prettify.teamOf(winner.side().name(), yours),
+                LaneWording.strength(
+                    margin, properties.getLaneClearMargin(), properties.getLaneBigMargin()));
+    return new Highlight(
+        "lanes",
+        end == null ? null : end.doubleValue(),
+        Highlight.scale(margin, properties.getHighlights().getLanes()),
+        text);
   }
 
   @Override
