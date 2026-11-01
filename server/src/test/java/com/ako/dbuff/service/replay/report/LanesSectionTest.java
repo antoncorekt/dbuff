@@ -56,6 +56,18 @@ class LanesSectionTest {
     when(resultRepo.findByMatchId(1L)).thenReturn(results);
     when(assignmentRepo.findByMatchId(1L)).thenReturn(assignments);
     when(reasonRepo.findByMatchId(1L)).thenReturn(reasons);
+    when(heroNames.bySlot(1L))
+        .thenReturn(
+            Map.of(
+                0L, "Phantom Assassin",
+                1L, "Sven",
+                2L, "Enchantress",
+                128L, "Venomancer",
+                129L, "Nature's Prophet",
+                130L, "Jakiro",
+                3L, "Sniper",
+                4L, "Riki",
+                131L, "Terrorblade"));
     when(heroNames.iconBySlot(1L))
         .thenReturn(
             Map.of(
@@ -480,6 +492,7 @@ class LanesSectionTest {
     assertThat(spec.getValue().headers())
         .containsExactly("Lane", "Winner", "Radiant", "Dire", "Ended");
     assertThat(spec.getValue().rows()).hasSize(3);
+    verify(heroNames).bySlot(1L);
     assertThat(spec.getValue().rows().get(0).get(1).sub()).isEqualTo("by a lot");
     assertThat(spec.getValue().rows().get(0).get(4).text()).isEqualTo("10:50");
   }

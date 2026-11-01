@@ -155,7 +155,7 @@ public class LanesSection implements ReplayReportSection, HighlightSource {
       ReplayReportInput input,
       List<Pair> pairs,
       Map<Integer, List<LaneAssignmentDomain>> assignments) {
-    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
+    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
     TeamSide yours = TeamSide.commonSide(input.focusSlots());
     List<List<Cell>> rows = new ArrayList<>();
     for (Pair pair : pairs) {
