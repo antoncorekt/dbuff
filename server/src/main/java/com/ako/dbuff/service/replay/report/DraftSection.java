@@ -197,7 +197,7 @@ public class DraftSection implements ReplayReportSection {
             byte[] heroIcon =
                 drafter.heroId() == null ? null : icons.hero(drafter.heroId()).orElse(null);
             String player =
-                hero.map(h -> drafter.name() + " (" + h.getLocalized_name() + ")")
+                hero.map(h -> ReportHeroNames.labelOnce(drafter.name(), h.getLocalized_name()))
                     .orElse(drafter.name());
             List<Cell> row = new ArrayList<>();
             row.add(new Cell(heroIcon, player, null, band));

@@ -195,6 +195,17 @@ class DraftSectionTest {
   }
 
   @Test
+  void view_doesNotRepeatTheHeroWhenTheNameAlreadyCarriesIt() {
+    when(repo.findByMatchId(1L)).thenReturn(List.of(pick(5, 129, "axe_counter_helix")));
+    when(stats.findAllByMatchId(1L)).thenReturn(List.of(played(129L, 18L)));
+    when(kits.hero(18L)).thenReturn(Optional.of(hero("Phoenix")));
+
+    section.view(input(Map.of(129L, "Пастух (Phoenix)"))).orElseThrow();
+
+    assertThat(drawn().rows().get(0).get(0).text()).isEqualTo("Пастух (Phoenix)");
+  }
+
+  @Test
   void view_drawsOneRowPerTrackedPlayerWithHeroTeamBandAndNumberedSkills() {
     when(repo.findByMatchId(1L))
         .thenReturn(

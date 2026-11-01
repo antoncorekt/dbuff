@@ -189,7 +189,7 @@ public class ItemBuildSection implements ReplayReportSection {
         : heroKits
             .hero(buyer.heroId())
             .map(HeroConstant::getLocalized_name)
-            .map(h -> buyer.name() + " (" + h + ")")
+            .map(h -> ReportHeroNames.labelOnce(buyer.name(), h))
             .orElse(buyer.name());
   }
 

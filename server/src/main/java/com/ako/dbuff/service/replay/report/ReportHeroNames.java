@@ -30,6 +30,14 @@ public class ReportHeroNames {
     return hero == null || hero.isBlank() ? name : name + " (" + hero + ")";
   }
 
+  /**
+   * {@link #label} unless the name already ends with the hero in brackets, as the report input's
+   * names do; a player whose name merely contains the hero's still gets the hero.
+   */
+  public static String labelOnce(String name, String hero) {
+    return hero == null || hero.isBlank() || name.endsWith(hero + ")") ? name : label(name, hero);
+  }
+
   /** The stored hero name; the replay's entity name, split into words, where it is not known. */
   public Map<Long, String> bySlot(long matchId) {
     return names(matchId, stat -> "");

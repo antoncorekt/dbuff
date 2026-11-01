@@ -121,6 +121,7 @@ class ReviewLoopTest extends ReplayPipelineFixture {
       if (mode.isEmpty()) {
         return "skipped: the game mode of the stored match is not active for replay processing";
       }
+      refreshDetails(String.valueOf(id));
       analysis.analyze(id, mode.get(), List.of());
       return "re-analysed from the stored data";
     }
