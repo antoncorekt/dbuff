@@ -47,7 +47,11 @@ class ReportHeroNamesTest {
   void labelOnce_addsTheHeroOnlyWhereTheNameDoesNotCarryIt() {
     assertThat(ReportHeroNames.labelOnce("Anton", "Axe")).isEqualTo("Anton (Axe)");
     assertThat(ReportHeroNames.labelOnce("Anton (Axe)", "Axe")).isEqualTo("Anton (Axe)");
-    assertThat(ReportHeroNames.labelOnce("Axe", "Axe")).isEqualTo("Axe");
+    assertThat(ReportHeroNames.labelOnce("Anton (<:axe:1> Axe)", "Axe"))
+        .isEqualTo("Anton (<:axe:1> Axe)");
+    assertThat(ReportHeroNames.labelOnce("Ionut", "Io")).isEqualTo("Ionut (Io)");
+    assertThat(ReportHeroNames.labelOnce("Anton (Nature's Prophet)", "Nature's Prophet"))
+        .isEqualTo("Anton (Nature's Prophet)");
     assertThat(ReportHeroNames.labelOnce("Anton", null)).isEqualTo("Anton");
   }
 }
