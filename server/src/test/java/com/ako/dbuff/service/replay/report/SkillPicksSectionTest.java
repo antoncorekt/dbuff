@@ -292,4 +292,27 @@ class SkillPicksSectionTest {
     when(buildRepo.findByMatchId(1L)).thenReturn(List.of(fit));
     assertThat(section.lines(input(3, 0L))).isEmpty();
   }
+
+  @Test
+  void missedPicksScoreByRatioForTrackedSlotsAndSkipCarriedOrUnrated() {
+    MissedPickDomain carried = missed(0, 3.0);
+    carried.setCarried(true);
+    MissedPickDomain unrated = missed(0, 2.0);
+    unrated.setRatio(null);
+    when(missedRepo.findByMatchId(1L))
+        .thenReturn(List.of(missed(0, 2.75), carried, unrated, missed(1, 3.0)));
+
+    List<Highlight> result =
+        section.highlights(new ReplayReportInput(1L, null, Set.of(0L), Map.of(0L, "Anton"), 3));
+
+    assertThat(result)
+        .singleElement()
+        .satisfies(
+            h -> {
+              assertThat(h.source()).isEqualTo("missed-pick");
+              assertThat(h.score()).isEqualTo(Highlight.scale(2.75, 1.5, 4));
+              assertThat(h.seconds()).isNull();
+              assertThat(h.text()).startsWith("Anton: The enemy took Chain Frost");
+            });
+  }
 }

@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class SkillPicksSection implements ReplayReportSection, SectionFindings {
+public class SkillPicksSection implements ReplayReportSection, SectionFindings, HighlightSource {
   private final SkillPickFindings findings;
 
   @Override
@@ -49,6 +49,11 @@ public class SkillPicksSection implements ReplayReportSection, SectionFindings {
   @Override
   public List<Finding> findings(ReplayReportInput input) {
     return findings.find(input);
+  }
+
+  @Override
+  public List<Highlight> highlights(ReplayReportInput input) {
+    return findings.highlights(input);
   }
 
   @Override
