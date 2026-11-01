@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.AbilityDomain;
 import com.ako.dbuff.dao.repo.AbilityRepo;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -65,13 +66,14 @@ public class AbilityHistoryHighlights implements HighlightSource {
     double ratio = damage / average;
     String name = current.getPrettyName() == null ? current.getName() : current.getPrettyName();
     String text =
-        "%s did %s damage, %.1fx this player's average of %s over %d games"
-            .formatted(
-                name,
-                MissedPickWording.damage(damage),
-                ratio,
-                MissedPickWording.damage(Math.round(average)),
-                games);
+        String.format(
+            Locale.ROOT,
+            "%s did %s damage, %.1fx this player's average of %s over %d games",
+            name,
+            MissedPickWording.damage(damage),
+            ratio,
+            MissedPickWording.damage(Math.round(average)),
+            games);
     return Optional.of(
         new Highlight(
             "ability-history",
