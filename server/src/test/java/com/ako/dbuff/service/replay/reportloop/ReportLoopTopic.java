@@ -175,7 +175,7 @@ class ReportLoopTopic implements ReviewLoopTopic {
       }
     }
     out.add("");
-    out.add("Messages: " + messages);
+    out.add("Messages: about " + messages + " (one per section view plus the more-reports text)");
     out.addAll(body);
     report.moreReports().ifPresent(text -> out.addAll(List.of("", "## more reports", "", text)));
     return String.join("\n", out) + "\n";

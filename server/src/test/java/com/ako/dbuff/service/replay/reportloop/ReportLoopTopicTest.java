@@ -64,7 +64,8 @@ class ReportLoopTopicTest {
             plain,
             dir);
 
-    assertThat(report).contains("Messages: 3", "| f1 |", "| d1 |", "[image 4-default-draft-1.png]");
+    assertThat(report)
+        .contains("Messages: about 3", "| f1 |", "| d1 |", "[image 4-default-draft-1.png]");
     assertThat(report.indexOf("## fights")).isLessThan(report.indexOf("## draft"));
     assertThat(report.stripTrailing()).endsWith("More: /match report");
     assertThat(Files.exists(dir.resolve("4-default-draft-1.png"))).isTrue();
