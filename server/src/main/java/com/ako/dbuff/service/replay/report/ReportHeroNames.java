@@ -30,6 +30,11 @@ public class ReportHeroNames {
     return hero == null || hero.isBlank() ? name : name + " (" + hero + ")";
   }
 
+  /** {@link #label} unless the name already carries the hero, as the report input's names do. */
+  public static String labelOnce(String name, String hero) {
+    return hero == null || hero.isBlank() || name.contains(hero) ? name : label(name, hero);
+  }
+
   /** The stored hero name; the replay's entity name, split into words, where it is not known. */
   public Map<Long, String> bySlot(long matchId) {
     return names(matchId, stat -> "");

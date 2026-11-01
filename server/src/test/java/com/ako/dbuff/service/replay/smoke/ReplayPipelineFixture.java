@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.smoke;
 import com.ako.dbuff.config.DotaApiConfig;
 import com.ako.dbuff.dao.model.AbilityDomain;
 import com.ako.dbuff.dao.model.DeathEventDomain;
+import com.ako.dbuff.dao.model.ItemDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerTimelineDomain;
@@ -12,6 +13,7 @@ import com.ako.dbuff.dao.model.TeamfightPlayerDomain;
 import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.DeathEventRepo;
 import com.ako.dbuff.dao.repo.DraftEventRepo;
+import com.ako.dbuff.dao.repo.ItemRepository;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.dao.repo.PlayerTimelineRepo;
@@ -211,9 +213,19 @@ public abstract class ReplayPipelineFixture {
     }
 
     @Bean
-    ConstantsManagers constantsManagers() {
+    ConstantsManagers constantsManagers() throws IOException {
+      ObjectMapper lenient =
+          new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+      Map<String, ItemConstant> items = new HashMap<>();
+      JsonNode itemJson = constants("constants-items.json");
+      if (itemJson != null) {
+        itemJson
+            .fields()
+            .forEachRemaining(
+                e -> items.put(e.getKey(), lenient.convertValue(e.getValue(), ItemConstant.class)));
+      }
       ConstantsManagers constants = mock(ConstantsManagers.class);
-      when(constants.getItemConstantMap()).thenReturn(Map.of());
+      when(constants.getItemConstantMap()).thenReturn(items);
       return constants;
     }
 
@@ -267,6 +279,8 @@ public abstract class ReplayPipelineFixture {
   @Autowired private PlayerTimelineRepo timelineRepo;
   @Autowired protected MatchRepo matchRepo;
   @Autowired private AbilityRepo abilityRepo;
+  @Autowired private ItemRepository itemRepo;
+  @Autowired private ConstantsManagers itemConstants;
   @Autowired private DeathEventRepo deathEventRepo;
   @Autowired private TeamfightRepo teamfightRepo;
   @Autowired private TeamfightPlayerRepo teamfightPlayerRepo;
@@ -328,13 +342,72 @@ public abstract class ReplayPipelineFixture {
       stat.setLastHits(optLong(p, "last_hits"));
       stat.setObsPlaced(optLong(p, "obs_placed"));
       stat.setSenPlaced(optLong(p, "sen_placed"));
+      applyScoreboard(stat, p);
       playerStatRepo.save(stat);
     }
     seedOpenDotaFights(match.getId(), json);
     seedTeamTimeline(match.getId(), json);
     seedMatchLogs(match, id);
     seedAbilities(match.getId(), json);
+    seedItems(match.getId(), json);
     return match;
+  }
+
+  /**
+   * The scoreboard numbers and the purchase log of a match stored before they were seeded, so a
+   * re-analysis of the stored data sees what a fresh import would.
+   */
+  protected void refreshDetails(String id) throws IOException {
+    if (!hasFixture(id)) {
+      return;
+    }
+    long matchId = Long.parseLong(id);
+    JsonNode json = new ObjectMapper().readTree(fixture(id + ".json").toFile());
+    Map<Long, PlayerMatchStatisticDomain> bySlot = new HashMap<>();
+    playerStatRepo.findAllByMatchId(matchId).forEach(s -> bySlot.put(s.getPlayerSlot(), s));
+    for (JsonNode p : json.path("players")) {
+      PlayerMatchStatisticDomain stat = bySlot.get(p.path("player_slot").asLong());
+      if (stat != null) {
+        applyScoreboard(stat, p);
+        playerStatRepo.save(stat);
+      }
+    }
+    seedItems(matchId, json);
+  }
+
+  private static void applyScoreboard(PlayerMatchStatisticDomain stat, JsonNode p) {
+    stat.setKills(optLong(p, "kills"));
+    stat.setDeaths(optLong(p, "deaths"));
+    stat.setAssists(optLong(p, "assists"));
+    stat.setGoldPerMin(optLong(p, "gold_per_min"));
+    stat.setXpPerMin(optLong(p, "xp_per_min"));
+  }
+
+  /** The purchase log as the match detail import stores it: one row per item and player. */
+  private void seedItems(long matchId, JsonNode json) {
+    itemRepo.deleteByMatchId(matchId);
+    Map<String, ItemConstant> catalog = itemConstants.getItemConstantMap();
+    for (JsonNode p : json.path("players")) {
+      long slot = p.path("player_slot").asLong();
+      Set<Long> saved = new HashSet<>();
+      for (JsonNode bought : p.path("purchase_log")) {
+        String key = bought.path("key").asText(null);
+        ItemConstant item = key == null ? null : catalog.get(key);
+        if (item == null || item.getId() == null || !saved.add(item.getId())) {
+          continue;
+        }
+        itemRepo.save(
+            ItemDomain.builder()
+                .itemId(item.getId())
+                .matchId(matchId)
+                .playerSlot(slot)
+                .playerId(optLong(p, "account_id"))
+                .itemName(key)
+                .itemPrettyName(item.getDname())
+                .itemPurchaseTime(optLong(bought, "time"))
+                .build());
+      }
+    }
   }
 
   /** The skills a hero leveled and the damage each did, as the match detail import stores them. */

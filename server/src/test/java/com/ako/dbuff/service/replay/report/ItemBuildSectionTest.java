@@ -137,6 +137,22 @@ class ItemBuildSectionTest {
   }
 
   @Test
+  void lines_doNotRepeatTheHeroWhenTheNameAlreadyCarriesIt() {
+    noPicture();
+    item("blink", "Blink Dagger", 2250, null);
+    when(itemRepo.findAllByMatchId(1L)).thenReturn(List.of(bought("blink", 60)));
+    when(stats.findAllByMatchId(1L))
+        .thenReturn(
+            List.of(PlayerMatchStatisticDomain.builder().playerSlot(0L).heroId(5L).build()));
+    when(kits.hero(5L))
+        .thenReturn(Optional.of(HeroConstant.builder().localized_name("Axe").build()));
+    ReplayReportInput in =
+        new ReplayReportInput(1L, null, java.util.Set.of(0L), Map.of(0L, "Anton (Axe)"), 3);
+
+    assertThat(section.lines(in)).contains("Anton (Axe): Blink Dagger 1:00");
+  }
+
+  @Test
   void image_drawsOneRowWithTimeTextAndNameWhereTheIconIsMissing() {
     item("blink", "Blink Dagger", 2250, null);
     item("bkb", "Black King Bar", 4050, null);

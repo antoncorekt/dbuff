@@ -5,6 +5,7 @@ import com.ako.dbuff.service.replay.report.CompositionSection;
 import com.ako.dbuff.service.replay.report.DeathSection;
 import com.ako.dbuff.service.replay.report.DraftSection;
 import com.ako.dbuff.service.replay.report.FightSection;
+import com.ako.dbuff.service.replay.report.ItemBuildSection;
 import com.ako.dbuff.service.replay.report.MovementSection;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -50,6 +51,7 @@ import org.springframework.test.context.TestPropertySource;
   FightSection.class,
   MovementSection.class,
   DraftSection.class,
+  ItemBuildSection.class,
   CompositionSection.class,
   SkillCountRepository.class
 })

@@ -42,4 +42,12 @@ class ReportHeroNamesTest {
 
     assertThat(names).containsEntry(0L, "Nature's Prophet").containsEntry(1L, "Phantom Assassin");
   }
+
+  @Test
+  void labelOnce_addsTheHeroOnlyWhereTheNameDoesNotCarryIt() {
+    assertThat(ReportHeroNames.labelOnce("Anton", "Axe")).isEqualTo("Anton (Axe)");
+    assertThat(ReportHeroNames.labelOnce("Anton (Axe)", "Axe")).isEqualTo("Anton (Axe)");
+    assertThat(ReportHeroNames.labelOnce("Axe", "Axe")).isEqualTo("Axe");
+    assertThat(ReportHeroNames.labelOnce("Anton", null)).isEqualTo("Anton");
+  }
 }
