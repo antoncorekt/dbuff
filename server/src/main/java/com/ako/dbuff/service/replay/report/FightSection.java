@@ -109,7 +109,8 @@ public class FightSection implements ReplayReportSection {
                 Collectors.toMap(FightDomain::getFightIndex, Function.identity(), (a, b) -> a));
     List<FightPlayerDomain> parts = fightPlayerRepo.findByMatchId(input.matchId());
     List<FightAbilityUseDomain> uses = abilityRepo.findByMatchId(input.matchId());
-    List<String> lines = new ArrayList<>();
+    List<Map.Entry<Double, String>> absences = new ArrayList<>();
+    List<String> abilityLines = new ArrayList<>();
     int missed = 0;
     int missedInLost = 0;
     int unused = 0;
@@ -124,8 +125,13 @@ public class FightSection implements ReplayReportSection {
               .toList();
       absent.stream()
           .limit(input.maxFindings())
-          .map(p -> absenceLine(player.getValue(), slot, p, fights.get(p.getFightIndex())))
-          .forEach(lines::add);
+          .map(
+              p -> {
+                FightDomain fight = fights.get(p.getFightIndex());
+                return Map.entry(
+                    fight.getStartSeconds(), absenceLine(player.getValue(), slot, p, fight));
+              })
+          .forEach(absences::add);
       missed += absent.size();
       missedInLost +=
           (int)
@@ -133,9 +139,13 @@ public class FightSection implements ReplayReportSection {
                   .filter(p -> "lost".equals(result(fights.get(p.getFightIndex()), slot)))
                   .count();
       Optional<String> ability = unusedAbilityLine(player.getValue(), slot, uses);
-      ability.ifPresent(lines::add);
+      ability.ifPresent(abilityLines::add);
       unused += ability.isPresent() ? 1 : 0;
     }
+    List<String> lines =
+        new ArrayList<>(
+            absences.stream().sorted(Map.Entry.comparingByKey()).map(Map.Entry::getValue).toList());
+    lines.addAll(abilityLines);
     if (lines.isEmpty()) {
       return new Found(List.of(), 0, 0, 0, TRACKED);
     }
