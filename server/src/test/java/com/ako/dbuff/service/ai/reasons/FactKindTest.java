@@ -30,7 +30,6 @@ class FactKindTest {
     assertThat(FactKind.RESULT.weight()).isGreaterThan(FactKind.FIGHT.weight());
     assertThat(FactKind.FIGHT.weight()).isGreaterThan(FactKind.LANE.weight());
     assertThat(FactKind.LANE.weight()).isGreaterThan(FactKind.OBJECTIVE.weight());
-    assertThat(FactKind.SWING.weight()).isEqualTo(FactKind.OBJECTIVE.weight());
     assertThat(FactKind.OBJECTIVE.weight()).isGreaterThan(FactKind.ENDGAME.weight());
     assertThat(FactKind.ENDGAME.weight()).isGreaterThan(FactKind.VISION.weight());
   }

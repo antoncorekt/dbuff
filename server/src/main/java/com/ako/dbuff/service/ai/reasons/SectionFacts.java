@@ -27,7 +27,6 @@ class SectionFacts {
           Map.entry("important-fights", FactKind.FIGHT),
           Map.entry("lanes", FactKind.LANE),
           Map.entry("objectives", FactKind.OBJECTIVE),
-          Map.entry("swing", FactKind.SWING),
           Map.entry("endgame", FactKind.ENDGAME),
           Map.entry("vision", FactKind.VISION),
           Map.entry("items", FactKind.ITEM),

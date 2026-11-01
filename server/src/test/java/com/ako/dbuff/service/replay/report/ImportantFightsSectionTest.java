@@ -4,6 +4,14 @@ import com.ako.dbuff.dao.model.FightDomain;
 import com.ako.dbuff.dao.model.FightExplanationDomain;
 import com.ako.dbuff.dao.model.FightImportanceDomain;
 import com.ako.dbuff.dao.model.FightReasonDomain;
+import com.ako.dbuff.dao.model.GameSpikeDomain;
+import com.ako.dbuff.dao.model.GameSpikeFactorDomain;
+import com.ako.dbuff.dao.repo.GameSpikeFactorRepo;
+import com.ako.dbuff.dao.repo.GameSpikeRepo;
+import com.ako.dbuff.service.constant.ConstantsManagers;
+import com.ako.dbuff.service.constant.data.ItemConstant;
+import com.ako.dbuff.service.discord.icon.IconKind;
+import com.ako.dbuff.service.discord.icon.TestIcons;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.LostFight;
 import com.ako.dbuff.service.replay.analysis.fightloss.FightExplanationReader.RankedReason;
@@ -27,15 +35,20 @@ import static org.mockito.Mockito.when;
 
 class ImportantFightsSectionTest {
 
+  private final GameSpikeRepo spikeRepo = mock(GameSpikeRepo.class);
+  private final GameSpikeFactorRepo factorRepo = mock(GameSpikeFactorRepo.class);
   private final FightExplanationReader reader = mock(FightExplanationReader.class);
   private final ReportHeroNames heroNames = mock(ReportHeroNames.class);
   private final ReplayReportProperties properties = new ReplayReportProperties();
   private final SectionSwitch sectionSwitch = new SectionSwitch(properties, List.of());
   private final ImportantFightsSection section =
       new ImportantFightsSection(
+          spikeRepo,
+          factorRepo,
           reader,
           heroNames,
           new ReasonWording(Prettify::ability),
+          Prettify::ability,
           properties,
           new PlainViewRenderer());
 
@@ -111,7 +124,7 @@ class ImportantFightsSectionTest {
 
     assertThat(lines)
         .containsExactly(
-            "**Important fights**",
+            "**Important fights and swings**",
             "10:00 Radiant won the fight, 1.2k net worth swing: Venomancer had no teleport,"
                 + " Venomancer was burst down",
             "17:00 Dire won the fight, 2.5k net worth swing",
@@ -164,9 +177,12 @@ class ImportantFightsSectionTest {
     stored(fight(1, 600, "DIRE", 1200L, false, cooldown));
     ImportantFightsSection real =
         new ImportantFightsSection(
+            spikeRepo,
+            factorRepo,
             reader,
             heroNames,
             new ReasonWording(TestLabels.labels()),
+            TestLabels.labels(),
             properties,
             new PlainViewRenderer());
 
@@ -192,7 +208,7 @@ class ImportantFightsSectionTest {
         fight(3, 1200, "RADIANT", 1200L, false));
 
     SectionView lost = section.view(input(0L)).orElseThrow();
-    assertThat(lost.title()).isEqualTo("Important fights");
+    assertThat(lost.title()).isEqualTo("Important fights and swings");
     assertThat(lost.verdict()).isEqualTo("Radiant (your team) won 1 of 3 important fights");
     assertThat(lost.accent()).isEqualTo(Accent.LOSS);
     assertThat(lost.bullets()).hasSize(3);
@@ -222,7 +238,7 @@ class ImportantFightsSectionTest {
 
     assertThat(section.lines(input(0L)))
         .isEqualTo(new PlainViewRenderer().lines(view))
-        .startsWith("**Important fights**");
+        .startsWith("**Important fights and swings**");
     assertThat(section.view(input(0L))).isPresent();
   }
 
@@ -263,7 +279,7 @@ class ImportantFightsSectionTest {
   }
 
   @Test
-  void repeatsTheReasonsOfAFightTheSwingSectionAlsoTells() {
+  void tellsTheReasonsTheLoserLost() {
     stored(fight(1, 600, "RADIANT", 1200L, false, reason("NO_TP", 130)));
 
     assertThat(section.lines(input(2L)).get(1)).endsWith("Venomancer had no teleport");
@@ -335,6 +351,246 @@ class ImportantFightsSectionTest {
     ReplayReportProperties.SectionToggle toggle = new ReplayReportProperties.SectionToggle();
     toggle.setEnabled(on);
     return toggle;
+  }
+
+  private GameSpikeDomain spike(int index, int start, long gold, String cause, boolean flip) {
+    return GameSpikeDomain.builder()
+        .spikeIndex(index)
+        .startSeconds(start)
+        .endSeconds(start + 180)
+        .benefitingTeam("DIRE")
+        .deltaGold(gold)
+        .directionChange(flip)
+        .primaryCause(cause)
+        .build();
+  }
+
+  private static GameSpikeFactorDomain itemFactor(String ref, Long slot, String detail) {
+    return GameSpikeFactorDomain.builder()
+        .spikeIndex(0)
+        .factorType("ITEM")
+        .ref(ref)
+        .playerSlot(slot)
+        .goldValue(3975L)
+        .detail(detail)
+        .build();
+  }
+
+  private static GameSpikeFactorDomain source(String ref, double share) {
+    return GameSpikeFactorDomain.builder()
+        .spikeIndex(0)
+        .factorType("SOURCE")
+        .ref(ref)
+        .sharePercent(share)
+        .build();
+  }
+
+  private void swings(GameSpikeDomain... spikes) {
+    when(spikeRepo.findByMatchId(1L)).thenReturn(List.of(spikes));
+  }
+
+  @Test
+  void swingAndFightLinesInterleaveInGameTime() {
+    stored(fight(1, 600, "RADIANT", 1200L, false), fight(2, 1700, "DIRE", 2500L, false));
+    swings(spike(0, 1200, 3000, "OBJECTIVE", false), spike(1, 1680, 7400, "FIGHT_WIN", true));
+
+    List<String> lines = section.lines(input(2L, 130L));
+
+    assertThat(lines).hasSize(5);
+    assertThat(lines.get(1)).startsWith("10:00 Radiant won the fight");
+    assertThat(lines.get(2)).startsWith("20:00-23:00: swung 3.0k gold toward Dire");
+    assertThat(lines.get(3))
+        .startsWith("28:00-31:00: swung 7.4k gold toward Dire and took the lead");
+    assertThat(lines.get(4)).startsWith("28:20 Dire won the fight");
+  }
+
+  @Test
+  void swingsWithoutImportantFightsStillPostWithTheBiggestAsTheVerdict() {
+    when(reader.importantFights(1L)).thenReturn(List.of());
+    swings(
+        spike(0, 1380, 5000, "FIGHT_WIN", false),
+        spike(1, 2400, 9000, "OBJECTIVE", true),
+        spike(2, 300, 9000, "OTHER", false));
+
+    SectionView view = section.view(input(128L)).orElseThrow();
+
+    ViewRendering.assertWithinLimits(view);
+    assertThat(view.title()).isEqualTo("Important fights and swings");
+    assertThat(view.verdict())
+        .isEqualTo(
+            "Biggest swing: 40:00-43:00: swung 9.0k gold toward Dire (your team) and took the"
+                + " lead, mostly from buildings");
+    assertThat(view.bullets())
+        .containsExactly(
+            "23:00-26:00: swung 5.0k gold toward Dire (your team), mostly from a won fight");
+    assertThat(view.accent()).isEqualTo(Accent.WIN);
+    assertThat(section.view(input(0L)).orElseThrow().accent()).isEqualTo(Accent.LOSS);
+  }
+
+  @Test
+  void keepsTheFightContestVerdictWhenSwingsAreListedToo() {
+    stored(fight(1, 600, "DIRE", 1200L, false));
+    swings(spike(0, 1380, 5000, "FIGHT_WIN", false));
+
+    SectionView view = section.view(input(0L)).orElseThrow();
+
+    assertThat(view.verdict()).isEqualTo("Radiant (your team) won 0 of 1 important fights");
+    assertThat(view.bullets()).hasSize(2);
+  }
+
+  @Test
+  void isEmptyWithoutFightsAndWithOnlySwingsWithoutACause() {
+    when(reader.importantFights(1L)).thenReturn(List.of());
+    swings(spike(0, 300, 9000, "OTHER", false));
+
+    assertThat(section.view(input(2L))).isEmpty();
+  }
+
+  @Test
+  void listsAtMostTheFindingsCapOfTheBiggestSwings() {
+    stored(fight(1, 600, "DIRE", 1200L, false));
+    swings(
+        java.util.stream.IntStream.range(0, 8)
+            .mapToObj(i -> spike(i, 300 + i * 100, 5000 + i, "FIGHT_WIN", false))
+            .toArray(GameSpikeDomain[]::new));
+
+    assertThat(section.lines(input(2L))).hasSize(1 + 1 + 3);
+  }
+
+  @Test
+  void doesNotPrintTheLostFightLinesOfASwing() {
+    stored(fight(1, 600, "DIRE", 1200L, false));
+    swings(spike(0, 1300, 5000, "FIGHT_WIN", false));
+
+    assertThat(String.join("\n", section.lines(input(2L)))).doesNotContain("lost");
+  }
+
+  @Test
+  void namesTheCauseSourcesOfASwing() {
+    stored(fight(1, 100, "DIRE", 1200L, false));
+    swings(spike(0, 1680, 7400, "FIGHT_WIN", true));
+    when(factorRepo.findByMatchId(1L))
+        .thenReturn(List.of(source("HERO_KILLS", 62.0), source("ROSHAN", 21.0)));
+
+    assertThat(section.lines(input(2L)).get(2)).contains("a won fight (kills 62%, Roshan 21%)");
+  }
+
+  @Test
+  void saysFromBothSourcesOnATieAndMostlyFromOnlyWithAClearLead() {
+    stored(fight(1, 100, "DIRE", 1200L, false));
+    swings(spike(0, 600, 3800, "CARRY_FARM", false));
+    when(factorRepo.findByMatchId(1L))
+        .thenReturn(List.of(source("FARM", 25.0), source("HERO_KILLS", 25.0)));
+
+    assertThat(section.lines(input(2L)).get(2))
+        .isEqualTo(
+            "10:00-13:00: swung 3.8k gold toward Dire, from farming and kills"
+                + " (farming 25%, kills 25%)");
+
+    when(factorRepo.findByMatchId(1L))
+        .thenReturn(List.of(source("FARM", 40.0), source("HERO_KILLS", 25.0)));
+    assertThat(section.lines(input(2L)).get(2))
+        .contains(", mostly from farming (farming 40%, kills 25%)");
+
+    when(factorRepo.findByMatchId(1L)).thenReturn(List.of(source("FARM", 40.0)));
+    assertThat(section.lines(input(2L)).get(2)).contains(", mostly from farming (farming 40%)");
+  }
+
+  private void oneSwingWithItem(GameSpikeFactorDomain... factors) {
+    stored(fight(1, 100, "DIRE", 1200L, false));
+    swings(spike(0, 1800, 5000, "FIGHT_WIN", false));
+    when(heroNames.iconBySlot(1L)).thenReturn(Map.of(2L, "Terrorblade", 130L, "Venomancer"));
+    when(factorRepo.findByMatchId(1L)).thenReturn(List.of(factors));
+  }
+
+  private String swingLine() {
+    return section.lines(input(2L)).get(2);
+  }
+
+  @Test
+  void namesTheKeyItemBehindTheSwing() {
+    oneSwingWithItem(itemFactor("black_king_bar", 2L, "1660"));
+
+    assertThat(swingLine())
+        .endsWith("; it came after Dire finished Black King Bar (Terrorblade) at 27:40");
+  }
+
+  @Test
+  void keepsTheKeyItemClauseOnTheBiggestSwingVerdict() {
+    when(reader.importantFights(1L)).thenReturn(List.of());
+    swings(spike(0, 1800, 5000, "FIGHT_WIN", false));
+    when(heroNames.iconBySlot(1L)).thenReturn(Map.of(2L, "Terrorblade"));
+    when(factorRepo.findByMatchId(1L))
+        .thenReturn(List.of(itemFactor("black_king_bar", 2L, "1660")));
+
+    assertThat(section.view(input(2L)).orElseThrow().verdict())
+        .endsWith("; it came after Dire finished Black King Bar (Terrorblade) at 27:40");
+  }
+
+  @Test
+  void putsTheItemIconOnlyBeforeTheItemName() {
+    oneSwingWithItem(itemFactor("blink", 2L, "1660"));
+    ConstantsManagers constants = mock(ConstantsManagers.class);
+    when(constants.getItemConstantMap())
+        .thenReturn(Map.of("blink", ItemConstant.builder().dname("Blink Dagger").build()));
+    ConstantAbilityLabels labels = new ConstantAbilityLabels(constants, TestIcons.on());
+    ImportantFightsSection withIcons =
+        new ImportantFightsSection(
+            spikeRepo,
+            factorRepo,
+            reader,
+            heroNames,
+            new ReasonWording(labels),
+            labels,
+            properties,
+            new PlainViewRenderer());
+
+    assertThat(withIcons.lines(input(2L)).get(2))
+        .endsWith("finished " + TestIcons.itemMention() + "Blink Dagger (Terrorblade) at 27:40");
+
+    when(factorRepo.findByMatchId(1L)).thenReturn(List.of(itemFactor("new_thing", 2L, "600")));
+    assertThat(withIcons.lines(input(2L)).get(2))
+        .endsWith(
+            "finished " + IconKind.ITEM.getPlaceholder() + " New Thing (Terrorblade) at 10:00");
+  }
+
+  @Test
+  void skipsTheHeroWhenUnknownOrWithoutASlot() {
+    oneSwingWithItem(itemFactor("aether_lens", 9L, "600"));
+    assertThat(swingLine()).endsWith("finished Aether Lens at 10:00");
+
+    when(factorRepo.findByMatchId(1L)).thenReturn(List.of(itemFactor("aether_lens", null, "600")));
+    assertThat(swingLine()).endsWith("finished Aether Lens at 10:00");
+  }
+
+  @Test
+  void dropsTheClauseForANegativeTimeAndPrettifiesAnUnknownItem() {
+    oneSwingWithItem(itemFactor("aether_lens", 2L, "-5"));
+    assertThat(swingLine()).doesNotContain("finished");
+
+    ImportantFightsSection raw =
+        new ImportantFightsSection(
+            spikeRepo,
+            factorRepo,
+            reader,
+            heroNames,
+            new ReasonWording(Prettify::ability),
+            n -> n,
+            properties,
+            new PlainViewRenderer());
+    when(factorRepo.findByMatchId(1L)).thenReturn(List.of(itemFactor("new_thing", 2L, "600")));
+    assertThat(raw.lines(input(2L)).get(2)).endsWith("finished New Thing (Terrorblade) at 10:00");
+  }
+
+  @Test
+  void ignoresAnItemRowWithoutATimeAndAnUnknownFactorType() {
+    oneSwingWithItem(
+        itemFactor("black_king_bar", 2L, null),
+        itemFactor("black_king_bar", 2L, "soon"),
+        GameSpikeFactorDomain.builder().spikeIndex(0).factorType("FUTURE").build(),
+        GameSpikeFactorDomain.builder().spikeIndex(0).build());
+
+    assertThat(swingLine()).doesNotContain("finished");
   }
 
   @Test

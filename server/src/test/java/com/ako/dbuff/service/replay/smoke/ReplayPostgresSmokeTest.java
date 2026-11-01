@@ -99,7 +99,6 @@ import com.ako.dbuff.service.replay.report.ReplayReportInput;
 import com.ako.dbuff.service.replay.report.RotationsSection;
 import com.ako.dbuff.service.replay.report.SkillPicksSection;
 import com.ako.dbuff.service.replay.report.SmokeSection;
-import com.ako.dbuff.service.replay.report.SwingSection;
 import com.ako.dbuff.service.replay.report.VisionSection;
 import com.ako.dbuff.service.replay.report.chart.ChartRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
@@ -200,7 +199,6 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private PlayerRoleRepo roleRepo;
   @Autowired private PlayerRoleProfileRepo roleProfileRepo;
   @Autowired private TeamCompositionRepo compositionRepo;
-  @Autowired private SwingSection swingSection;
   @Autowired private ImportantFightsSection importantFightsSection;
   @Autowired private LanesSection lanesSection;
   @Autowired private RotationsSection rotationsSection;
@@ -326,7 +324,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
                   "P7", 131L, "P8", 132L, "P9"),
               3);
       java.util.List<String> report = new java.util.ArrayList<>();
-      report.addAll(swingSection.lines(input));
+      report.addAll(importantFightsSection.lines(input));
       report.addAll(deathSection.lines(input));
       report.addAll(fightSection.lines(input));
       report.addAll(movementSection.lines(input));
@@ -699,7 +697,9 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     }
     String swing =
         String.join(
-            "\n", swingSection.lines(new ReplayReportInput(matchId, null, Set.of(), Map.of(), 10)));
+            "\n",
+            importantFightsSection.lines(
+                new ReplayReportInput(matchId, null, Set.of(), Map.of(), 10)));
     String text =
         "# Key item behind each swing, match "
             + id
@@ -1142,7 +1142,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(read.swings()).hasSameSizeAs(spikeRepo.findByMatchId(matchId));
     assertThat(read.swings()).allSatisfy(s -> assertThat(s.fights()).hasSizeLessThanOrEqualTo(2));
     List<String> swingLines =
-        swingSection.lines(new ReplayReportInput(matchId, null, Set.of(), Map.of(), 3));
+        importantFightsSection.lines(new ReplayReportInput(matchId, null, Set.of(), Map.of(), 3));
     System.out.println("SWINGS " + id + "\n" + String.join("\n", swingLines));
     assertThat(String.join("\n", swingLines))
         .as("%s: swings fit a message", id)

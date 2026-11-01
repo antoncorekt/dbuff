@@ -12,7 +12,6 @@ public enum FactKind {
   FIGHT("F", "important fights", 90),
   LANE("LANE", "lanes", 80),
   OBJECTIVE("OBJ", "objectives", 70),
-  SWING("SWING", "swings", 70),
   ENDGAME("ENDGAME", "end game", 65),
   DRAFT("DRAFT", "draft", 55),
   STATS("STATS", "player stats", 55),
