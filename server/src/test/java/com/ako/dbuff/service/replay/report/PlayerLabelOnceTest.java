@@ -8,6 +8,7 @@ import com.ako.dbuff.dao.model.FightPlayerDomain;
 import com.ako.dbuff.dao.model.PlayerPhaseSummaryDomain;
 import com.ako.dbuff.dao.model.PlayerRoleProfileDomain;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
+import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.DeathAnalysisRepo;
 import com.ako.dbuff.dao.repo.FightAbilityUseRepo;
 import com.ako.dbuff.dao.repo.FightPlayerRepo;
@@ -107,6 +108,7 @@ class PlayerLabelOnceTest {
     return new DraftSection(
             repo,
             mock(PlayerGameStatisticRepo.class),
+            mock(AbilityRepo.class),
             new AbilityDraftProfile(),
             TestLabels.labels(),
             mock(HeroKits.class),
