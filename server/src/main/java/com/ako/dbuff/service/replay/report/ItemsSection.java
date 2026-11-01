@@ -34,7 +34,10 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ItemsSection implements ReplayReportSection {
+public class ItemsSection implements ReplayReportSection, HighlightSource {
+  private static final double NEVER_USED_SCORE = 0.6;
+  private static final long NEVER_USED_COST = 2000;
+
   private record Entry(Long id, ItemEfficiency row, ItemKindWording wording, String category) {}
 
   private static final Comparator<Entry> CHRONOLOGICAL =
@@ -86,16 +89,48 @@ public class ItemsSection implements ReplayReportSection {
     return SectionViews.titled(rendered.lines(), paidBack(rendered.shown()));
   }
 
+  @Override
+  public List<Highlight> highlights(ReplayReportInput input) {
+    Set<Long> focus = input.focusSlots() == null ? Set.of() : input.focusSlots();
+    List<Entry> own =
+        allEntries(input).stream().filter(e -> focus.contains(e.row().slot())).toList();
+    if (own.isEmpty()) {
+      return List.of();
+    }
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
+    return own.stream().map(e -> highlight(e, heroes)).filter(Objects::nonNull).toList();
+  }
+
+  private Highlight highlight(Entry entry, Map<Long, String> heroes) {
+    ItemEfficiency row = entry.row();
+    double score =
+        row.ratio() == null || row.ratio().isNaN()
+            ? 0
+            : Highlight.scale(Math.abs(row.ratio() - 1), properties.getHighlights().getItems());
+    if (row.count() == 0 && row.cost() != null && row.cost() >= NEVER_USED_COST) {
+      score = Math.max(score, NEVER_USED_SCORE);
+    }
+    return score == 0
+        ? null
+        : new Highlight(
+            "items", null, score, entry.wording().shortVerdict(row, subject(row, heroes)));
+  }
+
   private List<Entry> entries(ReplayReportInput input) {
+    Optional<List<String>> wanted = wanted(input);
+    return allEntries(input).stream()
+        .filter(entry -> wanted.map(names -> isWanted(entry, names)).orElse(true))
+        .toList();
+  }
+
+  private List<Entry> allEntries(ReplayReportInput input) {
     List<ItemEfficiencyDomain> stored = itemRepo.findByMatchId(input.matchId());
     if (stored == null) {
       return List.of();
     }
-    Optional<List<String>> wanted = wanted(input);
     return stored.stream()
         .map(row -> usable(input.matchId(), row))
         .flatMap(Optional::stream)
-        .filter(entry -> wanted.map(names -> isWanted(entry, names)).orElse(true))
         .toList();
   }
 

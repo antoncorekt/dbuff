@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -30,9 +31,11 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class OutliersSection implements ReplayReportSection {
+public class OutliersSection implements ReplayReportSection, HighlightSource {
   private static final Comparator<PlayerOutlierDomain> CHRONOLOGICAL =
       OutlierRowOrder.CHRONOLOGICAL;
+
+  private static final double OUTLIER_SCORE = 0.8;
 
   /** An outlier stretch lasts to the end of its last minute. */
   private static final int LAST_MINUTE_SECONDS = 60;
@@ -88,6 +91,28 @@ public class OutliersSection implements ReplayReportSection {
   public Optional<SectionView> view(ReplayReportInput input) {
     List<PlayerOutlierDomain> rows = usableRows(input);
     return SectionViews.titled(render(input, rows), outliersVerdict(rows, input));
+  }
+
+  @Override
+  public List<Highlight> highlights(ReplayReportInput input) {
+    Set<Long> focus = input.focusSlots() == null ? Set.of() : input.focusSlots();
+    List<PlayerOutlierDomain> own =
+        usableRows(input).stream().filter(o -> focus.contains(o.getPlayerSlot())).toList();
+    if (own.isEmpty()) {
+      return List.of();
+    }
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
+    TeamSide yours = TeamSide.commonSide(focus);
+    LazyRotations rotations = new LazyRotations(input.matchId());
+    return own.stream()
+        .map(
+            o ->
+                new Highlight(
+                    "outliers",
+                    o.getStartSeconds().doubleValue(),
+                    OUTLIER_SCORE,
+                    line(o, heroes, yours, rotations)))
+        .toList();
   }
 
   private List<PlayerOutlierDomain> usableRows(ReplayReportInput input) {
