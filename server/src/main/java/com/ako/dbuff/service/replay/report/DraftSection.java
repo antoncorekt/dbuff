@@ -1,8 +1,11 @@
 package com.ako.dbuff.service.replay.report;
 
+import com.ako.dbuff.dao.model.AbilityDomain;
 import com.ako.dbuff.dao.model.AbilityDraftPickDomain;
+import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.ReportDetail;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
+import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
@@ -38,10 +41,12 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class DraftSection implements ReplayReportSection {
   private static final int DELIVERIES_KEPT = 8;
+  private static final String AD_SUFFIX = "_ad";
   static final String NOT_DRAWN = "The picture could not be drawn this time.";
 
   private final AbilityDraftPickRepo pickRepo;
   private final PlayerGameStatisticRepo statRepo;
+  private final AbilityRepo abilityRepo;
   private final AbilityDraftProfile profile;
   private final AbilityLabels labels;
   private final HeroKits heroKits;
@@ -102,15 +107,16 @@ public class DraftSection implements ReplayReportSection {
       return Optional.empty();
     }
     List<String> bullets = new ArrayList<>();
-    for (Drafter drafter : drafters) {
-      bullets.add(drafter.name());
-      drafter
-          .picks()
-          .forEach(
-              p -> bullets.add("- " + labels.decorated(p.getAbilityName()) + " · " + position(p)));
-    }
     Optional<ImageAttachment> image = picture(input.matchId(), drafters);
     if (image.isEmpty()) {
+      for (Drafter drafter : drafters) {
+        bullets.add(drafter.name());
+        drafter
+            .picks()
+            .forEach(
+                p ->
+                    bullets.add("- " + labels.decorated(p.getAbilityName()) + " · " + position(p)));
+      }
       bullets.add(NOT_DRAWN);
     }
     Verdict verdict =
@@ -119,20 +125,30 @@ public class DraftSection implements ReplayReportSection {
             Accent.NEUTRAL);
     return Optional.of(
         new SectionView(
-            "Draft", verdict.text(), verdict.accent(), bullets, null, image.orElse(null)));
+            "Draft and stats",
+            verdict.text(),
+            verdict.accent(),
+            bullets,
+            null,
+            image.orElse(null)));
   }
 
-  private record Drafter(long slot, String name, Long heroId, List<AbilityDraftPickDomain> picks) {}
+  private record Drafter(
+      long slot,
+      String name,
+      Long heroId,
+      PlayerMatchStatisticDomain stat,
+      List<AbilityDraftPickDomain> picks) {}
 
   private List<Drafter> drafters(ReplayReportInput input) {
     List<AbilityDraftPickDomain> picks = pickRepo.findByMatchId(input.matchId());
-    Map<Long, Long> heroBySlot = new HashMap<>();
+    Map<Long, PlayerMatchStatisticDomain> statBySlot = new HashMap<>();
     statRepo
         .findAllByMatchId(input.matchId())
         .forEach(
             h -> {
-              if (h.getPlayerSlot() != null && h.getHeroId() != null) {
-                heroBySlot.put(h.getPlayerSlot(), h.getHeroId());
+              if (h.getPlayerSlot() != null) {
+                statBySlot.put(h.getPlayerSlot(), h);
               }
             });
     List<Drafter> drafters = new ArrayList<>();
@@ -146,9 +162,14 @@ public class DraftSection implements ReplayReportSection {
                       Comparator.nullsLast(Comparator.naturalOrder())))
               .toList();
       if (!chosen.isEmpty()) {
+        PlayerMatchStatisticDomain stat = statBySlot.get(player.getKey());
         drafters.add(
             new Drafter(
-                player.getKey(), player.getValue(), heroBySlot.get(player.getKey()), chosen));
+                player.getKey(),
+                player.getValue(),
+                stat == null ? null : stat.getHeroId(),
+                stat,
+                chosen));
       }
     }
     return drafters;
@@ -157,7 +178,12 @@ public class DraftSection implements ReplayReportSection {
   private Optional<ImageAttachment> picture(long matchId, List<Drafter> drafters) {
     try {
       int skills = drafters.stream().mapToInt(d -> d.picks().size()).max().orElse(0);
-      List<String> headers = new ArrayList<>(List.of("Player", "Hero"));
+      Map<Long, List<AbilityDomain>> damageBySlot = new HashMap<>();
+      abilityRepo
+          .findAllByMatchId(matchId)
+          .forEach(
+              a -> damageBySlot.computeIfAbsent(a.getPlayerSlot(), k -> new ArrayList<>()).add(a));
+      List<String> headers = new ArrayList<>(List.of("Player", "K/D/A, GPM/XPM"));
       for (int i = 1; i <= skills; i++) {
         headers.add("Skill " + i);
       }
@@ -171,21 +197,26 @@ public class DraftSection implements ReplayReportSection {
             drafter.heroId() == null ? Optional.empty() : heroKits.hero(drafter.heroId());
         byte[] heroIcon =
             drafter.heroId() == null ? null : icons.hero(drafter.heroId()).orElse(null);
+        String player =
+            hero.map(h -> drafter.name() + " (" + h.getLocalized_name() + ")")
+                .orElse(drafter.name());
         List<Cell> row = new ArrayList<>();
-        row.add(new Cell(heroIcon, drafter.name(), null, band));
-        row.add(Cell.text(hero.map(HeroConstant::getLocalized_name).orElse("")));
+        row.add(new Cell(heroIcon, player, null, band));
+        row.add(kda(drafter.stat()));
+        List<AbilityDomain> damage = damageBySlot.getOrDefault(drafter.slot(), List.of());
         for (AbilityDraftPickDomain pick : drafter.picks()) {
           row.add(
               new Cell(
                   icons.ability(pick.getAbilityName()).orElse(null),
                   labels.label(pick.getAbilityName()),
-                  note(pick),
-                  null));
+                  null,
+                  null,
+                  sub(pick, damage)));
         }
         rows.add(row);
       }
       return tables
-          .render(new TableSpec("Draft", headers, rows))
+          .render(new TableSpec("Draft and stats", headers, rows))
           .map(png -> new ImageAttachment("draft-" + matchId + ".png", png));
     } catch (RuntimeException e) {
       log.warn("Draft picture of match {} failed: {}", matchId, e.toString(), e);
@@ -193,12 +224,49 @@ public class DraftSection implements ReplayReportSection {
     }
   }
 
-  private static String note(AbilityDraftPickDomain pick) {
+  private static Cell kda(PlayerMatchStatisticDomain stat) {
+    String score =
+        stat == null
+            ? "?/?/?"
+            : BehaviourWording.gold(stat.getKills())
+                + "/"
+                + BehaviourWording.gold(stat.getDeaths())
+                + "/"
+                + BehaviourWording.gold(stat.getAssists());
+    String rates =
+        stat == null
+            ? "?/?"
+            : BehaviourWording.gold(stat.getGoldPerMin())
+                + "/"
+                + BehaviourWording.gold(stat.getXpPerMin());
+    return new Cell(null, score, null, null, rates);
+  }
+
+  private static String sub(AbilityDraftPickDomain pick, List<AbilityDomain> damage) {
+    List<String> parts = new ArrayList<>();
     Integer number = number(pick);
     if (number != null) {
-      return "#" + number;
+      parts.add("#" + number);
+    } else if (pick.getTeamPickIndex() != null) {
+      parts.add("team pick " + pick.getTeamPickIndex());
     }
-    return pick.getTeamPickIndex() == null ? null : "team pick " + pick.getTeamPickIndex();
+    damageRow(pick.getAbilityName(), damage)
+        .ifPresent(
+            row -> {
+              parts.add(BehaviourWording.gold(row.getDamageDealt()));
+              parts.add(row.getUseCount() == null ? "?x" : row.getUseCount() + "x");
+            });
+    return parts.isEmpty() ? null : String.join(" · ", parts);
+  }
+
+  private static Optional<AbilityDomain> damageRow(String ability, List<AbilityDomain> damage) {
+    Optional<AbilityDomain> own =
+        damage.stream().filter(a -> ability.equals(a.getName())).findFirst();
+    if (own.isPresent() || !ability.endsWith(AD_SUFFIX)) {
+      return own;
+    }
+    String base = ability.substring(0, ability.length() - AD_SUFFIX.length());
+    return damage.stream().filter(a -> base.equals(a.getName())).findFirst();
   }
 
   private static String position(AbilityDraftPickDomain pick) {
