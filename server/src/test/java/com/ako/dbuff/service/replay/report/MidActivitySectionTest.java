@@ -189,4 +189,39 @@ class MidActivitySectionTest {
             "his gold per minute was 18% above the enemy mid and his experience per minute"
                 + " 20% below his team's average");
   }
+
+  @Test
+  void highlights_scoreTheGoldGapOfTheTrackedMidHeroAtNormalAndAtExtreme() {
+    when(heroNames.iconBySlot(1L)).thenReturn(HEROES);
+    MatchDomain match = MatchDomain.builder().id(1L).radiantWin(true).build();
+    ReplayReportInput input = new ReplayReportInput(1L, match, Set.of(0L), Map.of(), 3);
+    when(repo.findByMatchId(1L))
+        .thenReturn(
+            List.of(
+                puck().goldPerMinute(625).enemyGoldPerMinute(500).windowStartSeconds(600).build(),
+                lina().build()));
+    assertThat(section.highlights(input))
+        .singleElement()
+        .satisfies(
+            h -> {
+              assertThat(h.source()).isEqualTo("mid-activity");
+              assertThat(h.seconds()).isEqualTo(600.0);
+              assertThat(h.score()).isZero();
+              assertThat(h.text()).startsWith("Puck (");
+            });
+    when(repo.findByMatchId(1L))
+        .thenReturn(List.of(puck().goldPerMinute(800).enemyGoldPerMinute(500).build()));
+    assertThat(section.highlights(input))
+        .singleElement()
+        .satisfies(h -> assertThat(h.score()).isEqualTo(1.0));
+  }
+
+  @Test
+  void highlights_skipANullValueTheOtherTeamAndNoTrackedTeam() {
+    ReplayReportInput yours = input(true, 0L);
+    when(repo.findByMatchId(1L))
+        .thenReturn(List.of(puck().enemyGoldPerMinute(null).build(), lina().build()));
+    assertThat(section.highlights(yours)).isEmpty();
+    assertThat(section.highlights(input(true))).isEmpty();
+  }
 }
