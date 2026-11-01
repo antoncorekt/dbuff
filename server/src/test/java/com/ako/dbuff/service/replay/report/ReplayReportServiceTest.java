@@ -36,6 +36,7 @@ import com.ako.dbuff.service.replay.metrics.ReplayMetrics;
 import com.ako.dbuff.service.replay.metrics.ReplayRunCounts;
 import com.ako.dbuff.service.replay.mode.GameModeProfile;
 import com.ako.dbuff.service.replay.mode.TestModes;
+import com.ako.dbuff.service.replay.report.chart.TableRenderer;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.ComponentsViewRenderer;
 import com.ako.dbuff.service.replay.report.view.ImageAttachment;
@@ -314,7 +315,8 @@ class ReplayReportServiceTest {
             Mockito.mock(LaneReasonRepo.class),
             Mockito.mock(ReportHeroNames.class),
             new LaneProperties(),
-            properties);
+            properties,
+            Mockito.mock(TableRenderer.class));
     service = serviceWith(named("alpha", true), section);
     service.deliver(1L);
     assertThat(posted()).contains("line of alpha").doesNotContain("Top lane");
