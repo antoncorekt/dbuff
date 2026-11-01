@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
+import com.ako.dbuff.service.ai.reasons.ReplayReportAiProperties;
 import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.ItemConstant;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
@@ -12,6 +13,7 @@ import com.ako.dbuff.service.replay.looprunner.ReviewLoopTopic;
 import com.ako.dbuff.service.replay.mode.GameModeRegistry;
 import com.ako.dbuff.service.replay.report.AbilityLabels;
 import com.ako.dbuff.service.replay.report.ConstantAbilityLabels;
+import com.ako.dbuff.service.replay.report.MoreReportsMessage;
 import com.ako.dbuff.service.replay.report.OpenDotaSection;
 import com.ako.dbuff.service.replay.report.ReplayReportProperties;
 import com.ako.dbuff.service.replay.report.ReplayReportSection;
@@ -97,7 +99,10 @@ class ReportLoopTopic implements ReviewLoopTopic {
                           context.getBean(GameModeRegistry.class),
                           null,
                           null,
-                          context.getBean(ReportHeroNames.class)));
+                          context.getBean(ReportHeroNames.class),
+                          new MoreReportsMessage(
+                              context.getBean(SectionSwitch.class),
+                              context.getBeanProvider(ReplayReportAiProperties.class))));
     }
     return reportService;
   }

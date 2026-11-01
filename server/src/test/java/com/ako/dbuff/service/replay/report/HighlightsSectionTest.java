@@ -41,12 +41,12 @@ class HighlightsSectionTest {
   }
 
   @Test
-  void isPartOfTheStandardReportButOffByDefaultForNow() {
+  void isPartOfTheStandardReportAndOnByDefault() {
     HighlightsSection section = section();
     assertThat(section.name()).isEqualTo("highlights");
     assertThat(section.order()).isEqualTo(55);
     assertThat(section.minimumDetail()).isEqualTo(ReportDetail.STANDARD);
-    assertThat(section.defaultEnabled()).isFalse();
+    assertThat(section.defaultEnabled()).isTrue();
     assertThat(section.summary()).isEqualTo("the most unusual moments of the match");
   }
 

@@ -33,13 +33,13 @@ public class ReplayReportProperties {
   private ReportFormat format = ReportFormat.PLAIN;
 
   /** The most messages one match's replay analysis takes at the full detail level. */
-  private int maxMessages = 4;
+  private int maxMessages = 6;
 
   /** The most messages one {@code /match report section:everything} posts. */
   private int everythingMaxMessages = 30;
 
   /** The most messages it takes at the standard detail level. */
-  private int standardMaxMessages = 2;
+  private int standardMaxMessages = 4;
 
   /** The most findings one section lists. */
   private int maxFindingsPerSection = 3;

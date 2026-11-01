@@ -47,11 +47,6 @@ public class FightSection implements ReplayReportSection, HighlightSource {
   }
 
   @Override
-  public boolean defaultEnabled() {
-    return true;
-  }
-
-  @Override
   public int order() {
     return 42;
   }

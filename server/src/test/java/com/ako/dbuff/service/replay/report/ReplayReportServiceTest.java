@@ -28,6 +28,7 @@ import com.ako.dbuff.dao.repo.ReplayParseRunRepo;
 import com.ako.dbuff.dao.repo.ReplayReportPostedRepo;
 import com.ako.dbuff.dao.repo.SmokeUseRepo;
 import com.ako.dbuff.dao.repo.TeamRotationRepo;
+import com.ako.dbuff.service.ai.reasons.ReplayReportAiProperties;
 import com.ako.dbuff.service.discord.DiscordMessageService;
 import com.ako.dbuff.service.match.report.formatter.DiscordReportFormatter;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
@@ -60,6 +61,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.beans.factory.ObjectProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -71,6 +73,7 @@ import static org.mockito.Mockito.when;
 
 class ReplayReportServiceTest {
 
+  private static final String MORE_EVERYTHING = "`/match report section:everything` every report";
   private static final int PARSER_VERSION = new ReplayProcessingProperties().getParserVersion();
 
   private final ReplayReportProperties properties = new ReplayReportProperties();
@@ -157,12 +160,12 @@ class ReplayReportServiceTest {
     service.deliver(1L);
 
     ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
-    verify(discord).sendThreadMessageBlocking(Mockito.eq(thread), text.capture());
-    assertThat(text.getValue()).contains("Swings").contains("Anton did something");
+    verify(discord, Mockito.times(2)).sendThreadMessageBlocking(Mockito.eq(thread), text.capture());
+    assertThat(text.getAllValues().get(0)).contains("Swings").contains("Anton did something");
     ArgumentCaptor<ReplayReportPostedDomain> posted =
         ArgumentCaptor.forClass(ReplayReportPostedDomain.class);
     verify(postedRepo).save(posted.capture());
-    assertThat(posted.getValue().getMessages()).isEqualTo(1);
+    assertThat(posted.getValue().getMessages()).isEqualTo(2);
   }
 
   @Test
@@ -209,7 +212,7 @@ class ReplayReportServiceTest {
     verify(discord, never()).sendThreadMessageBlocking(any(), any());
 
     service.deliver(1L);
-    verify(discord).sendThreadMessageBlocking(any(), any());
+    verify(discord, Mockito.times(2)).sendThreadMessageBlocking(any(), any());
   }
 
   private static class AbilityDraftOnlySection extends ReplaySection {
@@ -238,7 +241,17 @@ class ReplayReportServiceTest {
         TestModes.registry(),
         new ReplayMetrics(registry, mock(ReplayRunCounts.class)),
         new ComponentsViewRenderer(new PlainViewRenderer()),
-        heroNames);
+        heroNames,
+        new MoreReportsMessage(
+            new SectionSwitch(properties, list), aiProvider(new ReplayReportAiProperties())));
+  }
+
+  @SuppressWarnings("unchecked")
+  private static ObjectProvider<ReplayReportAiProperties> aiProvider(
+      ReplayReportAiProperties properties) {
+    ObjectProvider<ReplayReportAiProperties> provider = mock(ObjectProvider.class);
+    when(provider.getIfAvailable()).thenReturn(properties);
+    return provider;
   }
 
   private static ReplayReportSection named(String name, boolean defaultEnabled) {
@@ -580,7 +593,7 @@ class ReplayReportServiceTest {
     service.deliver(1L);
 
     order.verify(postedRepo).save(any());
-    order.verify(discord).sendThreadMessageBlocking(any(), any());
+    order.verify(discord, Mockito.atLeastOnce()).sendThreadMessageBlocking(any(), any());
   }
 
   @Test
@@ -607,11 +620,11 @@ class ReplayReportServiceTest {
     when(postedRepo.findByMatchIdAndInstanceId(1L, "i1"))
         .thenReturn(Optional.of(ReplayReportPostedDomain.builder().id(3L).messages(1).build()));
     service.deliver(1L);
-    verify(discord, Mockito.times(1)).sendThreadMessageBlocking(any(), any());
+    verify(discord, Mockito.times(2)).sendThreadMessageBlocking(any(), any());
 
     assertThat(service.redeliver(1L, "i1")).isEqualTo(ReportDelivery.POSTED);
 
-    verify(discord, Mockito.times(2)).sendThreadMessageBlocking(any(), any());
+    verify(discord, Mockito.times(4)).sendThreadMessageBlocking(any(), any());
     ArgumentCaptor<ReplayReportPostedDomain> saved =
         ArgumentCaptor.forClass(ReplayReportPostedDomain.class);
     verify(postedRepo, Mockito.times(2)).save(saved.capture());
@@ -677,7 +690,7 @@ class ReplayReportServiceTest {
     when(quiet.isQuietTime(any())).thenReturn(true);
 
     service.redeliver(1L, "i1");
-    verify(discord, Mockito.times(1)).sendThreadMessageBlocking(any(), any());
+    verify(discord, Mockito.times(2)).sendThreadMessageBlocking(any(), any());
 
     when(instanceRepo.findById("i1"))
         .thenReturn(
@@ -688,7 +701,7 @@ class ReplayReportServiceTest {
     when(instanceRepo.findById("i1")).thenReturn(Optional.of(instance(null)));
     assertThat(service.redeliver(1L, "i1")).isEqualTo(ReportDelivery.REPORT_SWITCHED_OFF);
 
-    verify(discord, Mockito.times(1)).sendThreadMessageBlocking(any(), any());
+    verify(discord, Mockito.times(2)).sendThreadMessageBlocking(any(), any());
   }
 
   @Test
@@ -785,9 +798,12 @@ class ReplayReportServiceTest {
     service.deliver(1L);
 
     ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
-    verify(discord, Mockito.times(2)).sendThreadMessageBlocking(Mockito.eq(thread), text.capture());
+    verify(discord, Mockito.times(3)).sendThreadMessageBlocking(Mockito.eq(thread), text.capture());
     assertThat(text.getAllValues())
-        .containsExactly("**alpha**\n10:00: line of alpha", "**beta**\n10:00: line of beta");
+        .containsExactly(
+            "**alpha**\n10:00: line of alpha",
+            "**beta**\n10:00: line of beta",
+            "`/match report section:everything` every report");
     verify(discord, never()).sendThreadComponentsBlocking(any(), any());
   }
 
@@ -799,8 +815,10 @@ class ReplayReportServiceTest {
     service.deliver(1L);
 
     ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
-    verify(discord, Mockito.times(1)).sendThreadMessageBlocking(Mockito.eq(thread), text.capture());
-    assertThat(text.getValue()).contains("more left out").hasSizeLessThanOrEqualTo(2000);
+    verify(discord, Mockito.times(2)).sendThreadMessageBlocking(Mockito.eq(thread), text.capture());
+    assertThat(text.getAllValues().get(0)).contains("more left out").hasSizeLessThanOrEqualTo(2000);
+    assertThat(text.getAllValues().get(1))
+        .isEqualTo("`/match report section:everything` every report");
   }
 
   private static ReplayReportSection longSection(String name) {
@@ -833,14 +851,84 @@ class ReplayReportServiceTest {
 
     ArgumentCaptor<List<MessageTopLevelComponent>> cards = ArgumentCaptor.forClass(List.class);
     verify(discord).sendThreadComponentsBlocking(Mockito.eq(thread), cards.capture());
-    verify(discord, never()).sendThreadMessageBlocking(any(), any());
+    verify(discord, Mockito.times(1)).sendThreadMessageBlocking(any(), any());
     List<MessageTopLevelComponent> message = cards.getValue();
     assertThat(message).hasSize(2).allMatch(c -> c instanceof Container);
     assertThat(((Container) message.get(0)).getAccentColorRaw()).isEqualTo(Accent.INFO.rgb());
     ArgumentCaptor<ReplayReportPostedDomain> posted =
         ArgumentCaptor.forClass(ReplayReportPostedDomain.class);
     verify(postedRepo).save(posted.capture());
-    assertThat(posted.getValue().getMessages()).isEqualTo(1);
+    assertThat(posted.getValue().getMessages()).isEqualTo(2);
+  }
+
+  @Test
+  void deliver_theMoreReportsMessageIsLastAndSurvivesACapOfOne() {
+    properties.setMaxMessages(1);
+    service = serviceWith(longSection("alpha"), longSection("beta"), named("gamma", false));
+
+    service.deliver(1L);
+
+    ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
+    verify(discord, Mockito.times(2)).sendThreadMessageBlocking(Mockito.eq(thread), text.capture());
+    assertThat(text.getAllValues().get(1))
+        .startsWith("`/match report section:gamma`")
+        .endsWith(MORE_EVERYTHING);
+    ArgumentCaptor<ReplayReportPostedDomain> posted =
+        ArgumentCaptor.forClass(ReplayReportPostedDomain.class);
+    verify(postedRepo).save(posted.capture());
+    assertThat(posted.getValue().getMessages()).isEqualTo(2);
+  }
+
+  @Test
+  void deliverSectionAndDeliverEverythingDoNotAddTheMoreReportsMessage() {
+    storedRun(ReplayStatus.DONE);
+    service = serviceWith(named("alpha", true), named("beta", false));
+
+    service.deliverSection(1L, "i1", "beta");
+    service.deliverEverything(1L, "i1");
+
+    assertThat(posted()).doesNotContain("/match report");
+  }
+
+  @Test
+  void defaultReport_holdsTheViewsOfTheDefaultSetInPostingOrderAndTheMessage() {
+    service =
+        serviceWith(
+            ordered(named("gamma", true), 3),
+            ordered(named("alpha", true), 1),
+            ordered(named("off", false), 2));
+
+    ReplayReportService.DefaultReport report =
+        service.defaultReport(1L, instance(InstanceSettings.builder().build()));
+
+    assertThat(report.views().keySet()).containsExactly("alpha", "gamma");
+    assertThat(report.moreReports().orElseThrow())
+        .startsWith("`/match report section:off`")
+        .endsWith(MORE_EVERYTHING);
+  }
+
+  private static ReplayReportSection ordered(ReplayReportSection inner, int order) {
+    return new ReplaySection() {
+      @Override
+      public String name() {
+        return inner.name();
+      }
+
+      @Override
+      public boolean defaultEnabled() {
+        return inner.defaultEnabled();
+      }
+
+      @Override
+      public int order() {
+        return order;
+      }
+
+      @Override
+      public List<String> lines(ReplayReportInput input) {
+        return inner.lines(input);
+      }
+    };
   }
 
   private static ReplayReportSection bulky(String name) {

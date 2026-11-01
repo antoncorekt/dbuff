@@ -34,12 +34,12 @@ class GraphAdvantageSectionTest {
   }
 
   @Test
-  void isOffByDefaultAtStandardDetailUnderItsOwnName() {
+  void isOnByDefaultAtStandardDetailUnderItsOwnName() {
     assertThat(section.name()).isEqualTo("graph-advantage");
-    assertThat(section.defaultEnabled()).isFalse();
+    assertThat(section.defaultEnabled()).isTrue();
     assertThat(section.minimumDetail()).isEqualTo(ReportDetail.STANDARD);
     ReplayReportProperties properties = new ReplayReportProperties();
-    assertThat(new SectionSwitch(properties, List.of(section)).isEnabled(section)).isFalse();
+    assertThat(new SectionSwitch(properties, List.of(section)).isEnabled(section)).isTrue();
   }
 
   @Test

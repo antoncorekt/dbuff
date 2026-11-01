@@ -59,7 +59,7 @@ public class ItemBuildSection implements ReplayReportSection {
 
   @Override
   public boolean defaultEnabled() {
-    return false;
+    return true;
   }
 
   @Override

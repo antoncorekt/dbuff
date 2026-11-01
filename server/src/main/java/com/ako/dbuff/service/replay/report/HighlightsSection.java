@@ -37,6 +37,11 @@ public class HighlightsSection implements ReplayReportSection {
   }
 
   @Override
+  public boolean defaultEnabled() {
+    return true;
+  }
+
+  @Override
   public int order() {
     return 55;
   }
