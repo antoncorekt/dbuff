@@ -20,8 +20,6 @@ import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.ImageAttachment;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -30,19 +28,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /** What each tracked player bought and when: the assembled or costly items, in purchase order. */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ItemBuildSection implements ReplayReportSection {
-  private static final int DELIVERIES_KEPT = 8;
   private static final int ITEMS_SHOWN = 8;
   private static final long COSTLY = 2000;
   private static final String TITLE = "Item builds";
-  static final String NOT_DRAWN = "The picture could not be drawn this time.";
 
   private final ItemRepository itemRepo;
   private final PlayerGameStatisticRepo statRepo;
@@ -51,8 +45,7 @@ public class ItemBuildSection implements ReplayReportSection {
   private final SkillIconImages icons;
   private final TableRenderer tables;
   private final PlainViewRenderer plain = new PlainViewRenderer();
-  private final Cache<ReplayReportInput, Optional<SectionView>> views =
-      Caffeine.newBuilder().weakKeys().maximumSize(DELIVERIES_KEPT).build();
+  private final PictureViews pictures = new PictureViews();
 
   @Override
   public boolean supports(GameModeProfile mode) {
@@ -96,7 +89,7 @@ public class ItemBuildSection implements ReplayReportSection {
 
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
-    return views.get(input, this::build);
+    return pictures.view(input, this::build);
   }
 
   private record Bought(String key, String label, long cost, Long seconds) {}
@@ -116,7 +109,7 @@ public class ItemBuildSection implements ReplayReportSection {
         buyer.items().forEach(i -> parts.add(i.label() + " " + when(i.seconds())));
         bullets.add(player(buyer) + ": " + String.join(", ", parts));
       }
-      bullets.add(NOT_DRAWN);
+      bullets.add(PictureViews.NOT_DRAWN);
     }
     Verdict verdict =
         new Verdict(
@@ -201,34 +194,36 @@ public class ItemBuildSection implements ReplayReportSection {
   }
 
   private Optional<ImageAttachment> picture(long matchId, List<Buyer> buyers) {
-    try {
-      int most = buyers.stream().mapToInt(b -> b.items().size()).max().orElse(0);
-      List<String> headers = new ArrayList<>(List.of("Player"));
-      for (int i = 1; i <= most; i++) {
-        headers.add("Item " + i);
-      }
-      List<List<Cell>> rows = new ArrayList<>();
-      for (Buyer buyer : buyers) {
-        Color band =
-            TeamSide.ofSlot(buyer.slot()) == TeamSide.RADIANT
-                ? ChartPalette.RADIANT
-                : ChartPalette.DIRE;
-        byte[] heroIcon = buyer.heroId() == null ? null : icons.hero(buyer.heroId()).orElse(null);
-        List<Cell> row = new ArrayList<>();
-        row.add(new Cell(heroIcon, player(buyer), null, band));
-        for (Bought item : buyer.items()) {
-          byte[] icon = icons.item(item.key()).orElse(null);
-          row.add(
-              new Cell(icon, when(item.seconds()), null, null, icon == null ? item.label() : null));
-        }
-        rows.add(row);
-      }
-      return tables
-          .render(new TableSpec(TITLE, headers, rows))
-          .map(png -> new ImageAttachment("item-build-" + matchId + ".png", png));
-    } catch (RuntimeException e) {
-      log.warn("Item build picture of match {} failed: {}", matchId, e.toString(), e);
-      return Optional.empty();
-    }
+    return PictureViews.draw(
+        "Item build",
+        matchId,
+        () -> {
+          int most = buyers.stream().mapToInt(b -> b.items().size()).max().orElse(0);
+          List<String> headers = new ArrayList<>(List.of("Player"));
+          for (int i = 1; i <= most; i++) {
+            headers.add("Item " + i);
+          }
+          List<List<Cell>> rows = new ArrayList<>();
+          for (Buyer buyer : buyers) {
+            Color band =
+                TeamSide.ofSlot(buyer.slot()) == TeamSide.RADIANT
+                    ? ChartPalette.RADIANT
+                    : ChartPalette.DIRE;
+            byte[] heroIcon =
+                buyer.heroId() == null ? null : icons.hero(buyer.heroId()).orElse(null);
+            List<Cell> row = new ArrayList<>();
+            row.add(new Cell(heroIcon, player(buyer), null, band));
+            for (Bought item : buyer.items()) {
+              byte[] icon = icons.item(item.key()).orElse(null);
+              row.add(
+                  new Cell(
+                      icon, when(item.seconds()), null, null, icon == null ? item.label() : null));
+            }
+            rows.add(row);
+          }
+          return tables
+              .render(new TableSpec(TITLE, headers, rows))
+              .map(png -> new ImageAttachment("item-build-" + matchId + ".png", png));
+        });
   }
 }

@@ -22,8 +22,6 @@ import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.ImageAttachment;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -32,17 +30,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /** What each tracked player drafted in an Ability Draft and in which overall pick. */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class DraftSection implements ReplayReportSection {
-  private static final int DELIVERIES_KEPT = 8;
   private static final String AD_SUFFIX = "_ad";
-  static final String NOT_DRAWN = "The picture could not be drawn this time.";
 
   private final AbilityDraftPickRepo pickRepo;
   private final PlayerGameStatisticRepo statRepo;
@@ -53,8 +47,7 @@ public class DraftSection implements ReplayReportSection {
   private final SkillIconImages icons;
   private final TableRenderer tables;
   private final PlainViewRenderer plain = new PlainViewRenderer();
-  private final Cache<ReplayReportInput, Optional<SectionView>> views =
-      Caffeine.newBuilder().weakKeys().maximumSize(DELIVERIES_KEPT).build();
+  private final PictureViews pictures = new PictureViews();
 
   @Override
   public boolean supports(GameModeProfile mode) {
@@ -98,7 +91,7 @@ public class DraftSection implements ReplayReportSection {
 
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
-    return views.get(input, this::build);
+    return pictures.view(input, this::build);
   }
 
   private Optional<SectionView> build(ReplayReportInput input) {
@@ -117,7 +110,7 @@ public class DraftSection implements ReplayReportSection {
                 p ->
                     bullets.add("- " + labels.decorated(p.getAbilityName()) + " · " + position(p)));
       }
-      bullets.add(NOT_DRAWN);
+      bullets.add(PictureViews.NOT_DRAWN);
     }
     Verdict verdict =
         new Verdict(
@@ -176,52 +169,55 @@ public class DraftSection implements ReplayReportSection {
   }
 
   private Optional<ImageAttachment> picture(long matchId, List<Drafter> drafters) {
-    try {
-      int skills = drafters.stream().mapToInt(d -> d.picks().size()).max().orElse(0);
-      Map<Long, List<AbilityDomain>> damageBySlot = new HashMap<>();
-      abilityRepo
-          .findAllByMatchId(matchId)
-          .forEach(
-              a -> damageBySlot.computeIfAbsent(a.getPlayerSlot(), k -> new ArrayList<>()).add(a));
-      List<String> headers = new ArrayList<>(List.of("Player", "K/D/A, GPM/XPM"));
-      for (int i = 1; i <= skills; i++) {
-        headers.add("Skill " + i);
-      }
-      List<List<Cell>> rows = new ArrayList<>();
-      for (Drafter drafter : drafters) {
-        Color band =
-            TeamSide.ofSlot(drafter.slot()) == TeamSide.RADIANT
-                ? ChartPalette.RADIANT
-                : ChartPalette.DIRE;
-        Optional<HeroConstant> hero =
-            drafter.heroId() == null ? Optional.empty() : heroKits.hero(drafter.heroId());
-        byte[] heroIcon =
-            drafter.heroId() == null ? null : icons.hero(drafter.heroId()).orElse(null);
-        String player =
-            hero.map(h -> drafter.name() + " (" + h.getLocalized_name() + ")")
-                .orElse(drafter.name());
-        List<Cell> row = new ArrayList<>();
-        row.add(new Cell(heroIcon, player, null, band));
-        row.add(kda(drafter.stat()));
-        List<AbilityDomain> damage = damageBySlot.getOrDefault(drafter.slot(), List.of());
-        for (AbilityDraftPickDomain pick : drafter.picks()) {
-          row.add(
-              new Cell(
-                  icons.ability(pick.getAbilityName()).orElse(null),
-                  labels.label(pick.getAbilityName()),
-                  null,
-                  null,
-                  sub(pick, damage)));
-        }
-        rows.add(row);
-      }
-      return tables
-          .render(new TableSpec("Draft and stats", headers, rows))
-          .map(png -> new ImageAttachment("draft-" + matchId + ".png", png));
-    } catch (RuntimeException e) {
-      log.warn("Draft picture of match {} failed: {}", matchId, e.toString(), e);
-      return Optional.empty();
-    }
+    return PictureViews.draw(
+        "Draft",
+        matchId,
+        () -> {
+          int skills = drafters.stream().mapToInt(d -> d.picks().size()).max().orElse(0);
+          Map<Long, List<AbilityDomain>> damageBySlot = new HashMap<>();
+          abilityRepo
+              .findAllByMatchId(matchId)
+              .forEach(
+                  a ->
+                      damageBySlot
+                          .computeIfAbsent(a.getPlayerSlot(), k -> new ArrayList<>())
+                          .add(a));
+          List<String> headers = new ArrayList<>(List.of("Player", "K/D/A, GPM/XPM"));
+          for (int i = 1; i <= skills; i++) {
+            headers.add("Skill " + i);
+          }
+          List<List<Cell>> rows = new ArrayList<>();
+          for (Drafter drafter : drafters) {
+            Color band =
+                TeamSide.ofSlot(drafter.slot()) == TeamSide.RADIANT
+                    ? ChartPalette.RADIANT
+                    : ChartPalette.DIRE;
+            Optional<HeroConstant> hero =
+                drafter.heroId() == null ? Optional.empty() : heroKits.hero(drafter.heroId());
+            byte[] heroIcon =
+                drafter.heroId() == null ? null : icons.hero(drafter.heroId()).orElse(null);
+            String player =
+                hero.map(h -> drafter.name() + " (" + h.getLocalized_name() + ")")
+                    .orElse(drafter.name());
+            List<Cell> row = new ArrayList<>();
+            row.add(new Cell(heroIcon, player, null, band));
+            row.add(kda(drafter.stat()));
+            List<AbilityDomain> damage = damageBySlot.getOrDefault(drafter.slot(), List.of());
+            for (AbilityDraftPickDomain pick : drafter.picks()) {
+              row.add(
+                  new Cell(
+                      icons.ability(pick.getAbilityName()).orElse(null),
+                      labels.label(pick.getAbilityName()),
+                      null,
+                      null,
+                      sub(pick, damage)));
+            }
+            rows.add(row);
+          }
+          return tables
+              .render(new TableSpec("Draft and stats", headers, rows))
+              .map(png -> new ImageAttachment("draft-" + matchId + ".png", png));
+        });
   }
 
   private static Cell kda(PlayerMatchStatisticDomain stat) {
