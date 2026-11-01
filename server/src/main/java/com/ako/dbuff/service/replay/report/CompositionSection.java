@@ -56,6 +56,11 @@ public class CompositionSection implements ReplayReportSection {
   }
 
   @Override
+  public String summary() {
+    return "how the two team compositions compare";
+  }
+
+  @Override
   public ReportDetail minimumDetail() {
     return ReportDetail.STANDARD;
   }

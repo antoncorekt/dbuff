@@ -52,7 +52,12 @@ public class OpeningSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 18;
+    return 20;
+  }
+
+  @Override
+  public String summary() {
+    return "who came out ahead in the opening";
   }
 
   @Override

@@ -62,7 +62,12 @@ public class SwingSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 60;
+    return 41;
+  }
+
+  @Override
+  public String summary() {
+    return "the gold swings and what caused them";
   }
 
   @Override

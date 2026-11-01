@@ -41,7 +41,12 @@ public class ImportantFightsSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 65;
+    return 40;
+  }
+
+  @Override
+  public String summary() {
+    return "the fights that decided the game";
   }
 
   @Override

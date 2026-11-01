@@ -36,6 +36,11 @@ public class OpenDotaSection implements ReplayReportSection {
   }
 
   @Override
+  public String summary() {
+    return "the OpenDota summary of the match";
+  }
+
+  @Override
   public ReportDetail minimumDetail() {
     return ReportDetail.STANDARD;
   }

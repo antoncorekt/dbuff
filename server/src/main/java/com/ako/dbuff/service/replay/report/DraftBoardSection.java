@@ -33,6 +33,11 @@ public class DraftBoardSection implements ReplayReportSection {
   }
 
   @Override
+  public String summary() {
+    return "the whole draft, turn by turn";
+  }
+
+  @Override
   public ReportDetail minimumDetail() {
     return ReportDetail.STANDARD;
   }

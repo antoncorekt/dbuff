@@ -42,7 +42,12 @@ public class SkillEffectsSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 14;
+    return 72;
+  }
+
+  @Override
+  public String summary() {
+    return "what each skill did in the game";
   }
 
   @Override

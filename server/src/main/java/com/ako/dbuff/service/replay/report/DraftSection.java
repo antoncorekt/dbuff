@@ -72,6 +72,11 @@ public class DraftSection implements ReplayReportSection {
   }
 
   @Override
+  public String summary() {
+    return "the draft, with each hero's skills";
+  }
+
+  @Override
   public ReportDetail minimumDetail() {
     return ReportDetail.STANDARD;
   }

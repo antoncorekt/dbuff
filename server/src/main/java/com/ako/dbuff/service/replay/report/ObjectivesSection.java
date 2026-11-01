@@ -74,7 +74,12 @@ public class ObjectivesSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 74;
+    return 48;
+  }
+
+  @Override
+  public String summary() {
+    return "which won fights became objectives";
   }
 
   @Override
