@@ -42,7 +42,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class VisionSection implements ReplayReportSection {
+public class VisionSection implements ReplayReportSection, HighlightSource {
   private final FightVisionRepo visionRepo;
   private final FightRepo fightRepo;
   private final FightImportanceRepo importanceRepo;
@@ -111,11 +111,42 @@ public class VisionSection implements ReplayReportSection {
     return ReportDetail.STANDARD;
   }
 
+  private static final int MIN_FIGHTS_FOR_HIGHLIGHT = 3;
+
   private record Found(List<String> lines, int shown, boolean ownView, boolean tracked) {}
 
   @Override
   public List<String> lines(ReplayReportInput input) {
     return found(input).lines();
+  }
+
+  @Override
+  public List<Highlight> highlights(ReplayReportInput input) {
+    TeamSide yours = TeamSide.commonSide(input.focusSlots());
+    if (yours == null) {
+      return List.of();
+    }
+    List<Entry> entries = entries(input.matchId(), visionRepo.findByMatchId(input.matchId()));
+    long fights = importantFights(entries);
+    if (fights < MIN_FIGHTS_FOR_HIGHLIGHT) {
+      return List.of();
+    }
+    long problems =
+        entries.stream()
+            .filter(e -> e.team() == yours && !e.problems().isEmpty())
+            .map(e -> e.row().getFightIndex())
+            .distinct()
+            .count();
+    if (problems == 0) {
+      return List.of();
+    }
+    return List.of(
+        new Highlight(
+            "vision",
+            null,
+            Highlight.scale(problems / (double) fights, properties.getHighlights().getVision()),
+            "%s for your team in important fights"
+                .formatted(SectionViews.count((int) problems, "vision problem"))));
   }
 
   @Override

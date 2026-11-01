@@ -27,10 +27,11 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class FightSection implements ReplayReportSection {
+public class FightSection implements ReplayReportSection, HighlightSource {
   private static final long FIRST_DIRE_SLOT = 128;
   private static final int BIG_FIGHT_DEATHS = 3;
   private static final int MIN_FIGHTS_FOR_ABILITY_LINE = 2;
+  private static final int MIN_FIGHTS_FOR_HIGHLIGHT = 5;
   private static final String TRACKED = "Tracked players";
 
   private final FightRepo fightRepo;
@@ -38,6 +39,7 @@ public class FightSection implements ReplayReportSection {
   private final FightAbilityUseRepo abilityRepo;
   private final AbilityLabels labels;
   private final SkillFunctions skills;
+  private final ReplayReportProperties properties;
 
   @Override
   public String name() {
@@ -71,6 +73,24 @@ public class FightSection implements ReplayReportSection {
   @Override
   public List<String> lines(ReplayReportInput input) {
     return found(input).lines();
+  }
+
+  @Override
+  public List<Highlight> highlights(ReplayReportInput input) {
+    List<FightAbilityUseDomain> uses = abilityRepo.findByMatchId(input.matchId());
+    return input.namesBySlot().entrySet().stream()
+        .map(p -> unusedAbility(p.getValue(), p.getKey(), uses))
+        .flatMap(Optional::stream)
+        .filter(u -> u.total() >= MIN_FIGHTS_FOR_HIGHLIGHT)
+        .map(
+            u ->
+                new Highlight(
+                    "fights",
+                    null,
+                    Highlight.scale(
+                        u.notCast() / (double) u.total(), properties.getHighlights().getFights()),
+                    u.line()))
+        .toList();
   }
 
   @Override
@@ -202,9 +222,15 @@ public class FightSection implements ReplayReportSection {
     };
   }
 
-  /** "Ravage ready, not cast in 3 of 5 fights", for the worst such ability. */
+  private record Unused(long notCast, int total, String line) {}
+
   private Optional<String> unusedAbilityLine(
       String name, long slot, List<FightAbilityUseDomain> uses) {
+    return unusedAbility(name, slot, uses).map(Unused::line);
+  }
+
+  /** "Ravage ready, not cast in 3 of 5 fights", for the worst such ability. */
+  private Optional<Unused> unusedAbility(String name, long slot, List<FightAbilityUseDomain> uses) {
     Map<String, List<FightAbilityUseDomain>> byAbility =
         uses.stream()
             .filter(u -> u.getPlayerSlot() == slot)
@@ -222,11 +248,14 @@ public class FightSection implements ReplayReportSection {
         .max(Map.Entry.<String, Long>comparingByValue().thenComparing(Map.Entry.comparingByKey()))
         .map(
             e ->
-                "%s had %s ready and did not cast it in %d of %d fights."
-                    .formatted(
-                        name,
-                        labels.decorated(e.getKey()),
-                        e.getValue(),
-                        byAbility.get(e.getKey()).size()));
+                new Unused(
+                    e.getValue(),
+                    byAbility.get(e.getKey()).size(),
+                    "%s had %s ready and did not cast it in %d of %d fights."
+                        .formatted(
+                            name,
+                            labels.decorated(e.getKey()),
+                            e.getValue(),
+                            byAbility.get(e.getKey()).size())));
   }
 }

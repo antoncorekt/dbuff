@@ -75,6 +75,47 @@ class ObjectivesSectionTest {
     return new ReplayReportInput(1L, null, Set.of(focus), Map.of(), 3);
   }
 
+  private void wonFights(int total, int converted) {
+    for (int i = 0; i < total; i++) {
+      fight(i, 100 * (i + 1), "RADIANT", i < converted ? "CONVERTED" : "MISSED");
+    }
+  }
+
+  @Test
+  void highlightsScoreHowFarTheTrackedTeamWasFromHalfConverted() {
+    wonFights(4, 3);
+
+    List<Highlight> found = section.highlights(input(0L));
+
+    assertThat(found).hasSize(1);
+    assertThat(found.get(0).source()).isEqualTo("objectives");
+    assertThat(found.get(0).seconds()).isNull();
+    assertThat(found.get(0).score()).isCloseTo(0.375, org.assertj.core.data.Offset.offset(1e-9));
+    assertThat(found.get(0).text())
+        .isEqualTo("Radiant (your team) turned 3 of 4 won fights into objectives");
+  }
+
+  @Test
+  void highlightsReachTheExtremeWhenNothingOrEverythingWasConverted() {
+    wonFights(4, 0);
+    assertThat(section.highlights(input(0L)).get(0).score()).isEqualTo(1.0);
+
+    rows.clear();
+    wonFights(4, 4);
+    assertThat(section.highlights(input(0L)).get(0).score()).isEqualTo(1.0);
+  }
+
+  @Test
+  void highlightsNeedThreeWonFightsAndATrackedTeam() {
+    wonFights(2, 2);
+    assertThat(section.highlights(input(0L))).isEmpty();
+
+    rows.clear();
+    wonFights(4, 4);
+    assertThat(section.highlights(input())).isEmpty();
+    assertThat(section.highlights(input(128L))).isEmpty();
+  }
+
   @Test
   void isOffByDefaultAndStandardDetail() {
     assertThat(section.name()).isEqualTo("objectives");
