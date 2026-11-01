@@ -218,4 +218,33 @@ class EndGameSectionTest {
 
     assertThat(section.view(new ReplayReportInput(1L, null, Set.of(), Map.of(), 3))).isEmpty();
   }
+
+  @Test
+  void highlightsAThrownGameAtFullScoreAndALostLeadAtSixTenths() {
+    when(repo.findByMatchId(1L)).thenReturn(List.of(won().thrown(true).build()));
+    ReplayReportInput input = new ReplayReportInput(1L, null, Set.of(128L), Map.of(), 3);
+
+    assertThat(section.highlights(input))
+        .singleElement()
+        .satisfies(
+            h -> {
+              assertThat(h.source()).isEqualTo("endgame");
+              assertThat(h.score()).isEqualTo(1.0);
+              assertThat(h.seconds()).isNull();
+              assertThat(h.text()).startsWith("Dire (your team) threw a lead of 8.3k");
+            });
+
+    when(repo.findByMatchId(1L)).thenReturn(List.of(won().build()));
+    assertThat(section.highlights(input)).singleElement().extracting(h -> h.score()).isEqualTo(0.6);
+  }
+
+  @Test
+  void giveNoHighlightWhenTheLeadWasNotLostOrNothingIsStored() {
+    ReplayReportInput input = new ReplayReportInput(1L, null, Set.of(), Map.of(), 3);
+    when(repo.findByMatchId(1L)).thenReturn(List.of(won().leadLost(false).build()));
+    assertThat(section.highlights(input)).isEmpty();
+
+    when(repo.findByMatchId(1L)).thenReturn(List.of());
+    assertThat(section.highlights(input)).isEmpty();
+  }
 }
