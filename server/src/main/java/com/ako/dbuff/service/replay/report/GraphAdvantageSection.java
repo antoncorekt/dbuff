@@ -33,6 +33,11 @@ public class GraphAdvantageSection extends GraphSection {
   }
 
   @Override
+  public boolean defaultEnabled() {
+    return true;
+  }
+
+  @Override
   public int order() {
     return 64;
   }

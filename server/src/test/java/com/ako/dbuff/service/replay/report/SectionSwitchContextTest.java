@@ -43,6 +43,10 @@ class SectionSwitchContextTest {
 
   private static final Set<String> OFF_BY_DEFAULT =
       Set.of(
+          "composition",
+          "deaths",
+          "fights",
+          "movement",
           "important-fights",
           "lanes",
           "rotations",
@@ -114,8 +118,9 @@ class SectionSwitchContextTest {
                       "items",
                       "outliers");
               assertThat(byName.values())
-                  .filteredOn(s -> !OFF_BY_DEFAULT.contains(s.name()))
-                  .allMatch(ReplayReportSection::defaultEnabled);
+                  .filteredOn(ReplayReportSection::defaultEnabled)
+                  .extracting(ReplayReportSection::name)
+                  .containsExactly("draft");
               assertThat(byName.get("important-fights").defaultEnabled()).isFalse();
               OFF_BY_DEFAULT.forEach(
                   name -> assertThat(byName.get(name).defaultEnabled()).isFalse());

@@ -97,7 +97,8 @@ class ReportLoopTopic implements ReviewLoopTopic {
                           context.getBean(GameModeRegistry.class),
                           null,
                           null,
-                          context.getBean(ReportHeroNames.class)));
+                          context.getBean(ReportHeroNames.class),
+                          null));
     }
     return reportService;
   }
