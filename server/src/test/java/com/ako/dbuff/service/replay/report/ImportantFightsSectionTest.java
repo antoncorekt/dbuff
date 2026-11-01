@@ -102,6 +102,50 @@ class ImportantFightsSectionTest {
     return new ReplayReportInput(1L, null, Set.of(focus), Map.of(), 3);
   }
 
+  private static LostFight shared(LostFight fight, Double share) {
+    fight.importance().setSharePercent(share);
+    return fight;
+  }
+
+  @Test
+  void highlightsScoreEachImportantFightOfEitherTeamByItsShareWithTwoReasons() {
+    stored(
+        shared(
+            fight(
+                1,
+                600,
+                "RADIANT",
+                1200L,
+                false,
+                reason("NO_TP", 130),
+                reason("BURST", 130),
+                reason("DIED_FIRST", 130)),
+            12.5),
+        shared(fight(3, 1500, "DIRE", 4200L, true), -25.0),
+        shared(fight(4, 1800, "DIRE", 100L, false), 3.0));
+
+    List<Highlight> found = section.highlights(input(2L));
+
+    assertThat(found).extracting(Highlight::source).containsOnly("important-fights");
+    assertThat(found).extracting(Highlight::seconds).containsExactly(600.0, 1500.0, 1800.0);
+    assertThat(found.get(0).score()).isEqualTo(0.5);
+    assertThat(found.get(1).score()).isEqualTo(1.0);
+    assertThat(found.get(2).score()).isZero();
+    assertThat(found.get(0).text())
+        .startsWith("Radiant (your team) won the fight")
+        .doesNotContain("10:00");
+    assertThat(section.lines(input(2L)).get(1)).startsWith("10:00 ");
+  }
+
+  @Test
+  void highlightsSkipAFightWithoutShareAndGiveNothingWithoutFights() {
+    stored(fight(1, 600, "RADIANT", 1200L, false));
+    assertThat(section.highlights(input(2L))).isEmpty();
+
+    stored();
+    assertThat(section.highlights(input(2L))).isEmpty();
+  }
+
   @Test
   void isOffByDefaultAndShipsNamedImportantFights() {
     assertThat(section.name()).isEqualTo("important-fights");

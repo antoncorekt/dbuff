@@ -71,6 +71,48 @@ class VisionSectionTest {
     return new ReplayReportInput(1L, null, Set.of(focus), Map.of(), 3);
   }
 
+  private void fightsWithProblems(int total, int withProblem) {
+    for (int i = 1; i <= total; i++) {
+      row(i, i * 100, "RADIANT", i <= withProblem ? "LATE_WARD" : "FINE");
+      row(i, i * 100, "DIRE", "FINE");
+    }
+  }
+
+  @Test
+  void highlightsScoreTheShareOfImportantFightsWithAProblemForTheTrackedTeam() {
+    fightsWithProblems(4, 2);
+
+    List<Highlight> found = section.highlights(input(0L));
+
+    assertThat(found).hasSize(1);
+    assertThat(found.get(0).source()).isEqualTo("vision");
+    assertThat(found.get(0).seconds()).isNull();
+    assertThat(found.get(0).score()).isCloseTo(0.4, org.assertj.core.data.Offset.offset(1e-9));
+    assertThat(found.get(0).text())
+        .isEqualTo("2 vision problems for your team in important fights");
+  }
+
+  @Test
+  void highlightsReachTheExtremeWhenEveryFightHadAProblem() {
+    fightsWithProblems(4, 4);
+
+    assertThat(section.highlights(input(0L)).get(0).score()).isEqualTo(1.0);
+  }
+
+  @Test
+  void highlightsNeedThreeFightsATrackedTeamAndAProblem() {
+    fightsWithProblems(2, 2);
+    assertThat(section.highlights(input(0L))).isEmpty();
+
+    rows.clear();
+    fightsWithProblems(4, 4);
+    assertThat(section.highlights(input())).isEmpty();
+
+    rows.clear();
+    fightsWithProblems(4, 0);
+    assertThat(section.highlights(input(0L))).isEmpty();
+  }
+
   @Test
   void isOffByDefaultAndStandardDetail() {
     assertThat(section.name()).isEqualTo("vision");

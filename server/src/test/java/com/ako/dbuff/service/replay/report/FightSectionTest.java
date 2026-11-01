@@ -17,6 +17,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -27,10 +28,60 @@ class FightSectionTest {
   private final FightAbilityUseRepo abilityRepo = mock(FightAbilityUseRepo.class);
   private final SkillFunctions skills = mock(SkillFunctions.class);
   private final FightSection section =
-      new FightSection(fightRepo, partRepo, abilityRepo, Prettify::ability, skills);
+      new FightSection(
+          fightRepo,
+          partRepo,
+          abilityRepo,
+          Prettify::ability,
+          skills,
+          new ReplayReportProperties());
 
   private ReplayReportInput input() {
     return new ReplayReportInput(1L, null, Set.of(128L), Map.of(128L, "Anton"), 3);
+  }
+
+  private void ready(int fightsTotal, int notCast, String ability, long slot) {
+    when(skills.notCastable(any())).thenReturn(false);
+    List<FightAbilityUseDomain> uses = new ArrayList<>();
+    for (int i = 0; i < fightsTotal; i++) {
+      uses.add(
+          FightAbilityUseDomain.builder()
+              .playerSlot(slot)
+              .abilityName(ability)
+              .nonCastReason(i < notCast ? "READY_NOT_CAST" : "CAST")
+              .build());
+    }
+    when(abilityRepo.findByMatchId(1L)).thenReturn(uses);
+  }
+
+  @Test
+  void highlightsScoreTheShareOfFightsAnAbilityStayedReadyFromFiveFights() {
+    ready(8, 4, "faceless_void_chronosphere", 128L);
+    List<Highlight> normal = section.highlights(input());
+    assertThat(normal).hasSize(1);
+    assertThat(normal.get(0).source()).isEqualTo("fights");
+    assertThat(normal.get(0).seconds()).isNull();
+    assertThat(normal.get(0).score()).isEqualTo(0.5);
+    assertThat(normal.get(0).text()).contains("Anton had").contains("did not cast it in 4 of 8");
+
+    ready(8, 8, "faceless_void_chronosphere", 128L);
+    assertThat(section.highlights(input()).get(0).score()).isEqualTo(1.0);
+  }
+
+  @Test
+  void highlightsNeedFiveFightsAndSkipAbilitiesThatCannotBeCast() {
+    ready(4, 4, "faceless_void_chronosphere", 128L);
+    assertThat(section.highlights(input())).isEmpty();
+
+    ready(6, 6, "faceless_void_chronosphere", 128L);
+    when(skills.notCastable("faceless_void_chronosphere")).thenReturn(true);
+    assertThat(section.highlights(input())).isEmpty();
+  }
+
+  @Test
+  void highlightsAreEmptyWhenNothingWasStored() {
+    when(abilityRepo.findByMatchId(1L)).thenReturn(List.of());
+    assertThat(section.highlights(input())).isEmpty();
   }
 
   @Test

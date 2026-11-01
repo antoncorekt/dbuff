@@ -153,7 +153,12 @@ class PlayerLabelOnceTest {
     }
     when(abilityRepo.findByMatchId(1L)).thenReturn(uses);
     return new FightSection(
-            fightRepo, partRepo, abilityRepo, Prettify::ability, mock(SkillFunctions.class))
+            fightRepo,
+            partRepo,
+            abilityRepo,
+            Prettify::ability,
+            mock(SkillFunctions.class),
+            new ReplayReportProperties())
         .lines(INPUT);
   }
 

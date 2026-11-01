@@ -32,7 +32,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class ImportantFightsSection implements ReplayReportSection {
+public class ImportantFightsSection implements ReplayReportSection, HighlightSource {
   private static final int MAX_REASONS = 2;
   private static final int MAX_CAUSES = 2;
   private static final double MIN_SHARE = 10;
@@ -83,11 +83,42 @@ public class ImportantFightsSection implements ReplayReportSection {
   }
 
   @Override
+  public List<Highlight> highlights(ReplayReportInput input) {
+    List<LostFight> important = importantOf(input);
+    if (important.isEmpty()) {
+      return List.of();
+    }
+    TeamSide yours = TeamSide.commonSide(input.focusSlots());
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
+    Map<Integer, LostFight> withReasons =
+        explanationReader.lostFights(
+            input.matchId(),
+            important.stream().map(l -> l.fight().getFightIndex()).toList(),
+            MAX_REASONS);
+    return important.stream()
+        .filter(l -> l.importance().getSharePercent() != null)
+        .map(
+            l ->
+                new Highlight(
+                    "important-fights",
+                    l.fight().getStartSeconds(),
+                    Highlight.scale(
+                        Math.abs(l.importance().getSharePercent()),
+                        properties.getHighlights().getImportantFights()),
+                    description(
+                        l, withReasons.getOrDefault(l.fight().getFightIndex(), l), heroes, yours)))
+        .toList();
+  }
+
+  private List<LostFight> importantOf(ReplayReportInput input) {
+    return explanationReader.importantFights(input.matchId()).stream()
+        .filter(l -> Enums.find(TeamSide.class, l.importance().getWinningTeam()) != null)
+        .toList();
+  }
+
+  @Override
   public Optional<SectionView> view(ReplayReportInput input) {
-    List<LostFight> important =
-        explanationReader.importantFights(input.matchId()).stream()
-            .filter(l -> Enums.find(TeamSide.class, l.importance().getWinningTeam()) != null)
-            .toList();
+    List<LostFight> important = importantOf(input);
     List<GameSpikeDomain> swings = selectedSwings(input);
     if (important.isEmpty() && swings.isEmpty()) {
       return Optional.empty();
@@ -202,6 +233,13 @@ public class ImportantFightsSection implements ReplayReportSection {
 
   private String line(
       LostFight fight, LostFight withReasons, Map<Long, String> heroes, TeamSide yours) {
+    return GameTime.clock(fight.fight().getStartSeconds())
+        + " "
+        + description(fight, withReasons, heroes, yours);
+  }
+
+  private String description(
+      LostFight fight, LostFight withReasons, Map<Long, String> heroes, TeamSide yours) {
     FightImportanceDomain importance = fight.importance();
     TeamSide winner = Enums.find(TeamSide.class, importance.getWinningTeam());
     String reasons =
@@ -212,8 +250,7 @@ public class ImportantFightsSection implements ReplayReportSection {
             new ReasonWording.Perspective(winner.opponent(), yours));
     return String.format(
         Locale.ROOT,
-        "%s %s won the fight%s%s",
-        GameTime.clock(fight.fight().getStartSeconds()),
+        "%s won the fight%s%s",
         Prettify.teamOf(winner.name(), yours),
         worthText(fight),
         reasons.isEmpty() ? "" : ": " + reasons);
