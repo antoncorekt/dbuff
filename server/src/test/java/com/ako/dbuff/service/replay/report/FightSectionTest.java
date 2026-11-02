@@ -56,13 +56,13 @@ class FightSectionTest {
 
   @Test
   void highlightsScoreTheShareOfFightsAnAbilityStayedReadyFromFiveFights() {
-    ready(8, 4, "faceless_void_chronosphere", 128L);
+    ready(8, 6, "faceless_void_chronosphere", 128L);
     List<Highlight> normal = section.highlights(input());
     assertThat(normal).hasSize(1);
     assertThat(normal.get(0).source()).isEqualTo("fights");
     assertThat(normal.get(0).seconds()).isNull();
-    assertThat(normal.get(0).score()).isEqualTo(0.5);
-    assertThat(normal.get(0).text()).contains("Anton had").contains("did not cast it in 4 of 8");
+    assertThat(normal.get(0).score()).isEqualTo(Highlight.scale(0.75, 0.5, 0.9));
+    assertThat(normal.get(0).text()).contains("Anton had").contains("did not cast it in 6 of 8");
 
     ready(8, 8, "faceless_void_chronosphere", 128L);
     assertThat(section.highlights(input()).get(0).score()).isEqualTo(1.0);

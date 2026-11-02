@@ -558,8 +558,8 @@ class ItemsSectionTest {
 
   @Test
   void highlightsTrackedPlayersItemsFromTheRatioAndLeavesTheOtherTeamOut() {
-    add(stick(0, 100, 5.0, 2));
-    add(stick(128, 100, 5.0, 2));
+    add(stick(0, 100, 9.0, 2));
+    add(stick(128, 100, 9.0, 2));
     ReplayReportInput input = new ReplayReportInput(1L, null, Set.of(0L), Map.of(), 3);
 
     assertThat(section.highlights(input))
@@ -567,7 +567,7 @@ class ItemsSectionTest {
         .satisfies(
             h -> {
               assertThat(h.source()).isEqualTo("items");
-              assertThat(h.score()).isEqualTo(Highlight.scale(4, 1, 5));
+              assertThat(h.score()).isEqualTo(Highlight.scale(8, 5, 15));
               assertThat(h.seconds()).isNull();
               assertThat(h.text()).startsWith("Axe's Magic Stick");
             });

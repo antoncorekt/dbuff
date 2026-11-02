@@ -346,8 +346,8 @@ class OpeningSectionTest {
 
   @Test
   void highlights_scoreTheGapAtNormalAndAtExtreme() {
-    summary("RADIANT", "WON", 500, 2);
-    summary("DIRE", "LOST", -500, 1);
+    summary("RADIANT", "WON", 300, 2);
+    summary("DIRE", "LOST", -300, 1);
     summaries.forEach(s -> s.setWindowEnd(240));
     assertThat(section.highlights(input(0L)))
         .singleElement()
