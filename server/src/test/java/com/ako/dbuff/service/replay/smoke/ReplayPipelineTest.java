@@ -5,8 +5,8 @@ import com.ako.dbuff.service.replay.report.CompositionSection;
 import com.ako.dbuff.service.replay.report.DeathSection;
 import com.ako.dbuff.service.replay.report.DraftSection;
 import com.ako.dbuff.service.replay.report.FightSection;
+import com.ako.dbuff.service.replay.report.ItemBuildSection;
 import com.ako.dbuff.service.replay.report.MovementSection;
-import com.ako.dbuff.service.replay.report.SwingSection;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -47,11 +47,11 @@ import org.springframework.test.context.TestPropertySource;
                 ".*\\.(ReplayProcessingJob|ReplayRunJanitor|ReplayQueue|ReplayBatchService|ConstantAbilityNames|ConstantAbilityLabels|ConstantHeroKits|ConstantItemKits|ReplayTempCleaner|ReplayReportService)|.*Test(\\$.*)?"))
 @Import({
   ReplayPipelineFixture.Config.class,
-  SwingSection.class,
   DeathSection.class,
   FightSection.class,
   MovementSection.class,
   DraftSection.class,
+  ItemBuildSection.class,
   CompositionSection.class,
   SkillCountRepository.class
 })

@@ -46,13 +46,13 @@ public class CompositionSection implements ReplayReportSection {
   }
 
   @Override
-  public boolean defaultEnabled() {
-    return true;
+  public int order() {
+    return 12;
   }
 
   @Override
-  public int order() {
-    return 12;
+  public String summary() {
+    return "how the two team compositions compare";
   }
 
   @Override

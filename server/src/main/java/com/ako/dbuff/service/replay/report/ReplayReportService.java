@@ -81,6 +81,7 @@ public class ReplayReportService {
   private final ReplayMetrics metrics;
   private final ComponentsViewRenderer componentsRenderer;
   private final ReportHeroNames heroNames;
+  private final MoreReportsMessage moreReports;
 
   /** Delivers what is waiting for the matches whose replay run finished lately. */
   public void deliverPending() {
@@ -477,22 +478,52 @@ public class ReplayReportService {
           "Replay report of match {} not posted: every section is switched off", match.getId());
       return List.of();
     }
-    ReplayReportInput input = input(match, stats, instance);
-    List<ReplayReportSection> active =
-        sections.stream()
-            .filter(s -> sectionSwitch.isAutomatic(s, settings))
-            .filter(s -> s.supports(mode))
-            .filter(s -> settings.detail().includes(s.minimumDetail()))
-            .sorted(Comparator.comparingInt(ReplayReportSection::order))
-            .toList();
-    List<ReportMessage> all = render(active, input);
+    List<ReplayReportSection> active = defaultSections(mode, settings);
+    List<ReportMessage> all = render(active, input(match, stats, instance));
     int cap =
         Math.max(
             1,
             settings.detail() == ReportDetail.FULL
                 ? properties.getMaxMessages()
                 : properties.getStandardMaxMessages());
-    return MessageCap.apply(all, cap);
+    List<ReportMessage> capped = MessageCap.apply(all, cap);
+    if (capped.isEmpty()) {
+      return capped;
+    }
+    List<ReportMessage> withMore = new ArrayList<>(capped);
+    moreReports.text(sections, mode, active).map(ReportMessage.Plain::new).ifPresent(withMore::add);
+    return withMore;
+  }
+
+  /** What the default report holds: the views by section name and the closing message. */
+  public record DefaultReport(Map<String, List<SectionView>> views, Optional<String> moreReports) {}
+
+  /** The views of the sections an automatic post selects, as {@link #messages} renders them. */
+  public DefaultReport defaultReport(long matchId, DbufInstanceConfigDomain instance) {
+    MatchDomain match = matchRepo.findById(matchId).orElse(null);
+    GameModeProfile mode =
+        match == null ? null : modes.activeFor(match.getGameModeId()).orElse(null);
+    if (mode == null) {
+      return new DefaultReport(Map.of(), Optional.empty());
+    }
+    InstanceSettings settings = instance.effectiveSettings();
+    List<ReplayReportSection> active = defaultSections(mode, settings);
+    ReplayReportInput input = input(match, statRepo.findAllByMatchId(matchId), instance);
+    Map<String, List<SectionView>> views = new LinkedHashMap<>();
+    active.forEach(s -> views.put(s.name(), s.pages(input)));
+    boolean anything = views.values().stream().anyMatch(v -> !v.isEmpty());
+    return new DefaultReport(
+        views, anything ? moreReports.text(sections, mode, active) : Optional.empty());
+  }
+
+  private List<ReplayReportSection> defaultSections(
+      GameModeProfile mode, InstanceSettings settings) {
+    return sections.stream()
+        .filter(s -> sectionSwitch.isAutomatic(s, settings))
+        .filter(s -> s.supports(mode))
+        .filter(s -> settings.detail().includes(s.minimumDetail()))
+        .sorted(Comparator.comparingInt(ReplayReportSection::order))
+        .toList();
   }
 
   private List<ReportMessage> render(List<ReplayReportSection> active, ReplayReportInput input) {

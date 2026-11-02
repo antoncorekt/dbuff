@@ -1,8 +1,10 @@
 package com.ako.dbuff.service.replay.report;
 
+import com.ako.dbuff.dao.model.AbilityDomain;
 import com.ako.dbuff.dao.model.AbilityDraftPickDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.repo.AbilityDraftPickRepo;
+import com.ako.dbuff.dao.repo.AbilityRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.replay.analysis.role.HeroKits;
@@ -35,12 +37,20 @@ class DraftSectionTest {
 
   private final AbilityDraftPickRepo repo = mock(AbilityDraftPickRepo.class);
   private final PlayerGameStatisticRepo stats = mock(PlayerGameStatisticRepo.class);
+  private final AbilityRepo abilities = mock(AbilityRepo.class);
   private final HeroKits kits = mock(HeroKits.class);
   private final SkillIconImages icons = mock(SkillIconImages.class);
   private final TableRenderer tables = mock(TableRenderer.class);
   private final DraftSection section =
       new DraftSection(
-          repo, stats, new AbilityDraftProfile(), Prettify::ability, kits, icons, tables);
+          repo,
+          stats,
+          abilities,
+          new AbilityDraftProfile(),
+          Prettify::ability,
+          kits,
+          icons,
+          tables);
 
   DraftSectionTest() {
     when(tables.render(any())).thenReturn(Optional.of(PNG));
@@ -48,6 +58,7 @@ class DraftSectionTest {
     when(icons.hero(anyLong())).thenReturn(Optional.empty());
     when(kits.hero(anyLong())).thenReturn(Optional.empty());
     when(stats.findAllByMatchId(anyLong())).thenReturn(List.of());
+    when(abilities.findAllByMatchId(anyLong())).thenReturn(List.of());
   }
 
   private AbilityDraftPickDomain pick(int order, long slot, String ability) {
@@ -85,7 +96,8 @@ class DraftSectionTest {
   }
 
   @Test
-  void lines_listOneBulletPerSkillUnderEachTrackedPlayerInPickOrder() {
+  void lines_listOneBulletPerSkillUnderEachTrackedPlayerInPickOrderWhenThePictureFails() {
+    when(tables.render(any())).thenReturn(Optional.empty());
     when(repo.findByMatchId(1L))
         .thenReturn(
             List.of(
@@ -96,25 +108,38 @@ class DraftSectionTest {
 
     assertThat(section.lines(anton()))
         .containsExactly(
-            "**Draft**",
+            "**Draft and stats**",
             "Anton",
             "- Faceless Void Chronosphere · pick 4",
             "- Sven Gods Strength · pick 13",
-            "- Sven Storm Bolt · pick 23");
+            "- Sven Storm Bolt · pick 23",
+            "The picture could not be drawn this time.");
   }
 
   @Test
   void lines_nameACrossHeroPickByItsAbilityNotItsSourceHero() {
+    when(tables.render(any())).thenReturn(Optional.empty());
     when(repo.findByMatchId(1L))
         .thenReturn(
             List.of(pick(3, 0, "terrorblade_metamorphosis"), pick(12, 0, "sven_gods_strength")));
     DraftSection real =
         new DraftSection(
-            repo, stats, new AbilityDraftProfile(), TestLabels.labels(), kits, icons, tables);
+            repo,
+            stats,
+            abilities,
+            new AbilityDraftProfile(),
+            TestLabels.labels(),
+            kits,
+            icons,
+            tables);
 
     assertThat(real.lines(anton()))
         .containsExactly(
-            "**Draft**", "Anton", "- Metamorphosis · pick 4", "- Gods Strength · pick 13");
+            "**Draft and stats**",
+            "Anton",
+            "- Metamorphosis · pick 4",
+            "- Gods Strength · pick 13",
+            "The picture could not be drawn this time.");
   }
 
   @Test
@@ -128,6 +153,7 @@ class DraftSectionTest {
 
   @Test
   void lines_fallBackToTheTeamPickWhenTheOverallOrderIsNullAndSortThoseLast() {
+    when(tables.render(any())).thenReturn(Optional.empty());
     AbilityDraftPickDomain unordered =
         AbilityDraftPickDomain.builder()
             .teamPickIndex(2)
@@ -141,11 +167,12 @@ class DraftSectionTest {
 
     assertThat(section.lines(anton()))
         .containsExactly(
-            "**Draft**",
+            "**Draft and stats**",
             "Anton",
             "- Sven Gods Strength · pick 5",
             "- Sven Storm Bolt · team pick 2",
-            "- Sven Great Cleave · ");
+            "- Sven Great Cleave · ",
+            "The picture could not be drawn this time.");
   }
 
   @Test
@@ -157,15 +184,25 @@ class DraftSectionTest {
     SectionView view = section.view(in).orElseThrow();
 
     ViewRendering.assertWithinLimits(view);
-    assertThat(view.title()).isEqualTo("Draft");
+    assertThat(view.title()).isEqualTo("Draft and stats");
     assertThat(view.verdict()).isEqualTo("Ability picks of 1 tracked player");
     assertThat(view.accent()).isEqualTo(Accent.NEUTRAL);
     assertThat(view.image().name()).isEqualTo("draft-1.png");
     assertThat(view.image().bytes()).isEqualTo(PNG);
-    assertThat(view.bullets())
-        .containsExactly("Anton", "- Sven Storm Bolt · pick 4", "- Sven Gods Strength · pick 13");
+    assertThat(view.bullets()).isEmpty();
     assertThat(new PlainViewRenderer().lines(view)).isEqualTo(section.lines(in));
     assertThat(section.image(in).orElseThrow().name()).isEqualTo("draft-1.png");
+  }
+
+  @Test
+  void view_doesNotRepeatTheHeroWhenTheNameAlreadyCarriesIt() {
+    when(repo.findByMatchId(1L)).thenReturn(List.of(pick(5, 129, "axe_counter_helix")));
+    when(stats.findAllByMatchId(1L)).thenReturn(List.of(played(129L, 18L)));
+    when(kits.hero(18L)).thenReturn(Optional.of(hero("Phoenix")));
+
+    section.view(input(Map.of(129L, "Пастух (Phoenix)"))).orElseThrow();
+
+    assertThat(drawn().rows().get(0).get(0).text()).isEqualTo("Пастух (Phoenix)");
   }
 
   @Test
@@ -195,15 +232,16 @@ class DraftSectionTest {
     TableSpec drawn = drawn();
     assertThat(drawn.rows()).hasSize(4);
     assertThat(drawn.headers())
-        .containsExactly("Player", "Hero", "Skill 1", "Skill 2", "Skill 3", "Skill 4");
+        .containsExactly("Player", "K/D/A, GPM/XPM", "Skill 1", "Skill 2", "Skill 3", "Skill 4");
     TableSpec.Cell player = drawn.rows().get(0).get(0);
-    assertThat(player.text()).isEqualTo("Пастух");
+    assertThat(player.text()).isEqualTo("Пастух (Phoenix)");
     assertThat(player.icon()).containsExactly(7);
     assertThat(player.band()).isEqualTo(ChartPalette.DIRE);
-    assertThat(drawn.rows().get(0).get(1).text()).isEqualTo("Phoenix");
+    assertThat(drawn.rows().get(0).get(1).text()).isEqualTo("?/?/?");
+    assertThat(drawn.rows().get(0).get(1).sub()).isEqualTo("?/?");
     TableSpec.Cell first = drawn.rows().get(0).get(2);
     assertThat(first.text()).isEqualTo("Axe Counter Helix");
-    assertThat(first.note()).isEqualTo("#6");
+    assertThat(first.sub()).isEqualTo("#6");
     assertThat(first.icon()).containsExactly(8);
   }
 
@@ -218,11 +256,9 @@ class DraftSectionTest {
     section.view(input(new TreeMap<>(Map.of(130L, "Doctor", 132L, "Neurotic")))).orElseThrow();
 
     TableSpec drawn = drawn();
-    assertThat(drawn.rows().get(0).get(0).text()).isEqualTo("Doctor");
-    assertThat(drawn.rows().get(0).get(1).text()).isEqualTo("Troll Warlord");
+    assertThat(drawn.rows().get(0).get(0).text()).isEqualTo("Doctor (Troll Warlord)");
     assertThat(drawn.rows().get(0).get(2).text()).isEqualTo("Troll Warlord Fervor");
-    assertThat(drawn.rows().get(1).get(0).text()).isEqualTo("Neurotic");
-    assertThat(drawn.rows().get(1).get(1).text()).isEqualTo("Meepo");
+    assertThat(drawn.rows().get(1).get(0).text()).isEqualTo("Neurotic (Meepo)");
     assertThat(drawn.rows().get(1).get(2).text()).isEqualTo("Meepo Earthbind");
   }
 
@@ -259,6 +295,64 @@ class DraftSectionTest {
 
     verify(tables, times(1)).render(any());
     assertThat(image).isEqualTo(Optional.of(section.view(in).orElseThrow().image()));
+  }
+
+  @Test
+  void view_cellsCarryTheKdaTheRatesAndTheSkillDamageAndUses() {
+    when(repo.findByMatchId(1L))
+        .thenReturn(List.of(pick(5, 0, "axe_culling_blade"), pick(9, 0, "sven_storm_bolt")));
+    when(stats.findAllByMatchId(1L))
+        .thenReturn(
+            List.of(
+                PlayerMatchStatisticDomain.builder()
+                    .playerSlot(0L)
+                    .kills(6L)
+                    .deaths(9L)
+                    .assists(14L)
+                    .goldPerMin(540L)
+                    .xpPerMin(610L)
+                    .build()));
+    when(abilities.findAllByMatchId(1L))
+        .thenReturn(
+            List.of(
+                AbilityDomain.builder()
+                    .playerSlot(0L)
+                    .name("axe_culling_blade")
+                    .damageDealt(12_345L)
+                    .useCount(41L)
+                    .build()));
+
+    section.view(anton()).orElseThrow();
+
+    List<TableSpec.Cell> row = drawn().rows().get(0);
+    assertThat(row.get(1).text()).isEqualTo("6/9/14");
+    assertThat(row.get(1).sub()).isEqualTo("540/610");
+    assertThat(row.get(2).sub()).isEqualTo("#6 · 12.3k · 41x");
+    assertThat(row.get(3).sub()).isEqualTo("#10");
+  }
+
+  @Test
+  void view_anAdSkillFindsTheDamageOfItsBaseSkillAndOnlyOfThisPlayer() {
+    when(repo.findByMatchId(1L)).thenReturn(List.of(pick(5, 0, "axe_culling_blade_ad")));
+    when(abilities.findAllByMatchId(1L))
+        .thenReturn(
+            List.of(
+                AbilityDomain.builder()
+                    .playerSlot(0L)
+                    .name("axe_culling_blade")
+                    .damageDealt(800L)
+                    .useCount(3L)
+                    .build(),
+                AbilityDomain.builder()
+                    .playerSlot(1L)
+                    .name("axe_culling_blade")
+                    .damageDealt(5000L)
+                    .useCount(9L)
+                    .build()));
+
+    section.view(anton()).orElseThrow();
+
+    assertThat(drawn().rows().get(0).get(2).sub()).isEqualTo("#6 · 800 · 3x");
   }
 
   private TableSpec drawn() {

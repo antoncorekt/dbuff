@@ -555,4 +555,56 @@ class ItemsSectionTest {
     assertThat(view.bullets()).hasSize(4);
     assertThat(view.verdict()).matches("Items shown: [012] of 2 paid back");
   }
+
+  @Test
+  void highlightsTrackedPlayersItemsFromTheRatioAndLeavesTheOtherTeamOut() {
+    add(stick(0, 100, 9.0, 2));
+    add(stick(128, 100, 9.0, 2));
+    ReplayReportInput input = new ReplayReportInput(1L, null, Set.of(0L), Map.of(), 3);
+
+    assertThat(section.highlights(input))
+        .singleElement()
+        .satisfies(
+            h -> {
+              assertThat(h.source()).isEqualTo("items");
+              assertThat(h.score()).isEqualTo(Highlight.scale(8, 5, 15));
+              assertThat(h.seconds()).isNull();
+              assertThat(h.text()).startsWith("Axe's Magic Stick");
+            });
+  }
+
+  @Test
+  void highlightsIgnoreTheChannelCategoryFilterAndGiveNothingForARowWithoutRatio() {
+    add(stick(0, 100, null, 2));
+    add(stick(1, 100, 1.0, 2));
+    ReplayReportInput input =
+        new ReplayReportInput(1L, null, Set.of(0L, 1L), Map.of(), 3).withItemFilter(List.of("x"));
+
+    assertThat(section.highlights(input)).isEmpty();
+  }
+
+  @Test
+  void anExpensiveItemThatWasNeverUsedScoresSixTenths() {
+    ItemEfficiency m = midas(0, 100, null);
+    add(
+        new ItemEfficiency(
+            m.slot(),
+            m.itemKey(),
+            m.entryKey(),
+            m.kind(),
+            m.purchaseSeconds(),
+            0,
+            m.gain(),
+            m.cost(),
+            null,
+            null,
+            m.figures(),
+            List.of(),
+            List.of()));
+
+    assertThat(section.highlights(new ReplayReportInput(1L, null, Set.of(0L), Map.of(), 3)))
+        .singleElement()
+        .extracting(Highlight::score)
+        .isEqualTo(0.6);
+  }
 }

@@ -39,7 +39,12 @@ public class GraphIncomeSection extends GraphSection {
 
   @Override
   public int order() {
-    return 91;
+    return 66;
+  }
+
+  @Override
+  public String summary() {
+    return "where each team's income came from";
   }
 
   @Override

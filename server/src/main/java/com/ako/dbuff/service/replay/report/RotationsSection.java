@@ -51,7 +51,12 @@ public class RotationsSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 70;
+    return 32;
+  }
+
+  @Override
+  public String summary() {
+    return "who left their lane and when";
   }
 
   @Override

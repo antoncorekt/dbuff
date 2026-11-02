@@ -37,7 +37,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class ObjectivesSection implements ReplayReportSection {
+public class ObjectivesSection implements ReplayReportSection, HighlightSource {
   private final ObjectiveConversionRepo objectiveRepo;
   private final FightRepo fightRepo;
   private final FightImportanceRepo importanceRepo;
@@ -74,13 +74,20 @@ public class ObjectivesSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 74;
+    return 48;
+  }
+
+  @Override
+  public String summary() {
+    return "which won fights became objectives";
   }
 
   @Override
   public ReportDetail minimumDetail() {
     return ReportDetail.STANDARD;
   }
+
+  private static final int MIN_WON_FOR_HIGHLIGHT = 3;
 
   private static final String TITLE = "Objectives";
 
@@ -102,6 +109,36 @@ public class ObjectivesSection implements ReplayReportSection {
   }
 
   @Override
+  public List<Highlight> highlights(ReplayReportInput input) {
+    TeamSide yours = TeamSide.commonSide(input.focusSlots());
+    if (yours == null) {
+      return List.of();
+    }
+    List<Entry> own =
+        entries(input).stream()
+            .filter(e -> Enums.find(TeamSide.class, e.row().getWinnerTeam()) == yours)
+            .toList();
+    if (own.size() < MIN_WON_FOR_HIGHLIGHT) {
+      return List.of();
+    }
+    long converted = converted(own);
+    return List.of(
+        new Highlight(
+            "objectives",
+            null,
+            Highlight.scale(
+                Math.abs(converted / (double) own.size() - 0.5),
+                properties.getHighlights().getObjectives()),
+            turned(yours, converted, own.size())));
+  }
+
+  private static String turned(TeamSide yours, long converted, int won) {
+    return "%s turned %d of %s into objectives"
+        .formatted(
+            Prettify.teamOf(yours.name(), yours), converted, SectionViews.count(won, "won fight"));
+  }
+
+  @Override
   public Optional<SectionView> view(ReplayReportInput input) {
     List<Entry> entries = entries(input);
     return render(input, entries)
@@ -116,12 +153,7 @@ public class ObjectivesSection implements ReplayReportSection {
               Accent accent = Accent.NEUTRAL;
               if (yours != null && !own.isEmpty()) {
                 long converted = converted(own);
-                bullets.add(
-                    "%s turned %d of %s into objectives"
-                        .formatted(
-                            Prettify.teamOf(yours.name(), yours),
-                            converted,
-                            SectionViews.count(own.size(), "won fight")));
+                bullets.add(turned(yours, converted, own.size()));
                 accent = SectionViews.balance(converted, own.size() - converted);
               }
               bullets.addAll(r.details());

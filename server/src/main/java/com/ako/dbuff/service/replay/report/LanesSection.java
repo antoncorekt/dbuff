@@ -14,8 +14,14 @@ import com.ako.dbuff.service.replay.analysis.reason.Enums;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
 import com.ako.dbuff.service.replay.map.Zone;
 import com.ako.dbuff.service.replay.report.SectionViews.Verdict;
+import com.ako.dbuff.service.replay.report.chart.ChartPalette;
+import com.ako.dbuff.service.replay.report.chart.TableRenderer;
+import com.ako.dbuff.service.replay.report.chart.TableSpec;
+import com.ako.dbuff.service.replay.report.chart.TableSpec.Cell;
 import com.ako.dbuff.service.replay.report.view.Accent;
+import com.ako.dbuff.service.replay.report.view.ImageAttachment;
 import com.ako.dbuff.service.replay.report.view.SectionView;
+import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -38,7 +44,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class LanesSection implements ReplayReportSection {
+public class LanesSection implements ReplayReportSection, HighlightSource {
   private static final int MAX_REASONS = 2;
   private static final String UNKNOWN_HERO = "an unknown hero";
 
@@ -48,6 +54,8 @@ public class LanesSection implements ReplayReportSection {
   private final ReportHeroNames heroNames;
   private final LaneProperties laneProperties;
   private final ReplayReportProperties properties;
+  private final TableRenderer tables;
+  private final PictureViews pictures = new PictureViews();
 
   private record Pair(Zone.Lane lane, int pairId, Map<TeamSide, LaneResultDomain> sides) {}
 
@@ -60,7 +68,12 @@ public class LanesSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 20;
+    return 22;
+  }
+
+  @Override
+  public String summary() {
+    return "who won each lane and why";
   }
 
   @Override
@@ -70,13 +83,133 @@ public class LanesSection implements ReplayReportSection {
 
   @Override
   public List<String> lines(ReplayReportInput input) {
-    return render(input, pairs(input.matchId()));
+    List<Pair> pairs = pairs(input.matchId());
+    return render(input, pairs, assignments(input.matchId()));
+  }
+
+  @Override
+  public Optional<ImageAttachment> image(ReplayReportInput input) {
+    return view(input).map(SectionView::image);
+  }
+
+  @Override
+  public List<Highlight> highlights(ReplayReportInput input) {
+    TeamSide yours = TeamSide.commonSide(input.focusSlots());
+    if (yours == null) {
+      return List.of();
+    }
+    return pairs(input.matchId()).stream()
+        .filter(p -> p.sides().containsKey(yours))
+        .map(p -> highlight(p, yours))
+        .filter(Objects::nonNull)
+        .toList();
+  }
+
+  private Highlight highlight(Pair pair, TeamSide yours) {
+    Winner winner = winner(pair.sides());
+    if (winner == null || winner.row().getMargin() == null) {
+      return null;
+    }
+    double margin = winner.row().getMargin();
+    Integer end = winner.row().getEndSeconds();
+    String text =
+        "%s lane: %s won %s."
+            .formatted(
+                LaneWording.capitalised(pair.lane().name().toLowerCase(Locale.ROOT)),
+                Prettify.teamOf(winner.side().name(), yours),
+                LaneWording.strength(
+                    margin, properties.getLaneClearMargin(), properties.getLaneBigMargin()));
+    return new Highlight(
+        "lanes",
+        end == null ? null : end.doubleValue(),
+        Highlight.scale(margin, properties.getHighlights().getLanes()),
+        text);
   }
 
   @Override
   public Optional<SectionView> view(ReplayReportInput input) {
+    return pictures.view(input, this::build);
+  }
+
+  private Optional<SectionView> build(ReplayReportInput input) {
     List<Pair> pairs = pairs(input.matchId());
-    return SectionViews.titled(render(input, pairs), lanesVerdict(pairs, input));
+    Map<Integer, List<LaneAssignmentDomain>> assignments = assignments(input.matchId());
+    return SectionViews.titled(render(input, pairs, assignments), lanesVerdict(pairs, input))
+        .map(
+            view ->
+                PictureViews.draw(
+                        "Lanes", input.matchId(), () -> picture(input, pairs, assignments))
+                    .map(
+                        image ->
+                            new SectionView(
+                                view.title(),
+                                view.verdict(),
+                                view.accent(),
+                                view.bullets(),
+                                view.footnote(),
+                                image))
+                    .orElse(view));
+  }
+
+  private Optional<ImageAttachment> picture(
+      ReplayReportInput input,
+      List<Pair> pairs,
+      Map<Integer, List<LaneAssignmentDomain>> assignments) {
+    Map<Long, String> heroes = heroNames.bySlot(input.matchId());
+    TeamSide yours = TeamSide.commonSide(input.focusSlots());
+    List<List<Cell>> rows = new ArrayList<>();
+    for (Pair pair : pairs) {
+      List<LaneAssignmentDomain> onLane = assignments.getOrDefault(pair.pairId(), List.of());
+      rows.add(
+          List.of(
+              Cell.text(LaneWording.capitalised(pair.lane().name().toLowerCase(Locale.ROOT))),
+              winnerCell(pair, yours),
+              Cell.text(heroCell(onLane, TeamSide.RADIANT, heroes)),
+              Cell.text(heroCell(onLane, TeamSide.DIRE, heroes)),
+              Cell.text(
+                  Optional.ofNullable(any(pair.sides()).getEndSeconds())
+                      .map(GameTime::clock)
+                      .orElse("?"))));
+    }
+    return tables
+        .render(
+            new TableSpec(
+                "Laning stage", List.of("Lane", "Winner", "Radiant", "Dire", "Ended"), rows))
+        .map(png -> new ImageAttachment("lanes-" + input.matchId() + ".png", png));
+  }
+
+  private Cell winnerCell(Pair pair, TeamSide yours) {
+    Winner winner = winner(pair.sides());
+    if (winner == null) {
+      return Cell.text("Even");
+    }
+    String margin =
+        winner.row().getMargin() == null
+            ? null
+            : LaneWording.strength(
+                winner.row().getMargin(),
+                properties.getLaneClearMargin(),
+                properties.getLaneBigMargin());
+    Color band = winner.side() == TeamSide.RADIANT ? ChartPalette.RADIANT : ChartPalette.DIRE;
+    return new Cell(null, Prettify.teamOf(winner.side().name(), yours), null, band, margin);
+  }
+
+  private static String heroCell(
+      List<LaneAssignmentDomain> assignments, TeamSide side, Map<Long, String> heroes) {
+    List<String> names =
+        assignments.stream()
+            .filter(
+                a -> a.getPlayerSlot() != null && side == Enums.find(TeamSide.class, a.getTeam()))
+            .sorted(Comparator.comparing(LaneAssignmentDomain::getPlayerSlot))
+            .map(a -> heroes.getOrDefault(a.getPlayerSlot(), UNKNOWN_HERO))
+            .toList();
+    return names.isEmpty() ? "-" : String.join(", ", names);
+  }
+
+  private Map<Integer, List<LaneAssignmentDomain>> assignments(long matchId) {
+    return assignmentRepo.findByMatchId(matchId).stream()
+        .filter(a -> a.getPairId() != null)
+        .collect(Collectors.groupingBy(LaneAssignmentDomain::getPairId));
   }
 
   private Verdict lanesVerdict(List<Pair> pairs, ReplayReportInput input) {
@@ -106,14 +239,13 @@ public class LanesSection implements ReplayReportSection {
         .count();
   }
 
-  private List<String> render(ReplayReportInput input, List<Pair> pairs) {
+  private List<String> render(
+      ReplayReportInput input,
+      List<Pair> pairs,
+      Map<Integer, List<LaneAssignmentDomain>> assignments) {
     if (pairs.isEmpty()) {
       return List.of();
     }
-    Map<Integer, List<LaneAssignmentDomain>> assignments =
-        assignmentRepo.findByMatchId(input.matchId()).stream()
-            .filter(a -> a.getPairId() != null)
-            .collect(Collectors.groupingBy(LaneAssignmentDomain::getPairId));
     Map<Integer, List<LaneReasonDomain>> reasons =
         pairs.stream().anyMatch(p -> winner(p.sides()) != null)
             ? reasonRepo.findByMatchId(input.matchId()).stream()

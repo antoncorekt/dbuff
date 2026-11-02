@@ -105,6 +105,28 @@ public class SkillPickFindings {
     return findings;
   }
 
+  /** Each tracked player's missed pick that is not carried and has a ratio, scored by the ratio. */
+  public List<Highlight> highlights(ReplayReportInput input) {
+    Map<Long, String> heroes = heroNames.iconBySlot(input.matchId());
+    ReplayReportProperties.Scale scale = properties.getHighlights().getMissedPick();
+    List<Highlight> result = new ArrayList<>();
+    for (MissedPickDomain row : nonNull(missedRepo.findByMatchId(input.matchId()))) {
+      if (!input.focusSlots().contains(row.getPlayerSlot())
+          || Boolean.TRUE.equals(row.getCarried())
+          || row.getRatio() == null) {
+        continue;
+      }
+      String who = who(input, heroes, row.getPlayerSlot());
+      result.add(
+          new Highlight(
+              "missed-pick",
+              null,
+              Highlight.scale(row.getRatio(), scale),
+              who + ": " + MissedPickWording.line(row, labels)));
+    }
+    return result;
+  }
+
   private static int buildRank(BuildFitDomain row) {
     return BuildFitVerdict.GAP.name().equals(row.getVerdict()) || row.getVerdict() == null ? 0 : 1;
   }

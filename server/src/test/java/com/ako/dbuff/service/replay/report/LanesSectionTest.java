@@ -8,18 +8,23 @@ import com.ako.dbuff.dao.repo.LaneReasonRepo;
 import com.ako.dbuff.dao.repo.LaneResultRepo;
 import com.ako.dbuff.service.replay.analysis.lane.LaneProperties;
 import com.ako.dbuff.service.replay.analysis.role.TeamSide;
+import com.ako.dbuff.service.replay.report.chart.TableRenderer;
+import com.ako.dbuff.service.replay.report.chart.TableSpec;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
 import com.ako.dbuff.service.replay.report.view.SectionView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class LanesSectionTest {
@@ -32,17 +37,37 @@ class LanesSectionTest {
   private final ReportHeroNames heroNames = mock(ReportHeroNames.class);
   private final ReplayReportProperties properties = new ReplayReportProperties();
   private final SectionSwitch sectionSwitch = new SectionSwitch(properties, List.of());
+  private final TableRenderer tables = mock(TableRenderer.class);
   private final LanesSection section =
       new LanesSection(
-          resultRepo, assignmentRepo, reasonRepo, heroNames, new LaneProperties(), properties);
+          resultRepo,
+          assignmentRepo,
+          reasonRepo,
+          heroNames,
+          new LaneProperties(),
+          properties,
+          tables);
   private final List<LaneResultDomain> results = new ArrayList<>();
   private final List<LaneAssignmentDomain> assignments = new ArrayList<>();
   private final List<LaneReasonDomain> reasons = new ArrayList<>();
 
   LanesSectionTest() {
+    when(tables.render(any())).thenReturn(Optional.of(new byte[] {1, 2}));
     when(resultRepo.findByMatchId(1L)).thenReturn(results);
     when(assignmentRepo.findByMatchId(1L)).thenReturn(assignments);
     when(reasonRepo.findByMatchId(1L)).thenReturn(reasons);
+    when(heroNames.bySlot(1L))
+        .thenReturn(
+            Map.of(
+                0L, "Phantom Assassin",
+                1L, "Sven",
+                2L, "Enchantress",
+                128L, "Venomancer",
+                129L, "Nature's Prophet",
+                130L, "Jakiro",
+                3L, "Sniper",
+                4L, "Riki",
+                131L, "Terrorblade"));
     when(heroNames.iconBySlot(1L))
         .thenReturn(
             Map.of(
@@ -418,5 +443,70 @@ class LanesSectionTest {
   @Test
   void view_isEmptyWithoutLanes() {
     assertThat(section.view(input())).isEmpty();
+  }
+
+  @Test
+  void highlights_scoreTheMarginOfADecidedLaneAtNormalAndAtExtreme() {
+    result(2, "TOP", "RADIANT", "WON", 0.3);
+    result(2, "TOP", "DIRE", "LOST", -0.3);
+    result(0, "BOTTOM", "RADIANT", "LOST", -1.0);
+    result(0, "BOTTOM", "DIRE", "WON", 1.0);
+    result(1, "MID", "RADIANT", "EVEN", 0.0);
+    result(1, "MID", "DIRE", "EVEN", 0.0);
+    assertThat(section.highlights(input(0L)))
+        .extracting(Highlight::source, Highlight::seconds, Highlight::score)
+        .containsExactlyInAnyOrder(
+            org.assertj.core.groups.Tuple.tuple("lanes", 650.0, 0.0),
+            org.assertj.core.groups.Tuple.tuple("lanes", 650.0, 1.0));
+    assertThat(section.highlights(input(0L)))
+        .extracting(Highlight::text)
+        .anyMatch(t -> t.startsWith("Bottom lane:") && t.contains("by a lot"));
+  }
+
+  @Test
+  void highlights_skipANullMarginALaneWithoutTheTrackedTeamAndNoTrackedTeam() {
+    result(2, "TOP", "RADIANT", "WON", null);
+    result(2, "TOP", "DIRE", "LOST", null);
+    result(0, "BOTTOM", "DIRE", "WON", 1.0);
+    assertThat(section.highlights(input(0L))).isEmpty();
+    result(1, "MID", "RADIANT", "WON", 1.0);
+    result(1, "MID", "DIRE", "LOST", -1.0);
+    assertThat(section.highlights(input())).isEmpty();
+    assertThat(section.highlights(input(0L))).hasSize(1);
+  }
+
+  @Test
+  void theViewCarriesALanePictureAndTheTextStaysAsItWas() {
+    threeLanes();
+
+    ReplayReportInput in = input(0L, 128L);
+    SectionView view = section.view(in).orElseThrow();
+
+    assertThat(view.image().name()).isEqualTo("lanes-1.png");
+    assertThat(section.image(in)).isPresent();
+    assertThat(view.bullets()).hasSize(3);
+    assertThat(view.bullets()).noneMatch(b -> b.contains("could not be drawn"));
+    org.mockito.ArgumentCaptor<TableSpec> spec =
+        org.mockito.ArgumentCaptor.forClass(TableSpec.class);
+    verify(tables).render(spec.capture());
+    assertThat(spec.getValue().headers())
+        .containsExactly("Lane", "Winner", "Radiant", "Dire", "Ended");
+    assertThat(spec.getValue().rows()).hasSize(3);
+    verify(heroNames).bySlot(1L);
+    assertThat(spec.getValue().rows().get(0).get(1).sub()).isEqualTo("by a lot");
+    assertThat(spec.getValue().rows().get(0).get(4).text()).isEqualTo("10:50");
+  }
+
+  @Test
+  void aFailedDrawingLeavesTheTextWithoutImageOrExtraSentence() {
+    threeLanes();
+    when(tables.render(any())).thenThrow(new IllegalStateException("boom"));
+    List<String> before = section.lines(input());
+
+    SectionView view = section.view(input()).orElseThrow();
+
+    assertThat(view.image()).isNull();
+    assertThat(section.image(input())).isEmpty();
+    assertThat(view.bullets()).containsExactlyElementsOf(before.subList(1, before.size()));
   }
 }

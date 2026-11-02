@@ -43,7 +43,12 @@ public class GraphFarmSection extends GraphSection {
 
   @Override
   public int order() {
-    return 92;
+    return 68;
+  }
+
+  @Override
+  public String summary() {
+    return "where each hero's farm came from";
   }
 
   @Override

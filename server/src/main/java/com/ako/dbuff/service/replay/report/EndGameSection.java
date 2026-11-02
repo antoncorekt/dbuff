@@ -26,7 +26,10 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class EndGameSection implements ReplayReportSection {
+public class EndGameSection implements ReplayReportSection, HighlightSource {
+  private static final double THROWN_SCORE = 1.0;
+  private static final double LEAD_LOST_SCORE = 0.6;
+
   private final EndGameSummaryRepo summaryRepo;
   private final ReplayReportProperties properties;
 
@@ -39,7 +42,12 @@ public class EndGameSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 79;
+    return 50;
+  }
+
+  @Override
+  public String summary() {
+    return "how the game ended, thrown or held";
   }
 
   @Override
@@ -47,7 +55,8 @@ public class EndGameSection implements ReplayReportSection {
     return ReportDetail.STANDARD;
   }
 
-  private record Ended(List<String> lines, TeamSide winner, TeamSide yours) {}
+  private record Ended(
+      List<String> lines, TeamSide winner, TeamSide yours, EndGameSummaryDomain row) {}
 
   @Override
   public List<String> lines(ReplayReportInput input) {
@@ -65,6 +74,27 @@ public class EndGameSection implements ReplayReportSection {
                     SectionViews.forTeam(e.winner(), e.yours()),
                     e.lines().subList(1, e.lines().size()),
                     null));
+  }
+
+  @Override
+  public List<Highlight> highlights(ReplayReportInput input) {
+    return ended(input)
+        .flatMap(
+            e -> {
+              double score = score(e.row());
+              return score == 0
+                  ? Optional.<Highlight>empty()
+                  : Optional.of(new Highlight("endgame", null, score, e.lines().get(0)));
+            })
+        .stream()
+        .toList();
+  }
+
+  private static double score(EndGameSummaryDomain row) {
+    if (Boolean.TRUE.equals(row.getThrown())) {
+      return THROWN_SCORE;
+    }
+    return Boolean.TRUE.equals(row.getLeadLost()) ? LEAD_LOST_SCORE : 0;
   }
 
   private Optional<Ended> ended(ReplayReportInput input) {
@@ -88,7 +118,7 @@ public class EndGameSection implements ReplayReportSection {
     List<String> lines = new ArrayList<>();
     lines.add(LineText.cut(verdict(row, winner, yours), max));
     buybacks(row, winner, yours).ifPresent(l -> lines.add(LineText.cut(l, max)));
-    return Optional.of(new Ended(lines, winner, yours));
+    return Optional.of(new Ended(lines, winner, yours, row));
   }
 
   private String verdict(EndGameSummaryDomain r, TeamSide winner, TeamSide yours) {

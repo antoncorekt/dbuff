@@ -4,6 +4,7 @@ import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
+import com.ako.dbuff.service.ai.reasons.ReplayReportAiProperties;
 import com.ako.dbuff.service.constant.ConstantsManagers;
 import com.ako.dbuff.service.constant.data.ItemConstant;
 import com.ako.dbuff.service.replay.ReplayProcessingProperties;
@@ -12,10 +13,12 @@ import com.ako.dbuff.service.replay.looprunner.ReviewLoopTopic;
 import com.ako.dbuff.service.replay.mode.GameModeRegistry;
 import com.ako.dbuff.service.replay.report.AbilityLabels;
 import com.ako.dbuff.service.replay.report.ConstantAbilityLabels;
+import com.ako.dbuff.service.replay.report.MoreReportsMessage;
 import com.ako.dbuff.service.replay.report.OpenDotaSection;
 import com.ako.dbuff.service.replay.report.ReplayReportProperties;
 import com.ako.dbuff.service.replay.report.ReplayReportSection;
 import com.ako.dbuff.service.replay.report.ReplayReportService;
+import com.ako.dbuff.service.replay.report.ReplayReportService.DefaultReport;
 import com.ako.dbuff.service.replay.report.ReportHeroNames;
 import com.ako.dbuff.service.replay.report.SectionSwitch;
 import com.ako.dbuff.service.replay.report.view.ImageAttachment;
@@ -97,7 +100,10 @@ class ReportLoopTopic implements ReviewLoopTopic {
                           context.getBean(GameModeRegistry.class),
                           null,
                           null,
-                          context.getBean(ReportHeroNames.class)));
+                          context.getBean(ReportHeroNames.class),
+                          new MoreReportsMessage(
+                              context.getBean(SectionSwitch.class),
+                              context.getBeanProvider(ReplayReportAiProperties.class))));
     }
     return reportService;
   }
@@ -124,12 +130,55 @@ class ReportLoopTopic implements ReviewLoopTopic {
 
   @Override
   public String render(long matchId) {
+    DbufInstanceConfigDomain instance = instance(trackedPlayers());
+    writeDefault(matchId, service().defaultReport(matchId, instance), plain, roundDir());
     return render(
         matchId,
-        service().everythingViewsByName(matchId, instance(trackedPlayers())),
+        service().everythingViewsByName(matchId, instance),
         service().everythingSectionNames(),
         plain,
         roundDir());
+  }
+
+  private static void writeDefault(
+      long matchId, DefaultReport report, PlainViewRenderer plain, Path dir) {
+    try {
+      Files.createDirectories(dir);
+      Files.writeString(
+          dir.resolve(matchId + "-default.md"), renderDefault(matchId, report, plain, dir));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  static String renderDefault(
+      long matchId, DefaultReport report, PlainViewRenderer plain, Path imageDir) {
+    List<String> out = new ArrayList<>();
+    out.add("# Match " + matchId + " default report");
+    int messages = report.moreReports().isPresent() ? 1 : 0;
+    List<String> body = new ArrayList<>();
+    for (Map.Entry<String, List<SectionView>> section : report.views().entrySet()) {
+      List<String> rows = new ArrayList<>();
+      int imageNo = 0;
+      for (SectionView view : section.getValue()) {
+        messages++;
+        plain.lines(view, true).forEach(l -> rows.add(row(l)));
+        if (view.image() != null) {
+          String file =
+              saveImage(imageDir, matchId + "-default", section.getKey(), view.image(), ++imageNo);
+          rows.add(row("[image " + file + "]"));
+        }
+      }
+      if (!rows.isEmpty()) {
+        body.addAll(tableStart(section.getKey()));
+        body.addAll(rows);
+      }
+    }
+    out.add("");
+    out.add("Messages: about " + messages + " (one per section view plus the more-reports text)");
+    out.addAll(body);
+    report.moreReports().ifPresent(text -> out.addAll(List.of("", "## more reports", "", text)));
+    return String.join("\n", out) + "\n";
   }
 
   static DbufInstanceConfigDomain instance(Map<Long, String> players) {
@@ -228,8 +277,8 @@ class ReportLoopTopic implements ReviewLoopTopic {
   }
 
   private static String saveImage(
-      Path dir, long matchId, String section, ImageAttachment image, int number) {
-    String file = "%d-%s-%d.png".formatted(matchId, section, number);
+      Path dir, Object matchId, String section, ImageAttachment image, int number) {
+    String file = "%s-%s-%d.png".formatted(matchId, section, number);
     try {
       Files.createDirectories(dir);
       Files.write(dir.resolve(file), image.bytes());

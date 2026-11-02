@@ -343,4 +343,37 @@ class OpeningSectionTest {
     assertThat(view.bullets()).hasSize(1);
     assertThat(section.lines(input())).hasSize(2);
   }
+
+  @Test
+  void highlights_scoreTheGapAtNormalAndAtExtreme() {
+    summary("RADIANT", "WON", 300, 2);
+    summary("DIRE", "LOST", -300, 1);
+    summaries.forEach(s -> s.setWindowEnd(240));
+    assertThat(section.highlights(input(0L)))
+        .singleElement()
+        .satisfies(
+            h -> {
+              assertThat(h.source()).isEqualTo("opening");
+              assertThat(h.seconds()).isEqualTo(240.0);
+              assertThat(h.score()).isZero();
+              assertThat(h.text()).contains("won the opening");
+            });
+    summaries.clear();
+    summary("DIRE", "WON", 3000, 2);
+    summary("RADIANT", "LOST", -3000, 1);
+    assertThat(section.highlights(input(0L)))
+        .singleElement()
+        .satisfies(h -> assertThat(h.score()).isEqualTo(1.0));
+  }
+
+  @Test
+  void highlights_giveNothingForANullBalanceOrWithoutATrackedTeam() {
+    summaries.add(
+        OpeningSummaryDomain.builder().id(1L).matchId(1L).team("RADIANT").result("WON").build());
+    assertThat(section.highlights(input(0L))).isEmpty();
+    summaries.clear();
+    summary("RADIANT", "WON", 3000, 2);
+    assertThat(section.highlights(input())).isEmpty();
+    assertThat(section.highlights(input(0L, 128L))).isEmpty();
+  }
 }

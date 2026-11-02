@@ -2,6 +2,7 @@ package com.ako.dbuff.service.replay.reportloop;
 
 import com.ako.dbuff.dao.model.DbufInstanceConfigDomain;
 import com.ako.dbuff.dao.model.PlayerDomain;
+import com.ako.dbuff.service.replay.report.ReplayReportService;
 import com.ako.dbuff.service.replay.report.view.Accent;
 import com.ako.dbuff.service.replay.report.view.ImageAttachment;
 import com.ako.dbuff.service.replay.report.view.PlainViewRenderer;
@@ -10,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -45,6 +47,28 @@ class ReportLoopTopicTest {
         .contains("| note |", "| [image 9-draft-1.png] |", "## fights", "| 3 fights |");
     assertThat(report.indexOf("## draft")).isLessThan(report.indexOf("## fights"));
     assertThat(dir.resolve("9-draft-1.png")).hasBinaryContent(new byte[] {1, 2});
+  }
+
+  @Test
+  void theDefaultFileListsSectionsInOrderAndEndsWithTheMessage(@TempDir Path dir) {
+    SectionView draft = new SectionView("Draft", null, Accent.INFO, List.of("d1"), null, image());
+    SectionView fights = new SectionView("Fights", null, Accent.INFO, List.of("f1"), null);
+    Map<String, List<SectionView>> views = new java.util.LinkedHashMap<>();
+    views.put("fights", List.of(fights));
+    views.put("draft", List.of(draft));
+
+    String report =
+        ReportLoopTopic.renderDefault(
+            4L,
+            new ReplayReportService.DefaultReport(views, Optional.of("More: /match report")),
+            plain,
+            dir);
+
+    assertThat(report)
+        .contains("Messages: about 3", "| f1 |", "| d1 |", "[image 4-default-draft-1.png]");
+    assertThat(report.indexOf("## fights")).isLessThan(report.indexOf("## draft"));
+    assertThat(report.stripTrailing()).endsWith("More: /match report");
+    assertThat(Files.exists(dir.resolve("4-default-draft-1.png"))).isTrue();
   }
 
   @Test

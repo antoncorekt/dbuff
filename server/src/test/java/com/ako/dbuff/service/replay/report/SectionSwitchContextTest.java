@@ -24,7 +24,6 @@ class SectionSwitchContextTest {
 
   private static final List<Class<? extends ReplayReportSection>> REAL =
       List.of(
-          SwingSection.class,
           DeathSection.class,
           FightSection.class,
           MovementSection.class,
@@ -44,6 +43,10 @@ class SectionSwitchContextTest {
 
   private static final Set<String> OFF_BY_DEFAULT =
       Set.of(
+          "composition",
+          "deaths",
+          "fights",
+          "movement",
           "important-fights",
           "lanes",
           "rotations",
@@ -98,7 +101,6 @@ class SectionSwitchContextTest {
                       .collect(Collectors.toMap(ReplayReportSection::name, s -> s));
               assertThat(byName.keySet())
                   .containsExactlyInAnyOrder(
-                      "swing",
                       "deaths",
                       "fights",
                       "movement",
@@ -116,8 +118,9 @@ class SectionSwitchContextTest {
                       "items",
                       "outliers");
               assertThat(byName.values())
-                  .filteredOn(s -> !OFF_BY_DEFAULT.contains(s.name()))
-                  .allMatch(ReplayReportSection::defaultEnabled);
+                  .filteredOn(ReplayReportSection::defaultEnabled)
+                  .extracting(ReplayReportSection::name)
+                  .containsExactly("draft");
               assertThat(byName.get("important-fights").defaultEnabled()).isFalse();
               OFF_BY_DEFAULT.forEach(
                   name -> assertThat(byName.get(name).defaultEnabled()).isFalse());
@@ -169,7 +172,7 @@ class SectionSwitchContextTest {
                     .hasRootCauseInstanceOf(IllegalStateException.class)
                     .rootCause()
                     .hasMessageContaining("nope")
-                    .hasMessageContaining("swing"));
+                    .hasMessageContaining("important-fights"));
     runner()
         .withPropertyValues("replay.report.sections.nope.enabled=true")
         .run(context -> assertThat(context).hasNotFailed());

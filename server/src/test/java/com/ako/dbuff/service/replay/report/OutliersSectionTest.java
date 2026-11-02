@@ -75,7 +75,7 @@ class OutliersSectionTest {
   @Test
   void isOffByDefaultUntilThePropertyIsTrue() {
     assertThat(section.name()).isEqualTo("outliers");
-    assertThat(section.order()).isEqualTo(78);
+    assertThat(section.order()).isEqualTo(74);
     assertThat(section.defaultEnabled()).isFalse();
     assertThat(sectionSwitch.isEnabled(section)).isFalse();
 
@@ -211,5 +211,28 @@ class OutliersSectionTest {
   @Test
   void view_isEmptyWithoutUsableRows() {
     assertThat(section.view(input())).isEmpty();
+  }
+
+  @Test
+  void highlightsTrackedPlayersRowsAtFixedScoreAndLeavesTheOtherTeamOut() {
+    outlier(0, "NW_OUTLIER", 1440, 1800, 41.2);
+    outlier(129, "NW_OUTLIER", 600, 900, 30.0);
+
+    assertThat(section.highlights(input(0L)))
+        .singleElement()
+        .satisfies(
+            h -> {
+              assertThat(h.source()).isEqualTo("outliers");
+              assertThat(h.score()).isEqualTo(0.8);
+              assertThat(h.seconds()).isEqualTo(1440.0);
+              assertThat(h.text()).startsWith("Sven held 41% of the net worth of Radiant");
+            });
+  }
+
+  @Test
+  void highlightsSkipARowWithoutAShare() {
+    outlier(0, "NW_OUTLIER", 1440, 1800, 41.2).setSharePercent(null);
+
+    assertThat(section.highlights(input(0L))).isEmpty();
   }
 }

@@ -4,7 +4,9 @@ import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -31,25 +33,19 @@ public class ReplayReportProperties {
   private ReportFormat format = ReportFormat.PLAIN;
 
   /** The most messages one match's replay analysis takes at the full detail level. */
-  private int maxMessages = 4;
+  private int maxMessages = 6;
 
   /** The most messages one {@code /match report section:everything} posts. */
   private int everythingMaxMessages = 30;
 
   /** The most messages it takes at the standard detail level. */
-  private int standardMaxMessages = 2;
+  private int standardMaxMessages = 4;
 
   /** The most findings one section lists. */
   private int maxFindingsPerSection = 3;
 
   /** The longest a team's composition verdict line may be; a longer one ends in an ellipsis. */
   private int maxCompositionLineLength = 300;
-
-  /** The most reasons a lost fight in the swings section gives. */
-  private int maxReasonsPerFight = 3;
-
-  /** The most lost fights one swing tells the reasons of. */
-  private int maxLostFightsPerSwing = 2;
 
   /** The most lines the important fights section lists. */
   private int maxImportantFightLines = 6;
@@ -129,6 +125,9 @@ public class ReplayReportProperties {
    */
   private int onDemandCooldownSeconds = 30;
 
+  /** The "What stood out" card: how many lines and how unusual a fact must be to make it. */
+  private Highlights highlights = new Highlights();
+
   /**
    * Fails at startup on an important fights cap that leaves the section empty or too long for a
    * message, and on lane settings that cannot cut a line or tell narrow from clear wins.
@@ -165,6 +164,7 @@ public class ReplayReportProperties {
               + " and "
               + objectiveFarDistance);
     }
+    highlights.validate();
     requireLineLength("max-behaviour-line-length", maxBehaviourLineLength);
     requireRange("opening-rune-minutes", openingRuneMinutes, 1, MAX_OPENING_RUNE_MINUTES);
     requireLineLength("max-opening-line-length", maxOpeningLineLength);
@@ -192,6 +192,74 @@ public class ReplayReportProperties {
     if (value < min || value > max) {
       throw new IllegalStateException(
           "replay.report." + name + " must be " + min + " to " + max + ", got " + value);
+    }
+  }
+
+  /** Normal and extreme value of one highlight source; the score runs from 0 to 1 between them. */
+  @Data
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class Scale {
+    private double normal;
+    private double extreme;
+  }
+
+  @Data
+  public static class Highlights {
+    private static final int MAX_LINES = 15;
+    private static final int MAX_PER_SOURCE = 5;
+
+    /** The most lines the card lists. */
+    private int maxLines = 6;
+
+    /** The most lines one source adds to the card. */
+    private int maxPerSource = 2;
+
+    /** A candidate below this score is left out, unless nothing passes. */
+    private double minScore = 0.25;
+
+    /** The longest a line may be; a longer one ends in an ellipsis. */
+    private int maxLineLength = 240;
+
+    private Scale opening = new Scale(300, 1500);
+    private Scale lanes = new Scale(0.3, 1.0);
+    private Scale midActivity = new Scale(0.25, 0.6);
+    private Scale importantFights = new Scale(5, 20);
+    private Scale fights = new Scale(0.5, 0.9);
+    private Scale vision = new Scale(0.3, 0.8);
+    private Scale objectives = new Scale(0.1, 0.5);
+    private Scale items = new Scale(5, 15);
+    private Scale missedPick = new Scale(1.5, 4);
+    private Scale abilityHistory = new Scale(1.5, 4);
+
+    void validate() {
+      requireRange("highlights.max-lines", maxLines, 1, MAX_LINES);
+      requireRange("highlights.max-per-source", maxPerSource, 1, MAX_PER_SOURCE);
+      if (!(minScore >= 0 && minScore <= 1)) {
+        throw new IllegalStateException(
+            "replay.report.highlights.min-score must be 0 to 1, got " + minScore);
+      }
+      requireLineLength("highlights.max-line-length", maxLineLength);
+      requireScale("opening", opening);
+      requireScale("lanes", lanes);
+      requireScale("mid-activity", midActivity);
+      requireScale("important-fights", importantFights);
+      requireScale("fights", fights);
+      requireScale("vision", vision);
+      requireScale("objectives", objectives);
+      requireScale("items", items);
+      requireScale("missed-pick", missedPick);
+      requireScale("ability-history", abilityHistory);
+    }
+
+    private static void requireScale(String key, Scale scale) {
+      if (scale == null || !(scale.getNormal() < scale.getExtreme())) {
+        throw new IllegalStateException(
+            "replay.report.highlights."
+                + key
+                + " needs normal < extreme, got "
+                + (scale == null ? "nothing" : scale.getNormal() + " and " + scale.getExtreme()));
+      }
     }
   }
 

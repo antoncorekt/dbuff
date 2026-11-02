@@ -42,10 +42,10 @@ class SkillEffectsSectionTest {
   }
 
   @Test
-  void isOffByDefaultAndSitsBetweenSkillPicksAndOpening() {
+  void isOffByDefaultAndSitsInTheOverallSkillPart() {
     assertThat(section.defaultEnabled()).isFalse();
     assertThat(section.name()).isEqualTo("skill-effects");
-    assertThat(section.order()).isEqualTo(14);
+    assertThat(section.order()).isEqualTo(72);
     assertThat(section.minimumDetail()).isEqualTo(ReportDetail.STANDARD);
   }
 

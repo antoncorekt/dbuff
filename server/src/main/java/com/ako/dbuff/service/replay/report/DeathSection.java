@@ -40,13 +40,13 @@ public class DeathSection implements ReplayReportSection {
   }
 
   @Override
-  public boolean defaultEnabled() {
-    return true;
+  public int order() {
+    return 44;
   }
 
   @Override
-  public int order() {
-    return 50;
+  public String summary() {
+    return "each death and what led to it";
   }
 
   @Override
@@ -62,7 +62,7 @@ public class DeathSection implements ReplayReportSection {
   }
 
   private Found found(ReplayReportInput input) {
-    List<String> lines = new ArrayList<>();
+    List<Map.Entry<Double, String>> timed = new ArrayList<>();
     List<DeathAnalysisDomain> deaths = deathRepo.findByMatchId(input.matchId());
     for (Map.Entry<Long, String> player : input.namesBySlot().entrySet()) {
       deaths.stream()
@@ -76,10 +76,12 @@ public class DeathSection implements ReplayReportSection {
               Comparator.comparingInt((DeathAnalysisDomain d) -> SEVERITY.get(d.getReason()))
                   .thenComparing(DeathAnalysisDomain::getDeathSeconds))
           .limit(input.maxFindings())
-          .sorted(Comparator.comparing(DeathAnalysisDomain::getDeathSeconds))
-          .map(d -> line(player.getValue(), d))
-          .forEach(lines::add);
+          .map(d -> Map.entry(d.getDeathSeconds(), line(player.getValue(), d)))
+          .forEach(timed::add);
     }
+    List<String> lines =
+        new ArrayList<>(
+            timed.stream().sorted(Map.Entry.comparingByKey()).map(Map.Entry::getValue).toList());
     if (lines.isEmpty()) {
       return new Found(List.of(), 0);
     }

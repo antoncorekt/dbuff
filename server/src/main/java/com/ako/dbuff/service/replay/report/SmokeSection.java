@@ -49,7 +49,12 @@ public class SmokeSection implements ReplayReportSection {
 
   @Override
   public int order() {
-    return 72;
+    return 34;
+  }
+
+  @Override
+  public String summary() {
+    return "smoke ganks and how they went";
   }
 
   @Override
