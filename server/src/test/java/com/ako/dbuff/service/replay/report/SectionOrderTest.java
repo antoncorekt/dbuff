@@ -82,6 +82,19 @@ class SectionOrderTest {
   }
 
   @Test
+  void theDefaultReportIsDraftHighlightsItemBuildAndAdvantageGraph() {
+    List<String> enabled =
+        SECTIONS.stream()
+            .map(SectionOrderTest::mock)
+            .filter(ReplayReportSection::defaultEnabled)
+            .map(ReplayReportSection::name)
+            .toList();
+    assertThat(enabled)
+        .containsExactlyInAnyOrder("draft", "highlights", "item-build", "graph-advantage");
+    assertThat(mock(ItemBuildSection.class).defaultEnabled()).isTrue();
+  }
+
+  @Test
   void everySectionSaysInOnePhraseWhatItReports() {
     for (Class<? extends ReplayReportSection> type : SECTIONS) {
       ReplayReportSection section = mock(type);

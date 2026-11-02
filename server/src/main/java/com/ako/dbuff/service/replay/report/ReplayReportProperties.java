@@ -221,14 +221,14 @@ public class ReplayReportProperties {
     /** The longest a line may be; a longer one ends in an ellipsis. */
     private int maxLineLength = 240;
 
-    private Scale opening = new Scale(500, 3000);
+    private Scale opening = new Scale(300, 1500);
     private Scale lanes = new Scale(0.3, 1.0);
     private Scale midActivity = new Scale(0.25, 0.6);
     private Scale importantFights = new Scale(5, 20);
-    private Scale fights = new Scale(0.25, 0.75);
+    private Scale fights = new Scale(0.5, 0.9);
     private Scale vision = new Scale(0.3, 0.8);
     private Scale objectives = new Scale(0.1, 0.5);
-    private Scale items = new Scale(1, 5);
+    private Scale items = new Scale(5, 15);
     private Scale missedPick = new Scale(1.5, 4);
     private Scale abilityHistory = new Scale(1.5, 4);
 
