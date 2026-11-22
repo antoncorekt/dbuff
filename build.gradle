@@ -176,6 +176,9 @@ project('server') {
         // OpenAI Java SDK for AI-based match analysis
         implementation 'com.openai:openai-java:0.8.1'
 
+        // Anthropic Java SDK for the Discord ask conversation
+        implementation 'com.anthropic:anthropic-java:3.12.0'
+
         // Google Cloud Vision (OCR / text detection) for extracting player names from images.
         // Managed via the Google Cloud libraries BOM to keep transitive versions aligned.
         implementation platform('com.google.cloud:libraries-bom:26.44.0')
