@@ -165,6 +165,23 @@ class AskConversationServiceTest {
   }
 
   @Test
+  void hardStopStillAnswersEveryToolUseSoTheThreadCanContinue() {
+    properties.setMaxToolCallsPerAnswer(0);
+    for (int i = 0; i < 4; i++) {
+      responses.add(message(BetaStopReason.TOOL_USE, toolUse("t" + i, "echo", Map.of("q", "a"))));
+    }
+    responses.add(message(BetaStopReason.END_TURN, text("ok")));
+
+    AskAnswer answer = service.answer("thread-1", CTX, "q");
+    assertThat(answer.stopReason()).isEqualTo("tool_budget");
+
+    service.answer("thread-1", CTX, "again");
+    List<BetaMessageParam> replayed = requests.get(4).messages();
+    assertThat(replayed.get(replayed.size() - 2).user().get().content().contentBlockParams())
+        .isPresent();
+  }
+
+  @Test
   void refusalGivesTheFixedText() {
     responses.add(message(BetaStopReason.REFUSAL));
 

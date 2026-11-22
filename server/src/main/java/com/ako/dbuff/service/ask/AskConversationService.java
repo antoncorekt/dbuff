@@ -118,10 +118,6 @@ public class AskConversationService {
       if (!"tool_use".equals(stopReason)) {
         break;
       }
-      if (rounds > properties.getMaxToolCallsPerAnswer() + EXTRA_ROUNDS_AFTER_BUDGET) {
-        stopReason = "tool_budget";
-        break;
-      }
 
       List<BetaContentBlockParam> results = new ArrayList<>();
       for (BetaContentBlock block : last.content()) {
@@ -148,6 +144,10 @@ public class AskConversationService {
       BetaMessageParam resultMessage = BetaMessageParam.ofUserOfContentBlockParams(results);
       persist(threadId, seq++, resultMessage, false, null);
       history.add(resultMessage);
+      if (rounds > properties.getMaxToolCallsPerAnswer() + EXTRA_ROUNDS_AFTER_BUDGET) {
+        stopReason = "tool_budget";
+        break;
+      }
     }
 
     thread.setLastActivityAt(Instant.now());
