@@ -12,11 +12,13 @@ import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain_;
 import com.ako.dbuff.resources.model.AbilityComboStatisticResponse;
 import com.ako.dbuff.resources.model.AbilityRankingResponse;
+import com.ako.dbuff.service.ranking.RankingSort;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Tuple;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import java.math.BigDecimal;
@@ -60,17 +62,47 @@ public class AbilityRankingRepository {
       Set<Long> heroIds,
       Set<Long> gameModeIds,
       Integer limit) {
+    return findAbilityRankings(
+        Set.of(playerId),
+        startDate,
+        endDate,
+        abilityIds,
+        excludedAbilities,
+        heroIds,
+        gameModeIds,
+        RankingSort.PICKS,
+        0,
+        limit);
+  }
+
+  /**
+   * Same as {@link #findAbilityRankingsByPlayer} for a set of players (empty means every stored
+   * player), with a sort and a minimum number of games. {@code playerId} and {@code playerName} of
+   * the result are set only when exactly one player is asked for.
+   */
+  public List<AbilityRankingResponse> findAbilityRankings(
+      Set<Long> playerIds,
+      LocalDate startDate,
+      LocalDate endDate,
+      Set<Long> abilityIds,
+      Set<Long> excludedAbilities,
+      Set<Long> heroIds,
+      Set<Long> gameModeIds,
+      RankingSort sort,
+      int minGames,
+      Integer limit) {
 
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
 
     // First, get total match count for the player within the date range and hero filter
-    Long totalMatches = getTotalMatchCount(playerId, startDate, endDate, heroIds, gameModeIds);
+    Long totalMatches = getTotalMatchCount(playerIds, startDate, endDate, heroIds, gameModeIds);
     if (totalMatches == null || totalMatches == 0) {
       return List.of();
     }
 
     // Get player name
-    String playerName = getPlayerName(playerId);
+    Long playerId = playerIds.size() == 1 ? playerIds.iterator().next() : null;
+    String playerName = playerId != null ? getPlayerName(playerId) : null;
 
     // Main query for ability statistics
     CriteriaQuery<Tuple> query = cb.createTupleQuery();
@@ -85,7 +117,9 @@ public class AbilityRankingRepository {
     List<Predicate> predicates = new ArrayList<>();
 
     // Player filter on AbilityDomain
-    predicates.add(cb.equal(abilityRoot.get(AbilityDomain_.playerId), playerId));
+    if (!playerIds.isEmpty()) {
+      predicates.add(abilityRoot.get(AbilityDomain_.playerId).in(playerIds));
+    }
 
     // Correlate ability with match by matchId
     predicates.add(
@@ -147,12 +181,30 @@ public class AbilityRankingRepository {
         abilityRoot.get(AbilityDomain_.name),
         abilityRoot.get(AbilityDomain_.prettyName));
 
-    // Order by pick count descending
-    query.orderBy(cb.desc(cb.countDistinct(abilityRoot.get(AbilityDomain_.matchId))));
+    Expression<Long> pickCountExpr = cb.countDistinct(abilityRoot.get(AbilityDomain_.matchId));
+    if (minGames > 0) {
+      query.having(cb.greaterThanOrEqualTo(pickCountExpr, (long) minGames));
+    }
 
-    // Execute query with limit
-    List<Tuple> results =
-        entityManager.createQuery(query).setMaxResults(limit != null ? limit : 10).getResultList();
+    int effectiveLimit = limit != null ? limit : 10;
+    List<Tuple> results;
+    if (sort == null || sort == RankingSort.PICKS) {
+      query.orderBy(cb.desc(pickCountExpr));
+      results = entityManager.createQuery(query).setMaxResults(effectiveLimit).getResultList();
+    } else {
+      results =
+          entityManager.createQuery(query).getResultList().stream()
+              .sorted(
+                  sort.comparator(
+                      t -> {
+                        Long wins = t.get("winCount", Long.class);
+                        return wins != null ? wins : 0L;
+                      },
+                      t -> t.get("pickCount", Long.class),
+                      t -> t.get("abilityId", Long.class)))
+              .limit(effectiveLimit)
+              .toList();
+    }
 
     // Map results to response objects
     return results.stream()
@@ -438,7 +490,7 @@ public class AbilityRankingRepository {
 
   /** Gets the total number of matches for a player within the date range and hero filter. */
   private Long getTotalMatchCount(
-      Long playerId,
+      Set<Long> playerIds,
       LocalDate startDate,
       LocalDate endDate,
       Set<Long> heroIds,
@@ -449,7 +501,9 @@ public class AbilityRankingRepository {
     Root<MatchDomain> matchRoot = countQuery.from(MatchDomain.class);
 
     List<Predicate> predicates = new ArrayList<>();
-    predicates.add(cb.equal(statsRoot.get(PlayerMatchStatisticDomain_.playerId), playerId));
+    if (!playerIds.isEmpty()) {
+      predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.playerId).in(playerIds));
+    }
     predicates.add(
         cb.equal(
             statsRoot.get(PlayerMatchStatisticDomain_.matchId), matchRoot.get(MatchDomain_.id)));

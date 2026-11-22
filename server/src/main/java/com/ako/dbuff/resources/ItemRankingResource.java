@@ -2,17 +2,21 @@ package com.ako.dbuff.resources;
 
 import com.ako.dbuff.resources.model.ItemRankingResponse;
 import com.ako.dbuff.service.ranking.ItemRankingService;
+import com.ako.dbuff.service.ranking.RankingQuery;
+import com.ako.dbuff.service.ranking.RankingSort;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * REST API for item ranking statistics per player. Provides endpoints to retrieve item usage
@@ -47,6 +51,8 @@ public class ItemRankingResource {
    * @param gameModes Optional set of game mode names to restrict the statistics to. If null,
    *     includes every mode.
    * @param limit Maximum number of items to return. Defaults to 10 if null.
+   * @param sort PICKS (default), WIN_RATE or WILSON; case-insensitive.
+   * @param minGames Minimum number of games for an entry to be listed. Defaults to 0.
    * @return List of ItemRankingResponse ordered by pick count descending
    */
   @GetMapping("/{playerId}/itemRanking")
@@ -60,10 +66,12 @@ public class ItemRankingResource {
       @RequestParam(required = false) Set<String> excludedItems,
       @RequestParam(required = false) Set<String> heroes,
       @RequestParam(required = false) Set<String> gameModes,
-      @RequestParam(required = false) Integer limit) {
+      @RequestParam(required = false) Integer limit,
+      @RequestParam(required = false) String sort,
+      @RequestParam(required = false, defaultValue = "0") int minGames) {
 
     log.info(
-        "GET /api/v1/player/{}/itemRanking - startDate={}, endDate={}, items={}, excludedItems={}, heroes={}, gameModes={}, limit={}",
+        "GET /api/v1/player/{}/itemRanking - startDate={}, endDate={}, items={}, excludedItems={}, heroes={}, gameModes={}, limit={}, sort={}, minGames={}",
         playerId,
         startDate,
         endDate,
@@ -71,9 +79,28 @@ public class ItemRankingResource {
         excludedItems,
         heroes,
         gameModes,
-        limit);
+        limit,
+        sort,
+        minGames);
 
+    RankingSort rankingSort;
+    try {
+      rankingSort = RankingSort.parse(sort);
+    } catch (IllegalArgumentException e) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "sort must be PICKS, WIN_RATE or WILSON");
+    }
     return itemRankingService.getItemRankings(
-        playerId, startDate, endDate, items, excludedItems, heroes, gameModes, limit);
+        new RankingQuery(
+            Set.of(playerId),
+            startDate,
+            endDate,
+            items,
+            excludedItems,
+            heroes,
+            gameModes,
+            rankingSort,
+            minGames,
+            limit));
   }
 }

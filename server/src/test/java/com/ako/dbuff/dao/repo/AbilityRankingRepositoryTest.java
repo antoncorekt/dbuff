@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.resources.model.AbilityRankingResponse;
+import com.ako.dbuff.service.ranking.RankingSort;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -39,6 +40,7 @@ class AbilityRankingRepositoryTest {
 
   private static final Long PLAYER_ID = 123456L;
   private static final String PLAYER_NAME = "TestPlayer";
+  private static final Long OTHER_PLAYER_ID = 999L;
 
   // Ability IDs (these would be resolved from names via ConstantsManagers in the service layer)
   private static final Long BLINK_ABILITY_ID = 5004L;
@@ -583,5 +585,117 @@ class AbilityRankingRepositoryTest {
         .filter(r -> r.getAbilityId().equals(abilityId))
         .findFirst()
         .orElseThrow();
+  }
+
+  @Nested
+  @DisplayName("Sort, minimum games and several players")
+  class SortAndMinGamesTests {
+
+    @Test
+    void winRateSortPutsBestWinRateFirstAndBreaksTiesByPicks() {
+      List<AbilityRankingResponse> results = rank(Set.of(PLAYER_ID), RankingSort.WIN_RATE, 0, 10);
+
+      assertThat(results)
+          .extracting(AbilityRankingResponse::getAbilityId)
+          .containsExactly(ULTIMATE_ABILITY_ID, BLINK_ABILITY_ID, STUN_ABILITY_ID, HEAL_ABILITY_ID);
+    }
+
+    @Test
+    void wilsonSortPrefersTheLargerSampleAtEqualRate() {
+      List<AbilityRankingResponse> results = rank(Set.of(PLAYER_ID), RankingSort.WILSON, 0, 10);
+
+      assertThat(results.get(0).getAbilityId()).isEqualTo(BLINK_ABILITY_ID);
+    }
+
+    @Test
+    void limitIsAppliedAfterSorting() {
+      List<AbilityRankingResponse> results = rank(Set.of(PLAYER_ID), RankingSort.WIN_RATE, 0, 1);
+
+      assertThat(results)
+          .extracting(AbilityRankingResponse::getAbilityId)
+          .containsExactly(ULTIMATE_ABILITY_ID);
+    }
+
+    @Test
+    void minGamesDropsTheOneGameAbility() {
+      List<AbilityRankingResponse> results = rank(Set.of(PLAYER_ID), RankingSort.PICKS, 2, 10);
+
+      assertThat(results)
+          .extracting(AbilityRankingResponse::getAbilityId)
+          .doesNotContain(ULTIMATE_ABILITY_ID)
+          .contains(BLINK_ABILITY_ID, STUN_ABILITY_ID, HEAL_ABILITY_ID);
+    }
+
+    @Test
+    void severalPlayersAreCombinedWithoutPlayerIdOrName() {
+      addSecondPlayerWithUltimate();
+
+      List<AbilityRankingResponse> results =
+          rank(Set.of(PLAYER_ID, OTHER_PLAYER_ID), RankingSort.PICKS, 0, 10);
+
+      AbilityRankingResponse ultimate =
+          results.stream()
+              .filter(r -> r.getAbilityId().equals(ULTIMATE_ABILITY_ID))
+              .findFirst()
+              .orElseThrow();
+      assertThat(ultimate.getPickCount()).isEqualTo(2L);
+      assertThat(results).allSatisfy(r -> assertThat(r.getPlayerId()).isNull());
+      assertThat(results).allSatisfy(r -> assertThat(r.getPlayerName()).isNull());
+    }
+
+    @Test
+    void emptyPlayerSetMeansEveryPlayer() {
+      addSecondPlayerWithUltimate();
+
+      List<AbilityRankingResponse> all = rank(Set.of(), RankingSort.PICKS, 0, 10);
+      List<AbilityRankingResponse> one = rank(Set.of(PLAYER_ID), RankingSort.PICKS, 0, 10);
+
+      assertThat(find(all, ULTIMATE_ABILITY_ID).getPickCount()).isEqualTo(2L);
+      assertThat(find(one, ULTIMATE_ABILITY_ID).getPickCount()).isEqualTo(1L);
+    }
+
+    @Test
+    void singlePlayerKeepsIdAndName() {
+      List<AbilityRankingResponse> results = rank(Set.of(PLAYER_ID), RankingSort.PICKS, 0, 10);
+
+      assertThat(results.get(0).getPlayerId()).isEqualTo(PLAYER_ID);
+      assertThat(results.get(0).getPlayerName()).isEqualTo(PLAYER_NAME);
+    }
+
+    private List<AbilityRankingResponse> rank(
+        Set<Long> playerIds, RankingSort sort, int minGames, int limit) {
+      return abilityRankingRepository.findAbilityRankings(
+          playerIds, null, null, null, null, null, null, sort, minGames, limit);
+    }
+
+    private void addSecondPlayerWithUltimate() {
+      entityManager.persist(PlayerDomain.builder().id(OTHER_PLAYER_ID).name("Other").build());
+      entityManager.persist(
+          PlayerMatchStatisticDomain.builder()
+              .matchId(2L)
+              .playerSlot(1L)
+              .playerId(OTHER_PLAYER_ID)
+              .win(1L)
+              .heroId(ANTIMAGE_HERO_ID)
+              .build());
+      entityManager.persist(
+          AbilityDomain.builder()
+              .abilityId(ULTIMATE_ABILITY_ID)
+              .matchId(2L)
+              .playerSlot(1L)
+              .playerId(OTHER_PLAYER_ID)
+              .name("ultimate")
+              .prettyName("Ultimate")
+              .build());
+      entityManager.flush();
+      entityManager.clear();
+    }
+
+    private AbilityRankingResponse find(List<AbilityRankingResponse> list, Long abilityId) {
+      return list.stream()
+          .filter(r -> r.getAbilityId().equals(abilityId))
+          .findFirst()
+          .orElseThrow();
+    }
   }
 }
