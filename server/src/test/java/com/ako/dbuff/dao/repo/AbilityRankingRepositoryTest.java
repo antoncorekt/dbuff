@@ -655,6 +655,36 @@ class AbilityRankingRepositoryTest {
     }
 
     @Test
+    void severalPlayersInOneMatchKeepWinRateAtMostFullAndCountPlayerGames() {
+      addSecondPlayerWithUltimate();
+      entityManager.persist(
+          PlayerMatchStatisticDomain.builder()
+              .matchId(5L)
+              .playerSlot(1L)
+              .playerId(OTHER_PLAYER_ID)
+              .win(1L)
+              .heroId(ANTIMAGE_HERO_ID)
+              .build());
+      entityManager.persist(
+          AbilityDomain.builder()
+              .abilityId(ULTIMATE_ABILITY_ID)
+              .matchId(5L)
+              .playerSlot(1L)
+              .playerId(OTHER_PLAYER_ID)
+              .name("ultimate")
+              .prettyName("Ultimate")
+              .build());
+      entityManager.flush();
+      entityManager.clear();
+
+      AbilityRankingResponse ultimate =
+          find(rank(Set.of(), RankingSort.WIN_RATE, 0, 10), ULTIMATE_ABILITY_ID);
+
+      assertThat(ultimate.getPickCount()).isEqualTo(3L);
+      assertThat(ultimate.getWinRate()).isLessThanOrEqualTo(BigDecimal.valueOf(100));
+    }
+
+    @Test
     void singlePlayerKeepsIdAndName() {
       List<AbilityRankingResponse> results = rank(Set.of(PLAYER_ID), RankingSort.PICKS, 0, 10);
 

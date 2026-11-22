@@ -167,7 +167,7 @@ public class ItemRankingRepository {
         itemRoot.get(ItemDomain_.itemId).alias("itemId"),
         itemRoot.get(ItemDomain_.itemName).alias("itemName"),
         itemRoot.get(ItemDomain_.itemPrettyName).alias("itemPrettyName"),
-        cb.countDistinct(itemRoot.get(ItemDomain_.matchId)).alias("pickCount"),
+        cb.count(itemRoot.get(ItemDomain_.matchId)).alias("pickCount"),
         cb.sum(statsRoot.get(PlayerMatchStatisticDomain_.win)).alias("winCount"),
         cb.avg(itemRoot.get(ItemDomain_.itemPurchaseTime)).alias("avgPurchaseTime"),
         cb.avg(itemRoot.get(ItemDomain_.useCount)).alias("avgUseCount"));
@@ -180,7 +180,8 @@ public class ItemRankingRepository {
         itemRoot.get(ItemDomain_.itemName),
         itemRoot.get(ItemDomain_.itemPrettyName));
 
-    Expression<Long> pickCountExpr = cb.countDistinct(itemRoot.get(ItemDomain_.matchId));
+    // Primary keys make (match, slot) unique per ability or item, so count() counts player-games.
+    Expression<Long> pickCountExpr = cb.count(itemRoot.get(ItemDomain_.matchId));
     if (minGames > 0) {
       query.having(cb.greaterThanOrEqualTo(pickCountExpr, (long) minGames));
     }
@@ -438,7 +439,7 @@ public class ItemRankingRepository {
       predicates.add(matchRoot.get(MatchDomain_.gameModeId).in(gameModeIds));
     }
 
-    countQuery.select(cb.countDistinct(statsRoot.get(PlayerMatchStatisticDomain_.matchId)));
+    countQuery.select(cb.count(statsRoot.get(PlayerMatchStatisticDomain_.matchId)));
     countQuery.where(predicates.toArray(new Predicate[0]));
 
     return entityManager.createQuery(countQuery).getSingleResult();
