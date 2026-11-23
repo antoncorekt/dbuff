@@ -10,11 +10,13 @@ import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain_;
 import com.ako.dbuff.resources.model.ItemComboStatisticResponse;
 import com.ako.dbuff.resources.model.ItemRankingResponse;
+import com.ako.dbuff.service.ranking.RankingSort;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Tuple;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import java.math.BigDecimal;
@@ -57,17 +59,47 @@ public class ItemRankingRepository {
       Set<Long> heroIds,
       Set<Long> gameModeIds,
       Integer limit) {
+    return findItemRankings(
+        Set.of(playerId),
+        startDate,
+        endDate,
+        itemIds,
+        excludedItems,
+        heroIds,
+        gameModeIds,
+        RankingSort.PICKS,
+        0,
+        limit);
+  }
+
+  /**
+   * Same as {@link #findItemRankingsByPlayer} for a set of players (empty means every stored
+   * player), with a sort and a minimum number of games. {@code playerId} and {@code playerName} of
+   * the result are set only when exactly one player is asked for.
+   */
+  public List<ItemRankingResponse> findItemRankings(
+      Set<Long> playerIds,
+      LocalDate startDate,
+      LocalDate endDate,
+      Set<Long> itemIds,
+      Set<Long> excludedItems,
+      Set<Long> heroIds,
+      Set<Long> gameModeIds,
+      RankingSort sort,
+      int minGames,
+      Integer limit) {
 
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
 
     // First, get total match count for the player within the date range and hero filter
-    Long totalMatches = getTotalMatchCount(playerId, startDate, endDate, heroIds, gameModeIds);
+    Long totalMatches = getTotalMatchCount(playerIds, startDate, endDate, heroIds, gameModeIds);
     if (totalMatches == null || totalMatches == 0) {
       return List.of();
     }
 
     // Get player name
-    String playerName = getPlayerName(playerId);
+    Long playerId = playerIds.size() == 1 ? playerIds.iterator().next() : null;
+    String playerName = playerId != null ? getPlayerName(playerId) : null;
 
     // Main query for item statistics
     CriteriaQuery<Tuple> query = cb.createTupleQuery();
@@ -82,7 +114,9 @@ public class ItemRankingRepository {
     List<Predicate> predicates = new ArrayList<>();
 
     // Player filter on ItemDomain
-    predicates.add(cb.equal(itemRoot.get(ItemDomain_.playerId), playerId));
+    if (!playerIds.isEmpty()) {
+      predicates.add(itemRoot.get(ItemDomain_.playerId).in(playerIds));
+    }
 
     // Correlate item with match by matchId
     predicates.add(cb.equal(itemRoot.get(ItemDomain_.matchId), matchRoot.get(MatchDomain_.id)));
@@ -133,7 +167,7 @@ public class ItemRankingRepository {
         itemRoot.get(ItemDomain_.itemId).alias("itemId"),
         itemRoot.get(ItemDomain_.itemName).alias("itemName"),
         itemRoot.get(ItemDomain_.itemPrettyName).alias("itemPrettyName"),
-        cb.countDistinct(itemRoot.get(ItemDomain_.matchId)).alias("pickCount"),
+        cb.count(itemRoot.get(ItemDomain_.matchId)).alias("pickCount"),
         cb.sum(statsRoot.get(PlayerMatchStatisticDomain_.win)).alias("winCount"),
         cb.avg(itemRoot.get(ItemDomain_.itemPurchaseTime)).alias("avgPurchaseTime"),
         cb.avg(itemRoot.get(ItemDomain_.useCount)).alias("avgUseCount"));
@@ -146,12 +180,31 @@ public class ItemRankingRepository {
         itemRoot.get(ItemDomain_.itemName),
         itemRoot.get(ItemDomain_.itemPrettyName));
 
-    // Order by pick count descending
-    query.orderBy(cb.desc(cb.countDistinct(itemRoot.get(ItemDomain_.matchId))));
+    // Primary keys make (match, slot) unique per ability or item, so count() counts player-games.
+    Expression<Long> pickCountExpr = cb.count(itemRoot.get(ItemDomain_.matchId));
+    if (minGames > 0) {
+      query.having(cb.greaterThanOrEqualTo(pickCountExpr, (long) minGames));
+    }
 
-    // Execute query with limit
-    List<Tuple> results =
-        entityManager.createQuery(query).setMaxResults(limit != null ? limit : 10).getResultList();
+    int effectiveLimit = limit != null ? limit : 10;
+    List<Tuple> results;
+    if (sort == null || sort == RankingSort.PICKS) {
+      query.orderBy(cb.desc(pickCountExpr));
+      results = entityManager.createQuery(query).setMaxResults(effectiveLimit).getResultList();
+    } else {
+      results =
+          entityManager.createQuery(query).getResultList().stream()
+              .sorted(
+                  sort.comparator(
+                      t -> {
+                        Long wins = t.get("winCount", Long.class);
+                        return wins != null ? wins : 0L;
+                      },
+                      t -> t.get("pickCount", Long.class),
+                      t -> t.get("itemId", Long.class)))
+              .limit(effectiveLimit)
+              .toList();
+    }
 
     // Map results to response objects
     return results.stream()
@@ -350,7 +403,7 @@ public class ItemRankingRepository {
 
   /** Gets the total number of matches for a player within the date range and hero filter. */
   private Long getTotalMatchCount(
-      Long playerId,
+      Set<Long> playerIds,
       LocalDate startDate,
       LocalDate endDate,
       Set<Long> heroIds,
@@ -361,7 +414,9 @@ public class ItemRankingRepository {
     Root<MatchDomain> matchRoot = countQuery.from(MatchDomain.class);
 
     List<Predicate> predicates = new ArrayList<>();
-    predicates.add(cb.equal(statsRoot.get(PlayerMatchStatisticDomain_.playerId), playerId));
+    if (!playerIds.isEmpty()) {
+      predicates.add(statsRoot.get(PlayerMatchStatisticDomain_.playerId).in(playerIds));
+    }
     predicates.add(
         cb.equal(
             statsRoot.get(PlayerMatchStatisticDomain_.matchId), matchRoot.get(MatchDomain_.id)));
@@ -384,7 +439,7 @@ public class ItemRankingRepository {
       predicates.add(matchRoot.get(MatchDomain_.gameModeId).in(gameModeIds));
     }
 
-    countQuery.select(cb.countDistinct(statsRoot.get(PlayerMatchStatisticDomain_.matchId)));
+    countQuery.select(cb.count(statsRoot.get(PlayerMatchStatisticDomain_.matchId)));
     countQuery.where(predicates.toArray(new Predicate[0]));
 
     return entityManager.createQuery(countQuery).getSingleResult();

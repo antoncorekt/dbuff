@@ -127,6 +127,22 @@ paths:
         - $ref: '#/components/parameters/HeroesParam'
         - $ref: '#/components/parameters/GameModesParam'
         - $ref: '#/components/parameters/LimitParam'
+        - name: sort
+          in: query
+          description: PICKS (default), WIN_RATE or WILSON (Wilson lower bound of the win rate); case-insensitive. Ties break by pick count, then id. An unknown value returns 400.
+          required: false
+          schema:
+            type: string
+            enum: [PICKS, WIN_RATE, WILSON]
+            default: PICKS
+        - name: minGames
+          in: query
+          description: Minimum number of games for an entry to be listed
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         '200':
           description: Successful response
@@ -136,6 +152,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ItemRankingResponse'
+        '400':
+          description: Unknown sort value
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -170,6 +188,22 @@ paths:
         - $ref: '#/components/parameters/HeroesParam'
         - $ref: '#/components/parameters/GameModesParam'
         - $ref: '#/components/parameters/LimitParam'
+        - name: sort
+          in: query
+          description: PICKS (default), WIN_RATE or WILSON (Wilson lower bound of the win rate); case-insensitive. Ties break by pick count, then id. An unknown value returns 400.
+          required: false
+          schema:
+            type: string
+            enum: [PICKS, WIN_RATE, WILSON]
+            default: PICKS
+        - name: minGames
+          in: query
+          description: Minimum number of games for an entry to be listed
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         '200':
           description: Successful response
@@ -179,6 +213,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/AbilityRankingResponse'
+        '400':
+          description: Unknown sort value
         '401':
           $ref: '#/components/responses/Unauthorized'
 

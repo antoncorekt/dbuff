@@ -173,6 +173,56 @@ class ItemRankingServiceTest {
     assertThat(capturedArgument(6)).isNull();
   }
 
+  @Test
+  void queryOverload_forwardsPlayersSortAndMinGames() {
+    Mockito.when(
+            repository.findItemRankings(
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.anyInt(),
+                Mockito.any()))
+        .thenReturn(List.of());
+
+    service.getItemRankings(
+        new RankingQuery(
+            Set.of(1L, 2L), null, null, null, null, null, null, RankingSort.WILSON, 5, 3));
+
+    Mockito.verify(repository)
+        .findItemRankings(
+            Mockito.eq(Set.of(1L, 2L)),
+            Mockito.any(),
+            Mockito.eq(LocalDate.now()),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.eq(RankingSort.WILSON),
+            Mockito.eq(5),
+            Mockito.eq(3));
+  }
+
+  @Test
+  void oldSignature_usesPicksAndNoMinimum() {
+    service.getItemRankings(PLAYER_ID, null, null, null, null, null, null, null);
+
+    Mockito.verify(repository)
+        .findItemRankingsByPlayer(
+            Mockito.eq(PLAYER_ID),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.eq(10));
+  }
+
   /**
    * Returns the argument at {@code index} from the single repository call.
    *
