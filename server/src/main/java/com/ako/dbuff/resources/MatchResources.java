@@ -3,9 +3,6 @@ package com.ako.dbuff.resources;
 import com.ako.dbuff.context.ProcessContext;
 import com.ako.dbuff.dao.model.MatchAnalysisDomain;
 import com.ako.dbuff.dao.model.MatchDomain;
-import com.ako.dbuff.dao.repo.AbilityRepo;
-import com.ako.dbuff.dao.repo.ItemRepository;
-import com.ako.dbuff.dao.repo.KillLogRepo;
 import com.ako.dbuff.dao.repo.MatchRepo;
 import com.ako.dbuff.dao.repo.PlayerGameStatisticRepo;
 import com.ako.dbuff.resources.model.AnalyzeMatchesRequest;
@@ -18,6 +15,7 @@ import com.ako.dbuff.service.instance.DbufInstanceConfigService;
 import com.ako.dbuff.service.match.LastMatchesProcessorService;
 import com.ako.dbuff.service.match.MatchCompletenessService;
 import com.ako.dbuff.service.match.MatchDeletionService;
+import com.ako.dbuff.service.match.MatchDetailService;
 import com.ako.dbuff.service.match.MatchProcessorService;
 import com.ako.dbuff.service.match.report.MatchReportOrchestrator;
 import com.ako.dbuff.service.match.report.analyzer.PerPlayerReport;
@@ -52,11 +50,9 @@ public class MatchResources {
   private final LastMatchesProcessorService lastMatchesProcessorService;
   private final MatchDeletionService matchDeletionService;
   private final MatchStatisticsSummarizerService matchStatisticsSummarizerService;
+  private final MatchDetailService matchDetailService;
   private final MatchRepo matchRepo;
   private final PlayerGameStatisticRepo playerGameStatisticRepo;
-  private final ItemRepository itemRepository;
-  private final AbilityRepo abilityRepo;
-  private final KillLogRepo killLogRepo;
   private final DbufInstanceConfigService instanceConfigService;
   private final MatchCompletenessService matchCompletenessService;
   private final MatchProcessorService matchProcessorService;
@@ -64,16 +60,16 @@ public class MatchResources {
 
   @GetMapping("/{id}")
   public ResponseEntity<MatchDetailResponse> getMatch(@PathVariable Long id) {
-    return matchRepo
+    return matchDetailService
         .findById(id)
-        .map(match -> ResponseEntity.ok(buildMatchDetailResponse(match)))
+        .map(ResponseEntity::ok)
         .orElse(ResponseEntity.notFound().build());
   }
 
   @PostMapping("/{id}/parse")
   public MatchDetailResponse parseMatch(@PathVariable String id) {
     MatchDomain match = matchParserHandler.handle(Long.parseLong(id));
-    return buildMatchDetailResponse(match);
+    return matchDetailService.build(match);
   }
 
   /**
@@ -345,17 +341,5 @@ public class MatchResources {
         MatchReportResponse.builder().matchId(id).reports(reports).build();
 
     return ResponseEntity.ok(response);
-  }
-
-  private MatchDetailResponse buildMatchDetailResponse(MatchDomain match) {
-    Long matchId = match.getId();
-    return MatchDetailResponse.builder()
-        .match(match)
-        .players(playerGameStatisticRepo.findAllByMatchId(matchId))
-        .items(itemRepository.findAllByMatchId(matchId))
-        .abilities(abilityRepo.findAllByMatchId(matchId))
-        .killLogs(killLogRepo.findAllByMatchId(matchId))
-        .analysis(match.getAnalysis())
-        .build();
   }
 }
