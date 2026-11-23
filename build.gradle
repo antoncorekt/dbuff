@@ -66,8 +66,9 @@ subprojects {
     }
     test {
         // Tests tagged 'replay' need a real replay file and run through :server:replayTest only;
-        // 'reviewloop' is the local review round, run through :server:reviewLoop.
-        useJUnitPlatform { excludeTags 'replay', 'reviewloop' }
+        // 'reviewloop' is the local review round, run through :server:reviewLoop;
+        // 'pgsql' needs a real Postgres (SMOKE_PG_URL) and runs through :server:pgTest.
+        useJUnitPlatform { excludeTags 'replay', 'reviewloop', 'pgsql' }
     }
     tasks.withType(Test) { task ->
         maxHeapSize '2048m'
@@ -126,6 +127,14 @@ project('server') {
         useJUnitPlatform { includeTags 'replay' }
         // The production JVM runs with -Xmx512m; a parse that fits here fits there.
         maxHeapSize = '512m'
+    }
+
+    tasks.register('pgTest', Test) {
+        description = 'Runs the tests that need a real Postgres; set SMOKE_PG_URL first.'
+        group = 'verification'
+        testClassesDirs = sourceSets.test.output.classesDirs
+        classpath = sourceSets.test.runtimeClasspath
+        useJUnitPlatform { includeTags 'pgsql' }
     }
 
     def registerLoopTask = { String taskName, String taskDescription, Closure<String> topic ->
