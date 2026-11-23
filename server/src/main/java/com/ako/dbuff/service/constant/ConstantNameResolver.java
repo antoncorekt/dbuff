@@ -4,8 +4,11 @@ import com.ako.dbuff.service.constant.data.AbilityIdsConstant;
 import com.ako.dbuff.service.constant.data.HeroConstant;
 import com.ako.dbuff.service.constant.data.ItemConstant;
 import com.ako.dbuff.service.discord.command.TextSimilarity;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -57,6 +60,78 @@ public class ConstantNameResolver {
 
   public Optional<String> suggestAbility(String unknown) {
     return closest(unknown, abilitySuggestionCandidates());
+  }
+
+  /** What {@link #search} can look through. */
+  public enum Kind {
+    HERO,
+    ABILITY,
+    ITEM
+  }
+
+  /** One constant found by {@link #search}. */
+  public record ConstantMatch(String id, String name, String displayName) {}
+
+  /**
+   * Constants whose internal or display name contains the fragment, case-insensitive.
+   *
+   * @param limit the most results returned
+   */
+  public List<ConstantMatch> search(Kind kind, String fragment, int limit) {
+    if (fragment == null || fragment.isBlank() || limit < 1) {
+      return List.of();
+    }
+    String needle = fragment.trim().toLowerCase(Locale.ROOT);
+    return candidates(kind).stream()
+        .filter(
+            c ->
+                c.name().toLowerCase(Locale.ROOT).contains(needle)
+                    || c.displayName().toLowerCase(Locale.ROOT).contains(needle))
+        .limit(limit)
+        .toList();
+  }
+
+  private List<ConstantMatch> candidates(Kind kind) {
+    List<ConstantMatch> found = new ArrayList<>();
+    switch (kind) {
+      case HERO ->
+          constantsManagers
+              .getHeroConstantMap()
+              .values()
+              .forEach(
+                  hero -> {
+                    if (hero.getId() != null && hero.getLocalized_name() != null) {
+                      String name =
+                          hero.getName() != null ? hero.getName() : hero.getLocalized_name();
+                      found.add(new ConstantMatch(hero.getId(), name, hero.getLocalized_name()));
+                    }
+                  });
+      case ITEM ->
+          constantsManagers
+              .getItemConstantMap()
+              .forEach(
+                  (key, item) -> {
+                    if (item.getId() != null) {
+                      String display = item.getDname() != null ? item.getDname() : key;
+                      found.add(new ConstantMatch(String.valueOf(item.getId()), key, display));
+                    }
+                  });
+      case ABILITY ->
+          constantsManagers
+              .getAbilityConstantMap()
+              .values()
+              .forEach(
+                  ability -> {
+                    if (ability.getId() != null && ability.getName() != null) {
+                      found.add(
+                          new ConstantMatch(
+                              String.valueOf(ability.getId()),
+                              ability.getName(),
+                              ability.getName()));
+                    }
+                  });
+    }
+    return found;
   }
 
   private NameResolution resolve(Set<String> names, Function<String, Optional<Long>> lookup) {
