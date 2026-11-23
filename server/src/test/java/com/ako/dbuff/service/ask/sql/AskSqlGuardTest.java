@@ -63,4 +63,20 @@ class AskSqlGuardTest {
   void commentsAreStrippedFromTheWrappedSql() {
     assertThat(guard.check("select 1 -- hi\n")).isEqualTo("select * from (select 1) q limit 200");
   }
+
+  @Test
+  void rejectsQuotingTheScannerCannotFollow() {
+    assertThatThrownBy(() -> guard.check("select $$'$$ from a; delete from b; select '$$'"))
+        .isInstanceOf(AskToolException.class);
+    assertThatThrownBy(() -> guard.check("select $$ -- $$; delete from b\n"))
+        .isInstanceOf(AskToolException.class);
+    assertThatThrownBy(() -> guard.check("select E'\\''; delete from b; select ''"))
+        .isInstanceOf(AskToolException.class);
+  }
+
+  @Test
+  void rejectsSetConfig() {
+    assertThatThrownBy(() -> guard.check("select set_config('statement_timeout', '0', true)"))
+        .isInstanceOf(AskToolException.class);
+  }
 }

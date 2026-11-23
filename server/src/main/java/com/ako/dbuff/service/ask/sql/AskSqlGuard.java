@@ -14,7 +14,13 @@ public class AskSqlGuard {
   private static final Pattern FORBIDDEN =
       Pattern.compile(
           "\\b(insert|update|delete|merge|drop|alter|create|grant|revoke|truncate|copy|call|do"
-              + "|set|reset|lock|vacuum|listen|notify)\\b");
+              + "|set|reset|lock|vacuum|listen|notify|set_config)\\b");
+
+  /**
+   * Dollar quotes and E'' strings end at places this scanner cannot follow, so they are refused.
+   */
+  private static final Pattern UNSCANNABLE_QUOTING = Pattern.compile("\\$\\w*\\$|\\b[eE]'");
+
   private static final Pattern FIRST_WORD = Pattern.compile("^(select|with)\\b");
 
   private final int rowLimit;
@@ -26,6 +32,9 @@ public class AskSqlGuard {
   public String check(String sql) {
     if (sql == null) {
       throw new AskToolException("sql is required");
+    }
+    if (UNSCANNABLE_QUOTING.matcher(sql).find()) {
+      throw new AskToolException("Dollar-quoted and E'' strings are not allowed");
     }
     String stripped = stripComments(sql).strip();
     if (stripped.endsWith(";")) {
