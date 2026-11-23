@@ -5,6 +5,7 @@ import com.ako.dbuff.dao.model.MatchDomain;
 import com.ako.dbuff.dao.model.PlayerDomain;
 import com.ako.dbuff.dao.model.PlayerMatchStatisticDomain;
 import com.ako.dbuff.resources.model.ItemRankingResponse;
+import com.ako.dbuff.service.ranking.RankingSort;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -39,6 +40,7 @@ class ItemRankingRepositoryTest {
 
   private static final Long PLAYER_ID = 123456L;
   private static final String PLAYER_NAME = "TestPlayer";
+  private static final Long OTHER_PLAYER_ID = 999L;
 
   // Item IDs (these would be resolved from dnames via ConstantsManagers in the service layer)
   private static final Long BLINK_ITEM_ID = 100L;
@@ -617,5 +619,108 @@ class ItemRankingRepositoryTest {
 
   private static ItemRankingResponse find(List<ItemRankingResponse> results, Long itemId) {
     return results.stream().filter(r -> r.getItemId().equals(itemId)).findFirst().orElseThrow();
+  }
+
+  @Nested
+  @DisplayName("Sort, minimum games and several players")
+  class SortAndMinGamesTests {
+
+    @Test
+    void winRateSortPutsBestWinRateFirst() {
+      List<ItemRankingResponse> results = rank(Set.of(PLAYER_ID), RankingSort.WIN_RATE, 0, 10);
+
+      assertThat(results)
+          .extracting(ItemRankingResponse::getItemId)
+          .containsExactly(BLINK_ITEM_ID, BKB_ITEM_ID, BOOTS_ITEM_ID);
+    }
+
+    @Test
+    void wilsonSortRanksLargerSampleFirst() {
+      List<ItemRankingResponse> results = rank(Set.of(PLAYER_ID), RankingSort.WILSON, 0, 10);
+
+      assertThat(results.get(0).getItemId()).isEqualTo(BLINK_ITEM_ID);
+    }
+
+    @Test
+    void limitIsAppliedAfterSorting() {
+      List<ItemRankingResponse> results = rank(Set.of(PLAYER_ID), RankingSort.WIN_RATE, 0, 1);
+
+      assertThat(results).extracting(ItemRankingResponse::getItemId).containsExactly(BLINK_ITEM_ID);
+    }
+
+    @Test
+    void minGamesDropsTheTwoGameItem() {
+      List<ItemRankingResponse> results = rank(Set.of(PLAYER_ID), RankingSort.PICKS, 3, 10);
+
+      assertThat(results)
+          .extracting(ItemRankingResponse::getItemId)
+          .containsExactly(BLINK_ITEM_ID, BKB_ITEM_ID);
+    }
+
+    @Test
+    void severalPlayersAreCombinedWithoutPlayerIdOrName() {
+      addSecondPlayerWithBoots();
+
+      List<ItemRankingResponse> results =
+          rank(Set.of(PLAYER_ID, OTHER_PLAYER_ID), RankingSort.PICKS, 0, 10);
+
+      assertThat(find(results, BOOTS_ITEM_ID).getPickCount()).isEqualTo(3L);
+      assertThat(results).allSatisfy(r -> assertThat(r.getPlayerId()).isNull());
+      assertThat(results).allSatisfy(r -> assertThat(r.getPlayerName()).isNull());
+    }
+
+    @Test
+    void emptyPlayerSetMeansEveryPlayer() {
+      addSecondPlayerWithBoots();
+
+      List<ItemRankingResponse> all = rank(Set.of(), RankingSort.PICKS, 0, 10);
+      List<ItemRankingResponse> one = rank(Set.of(PLAYER_ID), RankingSort.PICKS, 0, 10);
+
+      assertThat(find(all, BOOTS_ITEM_ID).getPickCount()).isEqualTo(3L);
+      assertThat(find(one, BOOTS_ITEM_ID).getPickCount()).isEqualTo(2L);
+    }
+
+    @Test
+    void singlePlayerKeepsIdAndName() {
+      List<ItemRankingResponse> results = rank(Set.of(PLAYER_ID), RankingSort.PICKS, 0, 10);
+
+      assertThat(results.get(0).getPlayerId()).isEqualTo(PLAYER_ID);
+      assertThat(results.get(0).getPlayerName()).isEqualTo(PLAYER_NAME);
+    }
+
+    private List<ItemRankingResponse> rank(
+        Set<Long> playerIds, RankingSort sort, int minGames, int limit) {
+      return itemRankingRepository.findItemRankings(
+          playerIds, null, null, null, null, null, null, sort, minGames, limit);
+    }
+
+    private void addSecondPlayerWithBoots() {
+      entityManager.persist(PlayerDomain.builder().id(OTHER_PLAYER_ID).name("Other").build());
+      entityManager.persist(
+          PlayerMatchStatisticDomain.builder()
+              .matchId(1L)
+              .playerSlot(1L)
+              .playerId(OTHER_PLAYER_ID)
+              .win(0L)
+              .heroId(ANTIMAGE_HERO_ID)
+              .build());
+      entityManager.persist(
+          ItemDomain.builder()
+              .itemId(BOOTS_ITEM_ID)
+              .matchId(1L)
+              .playerSlot(1L)
+              .playerId(OTHER_PLAYER_ID)
+              .itemName("boots")
+              .itemPrettyName("Boots of Speed")
+              .itemPurchaseTime(30L)
+              .isNeutral(false)
+              .build());
+      entityManager.flush();
+      entityManager.clear();
+    }
+
+    private ItemRankingResponse find(List<ItemRankingResponse> list, Long itemId) {
+      return list.stream().filter(r -> r.getItemId().equals(itemId)).findFirst().orElseThrow();
+    }
   }
 }

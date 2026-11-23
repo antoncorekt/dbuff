@@ -2,17 +2,21 @@ package com.ako.dbuff.resources;
 
 import com.ako.dbuff.resources.model.AbilityRankingResponse;
 import com.ako.dbuff.service.ranking.AbilityRankingService;
+import com.ako.dbuff.service.ranking.RankingQuery;
+import com.ako.dbuff.service.ranking.RankingSort;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * REST API for ability ranking statistics per player. Provides endpoints to retrieve ability usage
@@ -60,10 +64,12 @@ public class AbilityRankingResource {
       @RequestParam(required = false) Set<String> excludedAbilities,
       @RequestParam(required = false) Set<String> heroes,
       @RequestParam(required = false) Set<String> gameModes,
-      @RequestParam(required = false) Integer limit) {
+      @RequestParam(required = false) Integer limit,
+      @RequestParam(required = false) String sort,
+      @RequestParam(required = false, defaultValue = "0") int minGames) {
 
     log.info(
-        "GET /api/v1/player/{}/abilityRanking - startDate={}, endDate={}, abilities={}, excludedAbilities={}, heroes={}, gameModes={}, limit={}",
+        "GET /api/v1/player/{}/abilityRanking - startDate={}, endDate={}, abilities={}, excludedAbilities={}, heroes={}, gameModes={}, limit={}, sort={}, minGames={}",
         playerId,
         startDate,
         endDate,
@@ -71,9 +77,28 @@ public class AbilityRankingResource {
         excludedAbilities,
         heroes,
         gameModes,
-        limit);
+        limit,
+        sort,
+        minGames);
 
+    RankingSort rankingSort;
+    try {
+      rankingSort = RankingSort.parse(sort);
+    } catch (IllegalArgumentException e) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "sort must be PICKS, WIN_RATE or WILSON");
+    }
     return abilityRankingService.getAbilityRankings(
-        playerId, startDate, endDate, abilities, excludedAbilities, heroes, gameModes, limit);
+        new RankingQuery(
+            Set.of(playerId),
+            startDate,
+            endDate,
+            abilities,
+            excludedAbilities,
+            heroes,
+            gameModes,
+            rankingSort,
+            minGames,
+            limit));
   }
 }

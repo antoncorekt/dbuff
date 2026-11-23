@@ -244,6 +244,56 @@ class AbilityRankingServiceTest {
     Mockito.verifyNoInteractions(repository);
   }
 
+  @Test
+  void queryOverload_forwardsPlayersSortAndMinGames() {
+    Mockito.when(
+            repository.findAbilityRankings(
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.anyInt(),
+                Mockito.any()))
+        .thenReturn(List.of());
+
+    service.getAbilityRankings(
+        new RankingQuery(
+            Set.of(1L, 2L), null, null, null, null, null, null, RankingSort.WILSON, 5, 3));
+
+    Mockito.verify(repository)
+        .findAbilityRankings(
+            Mockito.eq(Set.of(1L, 2L)),
+            Mockito.any(),
+            Mockito.eq(LocalDate.now()),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.eq(RankingSort.WILSON),
+            Mockito.eq(5),
+            Mockito.eq(3));
+  }
+
+  @Test
+  void oldSignature_usesPicksAndNoMinimum() {
+    service.getAbilityRankings(PLAYER_ID, null, null, null, null, null, null, null);
+
+    Mockito.verify(repository)
+        .findAbilityRankingsByPlayer(
+            Mockito.eq(PLAYER_ID),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.eq(10));
+  }
+
   /**
    * Returns the argument at {@code index} from the single repository call.
    *

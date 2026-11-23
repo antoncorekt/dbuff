@@ -92,6 +92,47 @@ public class ItemRankingService {
   }
 
   /**
+   * Gets item rankings for a set of players (empty means every stored player), sorted and filtered
+   * by a minimum number of games. The result carries no player id or name unless exactly one player
+   * is asked for.
+   *
+   * @throws UnknownConstantNameException if any supplied name matches no known constant
+   */
+  @Transactional(readOnly = true)
+  public List<ItemRankingResponse> getItemRankings(RankingQuery query) {
+    LocalDate effectiveEndDate = query.endDate() != null ? query.endDate() : LocalDate.now();
+    int effectiveLimit = query.limit() != null && query.limit() > 0 ? query.limit() : DEFAULT_LIMIT;
+    RankingSort sort = query.sort() != null ? query.sort() : RankingSort.PICKS;
+    Set<Long> playerIds = query.playerIds() != null ? query.playerIds() : Set.of();
+
+    Set<Long> itemIds = resolveItemsOrThrow(query.includedNames());
+    Set<Long> excludedItemIds = resolveItemsOrThrow(query.excludedNames());
+    Set<Long> heroIds = resolveHeroesOrThrow(query.heroNames());
+    Set<Long> gameModeIds = resolveGameModesOrThrow(query.gameModeNames());
+
+    log.info(
+        "Fetching item rankings for players {}: startDate={}, endDate={}, sort={}, minGames={}, limit={}",
+        playerIds.isEmpty() ? "all" : playerIds,
+        query.startDate(),
+        effectiveEndDate,
+        sort,
+        query.minGames(),
+        effectiveLimit);
+
+    return itemRankingRepository.findItemRankings(
+        playerIds,
+        query.startDate(),
+        effectiveEndDate,
+        itemIds,
+        excludedItemIds,
+        heroIds,
+        gameModeIds,
+        sort,
+        Math.max(0, query.minGames()),
+        effectiveLimit);
+  }
+
+  /**
    * Gets statistics over the games in which the player held every one of the named items.
    *
    * @throws UnknownConstantNameException if any supplied name matches no known constant

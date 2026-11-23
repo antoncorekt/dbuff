@@ -92,6 +92,47 @@ public class AbilityRankingService {
   }
 
   /**
+   * Gets ability rankings for a set of players (empty means every stored player), sorted and
+   * filtered by a minimum number of games. The result carries no player id or name unless exactly
+   * one player is asked for.
+   *
+   * @throws UnknownConstantNameException if any supplied name matches no known constant
+   */
+  @Transactional(readOnly = true)
+  public List<AbilityRankingResponse> getAbilityRankings(RankingQuery query) {
+    LocalDate effectiveEndDate = query.endDate() != null ? query.endDate() : LocalDate.now();
+    int effectiveLimit = query.limit() != null && query.limit() > 0 ? query.limit() : DEFAULT_LIMIT;
+    RankingSort sort = query.sort() != null ? query.sort() : RankingSort.PICKS;
+    Set<Long> playerIds = query.playerIds() != null ? query.playerIds() : Set.of();
+
+    Set<Long> abilityIds = resolveAbilitiesOrThrow(query.includedNames());
+    Set<Long> excludedAbilityIds = resolveAbilitiesOrThrow(query.excludedNames());
+    Set<Long> heroIds = resolveHeroesOrThrow(query.heroNames());
+    Set<Long> gameModeIds = resolveGameModesOrThrow(query.gameModeNames());
+
+    log.info(
+        "Fetching ability rankings for players {}: startDate={}, endDate={}, sort={}, minGames={}, limit={}",
+        playerIds.isEmpty() ? "all" : playerIds,
+        query.startDate(),
+        effectiveEndDate,
+        sort,
+        query.minGames(),
+        effectiveLimit);
+
+    return abilityRankingRepository.findAbilityRankings(
+        playerIds,
+        query.startDate(),
+        effectiveEndDate,
+        abilityIds,
+        excludedAbilityIds,
+        heroIds,
+        gameModeIds,
+        sort,
+        Math.max(0, query.minGames()),
+        effectiveLimit);
+  }
+
+  /**
    * Gets statistics over the games in which the player used every one of the named abilities, and —
    * when items are named too — also held every one of those items in the same game.
    *
