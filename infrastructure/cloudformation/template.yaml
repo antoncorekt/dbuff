@@ -433,7 +433,9 @@ Resources:
 
           # Read-only role for the ask sql_query tool; mirrors infrastructure/sql/ask-role.sql
           if [ -n "$ASK_DB_PASSWORD" ]; then
-            sudo -u postgres psql -d dbuff -v ON_ERROR_STOP=1 -v ask_password="$ASK_DB_PASSWORD" <<'ASKSQLEOF'
+            export ASK_DB_PASSWORD
+            sudo --preserve-env=ASK_DB_PASSWORD -u postgres psql -d dbuff -v ON_ERROR_STOP=1 <<'ASKSQLEOF'
+          \set ask_password `printenv ASK_DB_PASSWORD`
           DO $$
           BEGIN
             IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'dbuff_ask') THEN
