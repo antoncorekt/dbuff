@@ -60,6 +60,8 @@ Required environment variables for deploy:
   DISCORD_BOT_TOKEN   Discord bot token
 
 Optional:
+  ANTHROPIC_API_KEY   Anthropic API key for the Discord ask feature
+  ASK_DB_PASSWORD     Password for the read-only dbuff_ask role (no single quote)
   GOOGLE_VISION_CREDENTIALS_PATH  Path to Google Vision service-account JSON (enables OCR)
   STACK_NAME          CloudFormation stack name (default: dbuff)
   AWS_REGION          AWS region (default: eu-north-1)
@@ -137,6 +139,8 @@ cmd_deploy() {
       ParameterKey=DotaApiKey,ParameterValue="$DOTA_API_KEY" \
       ParameterKey=ScrapperApiKey,ParameterValue="$SCRAPPER_API_KEY" \
       ParameterKey=OpenAiApiKey,ParameterValue="$OPENAI_API_KEY" \
+      ParameterKey=AnthropicApiKey,ParameterValue="${ANTHROPIC_API_KEY:-}" \
+      ParameterKey=AskDbPassword,ParameterValue="${ASK_DB_PASSWORD:-}" \
       ParameterKey=DiscordBotToken,ParameterValue="$DISCORD_BOT_TOKEN" \
       ParameterKey=GoogleVisionCredentialsB64,ParameterValue="$GOOGLE_VISION_CREDENTIALS_B64" \
       ParameterKey=InstanceType,ParameterValue="$INSTANCE_TYPE" \
