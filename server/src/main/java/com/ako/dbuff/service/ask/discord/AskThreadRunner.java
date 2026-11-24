@@ -109,8 +109,9 @@ public class AskThreadRunner {
     String threadId = thread.getId();
     Lease lease = acquire(threadId);
     lease.lock.lock();
-    ScheduledFuture<?> typingTask = startTyping(thread);
+    ScheduledFuture<?> typingTask = null;
     try {
+      typingTask = startTyping(thread);
       AskContext context =
           new AskContext(
               request.instanceId(),
@@ -129,7 +130,9 @@ public class AskThreadRunner {
         log.error("Ask could not post its error to thread {}", threadId, postFailure);
       }
     } finally {
-      typingTask.cancel(false);
+      if (typingTask != null) {
+        typingTask.cancel(false);
+      }
       lease.lock.unlock();
       release(threadId);
     }
