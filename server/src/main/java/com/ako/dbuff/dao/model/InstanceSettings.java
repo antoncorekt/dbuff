@@ -41,6 +41,10 @@ public class InstanceSettings {
   @Column(name = "replay_report_enabled")
   private Boolean replayReportEnabled;
 
+  /** Whether the focus group may ask Claude questions in threads. Null means off. */
+  @Column(name = "ask_enabled")
+  private Boolean askEnabled;
+
   /**
    * Null follows the server-wide quiet hours, false turns them off for this channel, true uses
    * {@link #quietStart} and {@link #quietEnd}.
@@ -89,6 +93,10 @@ public class InstanceSettings {
 
   public boolean isReplayReportOn() {
     return replayReportEnabled == null || replayReportEnabled;
+  }
+
+  public boolean isAskOn() {
+    return Boolean.TRUE.equals(askEnabled);
   }
 
   /** The channel's own section list; empty when it follows the server's. */

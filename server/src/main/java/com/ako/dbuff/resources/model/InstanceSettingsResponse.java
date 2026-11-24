@@ -24,6 +24,8 @@ public class InstanceSettingsResponse {
 
   private boolean replayReportEnabled;
 
+  private boolean askEnabled;
+
   /** {@code server default}, {@code off}, or {@code HH:mm-HH:mm}. */
   private String quietHours;
 
@@ -51,6 +53,7 @@ public class InstanceSettingsResponse {
     return InstanceSettingsResponse.builder()
         .aiSummaryEnabled(settings.isAiSummaryOn())
         .replayReportEnabled(settings.isReplayReportOn())
+        .askEnabled(settings.isAskOn())
         .quietHours(
             quiet == null
                 ? "server default"
