@@ -201,8 +201,14 @@ final class SampleRecorder {
     private int[] flags = new int[256];
     private int[] gold = new int[256];
     private int[] maxHp = new int[256];
+    private int[] baseArmorX10 = new int[256];
+    private int[] baseMagicResistX10 = new int[256];
+    private int[] agilityTotalX10 = new int[256];
     private boolean goldSeen;
     private boolean maxHpSeen;
+    private boolean baseArmorSeen;
+    private boolean baseMagicResistSeen;
+    private boolean agilityTotalSeen;
     private int size;
 
     int size() {
@@ -229,6 +235,9 @@ final class SampleRecorder {
         flags = Arrays.copyOf(flags, capacity);
         gold = Arrays.copyOf(gold, capacity);
         maxHp = Arrays.copyOf(maxHp, capacity);
+        baseArmorX10 = Arrays.copyOf(baseArmorX10, capacity);
+        baseMagicResistX10 = Arrays.copyOf(baseMagicResistX10, capacity);
+        agilityTotalX10 = Arrays.copyOf(agilityTotalX10, capacity);
       }
       if (unspentGold >= 0) {
         gold[size] = unspentGold;
@@ -237,6 +246,9 @@ final class SampleRecorder {
         gold[size] = 0;
       }
       maxHp[size] = 0;
+      baseArmorX10[size] = 0;
+      baseMagicResistX10[size] = 0;
+      agilityTotalX10[size] = 0;
       if (hero != null) {
         x[size] = Positions.x(hero);
         y[size] = Positions.y(hero);
@@ -250,6 +262,18 @@ final class SampleRecorder {
             && hero.getProperty("m_iMaxHealth") instanceof Number n) {
           maxHp[size] = n.intValue();
           maxHpSeen = true;
+        }
+        if (hero.hasProperty("m_flPhysicalArmorValue")) {
+          baseArmorX10[size] = x10(hero, "m_flPhysicalArmorValue");
+          baseArmorSeen = true;
+        }
+        if (hero.hasProperty("m_flMagicalResistanceValue")) {
+          baseMagicResistX10[size] = x10(hero, "m_flMagicalResistanceValue");
+          baseMagicResistSeen = true;
+        }
+        if (hero.hasProperty("m_flAgilityTotal")) {
+          agilityTotalX10[size] = x10(hero, "m_flAgilityTotal");
+          agilityTotalSeen = true;
         }
       }
       size++;
@@ -267,12 +291,19 @@ final class SampleRecorder {
           Arrays.copyOf(level, size),
           Arrays.copyOf(flags, size),
           goldSeen ? Arrays.copyOf(gold, size) : null,
-          maxHpSeen ? Arrays.copyOf(maxHp, size) : null);
+          maxHpSeen ? Arrays.copyOf(maxHp, size) : null,
+          baseArmorSeen ? Arrays.copyOf(baseArmorX10, size) : null,
+          baseMagicResistSeen ? Arrays.copyOf(baseMagicResistX10, size) : null,
+          agilityTotalSeen ? Arrays.copyOf(agilityTotalX10, size) : null);
     }
 
     private static int percent(Entity hero, String value, String max) {
       double total = number(hero, max);
       return total <= 0 ? 0 : (int) Math.round(100 * number(hero, value) / total);
+    }
+
+    private static int x10(Entity hero, String property) {
+      return (int) Math.round(number(hero, property) * 10);
     }
 
     private static double number(Entity hero, String property) {

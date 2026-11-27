@@ -22,6 +22,9 @@ public record SampleFacts(
    * @param flags bit 0 is set while the hero is alive
    * @param gold reliable plus unreliable gold, or null when the replay has neither property
    * @param maxHp the hero's maximum health, or null when the replay does not have it
+   * @param baseArmorX10 the entity's base armor times 10 (no items, no agility), or null
+   * @param baseMagicResistX10 the entity's base magic resistance in percent times 10, or null
+   * @param agilityTotalX10 total agility including items, times 10, or null
    */
   public record PlayerSeries(
       int replayPlayerId,
@@ -34,7 +37,10 @@ public record SampleFacts(
       int[] level,
       int[] flags,
       int[] gold,
-      int[] maxHp) {}
+      int[] maxHp,
+      int[] baseArmorX10,
+      int[] baseMagicResistX10,
+      int[] agilityTotalX10) {}
 
   /**
    * One player's counters at a game minute, indexed by {@link MinuteStat#ordinal()}, with {@link
