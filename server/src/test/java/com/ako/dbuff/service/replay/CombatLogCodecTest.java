@@ -137,6 +137,51 @@ class CombatLogCodecTest {
   }
 
   @Test
+  void decode_keepsEachDamageTypeInAVersionThreeBlob() {
+    List<CombatEvent> events =
+        java.util.Arrays.stream(DamageType.values())
+            .map(
+                t ->
+                    new CombatEvent(
+                        CombatEventKind.DAMAGE, 5, "a", "b", "c", 3, 10, 90, 0, 0, 0, 0, 0, t))
+            .toList();
+
+    assertThat(CombatLogCodec.decode(CombatLogCodec.encode(events)))
+        .extracting(CombatEvent::damageType)
+        .containsExactly(DamageType.values());
+  }
+
+  @Test
+  void decode_readsAVersionTwoBlobWithUnknownDamageType() throws Exception {
+    ByteArrayOutputStream raw = new ByteArrayOutputStream();
+    try (DataOutputStream out = new DataOutputStream(raw)) {
+      out.writeInt(2);
+      out.writeInt(1);
+      out.writeUTF("");
+      out.writeInt(1);
+      out.writeByte(CombatEventKind.DAMAGE.ordinal());
+      out.writeInt(500);
+      out.writeShort(0);
+      out.writeShort(0);
+      out.writeShort(0);
+      out.writeByte(3);
+      out.writeInt(40);
+      out.writeInt(60);
+      out.writeInt(0);
+      out.writeInt(0);
+      out.writeShort(0);
+      out.writeShort(0);
+      out.writeShort(0);
+    }
+
+    List<CombatEvent> decoded = CombatLogCodec.decode(Zstd.compress(raw.toByteArray()));
+
+    assertThat(decoded).hasSize(1);
+    assertThat(decoded.getFirst().value()).isEqualTo(40);
+    assertThat(decoded.getFirst().damageType()).isEqualTo(DamageType.UNKNOWN);
+  }
+
+  @Test
   void whitelist_keepsNamedModifiersAndAnythingThatStuns() {
     assertThat(ModifierWhitelist.keeps("modifier_black_king_bar_immune", 0)).isTrue();
     assertThat(ModifierWhitelist.keeps("modifier_teleporting", 0)).isTrue();

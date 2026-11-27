@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.clarity;
 
 import com.ako.dbuff.service.replay.CombatEventKind;
+import com.ako.dbuff.service.replay.DamageType;
 import com.ako.dbuff.service.replay.GoldReason;
 import com.ako.dbuff.service.replay.XpReason;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,34 @@ class CombatLogRecorderTest {
     assertThat(events.getFirst().inflictor()).isEqualTo("item_mekansm");
     assertThat(events.getFirst().target()).isEqualTo("npc_dota_hero_luna");
     assertThat(events.getFirst().value()).isEqualTo(250);
+  }
+
+  @Test
+  void record_mapsTheDamageTypeOfDamageEntries_andResultKeepsIt() {
+    CombatLogRecorder recorder = new CombatLogRecorder();
+    for (int type : new int[] {1, 2, 4, 0}) {
+      CombatLogEntry damage = entry(DOTA_COMBATLOG_TYPES.DOTA_COMBATLOG_DAMAGE, 0, 0, 0f);
+      when(damage.hasDamageType()).thenReturn(true);
+      when(damage.getDamageType()).thenReturn(type);
+      recorder.record(damage);
+    }
+    recorder.record(entry(DOTA_COMBATLOG_TYPES.DOTA_COMBATLOG_DAMAGE, 0, 0, 0f));
+    CombatLogEntry heal = entry(DOTA_COMBATLOG_TYPES.DOTA_COMBATLOG_HEAL, 0, 0, 0f);
+    when(heal.hasDamageType()).thenReturn(true);
+    when(heal.getDamageType()).thenReturn(2);
+    recorder.record(heal);
+
+    var events = recorder.result(10).events();
+
+    assertThat(events)
+        .extracting(e -> e.damageType())
+        .containsExactly(
+            DamageType.PHYSICAL,
+            DamageType.MAGICAL,
+            DamageType.PURE,
+            DamageType.UNKNOWN,
+            DamageType.UNKNOWN,
+            DamageType.UNKNOWN);
   }
 
   private static CombatLogEntry entry(

@@ -3,6 +3,7 @@ package com.ako.dbuff.service.replay.clarity;
 import com.ako.dbuff.service.replay.CombatEvent;
 import com.ako.dbuff.service.replay.CombatEventKind;
 import com.ako.dbuff.service.replay.CombatLogFacts;
+import com.ako.dbuff.service.replay.DamageType;
 import com.ako.dbuff.service.replay.ModifierWhitelist;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +39,8 @@ final class CombatLogRecorder {
             (int) Math.round(entry.getModifierDuration() * CENTISECONDS),
             (int) entry.getLocationX(),
             (int) entry.getLocationY(),
-            assistMask(entry)));
+            assistMask(entry),
+            damageType(kind, entry)));
   }
 
   /** The events with times counted from 0:00. */
@@ -59,7 +61,8 @@ final class CombatLogRecorder {
               e.aux2(),
               e.x(),
               e.y(),
-              e.assistMask()));
+              e.assistMask(),
+              e.damageType()));
     }
     return new CombatLogFacts(shifted);
   }
@@ -71,6 +74,12 @@ final class CombatLogRecorder {
       case XP -> c.getXpReason();
       default -> (int) Math.round(c.getStunDuration() * CENTISECONDS);
     };
+  }
+
+  private static DamageType damageType(CombatEventKind kind, CombatLogEntry c) {
+    return kind == CombatEventKind.DAMAGE && c.hasDamageType()
+        ? DamageType.of(c.getDamageType())
+        : DamageType.UNKNOWN;
   }
 
   private static boolean keeps(CombatEventKind kind, CombatLogEntry c) {
