@@ -55,6 +55,12 @@ class ReplaySampleExtractorsTest {
     assertThat(radiant.getMaxHp()).containsExactly(0, 580, 640);
     assertThat(dire.getGold()).isNull();
     assertThat(dire.getMaxHp()).isNull();
+    assertThat(radiant.getBaseArmorX10()).containsExactly(0, 25, 30);
+    assertThat(radiant.getBaseMagicResistX10()).containsExactly(0, 250, 250);
+    assertThat(radiant.getAgilityTotalX10()).containsExactly(0, 240, 260);
+    assertThat(dire.getBaseArmorX10()).isNull();
+    assertThat(dire.getBaseMagicResistX10()).isNull();
+    assertThat(dire.getAgilityTotalX10()).isNull();
     assertThat(dire.getAttackRange()).containsExactly(0, 600, 600);
     assertThat(dire.getLevel()).containsExactly(0, 1, 2);
     assertThat(dire.getFlags()).containsExactly(0, 1, 1);
@@ -115,7 +121,10 @@ class ReplaySampleExtractorsTest {
                     new int[] {0, 1, 2},
                     new int[] {0, 1, 1},
                     new int[] {0, 625, 700},
-                    new int[] {0, 580, 640}),
+                    new int[] {0, 580, 640},
+                    new int[] {0, 25, 30},
+                    new int[] {0, 250, 250},
+                    new int[] {0, 240, 260}),
                 new SampleFacts.PlayerSeries(
                     10,
                     new int[] {-7000, 100, 6500},
@@ -126,6 +135,9 @@ class ReplaySampleExtractorsTest {
                     new int[] {0, 600, 600},
                     new int[] {0, 1, 2},
                     new int[] {0, 1, 1},
+                    null,
+                    null,
+                    null,
                     null,
                     null)),
             List.of(minute(0, 5, 3, 900), minute(10, 5, 1, 0)));

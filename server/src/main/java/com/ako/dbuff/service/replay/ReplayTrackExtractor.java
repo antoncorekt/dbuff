@@ -50,6 +50,9 @@ public class ReplayTrackExtractor implements ReplayExtractor {
                         .flags(series.flags())
                         .gold(series.gold())
                         .maxHp(series.maxHp())
+                        .baseArmorX10(series.baseArmorX10())
+                        .baseMagicResistX10(series.baseMagicResistX10())
+                        .agilityTotalX10(series.agilityTotalX10())
                         .build())
             .toList();
     repo.saveAll(rows);

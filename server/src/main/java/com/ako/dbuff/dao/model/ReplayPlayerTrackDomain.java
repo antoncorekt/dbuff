@@ -86,4 +86,19 @@ public class ReplayPlayerTrackDomain {
   @JdbcTypeCode(SqlTypes.ARRAY)
   @Column(columnDefinition = "integer array")
   private int[] maxHp;
+
+  /** Base armor times 10; null for tracks stored before this was recorded. */
+  @JdbcTypeCode(SqlTypes.ARRAY)
+  @Column(columnDefinition = "integer array")
+  private int[] baseArmorX10;
+
+  /** Base magic resistance in percent times 10; null for tracks stored before this was recorded. */
+  @JdbcTypeCode(SqlTypes.ARRAY)
+  @Column(columnDefinition = "integer array")
+  private int[] baseMagicResistX10;
+
+  /** Total agility times 10; null for tracks stored before this was recorded. */
+  @JdbcTypeCode(SqlTypes.ARRAY)
+  @Column(columnDefinition = "integer array")
+  private int[] agilityTotalX10;
 }
