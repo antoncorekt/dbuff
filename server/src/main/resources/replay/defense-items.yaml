@@ -1,0 +1,21 @@
+items:
+  - {key: pipe, kind: MAGIC}
+  - {key: eternal_shroud, kind: MAGIC}
+  - {key: hood_of_defiance, kind: MAGIC}
+  - {key: black_king_bar, kind: MAGIC}
+  - {key: glimmer_cape, kind: MAGIC}
+  - {key: mage_slayer, kind: MAGIC}
+  - {key: assault, kind: PHYSICAL}
+  - {key: crimson_guard, kind: PHYSICAL}
+  - {key: shivas_guard, kind: PHYSICAL}
+  - {key: solar_crest, kind: PHYSICAL}
+  - {key: blade_mail, kind: PHYSICAL}
+  - {key: ghost, kind: PHYSICAL}
+  - {key: butterfly, kind: PHYSICAL}
+  - {key: heart, kind: HP}
+  - {key: vanguard, kind: HP}
+  - {key: bloodstone, kind: HP}
+  - {key: lotus_orb, kind: STATUS}
+  - {key: sphere, kind: STATUS}
+  - {key: aeon_disk, kind: STATUS}
+  - {key: manta, kind: STATUS}
