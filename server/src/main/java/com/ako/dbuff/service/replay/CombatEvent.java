@@ -13,6 +13,7 @@ package com.ako.dbuff.service.replay;
  * @param aux2 a modifier duration in hundredths of a second
  * @param x world location, for gold and experience
  * @param assistMask player indexes (0-9) that assisted, one bit each, for deaths
+ * @param damageType the type of a DAMAGE event, UNKNOWN for the other kinds and older blobs
  */
 public record CombatEvent(
     CombatEventKind kind,
@@ -27,7 +28,39 @@ public record CombatEvent(
     int aux2,
     int x,
     int y,
-    int assistMask) {
+    int assistMask,
+    DamageType damageType) {
+
+  public CombatEvent(
+      CombatEventKind kind,
+      double gameSecond,
+      String attacker,
+      String target,
+      String inflictor,
+      int flags,
+      int value,
+      int health,
+      int aux,
+      int aux2,
+      int x,
+      int y,
+      int assistMask) {
+    this(
+        kind,
+        gameSecond,
+        attacker,
+        target,
+        inflictor,
+        flags,
+        value,
+        health,
+        aux,
+        aux2,
+        x,
+        y,
+        assistMask,
+        DamageType.UNKNOWN);
+  }
 
   public static final int ATTACKER_HERO = 1;
   public static final int TARGET_HERO = 2;

@@ -21,9 +21,11 @@ public final class CombatLogCodec {
   /**
    * Bumped whenever the layout or the meaning of a field changes. Version 2 has the same layout as
    * 1, but {@code aux} of GOLD and XP events holds the reason; a version 1 blob still decodes, with
-   * 0 (the stun duration it held) in those events, and is told apart by {@link #version}.
+   * 0 (the stun duration it held) in those events, and is told apart by {@link #version}. Version 3
+   * adds the damage type as one byte (its ordinal) after the assist mask; older blobs decode with
+   * UNKNOWN.
    */
-  public static final int VERSION = 2;
+  public static final int VERSION = 3;
 
   /** The oldest version {@link #decode} still reads. */
   public static final int FIRST_VERSION = 1;
@@ -42,6 +44,8 @@ public final class CombatLogCodec {
   private static final int MAX_ASSIST_MASK = 0xFFFF;
   private static final double CENTISECONDS = 100.0;
   private static final CombatEventKind[] KINDS = CombatEventKind.values();
+  private static final DamageType[] DAMAGE_TYPES = DamageType.values();
+  private static final int FIRST_DAMAGE_TYPE_VERSION = 3;
 
   private CombatLogCodec() {}
 
@@ -85,6 +89,7 @@ public final class CombatLogCodec {
         out.writeShort(e.x());
         out.writeShort(e.y());
         out.writeShort(e.assistMask());
+        out.writeByte(e.damageType().ordinal());
       }
     } catch (IOException e) {
       throw new UncheckedIOException(e);
@@ -139,7 +144,10 @@ public final class CombatLogCodec {
                 in.readInt(),
                 in.readShort(),
                 in.readShort(),
-                in.readUnsignedShort()));
+                in.readUnsignedShort(),
+                version >= FIRST_DAMAGE_TYPE_VERSION
+                    ? DAMAGE_TYPES[in.readUnsignedByte()]
+                    : DamageType.UNKNOWN));
       }
       return events;
     } catch (IOException e) {
