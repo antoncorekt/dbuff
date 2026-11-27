@@ -49,7 +49,7 @@ public class ThreadAsyncReply implements AsyncReply {
   }
 
   /** Splits on newlines where possible, hard-splitting only when a single line is too long. */
-  static List<String> splitToLimit(String message) {
+  public static List<String> splitToLimit(String message) {
     if (message.length() <= MAX_MESSAGE_LENGTH) {
       return List.of(message);
     }

@@ -43,6 +43,9 @@ public class UpdateInstanceRequest {
   /** Turn the replay analysis in the match thread on or off (optional) */
   private Boolean replayReportEnabled;
 
+  /** Answer the focus group's questions in threads (optional) */
+  private Boolean askEnabled;
+
   /** Quiet hours as {@code HH:mm-HH:mm}, {@code off}, or {@code default} (optional) */
   private String quietHours;
 
@@ -74,6 +77,7 @@ public class UpdateInstanceRequest {
   public boolean hasSettingsChange() {
     return aiSummaryEnabled != null
         || replayReportEnabled != null
+        || askEnabled != null
         || quietHours != null
         || timezone != null
         || defaultGameModes != null

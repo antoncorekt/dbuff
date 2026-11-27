@@ -55,6 +55,17 @@ class InstanceSettingsApplierTest {
   }
 
   @Test
+  void ask_isOffWhenNull_andFollowsTheRequest() {
+    assertThat(settings.isAskOn()).isFalse();
+
+    apply(UpdateInstanceRequest.builder().askEnabled(true));
+    assertThat(settings.isAskOn()).isTrue();
+
+    apply(UpdateInstanceRequest.builder().askEnabled(false));
+    assertThat(settings.isAskOn()).isFalse();
+  }
+
+  @Test
   void aiSummary_canBeTurnedOffAndOn() {
     apply(UpdateInstanceRequest.builder().aiSummaryEnabled(false));
     assertThat(settings.isAiSummaryOn()).isFalse();

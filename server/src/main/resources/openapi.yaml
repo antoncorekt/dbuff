@@ -1892,6 +1892,9 @@ components:
         replayReportEnabled:
           type: boolean
           description: "Replay analysis in the match thread on"
+        askEnabled:
+          type: boolean
+          description: "Questions from the focus group answered in threads"
         quietHours:
           type: string
           description: "\"server default\", \"off\" or HH:mm-HH:mm"
@@ -2033,6 +2036,9 @@ components:
         replayReportEnabled:
           type: boolean
           description: "Turn the replay analysis in the match thread on or off"
+        askEnabled:
+          type: boolean
+          description: "Turn answering the focus group's questions in threads on or off"
         quietHours:
           type: string
           description: "HH:mm-HH:mm, \"off\" or \"default\""

@@ -120,6 +120,11 @@ public class DbuffConfigCommand implements DbuffCommand {
                         "Post the replay analysis in the match thread",
                         false),
                     new OptionData(
+                        OptionType.BOOLEAN,
+                        "ask",
+                        "Answer questions from the focus group in threads",
+                        false),
+                    new OptionData(
                             OptionType.STRING,
                             "detail",
                             "How much each match report includes",
@@ -422,8 +427,10 @@ public class DbuffConfigCommand implements DbuffCommand {
 
     Boolean aiSummary = parseSwitch(context.getOption("ai_summary"));
     Boolean replayReport = parseSwitch(context.getOption("replay_report"));
+    Boolean ask = parseSwitch(context.getOption("ask"));
     if (unreadableSwitch(context, "ai_summary", aiSummary)
-        || unreadableSwitch(context, "replay_report", replayReport)) {
+        || unreadableSwitch(context, "replay_report", replayReport)
+        || unreadableSwitch(context, "ask", ask)) {
       return;
     }
 
@@ -432,6 +439,7 @@ public class DbuffConfigCommand implements DbuffCommand {
         UpdateInstanceRequest.builder()
             .aiSummaryEnabled(aiSummary)
             .replayReportEnabled(replayReport)
+            .askEnabled(ask)
             .reportDetail(context.getOption("detail"))
             .quietHours(context.getOption("quiet_hours"))
             .timezone(context.getOption("timezone"))
@@ -509,6 +517,8 @@ public class DbuffConfigCommand implements DbuffCommand {
         + (settings.isAiSummaryEnabled() ? "on" : "off")
         + "\n**Replay analysis:** "
         + (settings.isReplayReportEnabled() ? "on" : "off")
+        + "\n**Ask:** "
+        + (settings.isAskEnabled() ? "on" : "off")
         + "\n**Report detail:** "
         + settings.getReportDetail().toLowerCase()
         + "\n**Quiet hours:** "
