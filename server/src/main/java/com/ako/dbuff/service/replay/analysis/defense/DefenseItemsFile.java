@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,7 +68,7 @@ public class DefenseItemsFile {
 
   /** Catalog item keys in file order, to their kind. */
   public Map<String, DefenseItemKind> kinds() {
-    return Map.copyOf(kinds);
+    return Collections.unmodifiableMap(kinds);
   }
 
   /**
