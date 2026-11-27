@@ -43,6 +43,8 @@ tags:
     description: Replay run status, the stored replay analysis and re-running the analyzers
   - name: Skills
     description: Stored skill statistics of Ability Draft matches (last months of games, no minimum count)
+  - name: Defense
+    description: Stored team health and effective health, defensive items and win rates by balance
   - name: Discord
     description: Owner operations on the bot's Discord assets (application emoji)
   - name: Register
@@ -1142,6 +1144,65 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Nothing is stored for the hero
+  /api/v1/defense/match/{matchId}:
+    get:
+      tags: [Defense]
+      summary: Stored team defense of a match
+      description: |
+        Per team and game minute the summed health, estimated armor and magic resistance (times
+        ten), physical, magical and mixed effective health, the damage shares the enemy dealt and
+        the net worth, plus the defensive items bought. Armor and resistance are estimates from
+        base, agility and items (auras, talents and buffs are not counted); armorEstimated is
+        always true.
+      operationId: getDefenseOfMatch
+      parameters:
+        - $ref: '#/components/parameters/ReplayMatchIdParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefenseMatchResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Nothing is stored for the match
+  /api/v1/defense/stats:
+    get:
+      tags: [Defense]
+      summary: Win rate by effective health balance over the last 12 months
+      description: |
+        Teams of the mode at a checkpoint in buckets 0.05 wide. buckets uses the team's share of
+        both teams' effective health minus its share of both teams' net worth (from -0.25 to
+        0.25, the outer buckets open); rawBuckets uses the effective health share alone (from
+        0.25 to 0.75). Teams with a missing effective health or net worth are left out. END is
+        mostly a consequence of winning; use M10 or M20 to compare.
+      operationId: getDefenseStats
+      parameters:
+        - name: mode
+          in: query
+          required: true
+          description: Game mode id
+          schema:
+            type: integer
+        - name: checkpoint
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [M10, M20, M30, END]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefenseStatsResponse'
+        '400':
+          description: Another checkpoint than M10, M20, M30 or END
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
 components:
   securitySchemes:
@@ -1275,6 +1336,100 @@ components:
         type: string
 
   schemas:
+    DefenseMatchResponse:
+      type: object
+      properties:
+        matchId:
+          type: integer
+          format: int64
+        armorEstimated:
+          type: boolean
+          description: Always true; armor and magic resistance are estimates
+        points:
+          type: array
+          items:
+            type: object
+            properties:
+              team:
+                type: string
+                enum: [RADIANT, DIRE]
+              minute:
+                type: integer
+              maxHpSum:
+                type: integer
+              hpSum:
+                type: integer
+              armorAvgX10:
+                type: integer
+              magicResistAvgX10:
+                type: integer
+              ehpPhys:
+                type: integer
+              ehpMag:
+                type: integer
+              ehpMix:
+                type: integer
+              enemyPhysShare:
+                type: number
+              enemyMagShare:
+                type: number
+              enemyPureShare:
+                type: number
+              alive:
+                type: integer
+              netWorth:
+                type: integer
+              checkpoint:
+                type: string
+                nullable: true
+                enum: [M10, M20, M30, END]
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              team:
+                type: string
+              playerSlot:
+                type: integer
+                format: int64
+              item:
+                type: string
+              kind:
+                type: string
+                enum: [MAGIC, PHYSICAL, HP, STATUS]
+              atSecond:
+                type: integer
+    DefenseStatsResponse:
+      type: object
+      properties:
+        mode:
+          type: integer
+        checkpoint:
+          type: string
+        windowMonths:
+          type: integer
+        buckets:
+          type: array
+          items:
+            $ref: '#/components/schemas/DefenseBucket'
+        rawBuckets:
+          type: array
+          items:
+            $ref: '#/components/schemas/DefenseBucket'
+    DefenseBucket:
+      type: object
+      properties:
+        from:
+          type: number
+        to:
+          type: number
+        games:
+          type: integer
+          format: int64
+        wins:
+          type: integer
+          format: int64
     SkillStatMatchResponse:
       type: object
       properties:
