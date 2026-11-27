@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.replay.smoke;
 
 import com.ako.dbuff.dao.repo.DefenseStatRepository;
+import com.ako.dbuff.dao.repo.MissingDefenseItemRepo;
 import com.ako.dbuff.dao.repo.SkillCountRepository;
 import com.ako.dbuff.service.replay.report.CompositionSection;
 import com.ako.dbuff.service.replay.report.DeathSection;
@@ -55,7 +56,8 @@ import org.springframework.test.context.TestPropertySource;
   ItemBuildSection.class,
   CompositionSection.class,
   SkillCountRepository.class,
-  DefenseStatRepository.class
+  DefenseStatRepository.class,
+  MissingDefenseItemRepo.class
 })
 @TestPropertySource(properties = "replay.processing.enabled=true")
 @ExtendWith(LocalDatabase.class)
