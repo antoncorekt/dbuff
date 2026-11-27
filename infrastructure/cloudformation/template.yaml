@@ -30,6 +30,18 @@ Parameters:
     NoEcho: true
     Description: OpenAI API key
 
+  AnthropicApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Anthropic API key for the Discord ask feature (optional)
+
+  AskDbPassword:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Password for the read-only dbuff_ask database role (optional)
+
   DiscordBotToken:
     Type: String
     NoEcho: true
@@ -62,8 +74,12 @@ Parameters:
       access (Discord is outbound, deploy health checks use localhost), so this can be narrowed to
       your own IP or closed down without affecting it.
 
-# ---------- VPC ----------
+Conditions:
+  HasAnthropicKey: !Not [!Equals [!Ref AnthropicApiKey, '']]
+  HasAskDbPassword: !Not [!Equals [!Ref AskDbPassword, '']]
+
 Resources:
+  # ---------- VPC ----------
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -187,6 +203,24 @@ Resources:
       Type: String
       Value: !Ref OpenAiApiKey
       Description: OpenAI API key
+
+  SsmAnthropicApiKey:
+    Type: AWS::SSM::Parameter
+    Condition: HasAnthropicKey
+    Properties:
+      Name: /dbuff/ANTHROPIC_API_KEY
+      Type: String
+      Value: !Ref AnthropicApiKey
+      Description: Anthropic API key
+
+  SsmAskDbPassword:
+    Type: AWS::SSM::Parameter
+    Condition: HasAskDbPassword
+    Properties:
+      Name: /dbuff/ASK_DB_PASSWORD
+      Type: String
+      Value: !Ref AskDbPassword
+      Description: Password for the read-only dbuff_ask database role
 
   SsmDiscordBotToken:
     Type: AWS::SSM::Parameter
@@ -392,8 +426,29 @@ Resources:
           DOTA_API_KEY=$(aws ssm get-parameter --name /dbuff/DOTA_API_KEY --region $REGION --query 'Parameter.Value' --output text)
           SCRAPPER_API_KEY=$(aws ssm get-parameter --name /dbuff/SCRAPPER_API_KEY --region $REGION --query 'Parameter.Value' --output text)
           OPENAI_API_KEY=$(aws ssm get-parameter --name /dbuff/OPENAI_API_KEY --region $REGION --query 'Parameter.Value' --output text)
+          ANTHROPIC_API_KEY=$(aws ssm get-parameter --name /dbuff/ANTHROPIC_API_KEY --region $REGION --query 'Parameter.Value' --output text 2>/dev/null || true)
+          ASK_DB_PASSWORD=$(aws ssm get-parameter --name /dbuff/ASK_DB_PASSWORD --region $REGION --query 'Parameter.Value' --output text 2>/dev/null || true)
           DISCORD_BOT_TOKEN=$(aws ssm get-parameter --name /dbuff/DISCORD_BOT_TOKEN --region $REGION --query 'Parameter.Value' --output text)
           GOOGLE_VISION_CREDENTIALS_B64=$(aws ssm get-parameter --name /dbuff/GOOGLE_VISION_CREDENTIALS_B64 --region $REGION --query 'Parameter.Value' --output text)
+
+          # Read-only role for the ask sql_query tool; mirrors infrastructure/sql/ask-role.sql
+          if [ -n "$ASK_DB_PASSWORD" ]; then
+            export ASK_DB_PASSWORD
+            sudo --preserve-env=ASK_DB_PASSWORD -u postgres psql -d dbuff -v ON_ERROR_STOP=1 <<'ASKSQLEOF'
+          \set ask_password `printenv ASK_DB_PASSWORD`
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'dbuff_ask') THEN
+              CREATE ROLE dbuff_ask LOGIN;
+            END IF;
+          END
+          $$;
+
+          ALTER ROLE dbuff_ask PASSWORD :'ask_password';
+          ALTER ROLE dbuff_ask SET default_transaction_read_only = on;
+          GRANT CONNECT ON DATABASE dbuff TO dbuff_ask;
+          ASKSQLEOF
+          fi
 
           # Prepare directories
           mkdir -p /opt/dbuff /var/log/dbuff
@@ -510,6 +565,8 @@ Resources:
           Environment=DOTA_API_KEY=$DOTA_API_KEY
           Environment=SCRAPPER_API_KEY=$SCRAPPER_API_KEY
           Environment=OPENAI_API_KEY=$OPENAI_API_KEY
+          Environment=ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+          Environment=ASK_DB_PASSWORD=$ASK_DB_PASSWORD
           Environment=DISCORD_BOT_TOKEN=$DISCORD_BOT_TOKEN
           Environment=GOOGLE_VISION_CREDENTIALS_PATH=$GOOGLE_VISION_CREDENTIALS_PATH
 

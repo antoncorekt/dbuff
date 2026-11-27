@@ -63,6 +63,9 @@ public class InstanceSettingsApplier {
     if (request.getReplayReportEnabled() != null) {
       target.setReplayReportEnabled(request.getReplayReportEnabled());
     }
+    if (request.getAskEnabled() != null) {
+      target.setAskEnabled(request.getAskEnabled());
+    }
     if (request.getReportDetail() != null) {
       target.setReportDetail(parseDetail(request.getReportDetail()));
     }

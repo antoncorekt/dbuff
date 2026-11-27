@@ -1,7 +1,7 @@
 package com.ako.dbuff.service.discord.command.adapter;
 
 /** Shared naming rules for Discord objects created by the command layer. */
-final class DiscordNames {
+public final class DiscordNames {
 
   /** Discord truncates thread names beyond this. */
   private static final int MAX_THREAD_NAME_LENGTH = 100;
@@ -15,7 +15,7 @@ final class DiscordNames {
    * @param rawName the desired thread name
    * @return a name Discord will accept
    */
-  static String sanitizeThreadName(String rawName) {
+  public static String sanitizeThreadName(String rawName) {
     String name = rawName == null ? "DBuff" : rawName.replaceAll("\\s+", " ").trim();
     if (name.isEmpty()) {
       name = "DBuff";
