@@ -732,6 +732,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
             "items",
             "outliers",
             "behaviour",
+            "defense",
             "endgame");
     JsonNode json = new ObjectMapper().valueToTree(document);
     assertThat(json.at("/run/status").asText()).isEqualTo("DONE");
