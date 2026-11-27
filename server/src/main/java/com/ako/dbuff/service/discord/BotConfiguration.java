@@ -1,6 +1,7 @@
 package com.ako.dbuff.service.discord;
 
 import com.ako.dbuff.config.DiscordConfig;
+import com.ako.dbuff.service.ask.discord.AskMessageListener;
 import com.ako.dbuff.service.discord.command.adapter.SlashCommandAdapter;
 import com.ako.dbuff.service.discord.command.adapter.TextCommandAdapter;
 import net.dv8tion.jda.api.JDA;
@@ -13,12 +14,13 @@ import org.springframework.context.annotation.Configuration;
 public class BotConfiguration {
 
   /**
-   * Registers the four listeners that make up the whole Discord surface.
+   * Registers the five listeners that make up the whole Discord surface.
    *
    * <p>{@link SlashCommandAdapter} serves every {@code /} command and its autocomplete; {@link
    * TextCommandAdapter} keeps the legacy {@code !} forms working; {@link ScoreboardButtonListener}
    * offers scoreboard scouting on images; {@link GuildLifecycleListener} sets up servers the bot
-   * joins and winds down the ones it leaves.
+   * joins and winds down the ones it leaves; {@link AskMessageListener} answers questions in
+   * threads when the ask feature is on.
    *
    * <p>Exactly one listener may answer any given input. The old per-feature listeners were deleted
    * rather than left alongside these, because both surfaces recognised {@code !dbuf} and {@code
@@ -34,12 +36,14 @@ public class BotConfiguration {
       SlashCommandAdapter slashCommandAdapter,
       TextCommandAdapter textCommandAdapter,
       ScoreboardButtonListener scoreboardButtonListener,
-      GuildLifecycleListener guildLifecycleListener) {
+      GuildLifecycleListener guildLifecycleListener,
+      AskMessageListener askMessageListener) {
     return JDABuilder.createDefault(config.getApiKey())
         .addEventListeners(slashCommandAdapter)
         .addEventListeners(textCommandAdapter)
         .addEventListeners(scoreboardButtonListener)
         .addEventListeners(guildLifecycleListener)
+        .addEventListeners(askMessageListener)
         .enableIntents(GatewayIntent.MESSAGE_CONTENT)
         .build();
   }
