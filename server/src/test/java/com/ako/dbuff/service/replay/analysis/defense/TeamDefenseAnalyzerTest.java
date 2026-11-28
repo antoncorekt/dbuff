@@ -241,6 +241,55 @@ class TeamDefenseAnalyzerTest {
     assertThat(point.getEnemyPhysShare()).isNull();
   }
 
+  @Test
+  void zeroSampleOfMissingHeroCarriesForwardLastValidValuesAndStaysDead() {
+    ReplayPlayerTrackDomain dire = track(DIRE_SLOT, true);
+    int last = MINUTES - 1;
+    dire.getMaxHp()[last] = 0;
+    dire.getBaseArmorX10()[last] = 0;
+    dire.getBaseMagicResistX10()[last] = 0;
+    dire.getAgilityTotalX10()[last] = 0;
+    dire.getFlags()[last] = 0;
+    dire.getHpPercent()[last] = 0;
+    Mockito.when(trackRepo.findByMatchId(MATCH))
+        .thenReturn(List.of(track(RADIANT_SLOT, true), dire));
+
+    analyzer.analyze(MATCH);
+
+    PlayerDefenseTrackDomain row = trackOf(DIRE_SLOT);
+    assertThat(row.getMaxHp()[last]).isEqualTo(1000);
+    assertThat(row.getArmorX10()[last]).isEqualTo(row.getArmorX10()[last - 1]);
+    assertThat(row.getMagicResistX10()[last]).isEqualTo(250);
+    TeamDefensePointDomain end =
+        savedPoints.stream()
+            .filter(p -> p.getTeam().equals("DIRE") && "END".equals(p.getCheckpoint()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(end.getMaxHpSum()).isEqualTo(1000);
+    assertThat(end.getEhpPhys()).isPositive();
+    assertThat(end.getAlive()).isZero();
+    TeamDefensePointDomain before =
+        savedPoints.stream()
+            .filter(p -> p.getTeam().equals("DIRE") && p.getMinute() == last - 1)
+            .findFirst()
+            .orElseThrow();
+    assertThat(before.getMaxHpSum()).isEqualTo(1000);
+    assertThat(before.getAlive()).isEqualTo(1);
+  }
+
+  @Test
+  void zeroSampleWithoutEarlierValidSampleKeepsNullEhp() {
+    ReplayPlayerTrackDomain dire = track(DIRE_SLOT, true);
+    Arrays.fill(dire.getMaxHp(), 0);
+    Mockito.when(trackRepo.findByMatchId(MATCH)).thenReturn(List.of(dire));
+
+    analyzer.analyze(MATCH);
+
+    TeamDefensePointDomain point =
+        savedPoints.stream().filter(p -> p.getTeam().equals("DIRE")).findFirst().orElseThrow();
+    assertThat(point.getEhpPhys()).isNull();
+  }
+
   private int trackRepoSaved() {
     return savedTracks.size();
   }
