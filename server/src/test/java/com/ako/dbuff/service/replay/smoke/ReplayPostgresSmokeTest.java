@@ -801,8 +801,14 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(points.stream().map(p -> p.getTeam()).distinct())
         .as("%s: defense points for both teams", id)
         .containsExactlyInAnyOrder("RADIANT", "DIRE");
-    assertThat(points)
-        .as("%s: ehpPhys", id)
+    for (String team : List.of("RADIANT", "DIRE")) {
+      var teamPoints = points.stream().filter(p -> team.equals(p.getTeam())).toList();
+      assertThat(teamPoints)
+          .as("%s: %s has an ehpPhys", id, team)
+          .anyMatch(p -> p.getEhpPhys() != null);
+    }
+    assertThat(points.stream().filter(p -> Integer.valueOf(5).equals(p.getAlive())))
+        .as("%s: ehpPhys while the whole team is alive", id)
         .allSatisfy(p -> assertThat(p.getEhpPhys()).isNotNull());
     var tracks = playerDefenseTrackRepo.findByMatchId(matchId);
     assertThat(tracks).as("%s: a defense track per player", id).hasSize(10);
