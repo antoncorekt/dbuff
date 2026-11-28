@@ -81,7 +81,7 @@ public class TeamDefenseAnalyzer implements ReplayAnalyzer {
 
   @Override
   public int version() {
-    return 1;
+    return 2;
   }
 
   @Override
@@ -238,9 +238,14 @@ public class TeamDefenseAnalyzer implements ReplayAnalyzer {
     Integer flags = at(t.getFlags(), index);
     Integer hp = maxHp == null || hpPercent == null ? null : maxHp * hpPercent / 100;
     boolean alive = flags != null && (flags & 1) != 0;
-    Integer baseArmor = at(t.getBaseArmorX10(), index);
-    Integer baseMr = at(t.getBaseMagicResistX10(), index);
-    Integer agility = at(t.getAgilityTotalX10(), index);
+    int source = index;
+    if (maxHp == null || maxHp <= 0) {
+      source = lastValidIndex(t, index);
+    }
+    Integer baseArmor = at(t.getBaseArmorX10(), source);
+    Integer baseMr = at(t.getBaseMagicResistX10(), source);
+    Integer agility = at(t.getAgilityTotalX10(), source);
+    maxHp = at(t.getMaxHp(), source);
     if (baseArmor == null || baseMr == null || agility == null) {
       return new Sample(maxHp, hp, alive, null, null, null, null, null);
     }
@@ -268,6 +273,16 @@ public class TeamDefenseAnalyzer implements ReplayAnalyzer {
         DefenseMath.ehpPhysical(maxHp, armor),
         DefenseMath.ehpMagical(maxHp, mr),
         mixed);
+  }
+
+  private static int lastValidIndex(ReplayPlayerTrackDomain t, int index) {
+    for (int i = index - 1; i >= 0; i--) {
+      Integer earlier = at(t.getMaxHp(), i);
+      if (earlier != null && earlier > 0) {
+        return i;
+      }
+    }
+    return index;
   }
 
   private static Integer at(int[] values, int index) {
