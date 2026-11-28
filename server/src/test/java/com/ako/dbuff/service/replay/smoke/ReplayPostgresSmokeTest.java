@@ -180,6 +180,8 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
   @Autowired private RunePickupRepo runePickupRepo;
   @Autowired private RuneEventRepo runeEventRepo;
   @Autowired private ItemEfficiencyRepo itemEfficiencyRepo;
+  @Autowired private com.ako.dbuff.dao.repo.TeamDefensePointRepo teamDefensePointRepo;
+  @Autowired private com.ako.dbuff.dao.repo.PlayerDefenseTrackRepo playerDefenseTrackRepo;
   @Autowired private LaneAssignmentRepo laneAssignmentRepo;
   @Autowired private LaneResultRepo laneResultRepo;
   @Autowired private LaneReasonRepo laneReasonRepo;
@@ -309,6 +311,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertCreepKills(id, match.getId());
       assertRunes(id, match.getId());
       assertItemEfficiency(id, match.getId());
+      assertDefense(id, match.getId());
       assertLanes(id, match.getId());
       saveMidActivity(id, match);
       assertThat(buybackRepo.findByMatchId(match.getId())).isNotEmpty();
@@ -394,6 +397,7 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
       assertCreepKills(id, match.getId());
       assertRunes(id, match.getId());
       assertItemEfficiency(id, match.getId());
+      assertDefense(id, match.getId());
       assertLanes(id, match.getId());
       saveMidActivity(id, match);
       saveSkillPicks(id, match);
@@ -788,6 +792,21 @@ class ReplayPostgresSmokeTest extends ReplayPipelineFixture {
     assertThat(ours)
         .as("%s: last hits of all heroes against OpenDota's %d", id, theirs)
         .isGreaterThanOrEqualTo(Math.round(theirs * 0.75));
+  }
+
+  private void assertDefense(String id, long matchId) {
+    var points = teamDefensePointRepo.findByMatchId(matchId);
+    assertThat(points.stream().map(p -> p.getTeam()).distinct())
+        .as("%s: defense points for both teams", id)
+        .containsExactlyInAnyOrder("RADIANT", "DIRE");
+    assertThat(points)
+        .as("%s: ehpPhys", id)
+        .allSatisfy(p -> assertThat(p.getEhpPhys()).isNotNull());
+    var tracks = playerDefenseTrackRepo.findByMatchId(matchId);
+    assertThat(tracks).as("%s: a defense track per player", id).hasSize(10);
+    assertThat(tracks)
+        .as("%s: armorX10", id)
+        .allSatisfy(t -> assertThat(t.getArmorX10()).isNotNull().isNotEmpty());
   }
 
   /**
